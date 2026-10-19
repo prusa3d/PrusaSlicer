@@ -20,9 +20,10 @@ using SLAConfigLocation::Printer;
 using SLAConfigLocation::Material;
 using SLAConfigLocation::Print;
 using SLAConfigLocation::Object;
+using SLAConfigLocation::Project;
 
 const ConfigDefinitions& get_defs_sla() {
-    static ConfigDefinitions defs_sla({Printer, Print, Material, Object}, sla_config_init_fn);
+    static ConfigDefinitions defs_sla({Printer, Print, Material, Object, Project}, sla_config_init_fn);
     return defs_sla;
 }
 
@@ -271,11 +272,21 @@ void sla_config_init_fn(ConfigDefinitions& defs)
     def = defs.add("material_colour", typeid(std::string));
     def->location = Material;
     def->label = L("Color");
-    def->option_group = ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_MaterialProperty;
-    def->category = ConfigItemDef::Category::Filament_MaterialTemperatures;
+    // Hidden from the UI as filament_colour is. It is only the fallback of the project level
+    // resin_colour, and once that is set, editing the material color has no visible effect.
+    def->category = ConfigItemDef::Category::Hidden;
     def->gui_type = ConfigItemDef::GUIType::color;
     def->tooltip = L("This is only used in the Slic3r interface as a visual help.");
     def->init_fn = init_with("#29B2B2");
+
+    // The color of the resin used in the project, the SLA twin of extruder_colour. Empty means
+    // not resolved yet (the material color is used then).
+    def = defs.add("resin_colour", typeid(std::string));
+    def->location = Project;
+    def->label = "Resin Color";
+    def->category = ConfigItemDef::Category::Hidden;
+    def->gui_type = ConfigItemDef::GUIType::color;
+    def->init_fn = init_with("");
 
     def = defs.add("material_type", typeid(std::string));
     def->location = Material;
@@ -1274,6 +1285,7 @@ void sla_config_init_fn(ConfigDefinitions& defs)
         def->location = Print;
         def->overrides_in = Locations{ Object };
         def->row_group = L("Object elevation");
+        def->option_group = ConfigItemDef::OptionGroup::Print_Supports_SupportPillar;
         def->category = ConfigItemDef::Category::Print_Supports;
         def->gui_type = ConfigItemDef::GUIType::textfield;
         def->tooltip = L("How much the supports should lift up the supported object. "

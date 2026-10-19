@@ -1,0 +1,29 @@
+id: Zortrax Black
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Zortrax
+  material_type: Tough
+  material_colour: '#595959'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: LsuUWvhBTpuJJ36SdYGBVA
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Zortrax Black @SL1 0.025
+    id: sN2E7h8hQHK29G/1ShAF6w
+    values:
+      exposure_time: 4
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Zortrax Black @SL1 0.05
+    id: 9cfcY+akSB2HzeDFGRTK+A
+    values:
+      exposure_time: 7
+      initial_exposure_time: 35

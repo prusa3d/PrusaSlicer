@@ -68,6 +68,11 @@ class NoopUndoProvider : public IUndoProvider
     {
         return false;
     }
+
+    bool is_restoring_snapshot() const
+    {
+        return false;
+    }
 };
 
 /**
@@ -465,8 +470,13 @@ public:
      * @brief Creates PhysicalPrinter::PhysicalPrinterConfig and PrintHostData and passes it to ResultExportInteractor to start export.
      * PrintHostData copies gcode data from m_fdm_result_cache.
      * PhysicalPrinter::PhysicalPrinterConfig origin is yet to be decided.
+     * @param job_name Name stored inside of formats that have one (SL1), the stem of dest_path when empty.
      */
-    void do_result_export(const Domain::SlicingId id, const boost::filesystem::path& dest_path);
+    void do_result_export(
+        const Domain::SlicingId id,
+        const boost::filesystem::path& dest_path,
+        const std::string& job_name = {}
+    );
 
     /**
      * @brief Creates PrintHostData and passes it with the given destination to ResultExportInteractor to start upload.

@@ -133,6 +133,7 @@ void LogicalPrinterSettingsDialog::
 {
     this->update_warning();
     this->update_color_mix_visibility();
+    this->update_hw_items_visibility();
 }
 
 void LogicalPrinterSettingsDialog::on_preset_bundles_loaded()
@@ -391,7 +392,7 @@ void LogicalPrinterSettingsDialog::create_page_settings()
     m_printer_icon->set_margin({0, 5_fpx});
     m_printer_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
 
-    m_page_settings->emplace_back<Text>(_u8L("Sheet"), Render::ImguiFontType::Bold);
+    m_text_sheets = m_page_settings->emplace_back<Text>(_u8L("Sheet"), Render::ImguiFontType::Bold);
     m_combo_sheets =
         m_page_settings
             ->emplace_back<Yoga::ComboBoxListViewSelection<Domain::Preset::HwSheetConfigDef>>();
@@ -409,8 +410,8 @@ void LogicalPrinterSettingsDialog::create_page_settings()
         }
     };
 
-    Text* label = m_page_settings->emplace_back<Text>(_u8L("Nozzles"), Render::ImguiFontType::Bold);
-    label->set_margin(Margins(0, 10_fpx, 0, 0));
+    m_text_nozzles = m_page_settings->emplace_back<Text>(_u8L("Nozzles"), Render::ImguiFontType::Bold);
+    m_text_nozzles->set_margin(Margins(0, 10_fpx, 0, 0));
 
     auto validation_updated = [this](bool valid) { m_warning->set_visible(!valid); };
     m_nozzle_list_view =
@@ -465,6 +466,7 @@ void LogicalPrinterSettingsDialog::create_page_settings()
     m_color_mix_dialog->callbacks().closed = [this] { m_color_mix_button->set_checked(false); };
 
     this->update_color_mix_visibility();
+    this->update_hw_items_visibility();
 }
 
 void LogicalPrinterSettingsDialog::on_about_to_show()
@@ -488,6 +490,22 @@ void LogicalPrinterSettingsDialog::update_settings_data()
     }
 
     update_color_mix_visibility();
+    update_hw_items_visibility();
+}
+
+void LogicalPrinterSettingsDialog::update_hw_items_visibility()
+{
+    // SLA printers have neither print sheets nor nozzles to choose from.
+    bool is_fff = true;
+    if (m_project_interactor.selected_config_container_id() != Domain::INVALID_ID) {
+        is_fff = m_project_interactor.selected_config_container().print_technology()
+            == PrinterTechnology::FFF;
+    }
+
+    m_text_sheets->set_visible(is_fff);
+    m_combo_sheets->set_visible(is_fff);
+    m_text_nozzles->set_visible(is_fff);
+    m_nozzle_list_view->set_visible(is_fff);
 }
 
 void LogicalPrinterSettingsDialog::update_color_mix_visibility()

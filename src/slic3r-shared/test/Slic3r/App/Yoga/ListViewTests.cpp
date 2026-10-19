@@ -442,6 +442,37 @@ TEST_CASE_METHOD(ImGuiFixture, "ListView reset reuse, remove")
     }
 }
 
+TEST_CASE_METHOD(ImGuiFixture, "ListView reset to fewer items, items before the next frame")
+{
+    Slic3r::Biz::ObservableList<DummyState> list;
+
+    {
+        TestRootItem tree;
+
+        ListView<DummyItem, DummyState>* view =
+            tree.emplace_back<ListView<DummyItem, DummyState>>();
+        view->set_source_list(&list);
+
+        list.reset({{1}, {2}, {3}, {4}, {5}});
+        tree.process_loop_events();
+        list.reset({{1}, {2}, {3}});
+
+        // The removed items stay children until the next frame, so code iterating the items
+        // in between must use list_item_count(), not object_count().
+        CHECK(view->list_item_count() == 3);
+        CHECK(view->object_count() == 5);
+        for (size_t i = 0; i < view->list_item_count(); ++i) {
+            CHECK(view->item_at(i)->foo() == list.at(i).foo);
+        }
+        CHECK_THROWS_AS(view->item_at(3), std::out_of_range);
+
+        tree.process_loop_events();
+
+        CHECK(view->object_count() == 3);
+        compare_list_view(list, view);
+    }
+}
+
 TEST_CASE_METHOD(ImGuiFixture, "ListView ObservableList::append")
 {
     Slic3r::Biz::ObservableList<DummyState> list;

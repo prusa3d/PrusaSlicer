@@ -51,6 +51,8 @@ private:
     Yoga::Text* m_used_material_for_wipe_tower{nullptr};
     Yoga::Item* m_used_material_for_flush_row{nullptr};
     Yoga::Text* m_used_material_for_flush{nullptr};
+    Yoga::Item* m_used_material_for_supports_row{nullptr};
+    Yoga::Text* m_used_material_for_supports{nullptr};
 
     Yoga::Text* m_material_cost{nullptr};
     Yoga::Text* m_first_layer_time{nullptr};

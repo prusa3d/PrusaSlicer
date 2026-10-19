@@ -1,0 +1,42 @@
+id: FunToDo Snow White
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: FunToDo
+  material_type: Tough
+  material_colour: '#FFFFFF'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: 2TBunmJYTLGl369kJmLCeg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: FunToDo Snow White @SL1 0.025
+    id: iwCI8sikSuyTszqrXPCjKw
+    values:
+      exposure_time: 7
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: FunToDo Snow White @SL1 0.05
+    id: D9HNoMMjSUWoEUeSytyUgQ
+    values:
+      exposure_time: 10
+      initial_exposure_time: 35
+## SL1S
+- condition: printer.model == "SL1S"
+  id: +csE8CpmRYmxj7ZZEC2pYQ
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: FunToDo Snow White @SL1S 0.05
+    id: +dqfU5pIQmSm4tIlKnZkKg
+    values:
+      exposure_time: 3.3
+      initial_exposure_time: 28

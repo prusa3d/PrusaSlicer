@@ -1,0 +1,42 @@
+id: 3DM-ABS
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: 3DM
+  material_type: Tough
+  material_colour: '#FF8040'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: 8LYd7VEWT12o6TknyfWUHQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: 3DM-ABS @SL1 0.025
+    id: KgPM9r6GRsyT2vN4w3CFug
+    values:
+      exposure_time: 12
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-ABS @SL1 0.05
+    id: Dqida9r3S4mv+a6S4QlQVA
+    values:
+      exposure_time: 13
+      initial_exposure_time: 25
+## SL1S
+- condition: printer.model == "SL1S"
+  id: L7R/kUrhS42De6Jeq0sW1A
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-ABS @SL1S 0.05
+    id: dlDQg0XnTDecdndTGNW/xA
+    values:
+      exposure_time: 2.6
+      initial_exposure_time: 25

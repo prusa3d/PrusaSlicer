@@ -48,7 +48,7 @@ VoxelGrid &get_grid(Interior &interior);
 
 [[nodiscard]] indexed_triangle_set to_mesh(const Domain::SLA::DrainHole& hole);
 
-constexpr float HoleStickOutLength = 1.f;
+constexpr float HoleStickOutLength = Domain::SLA::DrainHole::stick_out_length;
 
 constexpr float IsoAtZero = 0.f;
 

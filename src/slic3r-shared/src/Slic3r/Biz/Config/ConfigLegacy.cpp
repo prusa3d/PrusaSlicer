@@ -692,6 +692,7 @@ ConfigPack convert_dynamic_print_config_to_new(Slic3rLegacy::DynamicPrintConfig&
             fill_config_box_from_legacy(cfg, out.sla_printer_settings, legacy_data);
             fill_config_box_from_legacy(cfg, out.sla_material_settings, legacy_data);
             fill_config_box_from_legacy(cfg, out.sla_print_settings, legacy_data);
+            fill_config_box_from_legacy(cfg, out.sla_project_settings, legacy_data);
             return out;
         }
     }
@@ -849,6 +850,7 @@ std::string serialize_as_legacy_config(
         boxes.emplace_back(&cfg.sla_printer_settings, -1);
         boxes.emplace_back(&cfg.sla_material_settings, -1);
         boxes.emplace_back(&cfg.sla_print_settings, -1);
+        boxes.emplace_back(&cfg.sla_project_settings, -1);
     }
 
     std::unique_ptr<Slic3rLegacy::DynamicPrintConfig> cfg_old(Slic3rLegacy::DynamicPrintConfig::new_from_defaults_keys(legacy_data.keys));

@@ -1,0 +1,29 @@
+id: Harz Labs Dental Cast Red
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Harz Labs
+  material_type: Medical
+  material_colour: '#EC0000'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: 9VQdhzDeRP+vUK/eHZpGsQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Harz Labs Dental Cast Red @SL1 0.025
+    id: ATuB3VhTRTKN+QNokwKPow
+    values:
+      exposure_time: 10
+      initial_exposure_time: 20
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Harz Labs Dental Cast Red @SL1 0.05
+    id: qIpGGbtkR6eKfZA0rbDP4g
+    values:
+      exposure_time: 13
+      initial_exposure_time: 20

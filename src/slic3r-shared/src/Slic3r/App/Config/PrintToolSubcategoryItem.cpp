@@ -98,7 +98,8 @@ void PrintToolSubcategoryItem::navigate_to_item(const Domain::ConfigItem* config
 
 void PrintToolSubcategoryItem::clear_navigation()
 {
-    for (size_t row_index = 0; row_index < m_rows_list_view->object_count(); ++row_index) {
+    // Not object_count(): rows removed by a list reset stay children until the next frame.
+    for (size_t row_index = 0; row_index < m_rows_list_view->list_item_count(); ++row_index) {
         m_rows_list_view->item_at(row_index)->clear_navigation();
     }
 }

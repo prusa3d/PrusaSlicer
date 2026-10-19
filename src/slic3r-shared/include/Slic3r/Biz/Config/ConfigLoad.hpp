@@ -32,6 +32,7 @@ enum GlobalParsingIssue {
     InvalidSLAPrinterSettings,
     InvalidSLAMaterialSettings,
     InvalidSLAPrintSettings,
+    InvalidSLAProjectSettings,
     FilamentsAndToolsCountIsNotEqual
 };
 

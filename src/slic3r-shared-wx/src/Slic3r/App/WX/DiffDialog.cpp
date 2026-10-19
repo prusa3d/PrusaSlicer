@@ -221,8 +221,8 @@ void DiffDialog::init_from_selection()
             }
             selected_frst_tool_print++;
         }
+        ASSERT(found);
     }
-    ASSERT(found);
 
     int selected_material = 0;
     found = false;

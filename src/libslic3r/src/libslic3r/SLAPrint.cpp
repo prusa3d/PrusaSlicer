@@ -23,6 +23,7 @@
 #include <boost/algorithm/string.hpp>
 #include "Slic3r/Biz/Parser/PlaceholderParser.hpp"
 #include "Slic3r/Biz/Algorithms/Scaling.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Exception.hpp"
 #include "libslic3r/InstanceTransformations.hpp"
 
@@ -109,7 +110,7 @@ sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfigView& c)
         double pillar_r = 0.5 * c.get<double>("branchingsupport_pillar_diameter");
         scfg.head_back_radius_mm = pillar_r;
         scfg.head_fallback_radius_mm =
-            0.01 * c.get<double>("branchingsupport_small_pillar_diameter_percent") * pillar_r;
+            c.get<Percentage>("branchingsupport_small_pillar_diameter_percent").get_abs_value(1.0) * pillar_r;
         scfg.head_penetration_mm = c.get<double>("branchingsupport_head_penetration");
         scfg.head_width_mm = c.get<double>("branchingsupport_head_width");
         scfg.object_elevation_mm = is_zero_elevation(c) ?
@@ -247,7 +248,13 @@ std::vector<Domain::ObjectID> SLAPrint::print_object_ids() const
 
 namespace {
 
-using StepsPerModelObjectId = std::map<ObjectID, std::set<SLAPrintObjectStep>>;
+using Step = std::variant<SLAPrintStep, SLAPrintObjectStep>;
+
+// The steps invalidated by a change of the step, including those depending on it.
+std::vector<Step> propagate(Step step);
+PrintAndObjectSteps split_steps(const std::set<Step>& steps);
+
+using StepsPerModelObjectId = std::map<ObjectID, PrintAndObjectSteps>;
 
 template <typename Set>
 AllOrSome<Set> merge (const AllOrSome<Set>& a, const AllOrSome<Set>& b) {
@@ -344,15 +351,22 @@ ModelObjectsSyncResult sync_model_objects(
             continue;
         }
 
-        std::set<SLAPrintObjectStep> invalidated_steps;
+        std::set<Step> invalidated_steps;
+        const auto invalidate = [&invalidated_steps](const SLAPrintObjectStep step) {
+            const std::vector<Step> steps{propagate(step)};
+            invalidated_steps.insert(steps.begin(), steps.end());
+        };
 
         const bool old_user_modified = model_object->sla_points_status
             == PointsStatus::UserModified;
         const bool new_user_modified = model_object_new->sla_points_status
             == PointsStatus::UserModified;
 
+        // The volumes and their transformations are the same, so the points in object
+        // coordinates differ only if the points of a volume differ.
         const bool supports_equal{
-            model_object->sla_support_points == model_object_new->sla_support_points
+            Biz::Algorithms::SlaPoints::support_points_in_object(*model_object)
+            == Biz::Algorithms::SlaPoints::support_points_in_object(*model_object_new)
         };
 
         const bool switching_to_auto_from_man{old_user_modified && !new_user_modified};
@@ -361,19 +375,20 @@ ModelObjectsSyncResult sync_model_objects(
         if (switching_to_auto_from_man
             || switching_to_man_from_auto
             || (new_user_modified && !supports_equal)) {
-            invalidated_steps.insert(slaposSupportPoints);
+            invalidate(slaposSupportPoints);
         }
 
         // Invalidate hollowing if drain holes have changed
-        if (model_object->sla_drain_holes != model_object_new->sla_drain_holes)
+        if (Biz::Algorithms::SlaPoints::drain_holes_in_object(*model_object)
+            != Biz::Algorithms::SlaPoints::drain_holes_in_object(*model_object_new))
         {
-            invalidated_steps.insert(slaposDrillHoles);
+            invalidate(slaposDrillHoles);
         }
 
         model_object->assign_copy(*model_object_new);
 
         objects.push_back(model_object);
-        reused_objects.insert({model_object->id(), invalidated_steps});
+        reused_objects.insert({model_object->id(), split_steps(invalidated_steps)});
     }
 
     ModelObjectsSyncResult result;
@@ -385,7 +400,9 @@ ModelObjectsSyncResult sync_model_objects(
         };
 
         if (reused_model_object_it != reused_objects.end()) {
-            result.invalidated_steps.object[print_object] = reused_model_object_it->second;
+            const auto& [print_steps, object_steps] = reused_model_object_it->second;
+            result.invalidated_steps.print = merge(result.invalidated_steps.print, print_steps);
+            result.invalidated_steps.object[print_object] = object_steps;
             result.reuse_candidates.insert({print_object->model_object()->id(), print_object});
         }
     }
@@ -405,9 +422,7 @@ void delete_old_model_objects(const Domain::ModelObjectPtrs& old_objects, const 
     }
 }
 
-using Step = std::variant<SLAPrintStep, SLAPrintObjectStep>;
-
-std::vector<Step> propagate(Step step)
+std::vector<Step> propagate_steps(Step step)
 {
     return std::visit(
         Domain::overloaded{
@@ -487,6 +502,26 @@ std::vector<Step> propagate(Step step)
         step
     );
 };
+
+std::vector<Step> propagate(Step step)
+{
+    std::vector<Step> result{propagate_steps(step)};
+
+    // The object steps list only the first print step they invalidate, the print steps depending
+    // on it have to go too (e.g. new slices have to be rasterized again).
+    for (size_t i = 0; i < result.size(); ++i) {
+        if (std::holds_alternative<SLAPrintStep>(result[i])) {
+            // A copy, the loop below appends to the result.
+            const SLAPrintStep print_step{std::get<SLAPrintStep>(result[i])};
+            for (const Step& dependent : propagate_steps(print_step)) {
+                if (std::ranges::find(result, dependent) == result.end()) {
+                    result.push_back(dependent);
+                }
+            }
+        }
+    }
+    return result;
+}
 
 std::vector<Step> steps(const std::vector<std::vector<Step>>& steps)
 {
@@ -596,6 +631,7 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"relative_correction_x", all_steps()},
     {"relative_correction_y", all_steps()},
     {"relative_correction_z", all_steps()},
+    {"resin_colour", steps({})},
     {"sla_archive_format", steps({propagate(slapsMergeSlicesAndEval)})},
     {"sla_output_precision", steps({propagate(slapsMergeSlicesAndEval)})},
     {"slice_closing_radius", steps({propagate(slaposObjectSlice)})},
@@ -651,7 +687,11 @@ PrintAndObjectSteps diff_to_invalidated_steps(
         const std::vector<Step>& invalidated_steps{invalidated_by.at(opt_key)};
         steps.insert(invalidated_steps.begin(), invalidated_steps.end());
     }
+    return split_steps(steps);
+}
 
+PrintAndObjectSteps split_steps(const std::set<Step>& steps)
+{
     std::set<SLAPrintStep> print_steps;
     std::set<SLAPrintObjectStep> print_object_steps;
     for (const Step& step : steps) {
@@ -887,7 +927,11 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
     }
 
     InvalidatedSteps invalidated_steps;
+    // Nothing to slice, as in FFF: the result would be empty, with nothing to export.
+    bool empty{false};
     Biz::Slicing::with_limited_instances(model, bed.model_instances, [&](){
+        // The limited model has only the printable instances of the bed.
+        empty = model.objects.empty();
         const InstanceTransformations original_transformations{
             transform_instances(model, bed.transformation.get_matrix().inverse())
         };
@@ -902,30 +946,23 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
     });
     const bool changed{!invalidated_steps.empty()};
     if (!changed) {
-        return ApplyStatus::Unchanged{};
+        return empty ? ApplyStatus::Status{ApplyStatus::Empty{}} : ApplyStatus::Unchanged{};
     }
 
     m_on_sla_result({});
 
     this->invalidate_object_steps(invalidated_steps);
 
-    std::vector<const SLAPrintObject*> objects_to_keep;
-    for (const SLAPrintObject* object : m_objects) {
-        if (object->all_steps_done()) {
-            objects_to_keep.push_back(object);
-        }
-    }
-
     for (const ObjectID id: old_ids) {
-        const auto it{std::ranges::find_if(objects_to_keep, [&](const SLAPrintObject* object) {
+        const auto it{std::ranges::find_if(m_objects, [&](const SLAPrintObject* object) {
             return object->model_object()->id() == id;
         })};
-        if (it != objects_to_keep.end()) {
-            Biz::Slicing::Sla::Object slicing_object{};
-            slicing_object.object_id = id;
-            slicing_object.instance_trafos = get_instance_trafos(**it);
-            // Sending just trafos means the object was not invalidated.
-            m_on_sla_object(slicing_object);
+        if (it != m_objects.end() && (*it)->drop_invalidated_preview()) {
+            // Send what is still valid, even of an object that was only sliced partially.
+            // Its steps that are done won't run again, so they wouldn't send it.
+            Biz::Slicing::Sla::Object& preview{*(*it)->m_preview};
+            preview.instance_trafos = get_instance_trafos(**it);
+            m_on_sla_object(preview);
         } else {
             Biz::Slicing::Sla::Object slicing_object{};
             slicing_object.object_id = id;
@@ -934,6 +971,9 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
         }
     }
 
+    if (empty) {
+        return ApplyStatus::Empty{};
+    }
     return ApplyStatus::Changed{};
 }
 
@@ -1270,6 +1310,29 @@ SLAPrintObject::SLAPrintObject(
     m_config(config)
 {}
 
+bool SLAPrintObject::drop_invalidated_preview()
+{
+    // The preview mesh is replaced by each of these steps.
+    if (!m_preview.has_value()
+        || !m_preview->mesh
+        || !is_step_done(slaposAssembly)
+        || !is_step_done(slaposHollowing)
+        || !is_step_done(slaposDrillHoles)) {
+        return false;
+    }
+
+    if (!is_step_done(slaposSupportPoints)) {
+        m_preview->support_points = nullptr;
+    }
+    if (!is_step_done(slaposSupportTree)) {
+        m_preview->support_structure = nullptr;
+    }
+    if (!is_step_done(slaposPad)) {
+        m_preview->pad = nullptr;
+    }
+    return true;
+}
+
 bool SLAPrintObject::invalidate_all_steps()
 {
     return Inherited::invalidate_all_steps() || m_print->invalidate_all_steps();
@@ -1409,18 +1472,15 @@ SLAPrintObject::get_parts_to_slice(SLAPrintObjectStep untilstep) const
 Domain::SLA::SupportPoints SLAPrintObject::transformed_support_points() const
 {
     assert(model_object());
-    auto spts = model_object()->sla_support_points;
-    Transform3f tr = trafo().cast<float>();
-    for (Domain::SLA::SupportPoint &suppt : spts) {
-        suppt.pos = tr * suppt.pos;
-    }
+    Domain::SLA::SupportPoints spts = Biz::Algorithms::SlaPoints::support_points_in_object(*model_object());
+    Domain::SLA::transform(spts, trafo());
     return spts;
 }
 
 Domain::SLA::DrainHoles SLAPrintObject::transformed_drainhole_points() const
 {
     assert(model_object());
-    Domain::SLA::DrainHoles drainholes = model_object()->sla_drain_holes; // Copy the drainholes
+    Domain::SLA::DrainHoles drainholes = Biz::Algorithms::SlaPoints::drain_holes_in_object(*model_object());
     sla::transform_drainhole_points(drainholes, trafo());
     return drainholes;
 }

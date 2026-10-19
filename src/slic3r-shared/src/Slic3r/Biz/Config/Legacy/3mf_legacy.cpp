@@ -44,6 +44,7 @@ namespace pt = boost::property_tree;
 
 #include "Slic3r/Biz/Algorithms/Geometry/Geometry.hpp"
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "Slic3r/Biz/Config/ConfigLegacy.hpp"
 #include "Slic3r/Biz/Config/Legacy/PrintConfig.hpp"
@@ -1231,17 +1232,6 @@ namespace Slic3rLegacy {
             if (obj_layer_config_ranges != m_layer_config_ranges.end())
                 model_object->layer_config_ranges = std::move(obj_layer_config_ranges->second);
 
-            // m_sla_support_points are indexed by a 1 based model object index.
-            IdToSlaSupportPointsMap::iterator obj_sla_support_points = m_sla_support_points.find(object.second + 1);
-            if (obj_sla_support_points != m_sla_support_points.end() && !obj_sla_support_points->second.empty()) {
-                model_object->sla_support_points = std::move(obj_sla_support_points->second);
-                model_object->sla_points_status = PointsStatus::UserModified;
-            }
-
-            IdToSlaDrainHolesMap::iterator obj_drain_holes = m_sla_drain_holes.find(object.second + 1);
-            if (obj_drain_holes != m_sla_drain_holes.end() && !obj_drain_holes->second.empty()) {
-                model_object->sla_drain_holes = std::move(obj_drain_holes->second);
-            }
 
             ObjectMetadata::VolumeMetadataList volumes;
             ObjectMetadata::VolumeMetadataList* volumes_ptr = nullptr;
@@ -1280,6 +1270,22 @@ namespace Slic3rLegacy {
 
             if (!_generate_volumes(*model_object, obj_geometry->second, *volumes_ptr, config_substitutions))
                 return false;
+
+            // The SLA points and holes are in object coordinates, they go to the volumes they sit on.
+            // The volumes have identity matrices and meshes in object coordinates at this point, so
+            // the points follow when the instance transformation is baked into the volumes later.
+            // m_sla_support_points are indexed by a 1 based model object index.
+            IdToSlaSupportPointsMap::iterator obj_sla_support_points = m_sla_support_points.find(object.second + 1);
+            if (obj_sla_support_points != m_sla_support_points.end() && !obj_sla_support_points->second.empty()) {
+                Biz::Algorithms::SlaPoints::set_support_points_in_object(*model_object, obj_sla_support_points->second);
+                if (Biz::Algorithms::SlaPoints::has_support_points(*model_object))
+                    model_object->sla_points_status = PointsStatus::UserModified;
+            }
+
+            IdToSlaDrainHolesMap::iterator obj_drain_holes = m_sla_drain_holes.find(object.second + 1);
+            if (obj_drain_holes != m_sla_drain_holes.end() && !obj_drain_holes->second.empty()) {
+                Biz::Algorithms::SlaPoints::set_drain_holes_in_object(*model_object, obj_drain_holes->second);
+            }
 
             // Apply cut information for object if any was loaded
             // m_cut_object_ids are indexed by a 1 based model object index.
@@ -3980,7 +3986,7 @@ namespace Slic3rLegacy {
         unsigned int count = 0;
         for (const Domain::ModelObject* object : model.objects) {
             ++count;
-            const std::vector<SupportPoint>& sla_support_points = object->sla_support_points;
+            const std::vector<SupportPoint> sla_support_points = Biz::Algorithms::SlaPoints::support_points_in_object(*object);
             if (!sla_support_points.empty()) {
                 sprintf(buffer, "object_id=%d|", count);
                 out += buffer;
@@ -4027,7 +4033,7 @@ namespace Slic3rLegacy {
         unsigned int count = 0;
         for (const Domain::ModelObject* object : model.objects) {
             ++count;
-            Domain::SLA::DrainHoles drain_holes = object->sla_drain_holes;
+            Domain::SLA::DrainHoles drain_holes = Biz::Algorithms::SlaPoints::drain_holes_in_object(*object);
 
             // The holes were placed 1mm above the mesh in the first implementation.
             // This was a bad idea and the reference point was changed in 2.3 so

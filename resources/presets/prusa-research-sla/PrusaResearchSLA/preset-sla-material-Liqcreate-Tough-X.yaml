@@ -1,0 +1,41 @@
+id: Liqcreate Tough-X
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Liqcreate
+  material_type: Engineering
+  material_colour: '#595959'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: Fpr1azg5Rn+uL+Axd5rp1Q
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Liqcreate Tough-X @SL1S 0.05
+    id: 0aTh4Xm8TyWpRT0kuOjsuw
+    values:
+      exposure_time: 12
+      initial_exposure_time: 40
+      material_correction_x: 1.005
+      material_correction_y: 1.005
+      support_pillar_diameter: 1.5
+      support_head_front_diameter: 1
+      support_head_penetration: 0.75
+      support_head_width: 3
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Liqcreate Tough-X @SL1S 0.1
+    id: O4GriFUbSeyGy4EgKw9HoA
+    values:
+      exposure_time: 15
+      initial_exposure_time: 50
+      material_correction_x: 1.005
+      material_correction_y: 1.005
+      support_pillar_diameter: 1.5
+      support_head_front_diameter: 1
+      support_head_penetration: 0.75
+      support_head_width: 3

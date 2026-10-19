@@ -51,6 +51,8 @@ struct PrintHostJobData
 
     boost::filesystem::path source_path;
     boost::filesystem::path dest_path;
+    // Name stored inside of the formats that have one (SL1); the stem of dest_path when empty.
+    std::string job_name;
 
     PrintHostAfterUploadAction post_action{PrintHostAfterUploadAction::None};
     std::string storage;

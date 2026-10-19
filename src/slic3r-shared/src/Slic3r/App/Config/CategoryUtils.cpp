@@ -49,6 +49,12 @@ Render::Icon category_render_icon(
     case Domain::ConfigItemDef::Category::Printer_CustomGCode:
         icon = Render::Icon::CustomGCode;
         break;
+    case Domain::ConfigItemDef::Category::Print_Pad:
+        icon = Render::Icon::Pad;
+        break;
+    case Domain::ConfigItemDef::Category::Print_Hollowing:
+        icon = Render::Icon::Hollowing;
+        break;
     case Domain::ConfigItemDef::Category::Print_OutputOptions:
         icon = Render::Icon::Output;
         break;
@@ -68,6 +74,9 @@ Render::Icon category_render_icon(
         break;
     case Domain::ConfigItemDef::Category::Filament_Overrides:
         icon = Render::Icon::Vector;
+        break;
+    case Domain::ConfigItemDef::Category::Filament_MaterialPrintingProfile:
+        icon = Render::Icon::Motions;
         break;
     case Domain::ConfigItemDef::Category::Printer_General:
         icon = pt == Domain::PrinterTechnology::FFF ? Render::Icon::PrinterIconMarker :

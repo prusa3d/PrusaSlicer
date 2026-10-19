@@ -23,6 +23,7 @@
 #include "Slic3r/Biz/Algorithms/Execution/ExecutionTBB.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "Slic3r/Biz/Algorithms/QuadricEdgeCollapse.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Domain/TriangleMesh.hpp"
 #include <libslic3r/SLAPrintSteps.hpp>
 #include "Slic3r/Biz/CGAL/Algorithms/MeshBoolean.hpp"
@@ -454,7 +455,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject& po, SLAPrintObjectStep st
 
             handled = true;
         } else if (step == slaposDrillHoles && is_pure_model) {
-            if (po.m_model_object->sla_drain_holes.empty()) {
+            if (!Biz::Algorithms::SlaPoints::has_drain_holes(*po.m_model_object)) {
                 // Get the last printable preview
                 return;
             } else if (can_hollow) {
@@ -508,6 +509,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject& po, SLAPrintObjectStep st
     po.m_preview = Biz::Slicing::Sla::Object {
         .object_id = po.m_model_object->id(),
         .instance_trafos = get_instance_trafos(po),
+        .object_trafo = po.trafo(),
         .mesh = std::make_shared<const TriangleMesh>(std::move(m), std::move(stats)),
         .issues = std::move(issues)
     };
@@ -802,6 +804,16 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
 
 
     po.m_supportable_mesh->zoffset = csgmesh_positive_bb(po.m_mesh_to_slice).min.z();
+
+    if (po.model_object()->sla_points_status == Domain::SLA::PointsStatus::UserModified) {
+        // There are either some points on the front-end, or the user
+        // removed them on purpose. No calculation will be done.
+        po.m_preview->support_points =
+            std::make_shared<const SupportPoints>(po.transformed_support_points());
+        po.m_supportable_mesh->pts = po.m_preview->support_points;
+        return;
+    }
+
     // Unless the user modified the points or we already did the calculation,
     // we will do the autoplacement. Otherwise we will just blindly copy the
     // frontend data into the backend cache.
@@ -852,7 +864,7 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
 
     SupportPointGeneratorData &data = po.m_support_point_generator_data; 
     SupportPoints &permanent_supports = data.permanent_supports;
-    const SupportPoints &object_supports = po.model_object()->sla_support_points;
+    const SupportPoints object_supports = Biz::Algorithms::SlaPoints::support_points_in_object(*po.model_object());
     const Transform3d& object_trafo = po.trafo();
     const AABBMesh& emesh = po.m_supportable_mesh->emesh;
     prepare_permanent_support_points(permanent_supports, object_supports, object_trafo, emesh);
@@ -970,7 +982,10 @@ void SLAPrint::Steps::generate_pad(SLAPrintObject& po)
     // AABBMesh is created in the previous step(support_points)
     po.m_supportable_mesh->pad_cfg = pcfg;
 
-    const indexed_triangle_set& tree_its = po.m_preview->support_structure->its;
+    // There is no support structure when supports are disabled.
+    static const indexed_triangle_set no_support_its;
+    const indexed_triangle_set& tree_its =
+        po.m_preview->support_structure ? po.m_preview->support_structure->its : no_support_its;
     indexed_triangle_set its = sla::create_pad(*po.m_supportable_mesh, tree_its, ctl);
     if (!validate_pad(its, po.m_supportable_mesh->pad_cfg)) {
         throw Biz::Slicing::Exception{
@@ -999,7 +1014,10 @@ void SLAPrint::Steps::slice_supports(SLAPrintObject &po) {
     ctl.stopcondition = [this]() { return canceled(); };
     ctl.cancelfn = [this]() { throw_if_canceled(); };
 
-    const indexed_triangle_set& tree_its = po.m_preview->support_structure->its;
+    // There is no support structure when supports are disabled.
+    static const indexed_triangle_set no_support_its;
+    const indexed_triangle_set& tree_its =
+        po.m_preview->support_structure ? po.m_preview->support_structure->its : no_support_its;
     const indexed_triangle_set& pad_its = po.m_preview->pad ? po.m_preview->pad->its : indexed_triangle_set{};
     float closing_radius = float(po.config().get<double>("slice_closing_radius"));
     po.m_support_slices = sla::slice(tree_its, pad_its, heights, closing_radius, ctl);

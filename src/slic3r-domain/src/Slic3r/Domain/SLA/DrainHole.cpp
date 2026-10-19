@@ -11,4 +11,16 @@ bool DrainHole::operator==(const DrainHole &sp) const
 }
 
 bool DrainHole::operator!=(const DrainHole &sp) const { return !(sp == (*this)); }
+
+void transform(DrainHoles& holes, const Transform3d& trafo)
+{
+    // Exactly as they are for the identity (common for single part objects), no rounding.
+    if (trafo.matrix() == Transform3d::Identity().matrix()) {
+        return;
+    }
+    for (DrainHole& hole : holes) {
+        hole.pos    = (trafo * hole.pos.cast<double>()).cast<float>();
+        hole.normal = (trafo.linear() * hole.normal.cast<double>()).normalized().cast<float>();
+    }
+}
 }

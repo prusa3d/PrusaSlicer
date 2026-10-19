@@ -1,6 +1,9 @@
 #pragma once
 
 #include "AbstractViewer.hpp"
+
+#include <map>
+
 #include "SegmentTemplate.hpp"
 #include "Slic3r/App/libvgcode/SlaObjectNodeTag.hpp"
 #include "Slic3r/App/Render/GeometryManager.hpp"
@@ -88,8 +91,16 @@ private:
     Scene::Node* m_main_node{nullptr};
     const Biz::Slicing::SLAResult* m_result{ nullptr };
     Scene::Transform m_bed_instance_transform{Scene::Transform::Identity()};
+    // Meshes the nodes of each object were built from, to replace the nodes when a mesh changes.
+    std::map<std::pair<size_t, SlaMeshType>, const Domain::TriangleMesh*> m_loaded_meshes;
 
 private:
+
+    // Removes the nodes and geometry of the object's mesh of the given type if the mesh changed.
+    void drop_changed_mesh(
+        size_t object_id,
+        SlaMeshType type,
+        const Domain::TriangleMesh* mesh);
 
     void build_instance_node(
         const Biz::Slicing::Sla::Object& sla_object, 

@@ -58,16 +58,10 @@ public:
     // The pairs of <z, layer_height> are packed into a 1D array.
     LayerHeightProfile      layer_height_profile;
 
-    // This vector holds the position of selected support points for SLA. The data are
-    // saved in mesh coordinates to allow using them for several instances.
-    // The format is (x, y, z, point_size, supports_island)
-    SLA::SupportPoints      sla_support_points;
-    // To keep track of where the points came from (used for synchronization between
-    // the SLA gizmo and the backend).
+    // To keep track of where the SLA support points came from (used for synchronization between
+    // the SLA gizmo and the backend). The points and the drain holes are stored with the volumes
+    // (ModelVolume::sla_support_points, ModelVolume::sla_drain_holes).
     SLA::PointsStatus       sla_points_status = SLA::PointsStatus::NoPoints;
-
-    // Holes to be drilled into the object, so resin can flow out
-    SLA::DrainHoles         sla_drain_holes;
 
     // Connectors to be added into the object before cut and are used to create a solid/negative volumes during a cut performing.
     CutConnectors           cut_connectors;
@@ -150,8 +144,6 @@ public:
     bool                    has_solid_mesh() const;
     // Detect if the object has at least one negative volume mash
     bool                    has_negative_volume_mesh() const;
-    // Detect if the object has at least one sla drain hole
-    bool                    has_sla_drain_holes() const;
     bool                    is_cut() const;
 
     double                  get_instance_min_z(size_t instance_idx) const;

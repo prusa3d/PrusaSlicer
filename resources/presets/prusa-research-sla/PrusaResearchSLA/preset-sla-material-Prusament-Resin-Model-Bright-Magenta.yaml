@@ -1,0 +1,45 @@
+id: fsvcUnzQQkmpuunlstgTAw
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Model
+  material_colour: '#FF0066'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: wynC5d3DQmmRbvqrEBRyWg
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [1, 10]
+    tilt_down_initial_speed: [layer1750, layer1750]
+    tilt_down_offset_steps: [0, 1200]
+    tilt_down_finish_speed: [move8000, move5120]
+    tilt_up_initial_speed: [move8000, move8000]
+    tilt_up_offset_steps: [600, 600]
+    tilt_up_finish_speed: [layer1750, layer1750]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Model Bright Magenta @SL1S 0.025
+    id: wGy0bu69Qt+X6c/oEk2yPA
+    values:
+      exposure_time: 2.1
+      initial_exposure_time: 5
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Model Bright Magenta @SL1S 0.05
+    id: JaltzbixTR2nHNeTnOSb2A
+    values:
+      exposure_time: 2.4
+      initial_exposure_time: 6
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Model Bright Magenta @SL1S 0.1
+    id: coy11ZH6SDykJbvwwPDP3Q
+    values:
+      exposure_time: 3.1
+      initial_exposure_time: 8

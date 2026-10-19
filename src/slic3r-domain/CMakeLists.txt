@@ -227,9 +227,11 @@ if(SLIC3R_BUILD_TESTS)
         test/Slic3r/Domain/TestUtils.cpp
         test/Slic3r/Domain/ConfigValueTests.cpp
         test/Slic3r/Domain/ConfigTests.cpp
+        test/Slic3r/Domain/ConfigDefsTests.cpp
         test/Slic3r/Domain/FDMConfigTests.cpp
         test/Slic3r/Domain/Preset/PresetTreeTests.cpp
         test/Slic3r/Domain/Preset/HwConfigTests.cpp
+        test/Slic3r/Domain/Preset/SelectedPresetTests.cpp
         test/Slic3r/Domain/SizeTests.cpp
         test/Slic3r/Domain/Preset/MatDbMatchRuleTests.cpp
     )

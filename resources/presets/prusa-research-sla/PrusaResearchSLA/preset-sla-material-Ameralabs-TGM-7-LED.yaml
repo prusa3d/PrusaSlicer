@@ -1,0 +1,63 @@
+id: Ameralabs TGM-7 LED
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Ameralabs
+  material_type: Tough
+  material_colour: '#C0C0C0'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: TPwaSmv3THqlC5lrt5hGJQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Ameralabs TGM-7 LED @SL1 0.025
+    id: sVAiv9XfQ8mVlt+LRK3jSA
+    values:
+      exposure_time: 4
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Ameralabs TGM-7 LED @SL1 0.05
+    id: RdipOdB0SHexHhRql+p7BQ
+    values:
+      exposure_time: 7
+      initial_exposure_time: 35
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Ameralabs TGM-7 LED @SL1 0.1
+    id: TSSz+FtOR4SoHvQvUZtagA
+    values:
+      exposure_time: 10
+      initial_exposure_time: 45
+## SL1S
+- condition: printer.model == "SL1S"
+  id: gjzBB7Q8Tkme3zjDLAodgg
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Ameralabs TGM-7 LED @SL1S 0.025
+    id: yyPcWUYdRnegu1+OiKi4bg
+    values:
+      exposure_time: 1.8
+      initial_exposure_time: 25
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Ameralabs TGM-7 LED @SL1S 0.05
+    id: zGxzFbrRR26TAASFP+U8gw
+    values:
+      exposure_time: 2
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Ameralabs TGM-7 LED @SL1S 0.1
+    id: RJiWuHnMR9C3A/s9RhZtGg
+    values:
+      exposure_time: 2.6
+      initial_exposure_time: 25

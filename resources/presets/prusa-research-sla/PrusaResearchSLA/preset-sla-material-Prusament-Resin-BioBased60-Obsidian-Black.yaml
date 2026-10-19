@@ -1,0 +1,66 @@
+id: Prusament Resin BioBased60 Obsidian Black
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Tough
+  material_colour: '#232323'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: GOXThFX5TaaGorssVpdLgA
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin BioBased60 Obsidian Black @SL1 0.025
+    id: FWdp/jQBQKOaOIzufXEMgw
+    values:
+      exposure_time: 10
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin BioBased60 Obsidian Black @SL1 0.05
+    id: ToilXOllTFaD65k6rhtFFg
+    values:
+      exposure_time: 12
+      initial_exposure_time: 35
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin BioBased60 Obsidian Black @SL1 0.1
+    id: Fiin3IwGQz6Sol5w2eHs9g
+    values:
+      exposure_time: 16
+      initial_exposure_time: 35
+## SL1S
+- condition: printer.model == "SL1S"
+  id: nR30cFugRhGGNSBfxgMZaQ
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [2, 15]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin BioBased60 Obsidian Black @SL1S 0.025
+    id: j95DT0frRrGR4MUAqvmNMA
+    values:
+      exposure_time: 4.7
+      initial_exposure_time: 15
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin BioBased60 Obsidian Black @SL1S 0.05
+    id: /4N7n/7PSbWl01rodwb8eA
+    values:
+      exposure_time: 6.3
+      initial_exposure_time: 19
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin BioBased60 Obsidian Black @SL1S 0.1
+    id: R4qkS+r+TbKoQ9Vl5DvIuA
+    values:
+      exposure_time: 7.9
+      initial_exposure_time: 24

@@ -152,6 +152,8 @@ private:
 
     void process_slicing_queue();
     void process_update_requests();
+    // Tells the listeners that nothing the process of the bed produced is valid any more.
+    void notify_bed_outputs_cleared(const Domain::SlicingId& id);
     int64_t get_active_processes_count() const;
     void update_status(const Domain::SlicingId id, const StatusCode status);
     void create_process(

@@ -1,0 +1,35 @@
+id: Photocentric Hard Grey
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Photocentric
+  material_type: Tough
+  material_colour: '#808080'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: Q0HTuNneTCel91NDvi3oAA
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Photocentric Hard Grey @SL1 0.05
+    id: VsvXFjFCSJev9HGlaSx9Yw
+    values:
+      exposure_time: 15
+      initial_exposure_time: 30
+## SL1S
+- condition: printer.model == "SL1S"
+  id: LIq5HIXZR12WwmsOpSkSgA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Photocentric Hard Grey @SL1S 0.05
+    id: hcr+W2owQbaaZDP9gXargg
+    values:
+      exposure_time: 5
+      initial_exposure_time: 24

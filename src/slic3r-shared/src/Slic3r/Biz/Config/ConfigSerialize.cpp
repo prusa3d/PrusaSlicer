@@ -32,6 +32,9 @@ namespace Slic3r::Domain {
 
 [[maybe_unused]] void to_json(nlohmann::ordered_json& json_value, const Domain::ConfigBox& box)
 {
+    // A box without items (e.g. SLA project settings) must still be an object, not null.
+    json_value = nlohmann::ordered_json::object();
+
     for (const ConfigItem& item : box.overrides.all_items()) {
         if (box.overrides.get(item.name())) {
             json_value[item.name()] = item;

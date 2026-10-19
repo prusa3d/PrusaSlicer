@@ -1,0 +1,63 @@
+id: PrimaCreator Tough Clear
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: PrimaCreator
+  material_type: Tough
+  material_colour: '#F8F8F8'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: EPazh6QXQpK0NmM9vQ4dsw
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: PrimaCreator Tough Clear @SL1 0.025
+    id: WyBwbvRCQaqfsffaCNmn2g
+    values:
+      exposure_time: 5
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: PrimaCreator Tough Clear @SL1 0.05
+    id: aHPmlB37R7GrZQ9RoxrWag
+    values:
+      exposure_time: 7
+      initial_exposure_time: 35
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: PrimaCreator Tough Clear @SL1 0.1
+    id: YXVKHamGRHqAF3BGkatSBw
+    values:
+      exposure_time: 13
+      initial_exposure_time: 45
+## SL1S
+- condition: printer.model == "SL1S"
+  id: o906oty+Qaar1si6GiVKbA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: PrimaCreator Tough Clear @SL1S 0.025
+    id: xALikQSQR+mKK9l17M8RPg
+    values:
+      exposure_time: 1.8
+      initial_exposure_time: 25
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: PrimaCreator Tough Clear @SL1S 0.05
+    id: pCRyCB5lTrmTKcTzQHpY6A
+    values:
+      exposure_time: 2
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: PrimaCreator Tough Clear @SL1S 0.1
+    id: mx+kWHn0To2wbMj/LjvaAw
+    values:
+      exposure_time: 2.6
+      initial_exposure_time: 25

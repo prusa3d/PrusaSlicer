@@ -70,6 +70,16 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Plater/PaintOnSupportsGizmo.cpp
         include/Slic3r/App/Plater/PaintOnSupportsDialog.hpp
         src/Slic3r/App/Plater/PaintOnSupportsDialog.cpp
+        include/Slic3r/App/Plater/SlaGizmoBase.hpp
+        src/Slic3r/App/Plater/SlaGizmoBase.cpp
+        include/Slic3r/App/Plater/SlaSupportPointsGizmo.hpp
+        src/Slic3r/App/Plater/SlaSupportPointsGizmo.cpp
+        include/Slic3r/App/Plater/SlaSupportPointsDialog.hpp
+        src/Slic3r/App/Plater/SlaSupportPointsDialog.cpp
+        include/Slic3r/App/Plater/SlaHollowGizmo.hpp
+        src/Slic3r/App/Plater/SlaHollowGizmo.cpp
+        include/Slic3r/App/Plater/SlaHollowDialog.hpp
+        src/Slic3r/App/Plater/SlaHollowDialog.cpp
         include/Slic3r/App/Plater/PaintOnSeamsGizmo.hpp
         src/Slic3r/App/Plater/PaintOnSeamsGizmo.cpp
         include/Slic3r/App/Plater/PaintOnSeamsDialog.hpp
@@ -1054,6 +1064,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/SLAResultCache.cpp
         include/Slic3r/Biz/SLAObjectCache.hpp
         src/Slic3r/Biz/SLAObjectCache.cpp
+        include/Slic3r/Biz/SLAObjectRequest.hpp
+        src/Slic3r/Biz/SLAObjectRequest.cpp
 
         include/Slic3r/Biz/UserAccount/IUserAccountListener.hpp
         include/Slic3r/Biz/UserAccount/IUserAccountSessionListener.hpp
@@ -1596,8 +1608,13 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/App/DialogNavigationTests.cpp
 
+            test/Slic3r/App/Config/CategoryUtilsTests.cpp
+
+            test/Slic3r/App/Undo/ToolStateSerializeTests.cpp
+
             test/Slic3r/App/Scene/Node.cpp
             test/Slic3r/App/Scene/Ray.cpp
+            test/Slic3r/App/Scene/ClipperTests.cpp
         test/Slic3r/App/Scene/MouseBindingScheme.cpp
 
             test/Slic3r/App/Plater/SurfaceMesh.cpp
@@ -1631,6 +1648,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/ProjectInteractorTests.cpp
             test/Slic3r/Biz/ExportGcodeTests.cpp
             test/Slic3r/Biz/Scene/SceneInteractorTests.cpp
+            test/Slic3r/Biz/SlaPointsOperationsTests.cpp
             test/Slic3r/Biz/Scene/VirtualBedPreviewTests.cpp
             test/Slic3r/Biz/WeakerPointerTests.cpp
             test/Slic3r/Biz/ObservableListSortFilterTests.cpp
@@ -1661,6 +1679,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/Slicing/GCodeUtils.cpp
             test/Slic3r/Biz/Slicing/ActionsTests.cpp
             test/Slic3r/Biz/Slicing/ListenersTests.cpp
+            test/Slic3r/Biz/Slicing/SLAObjectRequestTests.cpp
             test/Slic3r/Biz/Slicing/ThumbnailsTests.cpp
 
             test/Slic3r/Biz/Config/ConfigLegacyTests.cpp

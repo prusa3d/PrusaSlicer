@@ -358,6 +358,8 @@ std::string get_location_name(const ConfigLocation& location)
                     return "sla_material_settings";
                 case SLAConfigLocation::Object:
                     return "sla_object_settings";
+                case SLAConfigLocation::Project:
+                    return "sla_project_settings";
                 default:
                     PANIC("Unknown location");
                 }

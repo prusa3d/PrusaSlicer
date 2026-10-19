@@ -68,7 +68,9 @@ void ClipperPresenter::activate(
     const Domain::ModelInstance* selected_instance,
     Node* parent_node,
     double sla_shift,
-    BuildMeshesNodes should_build_meshes_nodes
+    BuildMeshesNodes should_build_meshes_nodes,
+    std::shared_ptr<const Domain::TriangleMesh> sla_mesh,
+    const Domain::Transformation& sla_mesh_trafo
 )
 {
     m_main_node = get_main_clipper_node(parent_node);
@@ -78,7 +80,14 @@ void ClipperPresenter::activate(
 
     if (m_clipper) {
         m_clipper->set_camera(&m_scene_provider->scene().camera());
-        m_clipper->update(selected_object, selected_instance, sla_shift, true);
+        m_clipper->update(
+            selected_object,
+            selected_instance,
+            sla_shift,
+            true,
+            std::move(sla_mesh),
+            sla_mesh_trafo
+        );
     }
 
     if (!m_main_node) {

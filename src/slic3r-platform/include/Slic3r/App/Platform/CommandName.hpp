@@ -40,6 +40,8 @@ struct CommandName
     static constexpr const char* MultiMaterialPaintingGizmo = "multi-material-painting-gizmo";
     static constexpr const char* VariableLayerHeightGizmo   = "variable-layer-height-gizmo";
     static constexpr const char* HeightRangeGizmo           = "height-range-gizmo";
+    static constexpr const char* SlaSupportPointsGizmo      = "sla-support-points-gizmo";
+    static constexpr const char* SlaHollowGizmo             = "sla-hollow-gizmo";
 
     static constexpr const char* SwitchToPlater  = "switch-to-plater";
     static constexpr const char* SwitchToPreview = "switch-to-preview";

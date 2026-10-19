@@ -40,6 +40,7 @@ using Slic3r::Domain::ConfigContainer;
 using Slic3r::Domain::ConfigItem;
 using Slic3r::Domain::ConfigPack;
 using Slic3r::Domain::ConfigPackFDM;
+using Slic3r::Domain::ConfigPackSLA;
 using Slic3r::Domain::ElementRefs;
 using Slic3r::Domain::ModelObject;
 using Slic3r::Domain::ModelVolume;
@@ -427,6 +428,8 @@ tl::expected<SelectionId, std::string> ProjectInteractor::new_project_with_prese
     config_container.mutable_selected_preset() = SelectedPreset::make(preset_metadata, config_pack);
     if (const ConfigPackFDM* config_pack_fdm = std::get_if<ConfigPackFDM>(&config_pack)) {
         config_container.project_settings() = config_pack_fdm->project;
+    } else if (const ConfigPackSLA* config_pack_sla = std::get_if<ConfigPackSLA>(&config_pack)) {
+        config_container.sla_project_settings() = config_pack_sla->sla_project_settings;
     }
 
     return do_load_project(std::move(project));
@@ -954,7 +957,11 @@ void ProjectInteractor::do_result_export_inner(const Domain::SlicingId id, Physi
     }
 }
 
-void ProjectInteractor::do_result_export(const Domain::SlicingId id, const boost::filesystem::path& dest_path)
+void ProjectInteractor::do_result_export(
+    const Domain::SlicingId id,
+    const boost::filesystem::path& dest_path,
+    const std::string& job_name
+)
 {
     set_output_dir(id.project_id, dest_path);
     set_output_extension(id.project_id, dest_path.extension().string());
@@ -970,6 +977,7 @@ void ProjectInteractor::do_result_export(const Domain::SlicingId id, const boost
         dest_path,
         PrintHost::get_export_format_from_extension(dest_path.extension().string())
     };
+    data.job_name = job_name;
     do_result_export_inner(id, std::move(config), std::move(data));
 }
 

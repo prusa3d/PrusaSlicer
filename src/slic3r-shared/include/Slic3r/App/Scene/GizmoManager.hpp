@@ -13,6 +13,7 @@
 #include "Slic3r/App/Scene/GeometryDataFactory.hpp"
 #include "Slic3r/App/Scene/MouseDragDetector.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
+#include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/App/Scene/GizmoCommandRegistry.hpp"
 #include "Slic3r/App/Scene/Clipper.hpp"
 #include "Slic3r/App/Scene/IGizmoController.hpp"
@@ -23,6 +24,10 @@
 #define DEBUG_GIZMO_MANAGER 0
 #endif
 
+
+namespace Slic3r::Biz::Preset {
+class PresetInteractor;
+}
 
 namespace Slic3r::App::Scene {
 
@@ -38,6 +43,7 @@ class GizmoManager :
     public Biz::ISelectedProjectChangedListener,
     public Biz::IProjectsChangedListener,
     public Biz::Scene::ISceneSelectionChangedListener,
+    public Biz::Preset::IPresetChangedListener,
     public IGizmoController
 {
 public:
@@ -47,6 +53,8 @@ public:
         Biz::ProjectInteractor& project_interactor,
         std::unique_ptr<MouseDragDetector> mouse_drag_detector
     );
+    // Defined in the cpp: m_preset_changed_listener_scope needs the complete PresetInteractor.
+    ~GizmoManager() override;
 
     void on_scene_mouse_event(const Platform::MouseEvent& e, const Render::ScreenInfo& screen_info);
     bool on_scene_keyboard_event(const Platform::KeyboardEvent& e);
@@ -54,6 +62,18 @@ public:
     void on_scene_selection_changed(
         Domain::SelectionId project_id,
         const Biz::Scene::ObjectSelection& selection
+    ) override;
+
+    // A different config container, or a different printer (and so possibly a different printer
+    // technology), can disable the active tool without the object selection changing.
+    void on_config_container_selection_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id
+    ) override;
+    void on_preset_selection_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        Biz::Preset::PresetItemType type
     ) override;
 
     template<typename G, typename... ArgsT>
@@ -166,6 +186,13 @@ private:
         Biz::Scene::SceneInteractor,
         GizmoManager>
         m_scene_selection_changed_listener_scope;
+    Biz::ListenerScope<
+        Biz::Preset::IPresetChangedListener,
+        Biz::Preset::PresetInteractor,
+        GizmoManager>
+        m_preset_changed_listener_scope;
+
+    void deactivate_current_tool_if_disabled();
 
     struct ProjectContext
     {

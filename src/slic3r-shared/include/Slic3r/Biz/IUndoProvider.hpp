@@ -107,6 +107,19 @@ enum class UndoSnapshotType
     HeightRangeRestart,
     HeightRangePaste,
     HeightRangeLayerHeightOverride,
+    SlaSupportPointsAdd,
+    SlaSupportPointsDelete,
+    SlaSupportPointsMove,
+    SlaSupportPointsHeadDiameter,
+    SlaSupportPointsRemoveAll,
+    SlaSupportPointsApply,
+    SlaSupportPointsAutoGenerate,
+    SlaDrainHolesAdd,
+    SlaDrainHolesDelete,
+    SlaDrainHolesMove,
+    SlaDrainHolesSize,
+    SlaDrainHolesRemoveAll,
+    SlaDrainHolesApply,
     ExecutePlugin,
     ReplaceWithStl,
     ReloadFromDisk,
@@ -136,6 +149,11 @@ public:
     virtual bool is_undo_possible() const = 0;
 
     virtual bool is_redo_possible() const = 0;
+
+    /**
+     * @brief Whether a snapshot is being restored (undo/redo) right now.
+     */
+    virtual bool is_restoring_snapshot() const = 0;
 };
 
 } // namespace Slic3r::Biz

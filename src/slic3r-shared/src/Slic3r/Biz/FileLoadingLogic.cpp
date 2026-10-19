@@ -445,6 +445,9 @@ void fix_volume_transformation(ModelVolume& volume) {
     volume.set_transformation(volume.get_matrix() * mesh_trafo.inverse());
     volume.set_mesh(std::move(mesh));
     Algorithms::ModelVolume::calculate_convex_hull(volume);
+    // The SLA points and holes are in mesh coordinates.
+    Domain::SLA::transform(volume.sla_support_points, mesh_trafo);
+    Domain::SLA::transform(volume.sla_drain_holes, mesh_trafo);
 
     // data for fix transformation is not useable anymore
     fix_opt.reset();
@@ -1044,7 +1047,7 @@ static Project convert_to_project(Loaded3MF&& loaded_3mf, IMessageDialogProvider
                 );
             }
         } else if (const auto& sla_config_pack = std::get_if<Domain::ConfigPackSLA>(&cc_data.config_pack)) {
-            // TODO: cc.project_settings() = sla_config_pack->project;
+            cc.sla_project_settings() = sla_config_pack->sla_project_settings;
         } else {
             PANIC("Unhandled variant of config pack");
         }

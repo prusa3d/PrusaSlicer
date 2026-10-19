@@ -19,11 +19,23 @@
 #include "boost/system/error_code.hpp"
 #include "boost/nowide/fstream.hpp"
 
+#include <algorithm>
+
 using namespace Slic3r::Biz;
 
 namespace Slic3r::App {
 
     void appconfig_config_init_fn(Domain::ConfigDefinitions& defs);
+
+// The default favorites of SLA printers. Configs saved before they were added get them once, see
+// AppConfig::handle_legacy_config().
+static const std::vector<std::string> sla_favorite_params{
+    "supports_enable",
+    "support_tree_type",
+    "support_points_density_relative",
+    "pad_enable",
+    "hollowing_enable"
+};
 
 AppSettings::AppSettings(const Domain::ConfigDefinitions& defs_appconfig) : ConfigBox(defs_appconfig, Domain::AppConfigLocation{}) {}
 
@@ -381,17 +393,28 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn  = []()
     {
-        return Domain::ConfigValue(
-            std::vector<std::string>{
-                "perimeters",
-                "fill_pattern",
-                "fill_density",
-                "brim_type",
-                "support_material",
-                "support_material_style"
-            }
-        );
+        // One list for both technologies, the sidebar shows the ones of the selected printer.
+        std::vector<std::string> favorites{
+            "perimeters",
+            "fill_pattern",
+            "fill_density",
+            "brim_type",
+            "support_material",
+            "support_material_style"
+        };
+        favorites.insert(favorites.end(), sla_favorite_params.begin(), sla_favorite_params.end());
+        return Domain::ConfigValue(std::move(favorites));
     };
+
+    // Whether the SLA defaults were added to favorite_params. A config without it was saved
+    // before they existed.
+    // TEMPORARY: only migrates app configs from 3.0.0-alpha11, so they get the SLA favorites
+    // added in 3.0.0-alpha13. Once configs older than 3.0.0-alpha13 are phased out, remove this
+    // option together with its handling in AppConfig::handle_legacy_config().
+    def           = defs.add("favorite_params_sla_added", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue(false); };
 
     def           = defs.add("printers_only_favorites", typeid(bool));
     def->location = Domain::AppConfigLocation{};
@@ -471,6 +494,20 @@ tl::expected<std::unique_ptr<AppConfig>, std::string> AppConfig::load_appconfig(
 
 void AppConfig::handle_legacy_config(AppConfig& app_config)
 {
+    // A stored favorite_params replaces the default, so configs saved before the SLA favorites
+    // existed would never show them. Add them once; when the user unstars them later, they stay
+    // removed. A new config has them already, so nothing is added there.
+    if (!app_config.get<bool>("favorite_params_sla_added")) {
+        auto favorites{app_config.get<std::vector<std::string>>("favorite_params")};
+        for (const std::string& key : sla_favorite_params) {
+            if (std::ranges::find(favorites, key) == favorites.end()) {
+                favorites.push_back(key);
+            }
+        }
+        app_config.set("favorite_params", favorites);
+        app_config.set("favorite_params_sla_added", true);
+    }
+
     const boost::optional<Semver> semver{Semver::parse(app_config.get<std::string>("version"))};
     if (!semver.has_value()) {
         return;

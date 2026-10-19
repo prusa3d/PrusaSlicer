@@ -1,0 +1,29 @@
+id: FunToDo Castable Blend Red
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: FunToDo
+  material_type: Casting
+  material_colour: '#EC0000'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: dmw5JhDZRC2CXJO3bqJSvw
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: FunToDo Castable Blend Red @SL1 0.025
+    id: qaaW3exoTGamoXAo72oC2g
+    values:
+      exposure_time: 10
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: FunToDo Castable Blend Red @SL1 0.05
+    id: sr/PVPwPTaKL0Jrs1Q4EaA
+    values:
+      exposure_time: 15
+      initial_exposure_time: 35

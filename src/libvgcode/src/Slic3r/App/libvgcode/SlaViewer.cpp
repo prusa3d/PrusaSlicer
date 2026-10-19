@@ -146,6 +146,7 @@ void SlaViewer::reset()
         m_model_geometry_manager.release(id);
         m_model_triangle_mesh_manager.release(id);
     }
+    m_loaded_meshes.clear();
 }
 
 void SlaViewer::reset_layers()
@@ -181,6 +182,57 @@ void SlaViewer::reset_object(const Domain::ObjectID object_id)
 
         m_model_geometry_manager.release(id);
         m_model_triangle_mesh_manager.release(id);
+    }
+    std::erase_if(m_loaded_meshes, [&](const auto& entry) { return entry.first.first == object_id.id; });
+}
+
+static Scene::AuxiliaryElementId::Type to_auxiliary_element_type(const SlaMeshType type)
+{
+    switch (type) {
+    case SlaMeshType::Object: return Scene::AuxiliaryElementId::Type::SlaMesh;
+    case SlaMeshType::Supports: return Scene::AuxiliaryElementId::Type::SlaSupports;
+    case SlaMeshType::Pad: return Scene::AuxiliaryElementId::Type::SlaPad;
+    default: return Scene::AuxiliaryElementId::Type::Volume;
+    }
+}
+
+void SlaViewer::drop_changed_mesh(
+    const size_t object_id,
+    const SlaMeshType type,
+    const Domain::TriangleMesh* mesh
+)
+{
+    const std::pair<size_t, SlaMeshType> key{object_id, type};
+    const auto it{m_loaded_meshes.find(key)};
+    const Domain::TriangleMesh* loaded_mesh{it == m_loaded_meshes.end() ? nullptr : it->second};
+    if (loaded_mesh == mesh) {
+        return;
+    }
+
+    // The mesh nodes are children of the instance nodes of the object node. The nodes of all
+    // instances share the geometry, so all of them have to go before it is released.
+    const auto is_mesh_node = [type](const Scene::Node* node) {
+        const SlaObjectNodeTag* t = node->tag_of_type<SlaObjectNodeTag>();
+        return t && t->type == type;
+    };
+    for (const auto& object_node : m_main_node->children()) {
+        const SlaObjectNodeTag* t = object_node->tag_of_type<SlaObjectNodeTag>();
+        if (t == nullptr || t->object_id != object_id || t->type != SlaMeshType::Undefined) {
+            continue;
+        }
+        for (const auto& instance_node : object_node->children()) {
+            m_scene->remove_children(is_mesh_node, instance_node.get());
+        }
+    }
+
+    const Scene::AuxiliaryElementId id{to_auxiliary_element_type(type), object_id};
+    m_model_geometry_manager.release(id);
+    m_model_triangle_mesh_manager.release(id);
+
+    if (mesh == nullptr) {
+        m_loaded_meshes.erase(key);
+    } else {
+        m_loaded_meshes[key] = mesh;
     }
 }
 
@@ -408,6 +460,11 @@ void SlaViewer::load_object(const Biz::Slicing::Sla::Object& sla_object, const S
         object_node = m_main_node->children().back().get();
     }
     ASSERT(object_node);
+
+    // The backend sends the object again whenever one of its meshes changes or goes away.
+    drop_changed_mesh(object_id, SlaMeshType::Object, sla_object.mesh.get());
+    drop_changed_mesh(object_id, SlaMeshType::Supports, sla_object.support_structure.get());
+    drop_changed_mesh(object_id, SlaMeshType::Pad, sla_object.pad.get());
 
     // add instances nodes
     for (const auto& [id, trafo] : sla_object.instance_trafos) {

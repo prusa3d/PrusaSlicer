@@ -12,6 +12,8 @@
 #include "Slic3r/Domain/TriangleMesh.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Domain/ITransformable.hpp"
+#include "Slic3r/Domain/SLA/DrainHole.hpp"
+#include "Slic3r/Domain/SLA/SupportPoint.hpp"
 
 #include <optional>
 
@@ -133,6 +135,14 @@ public:
 
     // List of mesh facets painted for fuzzy skin.
     FacetsAnnotation                    fuzzy_skin_facets;
+
+    // SLA support points placed by the user on this volume, in its mesh coordinates, so they follow
+    // every transformation of the volume. Whether they are used is decided by
+    // ModelObject::sla_points_status.
+    SLA::SupportPoints                  sla_support_points;
+
+    // SLA drain holes placed on this volume, in its mesh coordinates.
+    SLA::DrainHoles                     sla_drain_holes;
 
     // Is set only when volume is Embossed Text type
     // Contain information how to re-create volume
@@ -276,7 +286,8 @@ private:
     // Copying an existing volume, therefore this volume will get a copy of the ID assigned.
     ModelVolume(ModelObject* object, const ModelVolume& other)
         : ObjectBase(other), name(other.name), source(other.source), cut_info(other.cut_info), volume_settings(other.volume_settings), supported_facets(other.supported_facets)
-        , seam_facets(other.seam_facets), mm_segmentation_facets(other.mm_segmentation_facets), fuzzy_skin_facets(other.fuzzy_skin_facets), text_configuration(other.text_configuration), emboss_shape(other.emboss_shape)
+        , seam_facets(other.seam_facets), mm_segmentation_facets(other.mm_segmentation_facets), fuzzy_skin_facets(other.fuzzy_skin_facets)
+        , sla_support_points(other.sla_support_points), sla_drain_holes(other.sla_drain_holes), text_configuration(other.text_configuration), emboss_shape(other.emboss_shape)
         , object(object), m_mesh(other.m_mesh), m_type(other.m_type), m_convex_hull(other.m_convex_hull), m_transformation(other.m_transformation)
     {
         assert(this->id().valid());

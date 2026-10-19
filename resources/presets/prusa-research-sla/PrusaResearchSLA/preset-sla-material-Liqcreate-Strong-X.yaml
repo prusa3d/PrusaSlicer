@@ -1,0 +1,36 @@
+id: Liqcreate Strong X
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Liqcreate
+  material_type: Engineering
+  material_colour: '#C0C0C0'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: waSWCsuRR1ig7BghfWpt+A
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Liqcreate Strong X @SL1S 0.025
+    id: 0SfNSRKlSCSYxKj6oJqr5A
+    values:
+      exposure_time: 7
+      initial_exposure_time: 40
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Liqcreate Strong X @SL1S 0.05
+    id: jBXr8zX1SSaT233QWb710g
+    values:
+      exposure_time: 10
+      initial_exposure_time: 40
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Liqcreate Strong X @SL1S 0.1
+    id: jlh6172qT+eFqWx5JMDdQg
+    values:
+      exposure_time: 20
+      initial_exposure_time: 40

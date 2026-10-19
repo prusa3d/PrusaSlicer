@@ -1,7 +1,10 @@
 #include "Slic3r/App/Yoga/Validator.hpp"
 
-#include "Slic3r/Biz/I18N/I18N.hpp"
 #include <Slic3r/Assert.hpp>
+
+#include "Slic3r/Domain/Types.hpp"
+
+#include "Slic3r/Biz/I18N/I18N.hpp"
 
 #include <fmt/format.h>
 #include <cmath>
@@ -94,7 +97,10 @@ int IntValidator::from() const
 
 void IntValidator::set_from(int from)
 {
-    m_from = from;
+    if (m_from != from) {
+        m_from  = from;
+        m_value = std::clamp(m_value, m_from, m_to);
+    }
 }
 
 int IntValidator::to() const
@@ -104,7 +110,10 @@ int IntValidator::to() const
 
 void IntValidator::set_to(int to)
 {
-    m_to = to;
+    if (m_to != to) {
+        m_to    = to;
+        m_value = std::clamp(m_value, m_from, m_to);
+    }
 }
 
 DoubleValidator::DoubleValidator(double from, double to) : m_from(from), m_to(to)
@@ -119,7 +128,10 @@ double DoubleValidator::from() const
 
 void DoubleValidator::set_from(double from)
 {
-    m_from = from;
+    if (!Domain::fuzzy_compare(m_from, from)) {
+        m_from  = from;
+        m_value = std::clamp(m_value, m_from, m_to);
+    }
 }
 
 double DoubleValidator::to() const
@@ -129,7 +141,10 @@ double DoubleValidator::to() const
 
 void DoubleValidator::set_to(double to)
 {
-    m_to = to;
+    if (!Domain::fuzzy_compare(m_to, to)) {
+        m_to    = to;
+        m_value = std::clamp(m_value, m_from, m_to);
+    }
 }
 
 double DoubleValidator::value() const

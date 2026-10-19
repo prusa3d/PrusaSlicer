@@ -181,6 +181,11 @@ PrinterData get_printer_data_from_cbi(const Biz::Preset::PresetInteractor& prese
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectSelect::on_connect_action_webapp_ready(const std::string& message_data)
 {
+    if (m_project_interactor.preset_interactor().selected_printer_preset().technology()
+        == Domain::PrinterTechnology::SLA)
+    {
+        return request_compatible_printers_SLA();
+    }
     return request_compatible_printers_FFF();
 }
 
@@ -242,8 +247,40 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectSelect::request_compatible_p
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectSelect::request_compatible_printers_SLA()
 {
-    // TODO
-    return {};
+    /*
+    {
+        "printerUuid": "",
+        "printerModel": "SL1S",
+        "material": "Tough",
+        "filename": "Shape-Box_0.05mm_Tough_SL1S_1h.sl1s",
+        "multiple_beds": false
+    }
+    */
+
+    const auto filename_data = ExportPathSelect::get_export_name_data(m_project_interactor);
+    const std::string uuid = m_project_interactor.connect_message_handler().uuid_for_upload();
+    const Biz::Preset::PresetInteractor& preset_interactor = m_project_interactor.preset_interactor();
+
+    // SLA has a single material, read from its config box as the FFF filament types are.
+    std::string material_type;
+    if (const auto& material_cbis = preset_interactor.material_cbi_list(); material_cbis.size() > 0) {
+        material_type = material_cbis.at(0).find("material_type")->get<std::string>();
+    }
+
+    nlohmann::json payload = {
+        {"printerUuid", uuid},
+        {"filename", filename_data.filename},
+        {"printerModel", preset_interactor.current_printer_config().legacy_printer_model.value_or("")},
+        {"material", material_type},
+        {"multiple_beds", false} // TODO when we have multiple bed export
+    };
+
+    std::string placeholder_script = fmt::format(
+        "window._prusaConnect_v2.requestCompatiblePrinter({})",
+        payload.dump()
+    );
+
+    return {{BrowserLogicCommandType::RunScript, placeholder_script}};
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectSelect::on_webview_reload_event(const std::string& message_data)

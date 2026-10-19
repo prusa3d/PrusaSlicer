@@ -359,7 +359,13 @@ slice_and_export_selected_bed(CLIRuntime& runtime, const std::optional<std::stri
         dest_path = export_path.string();
     }
 
-    project_interactor.do_result_export(slicing_id, export_path);
+    // The result is exported under export_path and renamed to the requested output below. Formats
+    // storing their own name inside (SL1) get the one of the requested output, not export_path's.
+    std::string job_name;
+    if (output_path.has_value() && !boost::filesystem::is_directory(output_path.value())) {
+        job_name = boost::filesystem::path(output_path.value()).stem().string();
+    }
+    project_interactor.do_result_export(slicing_id, export_path, job_name);
 
     runtime.wait_until([&export_finished_listener]()
                        { return export_finished_listener.export_finished; });
@@ -762,12 +768,12 @@ static bool perform_slicing_exports(
             project_interactor.selected_config_container().selected_preset().technology();
         if (action.export_gcode && printer_technology == PrinterTechnology::SLA) {
             boost::nowide::cerr
-                << "Error: Cannot export G-code for an FFF configuration."
+                << "Error: Cannot export G-code for an SLA configuration."
                 << std::endl;
             return false;
         } else if (action.export_sla && printer_technology == PrinterTechnology::FFF) {
             boost::nowide::cerr
-                << "error: Cannot export SLA slices for a SLA configuration."
+                << "Error: Cannot export SLA slices for an FFF configuration."
                 << std::endl;
             return false;
         }

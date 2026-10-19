@@ -263,7 +263,9 @@ void load(Archive& ar, Slic3r::Domain::ModelVolume& model_volume)
        model_volume.cut_info,
        model_volume.volume_settings,
        model_volume.text_configuration,
-       model_volume.emboss_shape);
+       model_volume.emboss_shape,
+       model_volume.sla_support_points,
+       model_volume.sla_drain_holes);
 
     for (Slic3r::Domain::FacetsAnnotation* facet_annotation :
          {&model_volume.supported_facets,
@@ -291,7 +293,9 @@ void save(Archive& ar, const Slic3r::Domain::ModelVolume& model_volume)
        model_volume.cut_info,
        model_volume.volume_settings,
        model_volume.text_configuration,
-       model_volume.emboss_shape);
+       model_volume.emboss_shape,
+       model_volume.sla_support_points,
+       model_volume.sla_drain_holes);
 
     for (const Slic3r::Domain::FacetsAnnotation* facet_annotation :
          {&model_volume.supported_facets,
@@ -342,9 +346,7 @@ void load(Archive& ar, Slic3r::Domain::ModelObject& model_object)
 
     ar(model_object.object_settings,
        model_object.object_settings_sla,
-       model_object.sla_support_points,
        model_object.sla_points_status,
-       model_object.sla_drain_holes,
        model_object.origin_translation,
        model_object.m_bounding_box_approx,
        model_object.m_bounding_box_approx_valid,
@@ -381,9 +383,7 @@ void save(Archive& ar, const Slic3r::Domain::ModelObject& model_object)
 
     ar(model_object.object_settings,
        model_object.object_settings_sla,
-       model_object.sla_support_points,
        model_object.sla_points_status,
-       model_object.sla_drain_holes,
        model_object.origin_translation,
        model_object.m_bounding_box_approx,
        model_object.m_bounding_box_approx_valid,

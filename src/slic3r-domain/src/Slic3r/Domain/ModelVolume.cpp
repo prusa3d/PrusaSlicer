@@ -82,6 +82,10 @@ void ModelVolume::scale_geometry_after_creation(const Vec3f& versor)
 {
     const_cast<TriangleMesh*>(m_mesh.get())->scale(versor);
     const_cast<TriangleMesh*>(m_convex_hull.get())->scale(versor);
+    // The SLA points and holes are in mesh coordinates.
+    const Transform3d scale{Eigen::Scaling(versor.cast<double>())};
+    SLA::transform(this->sla_support_points, scale);
+    SLA::transform(this->sla_drain_holes, scale);
 }
 
 void ModelVolume::scale_geometry_after_creation(const float scale) { this->scale_geometry_after_creation(Vec3f(scale, scale, scale)); }
@@ -215,6 +219,9 @@ void ModelVolume::transform_this_mesh(const Transform3d& mesh_trafo, const bool 
     TriangleMesh convex_hull = this->get_convex_hull();
     convex_hull.transform(mesh_trafo, fix_left_handed);
     m_convex_hull = std::make_shared<TriangleMesh>(std::move(convex_hull));
+    // The SLA points and holes are in mesh coordinates.
+    SLA::transform(this->sla_support_points, mesh_trafo);
+    SLA::transform(this->sla_drain_holes, mesh_trafo);
     // Let the rest of the application know that the geometry changed, so the meshes have to be reloaded.
     this->set_new_unique_id();
 }

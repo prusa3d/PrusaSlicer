@@ -1,0 +1,36 @@
+id: Forward AM Ultracur3D ST 45
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Forward AM
+  material_type: Engineering
+  material_colour: '#595959'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: znv0jU/qQ5ePH60t8InVhA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Forward AM Ultracur3D ST 45 @SL1S 0.025
+    id: XfYN/bkbSz2rvf19Cf6U2A
+    values:
+      exposure_time: 2.5
+      initial_exposure_time: 25
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Forward AM Ultracur3D ST 45 @SL1S 0.05
+    id: GE64nhJhQiWX0YRJRDr5Tg
+    values:
+      exposure_time: 3
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Forward AM Ultracur3D ST 45 @SL1S 0.1
+    id: RltMuchnTvKO803Gr+nKTg
+    values:
+      exposure_time: 7.5
+      initial_exposure_time: 25

@@ -170,7 +170,12 @@ void PrintToolRowItem::on_colors_changed(
 
 void PrintToolRowItem::on_view_will_be_reset()
 {
-    m_tool_overrides.clear();
+    clear();
+}
+
+void PrintToolRowItem::on_view_will_be_removed()
+{
+    clear();
 }
 
 void PrintToolRowItem::on_preset_selection_changed(
@@ -379,6 +384,7 @@ void PrintToolRowItem::clear()
         m_content     = nullptr;
         m_main_button = nullptr;
         m_tool_overrides.clear();
+        m_overrides.clear();
     }
     m_tool_list_view   = nullptr;
     m_initialized_type = InitializedType::None;

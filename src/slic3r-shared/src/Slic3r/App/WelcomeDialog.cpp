@@ -614,9 +614,12 @@ public:
                         .vendor_data};
 
                 Domain::Preset::HwPrinterConfig config{printer.default_config};
-                config.sheet = Biz::Preset::from_def(
-                    vendor_data,
-                    printer.sheets.sheet_defs.at(printer.sheets.selected_sheet));
+                // SLA printers have no print sheets.
+                if (!printer.sheets.sheet_defs.empty()) {
+                    config.sheet = Biz::Preset::from_def(
+                        vendor_data,
+                        printer.sheets.sheet_defs.at(printer.sheets.selected_sheet));
+                }
                 config.tools.clear();
                 for (std::size_t selected_tool : printer.tools.selected_tools) {
                     config.tools.push_back(
@@ -749,6 +752,11 @@ public:
         }
         if (!preset) {
             return std::nullopt;
+        }
+
+        // SLA printers have no exchangeable tools, keep the default one.
+        if (config.technology != Domain::PrinterTechnology::FFF) {
+            return PrinterToAdd{config, preset->id};
         }
 
         const std::vector<Domain::Preset::HwToolConfigDef>& tool_defs{
@@ -1022,16 +1030,16 @@ public:
         title->set_font_type(Render::ImguiFontType::Bold);
         title->set_flex_shrink(0);
 
-        const std::string sheet_name{printer.config.sheet.name};
-
-        std::string nozzles;
-        for (std::size_t i{}; i < printer.config.tools.size(); ++i) {
-            nozzles += (i == 0 ? "" : ", ") + printer.config.tools[i].name;
+        std::string description;
+        if (printer.config.technology == Domain::PrinterTechnology::FFF) {
+            std::string nozzles;
+            for (std::size_t i{}; i < printer.config.tools.size(); ++i) {
+                nozzles += (i == 0 ? "" : ", ") + printer.config.tools[i].name;
+            }
+            description = fmt::format(fmt::runtime("{} sheet, {}"), printer.config.sheet.name, nozzles);
         }
 
-        auto sub_title{label->emplace_back<Text>(
-            fmt::format(fmt::runtime("{} sheet, {}"), sheet_name, nozzles)
-        )};
+        auto sub_title{label->emplace_back<Text>(description)};
         sub_title->set_text_color(
             m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled));
         sub_title->set_wrap_mode(Yoga::Text::WrapMode::Wrap);

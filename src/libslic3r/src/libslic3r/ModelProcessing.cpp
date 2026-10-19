@@ -2,6 +2,7 @@
 
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
 #include "Slic3r/Biz/Algorithms/ModelVolume.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Domain/Types.hpp"
 
@@ -125,9 +126,6 @@ void convert_units(Domain::Model& model_to, Domain::ModelObject* object_from, Co
                  conv_type == ConversionType::CONV_FROM_METER ? 1000.f : conv_type == ConversionType::CONV_TO_METER ? 0.001f : 1.f;
 
     Domain::ModelObject* new_object = model_to.add_object(*object_from);
-    new_object->sla_support_points.clear();
-    new_object->sla_drain_holes.clear();
-    new_object->sla_points_status = Domain::SLA::PointsStatus::NoPoints;
     new_object->clear_volumes();
     new_object->input_file.clear();
 
@@ -150,6 +148,9 @@ void convert_units(Domain::Model& model_to, Domain::ModelObject* object_from, Co
             vol->supported_facets.assign(volume->supported_facets);
             vol->seam_facets.assign(volume->seam_facets);
             vol->mm_segmentation_facets.assign(volume->mm_segmentation_facets);
+            // In mesh coordinates, scaled with the mesh below.
+            vol->sla_support_points = volume->sla_support_points;
+            vol->sla_drain_holes    = volume->sla_drain_holes;
 
             // Perform conversion only if the target "imperial" state is different from the current one.
             // This check supports conversion of "mixed" set of volumes, each with different "imperial" state.
@@ -170,6 +171,7 @@ void convert_units(Domain::Model& model_to, Domain::ModelObject* object_from, Co
         vol_idx++;
     }
     new_object->invalidate_bounding_box();
+    Biz::Algorithms::SlaPoints::drop_user_status_without_points(*new_object);
 
     SPDLOG_TRACE("ModelObject::convert_units - end");
 }

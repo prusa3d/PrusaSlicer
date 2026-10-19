@@ -3,7 +3,9 @@
 #include "Slic3r/App/Init.hpp"
 
 #include <cstddef>
+#include <optional>
 #include <string>
+#include <vector>
 
 #include <boost/filesystem/path.hpp>
 
@@ -20,7 +22,15 @@ struct TestProfileSet
     std::size_t tool_count{0};
 };
 
+/**
+ * @brief FFF profile sets, one per FFF printer in the preset bundle.
+ */
 const std::vector<TestProfileSet>& resolved_profile_sets();
+
+/**
+ * @brief SLA profile sets, one per SLA printer in the preset bundle.
+ */
+const std::vector<TestProfileSet>& resolved_sla_profile_sets();
 
 /**
  * @brief Unique temporary directory removed at the end of the scope.
@@ -60,5 +70,18 @@ InitParams make_params(const TestProfileSet& profile_set);
  * @brief Counts the regular files with a .gcode or .bgcode extension in the directory.
  */
 std::size_t count_gcode_files(const boost::filesystem::path& directory);
+
+/**
+ * @brief Lists the regular files with a .sl1 or .sl1s extension in the directory.
+ */
+std::vector<boost::filesystem::path> find_sla_archives(const boost::filesystem::path& directory);
+
+/**
+ * @brief Returns the content of an entry of a ZIP archive, or nullopt if it cannot be read.
+ */
+std::optional<std::string> read_zip_entry(
+    const boost::filesystem::path& archive_path,
+    const std::string& entry_name
+);
 
 } // namespace Slic3r::App::CLI::Test

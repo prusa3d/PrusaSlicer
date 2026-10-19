@@ -54,9 +54,7 @@ ModelObject::new_clone(const ModelObject& rhs, const std::vector<size_t>& instan
     new_object->input_file           = rhs.input_file;
     new_object->object_settings      = rhs.object_settings;
     new_object->object_settings_sla  = rhs.object_settings_sla;
-    new_object->sla_support_points   = rhs.sla_support_points;
     new_object->sla_points_status    = rhs.sla_points_status;
-    new_object->sla_drain_holes      = rhs.sla_drain_holes;
     new_object->layer_config_ranges  = rhs.layer_config_ranges;
     new_object->layer_height_profile = rhs.layer_height_profile;
     new_object->origin_translation   = rhs.origin_translation;
@@ -101,9 +99,7 @@ ModelObject& ModelObject::assign_copy(const ModelObject& rhs)
     this->input_file           = rhs.input_file;
     this->object_settings      = rhs.object_settings;
     this->object_settings_sla  = rhs.object_settings_sla;
-    this->sla_support_points   = rhs.sla_support_points;
     this->sla_points_status    = rhs.sla_points_status;
-    this->sla_drain_holes      = rhs.sla_drain_holes;
     this->layer_config_ranges  = rhs.layer_config_ranges;
     this->layer_height_profile = rhs.layer_height_profile;
     this->origin_translation   = rhs.origin_translation;
@@ -137,9 +133,7 @@ ModelObject& ModelObject::assign_copy(ModelObject&& rhs)
     this->input_file           = std::move(rhs.input_file);
     this->object_settings      = std::move(rhs.object_settings);
     this->object_settings_sla  = std::move(rhs.object_settings_sla);
-    this->sla_support_points   = std::move(rhs.sla_support_points);
     this->sla_points_status    = std::move(rhs.sla_points_status);
-    this->sla_drain_holes      = std::move(rhs.sla_drain_holes);
     this->layer_config_ranges  = std::move(rhs.layer_config_ranges);
     this->layer_height_profile = std::move(rhs.layer_height_profile);
     this->origin_translation   = std::move(rhs.origin_translation);
@@ -481,7 +475,6 @@ bool ModelObject::has_negative_volume_mesh() const
     return false;
 }
 
-bool ModelObject::has_sla_drain_holes() const { return !this->sla_drain_holes.empty(); }
 
 bool ModelObject::is_cut() const { return this->cut_id.valid(); }
 
@@ -546,8 +539,6 @@ void ModelObject::clone_for_cut(ModelObject** obj)
 {
     (*obj) = ModelObject::new_clone(*this);
     (*obj)->set_model(this->get_model());
-    (*obj)->sla_support_points.clear();
-    (*obj)->sla_drain_holes.clear();
     (*obj)->sla_points_status = SLA::PointsStatus::NoPoints;
     (*obj)->clear_volumes();
     (*obj)->input_file.clear();

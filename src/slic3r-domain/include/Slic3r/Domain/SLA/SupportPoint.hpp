@@ -3,6 +3,7 @@
 
 #include "Slic3r/Domain/Constants.hpp"
 #include "Slic3r/Domain/Point.hpp"
+#include "Slic3r/Domain/Types.hpp"
 
 namespace Slic3r::Domain::SLA {
 
@@ -48,5 +49,8 @@ struct SupportPoint
 
 };
 using SupportPoints = std::vector<SupportPoint>;
+
+// Moves the points by the transformation. The head radius is a physical size and stays.
+void transform(SupportPoints& points, const Transform3d& trafo);
 
 } // namespace Slic3r::Domain::SLA

@@ -1,0 +1,63 @@
+id: BlueCast X-One
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: BlueCast
+  material_type: Casting
+  material_colour: '#C0C0C0'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: hS8zFdxmQWighO5S84dUsQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: BlueCast X-One @SL1 0.025
+    id: b7HHj+MkQy2fr7H0iD3p5w
+    values:
+      exposure_time: 25
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: BlueCast X-One @SL1 0.05
+    id: cbsff0SZRmG5u9qwNf3G6g
+    values:
+      exposure_time: 27
+      initial_exposure_time: 35
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: BlueCast X-One @SL1 0.1
+    id: 5ZAeVoyHSU6QB24QAQubYg
+    values:
+      exposure_time: 30
+      initial_exposure_time: 45
+## SL1S
+- condition: printer.model == "SL1S"
+  id: web3P21lSSe+JZ/aSyxVwA
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: BlueCast X-One @SL1S 0.025
+    id: f0pgQ1cYTpKcnsPKlzDRMg
+    values:
+      exposure_time: 6
+      initial_exposure_time: 25
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: BlueCast X-One @SL1S 0.05
+    id: FCjL+ho6Qh+PCj7gDCSk5Q
+    values:
+      exposure_time: 7
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: BlueCast X-One @SL1S 0.1
+    id: rmo3Sv9hSuqs9C3tJY80oA
+    values:
+      exposure_time: 8.5
+      initial_exposure_time: 25

@@ -11,6 +11,7 @@
 
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Biz/Algorithms/LayerHeight.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Biz/Format/ProjectFileConstants.hpp"
 #include "Slic3r/Biz/Format/VirtualExtruder.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
@@ -20,6 +21,7 @@
 #include "Slic3r/Biz/Config/SelectedPresetJson.hpp"
 #include "Slic3r/Biz/Emboss/NSVGUtils.hpp" // open content of svg file
 #include "Slic3r/Domain/ConfigBoxesFDM.hpp"
+#include "Slic3r/Domain/ConfigBoxesSLA.hpp"
 #include "Slic3r/Domain/FullConfigFDM.hpp"
 #include "Slic3r/Domain/FullConfigSLA.hpp"
 #include "Slic3r/Domain/ConfigContainer.hpp"
@@ -1030,6 +1032,84 @@ void load(const json &cut_object_json, CutId &cut, Read3mfIssues& collected_issu
 }
 } // namespace CutSerialization
 
+namespace SlaSupportPointsSerialization {
+
+constexpr std::string_view POSITION = "p";          // position of support point on Object
+constexpr std::string_view HEAD_FRONT_RADIUS = "r"; // head front radius
+constexpr std::string_view IS_NEW_ISLAND = "island";        // is new island
+NamesType NAMES{{POSITION, HEAD_FRONT_RADIUS, IS_NEW_ISLAND}};
+
+json to_json(const Domain::SLA::SupportPoints &points) {
+    json r = json::array();
+    for (const Domain::SLA::SupportPoint &p : points) {
+        json p_json;
+        p_json[POSITION] = ::to_json(p.pos);
+        p_json[HEAD_FRONT_RADIUS] = p.head_front_radius;
+        if (p.is_island())
+            p_json[IS_NEW_ISLAND] = true;
+        r.push_back(std::move(p_json));
+    }
+    return r;
+}
+
+void load(const json &pts_json, Domain::SLA::SupportPoints &pts, Read3mfIssues& collected_issues) {
+    if (!pts_json.is_array()) {
+        collected_issues.add_issue(Read3mfIssue(RT::project_sla_support_points_must_be_array));
+        return;
+    }
+    pts.reserve(pts_json.size());
+    for (const json &pt_json : pts_json) {
+        if(!is_valid(pt_json, NAMES, collected_issues, RT::project_sla_support_point_unknown_property))
+            continue;
+        Domain::SLA::SupportPoint pt;
+        bool is_island = pt.is_island();
+        from_json(pt_json, POSITION,          pt.pos,               collected_issues, RT::project_sla_support_point_position_issue, true);
+        from_json(pt_json, HEAD_FRONT_RADIUS, pt.head_front_radius, collected_issues, RT::project_sla_support_point_radius_issue, true);
+        from_json(pt_json, IS_NEW_ISLAND,     is_island,            collected_issues, RT::project_sla_support_point_is_new_island_issue);
+        if (is_island)
+            pt.type = Domain::SLA::SupportPointType::island;
+        pts.push_back(pt);
+    }
+}
+} // namespace SlaSupportPointsSerialization
+
+namespace SlaDrainHolesSerialization {
+constexpr std::string_view POSITION = "position";
+constexpr std::string_view NORMAL = "normal";
+constexpr std::string_view RADIUS = "radius";
+constexpr std::string_view HEIGHT = "height";
+NamesType NAMES{{POSITION, NORMAL, RADIUS, HEIGHT}};
+json to_json(const Domain::SLA::DrainHoles &holes) {
+    json r = json::array();
+    for (const Domain::SLA::DrainHole &h : holes) {
+        json h_json;
+        h_json[POSITION] = ::to_json(h.pos);
+        h_json[NORMAL]   = ::to_json(h.normal);
+        h_json[RADIUS]   = h.radius;
+        h_json[HEIGHT]   = h.height;
+        r.push_back(std::move(h_json));
+    }
+    return r;
+}
+void from_json(const json &holes_json, Domain::SLA::DrainHoles &holes, Read3mfIssues& collected_issues) {
+    if (!holes_json.is_array()) {
+        collected_issues.add_issue(Read3mfIssue(RT::project_sla_drain_holes_must_be_array));
+        return;
+    }
+    holes.reserve(holes_json.size());
+    for (const json &hole_json : holes_json) {
+        if(!is_valid(hole_json, NAMES, collected_issues, RT::project_sla_drain_hole_unknown_property))
+            continue;
+        Domain::SLA::DrainHole hole;
+        ::from_json(hole_json, POSITION, hole.pos,    collected_issues, RT::project_sla_drain_hole_position_issue, true);
+        ::from_json(hole_json, NORMAL,   hole.normal, collected_issues, RT::project_sla_drain_hole_normal_issue, true);
+        ::from_json(hole_json, RADIUS,   hole.radius, collected_issues, RT::project_sla_drain_hole_radius_issue, true);
+        ::from_json(hole_json, HEIGHT,   hole.height, collected_issues, RT::project_sla_drain_hole_height_issue, true);
+        holes.push_back(hole);
+    }
+}
+} // namespace SlaDrainHolesSerialization
+
 namespace VolumeSerialization {
 constexpr std::string_view ID                 = "id";                // Object_id from 3mf
 constexpr std::string_view VOLUME_UUID        = "object_uuid";       // 3mf Object uuid
@@ -1039,9 +1119,11 @@ constexpr std::string_view TEXT_CONFIGURATION = "textConfiguration"; // more in 
 constexpr std::string_view SHAPE              = "shape";             // more in EmbossShapeSerialization
 constexpr std::string_view SOURCE             = "source";            // more in SourceSerialization
 constexpr std::string_view CUT_INFO           = "cutInfo";           // more in CutSerialization
+constexpr std::string_view SLA_SUPPORT_POINTS = "slaSupportPoints";  // in mesh coordinates, more in SlaSupportPointsSerialization
+constexpr std::string_view SLA_DRAIN_HOLES    = "slaDrainHoles";     // in mesh coordinates, more in SlaDrainHolesSerialization
 
 NamesType VOLUME_NAMES{{ID, VOLUME_UUID, VOLUME_TYPE, VOLUME_SETTINGS, SOURCE, 
-                        TEXT_CONFIGURATION, SHAPE, CUT_INFO}};
+                        TEXT_CONFIGURATION, SHAPE, CUT_INFO, SLA_SUPPORT_POINTS, SLA_DRAIN_HOLES}};
 
 using VolumeTypeToName = boost::bimap<ModelVolumeType, std::string_view>;
 const VolumeTypeToName volume_type_to_name = boost::assign::list_of<VolumeTypeToName::relation>
@@ -1078,6 +1160,10 @@ json volumes_to_json(const ModelVolumePtrs &volumes, const VolumeToObjectid &v2i
         add(volume_json, VOLUME_SETTINGS, nlohmann::ordered_json(volume.volume_settings));
         if (volume.is_cut_connector())
             add(volume_json, CUT_INFO, CutSerialization::cut_to_json(volume.cut_info));
+        if (!volume.sla_support_points.empty())
+            add(volume_json, SLA_SUPPORT_POINTS, SlaSupportPointsSerialization::to_json(volume.sla_support_points));
+        if (!volume.sla_drain_holes.empty())
+            add(volume_json, SLA_DRAIN_HOLES, SlaDrainHolesSerialization::to_json(volume.sla_drain_holes));
         if (!volume_json.empty())
             volumes_json.push_back(std::move(volume_json));
     }
@@ -1181,86 +1267,24 @@ void load_volume(const json &volume_json, const VolumeMap &volume_map, Read3mfIs
         for (ModelVolume *mv : mvs)
             mv->cut_info = cut_info;
     }
+
+    if (auto sla_points_json_it = volume_json.find(SLA_SUPPORT_POINTS);
+        sla_points_json_it != volume_json.end()) {
+        Domain::SLA::SupportPoints points;
+        SlaSupportPointsSerialization::load(*sla_points_json_it, points, collected_issues);
+        for (ModelVolume *mv : mvs)
+            mv->sla_support_points = points;
+    }
+
+    if (auto sla_holes_json_it = volume_json.find(SLA_DRAIN_HOLES);
+        sla_holes_json_it != volume_json.end()) {
+        Domain::SLA::DrainHoles holes;
+        SlaDrainHolesSerialization::from_json(*sla_holes_json_it, holes, collected_issues);
+        for (ModelVolume *mv : mvs)
+            mv->sla_drain_holes = holes;
+    }
 }
 } // namespace VolumeSerialization
-
-namespace SlaSupportPointsSerialization {
-
-constexpr std::string_view POSITION = "p";          // position of support point on Object
-constexpr std::string_view HEAD_FRONT_RADIUS = "r"; // head front radius
-constexpr std::string_view IS_NEW_ISLAND = "island";        // is new island
-NamesType NAMES{{POSITION, HEAD_FRONT_RADIUS, IS_NEW_ISLAND}};
-
-json to_json(const Domain::SLA::SupportPoints &points) {
-    json r = json::array();
-    for (const Domain::SLA::SupportPoint &p : points) {
-        json p_json;
-        p_json[POSITION] = ::to_json(p.pos);
-        p_json[HEAD_FRONT_RADIUS] = p.head_front_radius;
-        if (p.is_island())
-            p_json[IS_NEW_ISLAND] = true;
-        r.push_back(std::move(p_json));
-    }
-    return r;
-}
-
-void load(const json &pts_json, Domain::SLA::SupportPoints &pts, Read3mfIssues& collected_issues) {
-    if (!pts_json.is_array()) {
-        collected_issues.add_issue(Read3mfIssue(RT::project_sla_support_points_must_be_array));
-        return;
-    }
-    pts.reserve(pts_json.size());
-    for (const json &pt_json : pts_json) {
-        if(!is_valid(pt_json, NAMES, collected_issues, RT::project_sla_support_point_unknown_property))
-            continue;
-        Domain::SLA::SupportPoint pt;
-        bool is_island = pt.is_island();
-        from_json(pt_json, POSITION,          pt.pos,               collected_issues, RT::project_sla_support_point_position_issue, true);
-        from_json(pt_json, HEAD_FRONT_RADIUS, pt.head_front_radius, collected_issues, RT::project_sla_support_point_radius_issue, true);
-        from_json(pt_json, IS_NEW_ISLAND,     is_island,            collected_issues, RT::project_sla_support_point_is_new_island_issue);
-        if (is_island)
-            pt.type = Domain::SLA::SupportPointType::island;
-        pts.push_back(pt);
-    }
-}
-} // namespace SlaSupportPointsSerialization
-
-namespace SlaDrainHolesSerialization {
-constexpr std::string_view POSITION = "position";
-constexpr std::string_view NORMAL = "normal";
-constexpr std::string_view RADIUS = "radius";
-constexpr std::string_view HEIGHT = "height";
-NamesType NAMES{{POSITION, NORMAL, RADIUS, HEIGHT}};
-json to_json(const Domain::SLA::DrainHoles &holes) {
-    json r = json::array();
-    for (const Domain::SLA::DrainHole &h : holes) {
-        json h_json;
-        h_json[POSITION] = ::to_json(h.pos);
-        h_json[NORMAL]   = ::to_json(h.normal);
-        h_json[RADIUS]   = h.radius;
-        h_json[HEIGHT]   = h.height;
-        r.push_back(std::move(h_json));
-    }
-    return r;
-}
-void from_json(const json &holes_json, Domain::SLA::DrainHoles &holes, Read3mfIssues& collected_issues) {
-    if (!holes_json.is_array()) {
-        collected_issues.add_issue(Read3mfIssue(RT::project_sla_drain_holes_must_be_array));
-        return;
-    }
-    holes.reserve(holes_json.size());
-    for (const json &hole_json : holes_json) {
-        if(!is_valid(hole_json, NAMES, collected_issues, RT::project_sla_drain_hole_unknown_property))
-            continue;
-        Domain::SLA::DrainHole hole;
-        ::from_json(hole_json, POSITION, hole.pos,    collected_issues, RT::project_sla_drain_hole_position_issue, true);
-        ::from_json(hole_json, NORMAL,   hole.normal, collected_issues, RT::project_sla_drain_hole_normal_issue, true);
-        ::from_json(hole_json, RADIUS,   hole.radius, collected_issues, RT::project_sla_drain_hole_radius_issue, true);
-        ::from_json(hole_json, HEIGHT,   hole.height, collected_issues, RT::project_sla_drain_hole_height_issue, true);
-        holes.push_back(hole);
-    }
-}
-} // namespace SlaDrainHolesSerialization
 
 namespace RangesSerialization {
 
@@ -1399,14 +1423,13 @@ constexpr std::string_view OBJECT_UUID        = "object_uuid";    // Universally
 constexpr std::string_view VOLUMES            = "volumes";        // List of volume settings
 constexpr std::string_view INSTANCES          = "instances";      
 constexpr std::string_view OBJECT_SETTINGS    = "object_settings";
+constexpr std::string_view OBJECT_SETTINGS_SLA = "object_settings_sla";
 constexpr std::string_view LAYER_HEIGHT_PROFILE="layerHeightProfile";
 constexpr std::string_view RANGES             = "ranges";         // layer ranges configurations
 constexpr std::string_view CUT_OBJECT_ID      = "cutId";          // more in CutSerialization
-constexpr std::string_view SLA_SUPPORT_POINTS = "slaSupportPoints";
-constexpr std::string_view SLA_DRAIN_HOLES    = "slaDrainHoles";
 
-const NamesType OBJECT_NAMES{{ID, OBJECT_UUID, VOLUMES, INSTANCES, RANGES, CUT_OBJECT_ID, OBJECT_SETTINGS, 
-                              LAYER_HEIGHT_PROFILE, SLA_SUPPORT_POINTS, SLA_DRAIN_HOLES}};
+const NamesType OBJECT_NAMES{{ID, OBJECT_UUID, VOLUMES, INSTANCES, RANGES, CUT_OBJECT_ID, OBJECT_SETTINGS, OBJECT_SETTINGS_SLA,
+                              LAYER_HEIGHT_PROFILE}};
 
 json object_to_json(const ModelObject &object, const StoredStructure &stored_structure) {
     const ObjectToObjectid &o2id = stored_structure.objects;
@@ -1429,13 +1452,10 @@ json object_to_json(const ModelObject &object, const StoredStructure &stored_str
     if (object.is_cut())
         add(object_json, CUT_OBJECT_ID, CutSerialization::cut_to_json(object.cut_id));
     add(object_json, OBJECT_SETTINGS, object.object_settings);
+    add(object_json, OBJECT_SETTINGS_SLA, object.object_settings_sla);
     if (const Domain::ZHeightPairs &layer_height_profile = object.layer_height_profile.get();
         !layer_height_profile.empty())
         add(object_json, LAYER_HEIGHT_PROFILE, LayerHeightProfileSerialization::to_json(layer_height_profile));
-    if (!object.sla_support_points.empty())
-        add(object_json, SLA_SUPPORT_POINTS, SlaSupportPointsSerialization::to_json(object.sla_support_points));
-    if (!object.sla_drain_holes.empty())
-        add(object_json, SLA_DRAIN_HOLES, SlaDrainHolesSerialization::to_json(object.sla_drain_holes));
     return object_json;
 }
 
@@ -1513,6 +1533,18 @@ void load_objects(
             }
         }
 
+        for (ModelObject* mo_ptr : mos) {
+            if (! object_json.contains(OBJECT_SETTINGS_SLA) || ! object_json[OBJECT_SETTINGS_SLA].is_object())
+                continue;
+            Domain::SLAObjectSettings object_settings_sla;
+            auto issues = Biz::Config::load_box(object_json[OBJECT_SETTINGS_SLA], object_settings_sla);
+            mo_ptr->object_settings_sla = object_settings_sla;
+            if (! issues.empty()) {
+                // TODO Handle errors.
+                // RT issue = RT::project_object_configuration_issue;
+            }
+        }
+
         ModelObject &mo = *mos.front(); // mos is not empty it is checked before
         Domain::ModelObjectPtrs mos_(mos.begin() + 1, mos.end()); // without first model object
         if (auto ranges_json = object_json.find(RANGES);
@@ -1527,17 +1559,10 @@ void load_objects(
             for (auto mo_ : mos_) // copy into other objects
                 mo_->layer_height_profile.set(mo.layer_height_profile.get());
         }
-        if (auto sla_points_json = object_json.find(SLA_SUPPORT_POINTS);
-            sla_points_json != object_json.end()) {
-            SlaSupportPointsSerialization::load(*sla_points_json, mo.sla_support_points, collected_issues);
-            for (auto mo_ : mos_) // copy into other objects
-                mo_->sla_support_points = mo.sla_support_points;
-        }
-        if (auto sla_holes_json = object_json.find(SLA_DRAIN_HOLES);
-            sla_holes_json != object_json.end()) {
-            SlaDrainHolesSerialization::from_json(*sla_holes_json, mo.sla_drain_holes, collected_issues);
-            for (auto mo_ : mos_) // copy into other objects
-                mo_->sla_drain_holes = mo.sla_drain_holes;
+        // Only user modified points are stored, the generated ones stay in the backend.
+        for (ModelObject* mo_ptr : mos) {
+            if (Biz::Algorithms::SlaPoints::has_support_points(*mo_ptr))
+                mo_ptr->sla_points_status = Domain::SLA::PointsStatus::UserModified;
         }
         if (auto cut_object_json = object_json.find(CUT_OBJECT_ID);
             cut_object_json != object_json.end()) {

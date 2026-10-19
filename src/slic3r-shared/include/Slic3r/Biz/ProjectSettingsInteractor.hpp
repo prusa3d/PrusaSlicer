@@ -32,9 +32,10 @@ struct WipingVolumesData {
 };
 
 /**
- * @brief Manages per-config-container project settings, including the extruder slot color map.
+ * @brief Manages per-config-container project settings, including the material slot color map
+ *        (FFF extruder_colour, SLA resin_colour).
  *
- * Invariant: no entry in extruder_colour is ever an empty string.
+ * Invariant: no stored color is ever an empty string once resolved.
  */
 class ProjectSettingsInteractor :
     public ISelectedConfigContainerChangedListener,
@@ -46,7 +47,7 @@ public:
 
     /**
      * @brief Returns current colors for the given container (for initial UI population).
-     * @return Empty vector if the container is not found or is not FDM.
+     * @return Empty vector if the container is not found.
      */
     std::vector<Domain::ColorRGB> get_colors(
         Domain::SelectionId project_id,
@@ -161,7 +162,8 @@ private:
     /**
      * @brief Resolve a color for a slot via the priority chain.
      *
-     * Priority: MDB (via uuid) → filament_colour preset → hardcoded palette.
+     * Priority: MDB (via uuid) → material preset color (filament_colour / material_colour)
+     *           → hardcoded palette.
      * Never returns an empty string.
      *
      * @param project_id          Project containing the config container.
@@ -177,7 +179,7 @@ private:
     ) const;
 
     /**
-     * @brief Read filament_colour from the resolved preset for the given slot.
+     * @brief Read the material preset color (filament_colour / material_colour) for the slot.
      * @return Empty string if no preset is loaded for the slot.
      */
     std::string preset_color(

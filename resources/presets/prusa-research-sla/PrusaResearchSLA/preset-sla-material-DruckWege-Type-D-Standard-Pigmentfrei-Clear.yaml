@@ -1,0 +1,29 @@
+id: DruckWege Type D Standard Pigmentfrei Clear
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: DruckWege
+  material_type: Model
+  material_colour: '#F8F8F8'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: D570mf8wSiKTk23v2d4L9w
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: DruckWege Type D Standard Pigmentfrei Clear @SL1S 0.025
+    id: XuA7e5t6ToKdaRXDCsdgKQ
+    values:
+      exposure_time: 1.8
+      initial_exposure_time: 15
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: DruckWege Type D Standard Pigmentfrei Clear @SL1S 0.05
+    id: CTTMem7kRyusYRquz33yEg
+    values:
+      exposure_time: 2
+      initial_exposure_time: 15

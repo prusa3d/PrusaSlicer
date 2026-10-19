@@ -17,7 +17,6 @@
 #include "Slic3r/Biz/CGAL/Algorithms/CutSurface.hpp" // use surface cuts
 
 // #include "libslic3r/Format/OBJ.hpp" // load_obj for default mesh
-// #include <libslic3r/SLA/ReprojectPointsOnMesh.hpp>
 
 #include "tl/expected.hpp"
 

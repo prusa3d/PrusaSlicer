@@ -42,8 +42,6 @@ ConfigItemSpinBox::ConfigItemSpinBox(
             set_item_value(val.value());
         }
     };
-
-    set_tooltip(ConfigItemUtils::config_item_tooltip(*m_state));
     m_tooltip->set_text_wrap(true);
     m_tooltip->content_item()->set_width(350);
 
@@ -57,11 +55,15 @@ int ConfigItemSpinBox::value() const
 
 void ConfigItemSpinBox::on_data_update()
 {
+    set_tooltip(ConfigItemUtils::config_item_tooltip(*m_state));
+
     if (mixed()) {
         set_override_label(Biz::_u8L("Mixed"));
         set_font_type(Render::ImguiFontType::Italic);
         return;
     }
+    m_value_validator->set_from(m_state->def().min.value_or(std::numeric_limits<int>::min()));
+    m_value_validator->set_to(m_state->def().max.value_or(std::numeric_limits<int>::max()));
     m_value_validator->set_units(m_state->def().units);
 
     set_override_label({});

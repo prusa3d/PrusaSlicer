@@ -60,6 +60,8 @@ class RotationGizmo;
 class ScaleGizmo;
 class PlaceOnFaceGizmo;
 class PaintOnSupportsGizmo;
+class SlaSupportPointsGizmo;
+class SlaHollowGizmo;
 class PaintOnSeamsGizmo;
 class PaintOnFuzzySkinGizmo;
 class MultiMaterialPaintingGizmo;
@@ -224,6 +226,8 @@ private:
     ToolBarButton* m_toolbar_simplify                = nullptr;
     ToolBarButton* m_toolbar_arrange                 = nullptr;
     ToolBarButton* m_toolbar_paint_on_supports       = nullptr;
+    ToolBarButton* m_toolbar_sla_support_points      = nullptr;
+    ToolBarButton* m_toolbar_sla_hollow              = nullptr;
     ToolBarButton* m_toolbar_paint_on_seams          = nullptr;
     ToolBarButton* m_toolbar_paint_on_fuzzy_skin     = nullptr;
     ToolBarButton* m_toolbar_multi_material_painting = nullptr;
@@ -242,6 +246,8 @@ private:
     ArrangeGizmo* m_arrange_gizmo                               = nullptr;
     SimplifyGizmo* m_simplify_gizmo                             = nullptr;
     PaintOnSupportsGizmo* m_paint_on_supports_gizmo             = nullptr;
+    SlaSupportPointsGizmo* m_sla_support_points_gizmo           = nullptr;
+    SlaHollowGizmo* m_sla_hollow_gizmo                          = nullptr;
     PaintOnSeamsGizmo* m_paint_on_seams_gizmo                   = nullptr;
     PaintOnFuzzySkinGizmo* m_paint_on_fuzzy_skin_gizmo          = nullptr;
     MultiMaterialPaintingGizmo* m_multi_material_painting_gizmo = nullptr;

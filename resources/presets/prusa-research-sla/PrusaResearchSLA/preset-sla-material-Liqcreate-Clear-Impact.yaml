@@ -1,0 +1,36 @@
+id: Liqcreate Clear Impact
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Liqcreate
+  material_type: Engineering
+  material_colour: '#F8F8F8'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: y/yB7U4HT02+JQ8NkAXr4g
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Liqcreate Clear Impact @SL1S 0.025
+    id: 4a4615jwQjCdUQsSC7MbSQ
+    values:
+      exposure_time: 7
+      initial_exposure_time: 40
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Liqcreate Clear Impact @SL1S 0.05
+    id: jwI61YtBRA+iW9lIxyRHxg
+    values:
+      exposure_time: 10
+      initial_exposure_time: 40
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Liqcreate Clear Impact @SL1S 0.1
+    id: w0mfdIfqSKSRBuH6srJK1w
+    values:
+      exposure_time: 20
+      initial_exposure_time: 40

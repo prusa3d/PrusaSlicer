@@ -6,6 +6,7 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/SLA/Hollowing.hpp"
 #include "Slic3r/Biz/Algorithms/MeshSplitImpl.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 
 namespace Slic3r { namespace csg {
 
@@ -98,7 +99,7 @@ void model_to_csgmesh(const Domain::ModelObject &mo,
     }
 
     if (do_drillholes) {
-        Domain::SLA::DrainHoles drainholes = mo.sla_drain_holes; // Copy the drainholes
+        Domain::SLA::DrainHoles drainholes = Biz::Algorithms::SlaPoints::drain_holes_in_object(mo);
         sla::transform_drainhole_points(drainholes, trafo);
 
         for (const Domain::SLA::DrainHole &dhole : drainholes) {
