@@ -18,10 +18,10 @@ struct ExpectedToolResult
 struct ExpectedFeederResult
 {
     Domain::Preset::HwModel model;
-    Domain::Preset::FeatureValueMap features;
 };
 
 using ExpectedToolResults = std::vector<ExpectedToolResult>;
+using ExpectedFeederResults = std::map<Domain::Preset::Address, ExpectedFeederResult>;
 
 struct ExpectedPrinterResult
 {
@@ -29,9 +29,10 @@ struct ExpectedPrinterResult
     Domain::PrinterTechnology technology{Domain::PrinterTechnology::FFF};
     uint8_t tool_count{1};
     ExpectedToolResults tools;
+    ExpectedFeederResults feeders;
 };
 
 using TestDesc = std::pair<TestInput, ExpectedPrinterResult>;
 
-std::vector<TestDesc> create_test_desc(bool remove_hardend_feature=false);
+std::vector<TestDesc> create_test_desc(bool remove_external_features=false);
 } // namespace Slic3r::Biz::Preset::ConnectJsonTestUtils

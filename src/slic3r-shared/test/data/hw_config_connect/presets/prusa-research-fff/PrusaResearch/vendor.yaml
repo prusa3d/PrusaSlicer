@@ -681,24 +681,13 @@ features:
 ---
 kind: feeder
 technology: FFF
-id: mmu3_32b
+id: mmu3
 name: MMU3
-condition: printer.base_model=~/(COREONE|MK4)/ #and (tool.nozzle_diameter == 0.4 or tool.nozzle_diameter == 0.6) and ! (tool.nozzle_diameter == 0.6 and tool.nozzle_high_flow)
+condition: printer.base_model=~/(COREONE|MK4)/ or printer.model=~/(MK3S|MK3.5)/
 feeder_type: mmu
 model:
   base_model: MMU3
-  model: MMU3_32bit
-slot_count: 5
----
-kind: feeder
-technology: FFF
-id: mmu3_8b
-name: MMU3 8bit
-condition: printer.model=~/(MK3S|MK3.5)/ #and (tool.nozzle_diameter == 0.25 or tool.nozzle_diameter == 0.4 or tool.nozzle_diameter == 0.6)
-feeder_type: mmu
-model:
-  base_model: MMU3
-  model: MMU3_8bit
+  model: MMU3
 slot_count: 5
 ---
 kind: feeder
@@ -896,7 +885,7 @@ legacy_printer_model: [COREONELMMU3]
 tools:
 - tool: '0.4'
 feeders:
-- feeder: mmu3_32b
+- feeder: mmu3
   address: [0]
 sheet: satin
 ---
@@ -926,7 +915,7 @@ legacy_printer_model: [COREONEMMU3]
 tools:
 - tool: '0.4'
 feeders:
-- feeder: mmu3_32b
+- feeder: mmu3
   address: [0]
 sheet: satin
 ---
@@ -995,7 +984,7 @@ legacy_printer_model: [MK4ISMMU3]
 tools:
   - tool: '0.4'
 feeders:
-  - feeder: mmu3_32b
+  - feeder: mmu3
     address: [0]
 sheet: satin
 ---
@@ -1016,7 +1005,7 @@ legacy_printer_model: [MK4SMMU3]
 tools:
   - tool: '0.4'
 feeders:
-  - feeder: mmu3_32b
+  - feeder: mmu3
     address: [0]
 sheet: satin
 ---
@@ -1037,7 +1026,7 @@ legacy_printer_model: [MK3.9MMU3]
 tools:
   - tool: '0.4'
 feeders:
-  - feeder: mmu3_32b
+  - feeder: mmu3
     address: [0]
 sheet: pei_smooth
 ---
@@ -1058,7 +1047,7 @@ legacy_printer_model: [MK3.9SMMU3]
 tools:
   - tool: '0.4'
 feeders:
-  - feeder: mmu3_32b
+  - feeder: mmu3
     address: [0]
 sheet: pei_smooth
 ---
@@ -1079,7 +1068,7 @@ legacy_printer_model: [MK3.5MMU3]
 tools:
   - tool: '0.4'
 feeders:
-  - feeder: mmu3_8b
+  - feeder: mmu3
     address: [0]
 sheet: pei_smooth
 ---
@@ -1112,7 +1101,7 @@ legacy_printer_model: [MK3SMMU3]
 tools:
   - tool: '0.4'
 feeders:
-  - feeder: mmu3_8b
+  - feeder: mmu3
     address: [0]
 sheet: pei_smooth
 ---

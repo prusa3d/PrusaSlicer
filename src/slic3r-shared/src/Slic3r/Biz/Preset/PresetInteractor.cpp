@@ -985,7 +985,6 @@ tl::expected<void, std::string> PresetInteractor::select_external_printer_config
             return tl::unexpected{hw_config_result.error()};
         }
         auto hw_config = hw_config_result.value();
-        auto& preset_bundle = m_workbench.preset_bundle();
         update_changed_printer_configs({hw_config});
         select_printer_config_internal(hw_config.id, false, bag);
     }
@@ -1068,6 +1067,7 @@ bool PresetInteractor::update_changed_printer_configs(
         }
     }
 
+    fill_printer_configs(false, bag);
     fill_printer_presets(false, bag);
 
     if (!selected_hw_config_id.empty()) {
@@ -1134,6 +1134,7 @@ bool PresetInteractor::update_changed_selected_preset_hw_config(Domain::Preset::
     ASSERT(epps.size() > 0);
     evaluated_printer_presets = epps;
 
+    fill_printer_configs(false, bag);
     fill_printer_presets(false, bag);
     select_printer_preset_internal(hw_config.id, selected_printer_preset_id, false, bag);
 
@@ -2117,6 +2118,10 @@ void PresetInteractor::select_printer_config_internal(
     ListenerInvokeLaterBag& bag
 )
 {
+    auto& selected_preset = mutable_selected_printer_preset();
+    auto [hw_cfg, runtime] = get_printer_config(m_selected_project_id, printer_hw_config_id);
+    selected_preset.hw_config = hw_cfg.get();
+
     const bool found_and_selected = m_printer_configs.set_selected(
         [&printer_hw_config_id](const auto& hwc)
         { return hwc.hw_printer_config_id == printer_hw_config_id; }
@@ -2131,6 +2136,7 @@ void PresetInteractor::select_printer_config_internal(
         it = std::ranges::find_if(printer_presets, [](const auto& p) { return p.first.get().origin == Domain::Preset::PresetOrigin::System; });
     }
     ASSERT (it != printer_presets.end());
+    fill_printer_presets(no_data_update, bag);
     select_printer_preset_internal(printer_hw_config_id, (*it).first.get().id, no_data_update, bag);
 }
 
@@ -2429,6 +2435,7 @@ void PresetInteractor::duplicate_hw_config_if_needed_and_update(
         if (dup_needed)
             preset_bundle.vendor_bundles[hw_config.vendor_id].printer_configs.push_back(hw_config);
     }
+    fill_printer_configs(false, bag);
     fill_printer_presets(false, bag);
 }
 

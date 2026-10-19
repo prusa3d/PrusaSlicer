@@ -10,7 +10,6 @@ struct VendorId
 {
     std::string repo_id;
     std::string vendor_id;
-    Domain::PrinterTechnology technology{Domain::PrinterTechnology::FFF};
 
     bool valid() const
     {
@@ -111,13 +110,18 @@ HwBundleEvaluator::evaluate_config(const Domain::Preset::HwPrinterConfig& extern
     auto template_it          = std::ranges::find_if(
         vendor_data.printer_configs,
         [&](const auto& printer)
-    {
-        auto printer_def_it = defs.printers.find(printer.printer);
-        ASSERT(printer_def_it != defs.printers.end());
-        const auto& printer_def = printer_def_it->second;
-        // TODO: @barzto match also feeder
-        return printer_def.model == external_config.model && printer.tool_count.value_or(printer_def.tool_count) == external_config.tool_count;
-    });
+        {
+            auto printer_def_it = defs.printers.find(printer.printer);
+            ASSERT(printer_def_it != defs.printers.end());
+            const auto& printer_def = printer_def_it->second;
+            return printer_def.model == external_config.model
+                && printer.tool_count.value_or(printer_def.tool_count)
+                == external_config.tool_count
+                // we are looking for template without feeder, as we need to
+                // set it up anyway (if present in external hw config)
+                && printer.feeders.empty();
+        }
+    );
 
     Domain::Preset::HwPrinterConfig hw_config;
 
@@ -157,7 +161,28 @@ HwBundleEvaluator::evaluate_config(const Domain::Preset::HwPrinterConfig& extern
         hw_config.tools[i] = from_def(vendor_data, *td);
     }
 
-    // TODO: @barzto handle feeder
+    auto find_feeder = [&](const Domain::Preset::HwFeederConfig& external_feeder) -> const Domain::Preset::HwFeederConfigDef*
+    {
+        auto r  = defs.feeders | std::views::values;
+        auto it = std::ranges::find_if(
+            r,
+            [&external_feeder](const Domain::Preset::HwFeederConfigDef& d) -> bool
+            { return d.model == external_feeder.model; }
+        );
+        return (it == std::ranges::end(r)) ? nullptr : &*it;
+    };
+
+    for (const auto& [addr, feeder] : external_config.feeders) {
+        const auto* feeder_def = find_feeder(feeder);
+        if (feeder_def == nullptr) {
+            return tl::unexpected{fmt::format(
+                "Cannot find definition for feeder with model: {} and base_model: {}",
+                feeder.model.model,
+                feeder.model.base_model
+            )};
+        }
+        hw_config.feeders[addr] = from_def(vendor_data, *feeder_def);
+    }
 
     return hw_config;
 }

@@ -45,5 +45,11 @@ TEST_CASE("Load Connect HW Config Tests", "[preset]")
 
             REQUIRE(t.features == exp.features);
         }
+
+        for (const auto& [addr, feeder] : hw_config.feeders) {
+            auto feeder_it = expected.feeders.find(addr);
+            REQUIRE(feeder_it != expected.feeders.end());
+            REQUIRE(feeder_it->second.model == feeder.model);
+        }
     }
 }

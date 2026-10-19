@@ -71,13 +71,11 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
     m_preset_combo_box->set_flex_grow(1);
     m_preset_combo_box->set_get_name_fn([](const Biz::Preset::PresetItem* preset_item)
                                         { return preset_item->ui_preset_name(); });
-    // @barzto: Replace printer_presets() with correct observable list here
     m_preset_combo_box->set_source_list(
         &m_project_interactor.preset_interactor().printer_presets()
     );
     m_preset_combo_box->callbacks().selection_changed = [this](int index)
     {
-        // @barzto: Replace printer_presets() with correct observable list here
         const Biz::Preset::PresetItem& preset =
             m_project_interactor.preset_interactor().printer_presets().items().at(index);
         if (!Biz::Preset::PresetSelectionCheck::can_select_printer_preset(

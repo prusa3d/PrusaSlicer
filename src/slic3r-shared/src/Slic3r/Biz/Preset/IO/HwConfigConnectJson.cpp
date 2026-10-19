@@ -149,7 +149,9 @@ load_external_hw_config(std::string_view json)
                     }
                 }
                 if (v.contains("feeder")) {
-                    if (auto feeder_result = load_external_feeder(v); feeder_result.has_value()) {
+                    if (auto feeder_result = load_external_feeder(v.at("feeder"));
+                        feeder_result.has_value())
+                    {
                         ret.feeders[addr] = feeder_result.value();
                     } else {
                         return tl::unexpected{fmt::format(

@@ -2,13 +2,14 @@
 
 namespace Slic3r::Biz::Preset::ConnectJsonTestUtils {
 
-std::vector<TestDesc> create_test_desc(bool remove_hardend_feature)
+std::vector<TestDesc> create_test_desc(bool remove_external_features)
 {
-    auto process_features = [remove_hardend_feature](Domain::Preset::FeatureValueMap src)
+    auto process_features = [remove_external_features](Domain::Preset::FeatureValueMap src)
         -> Domain::Preset::FeatureValueMap
     {
-        if (remove_hardend_feature) {
+        if (remove_external_features) {
             src.erase("nozzle_hardened");
+            src.erase("feeder");
         }
         return src;
     };
@@ -76,7 +77,17 @@ std::vector<TestDesc> create_test_desc(bool remove_hardend_feature)
          {.model      = {.model = "SL1S", .base_model = "SL1"},
           .technology = Domain::PrinterTechnology::SLA,
           .tool_count = 1,
-          .tools      = {{}}}}
+          .tools      = {{}}}},
+        {{"printer_6.json"},
+         {.model      = {.model = "MK4", .base_model = "MK4"},
+          .tool_count = 1,
+          .tools      = {{process_features(
+              {{"nozzle_diameter", 0.4},
+                    {"nozzle_high_flow", false},
+                    {"nozzle_hardened", false},
+                    {"feeder", true}}
+          )}},
+         .feeders = {{{0}, {{.model="MMU3", .base_model="MMU3"}}},}}}
     };
 }
 

@@ -157,6 +157,11 @@ Domain::Preset::HwPrinterConfig from_def(
     const Domain::Preset::HwPrinterConfigDef& printer_def
 );
 
+Domain::Preset::HwFeederConfig from_def(
+    const Domain::Preset::VendorData& vendor_data,
+    const Domain::Preset::HwFeederConfigDef& feeder_def
+);
+
 Domain::Preset::HwPrinterConfig new_scratch_config(
     Domain::PrinterTechnology technology,
     const std::string& name,
