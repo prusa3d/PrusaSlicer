@@ -2355,10 +2355,13 @@ void PrintObjectSupportMaterial::generate_base_layers(
         // No top contacts -> no intermediate layers will be produced.
         return;
 
+    // Horizontal expansion of the base support beyond the object contour (scaled).
+    const float support_base_expansion = float(scale_(m_support_params.support_material_base_expansion));
+
     SPDLOG_DEBUG("PrintObjectSupportMaterial::generate_base_layers() in parallel - start");
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, intermediate_layers.size()),
-        [&object, &bottom_contacts, &top_contacts, &intermediate_layers, &layer_support_areas](const tbb::blocked_range<size_t>& range) {
+        [&object, &bottom_contacts, &top_contacts, &intermediate_layers, &layer_support_areas, support_base_expansion](const tbb::blocked_range<size_t>& range) {
             // index -2 means not initialized yet, -1 means intialized and decremented to 0 and then -1.
             int idx_top_contact_above           = -2;
             int idx_bottom_contact_overlapping  = -2;
@@ -2460,6 +2463,14 @@ void PrintObjectSupportMaterial::generate_base_layers(
                         polygons_new,
                         polygons_trimming,
                         ApplySafetyOffset::Yes); // safety offset to merge the touching source polygons
+
+                // Expand the base support horizontally beyond the object contour.
+                // The base layers are trimmed by the object afterwards (trim_support_layers_by_object), so the
+                // expansion never intrudes into the object, it only grows the support into the free space around it.
+                if (support_base_expansion > 0.f && ! layer_intermediate.polygons.empty())
+                    layer_intermediate.polygons = expand(
+                        layer_intermediate.polygons, support_base_expansion, SUPPORT_SURFACES_OFFSET_PARAMETERS);
+
                 layer_intermediate.layer_type = SupporLayerType::Base;
 
         #if 0

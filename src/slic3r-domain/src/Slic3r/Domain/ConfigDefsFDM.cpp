@@ -4075,6 +4075,23 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->min      = 0;
     def->init_fn  = init_with(3.);
 
+    def           = defs.add("support_material_base_expansion", typeid(double));
+    def->location = Print;
+    def->compatibility_rule = CompatibilityRule::Max;
+    def->overrides_in               = Locations{Tool, Object};
+    def->label                      = L("Support base expansion");
+    def->option_group               = ConfigItemDef::OptionGroup::Print_Supports_SupportGeometry;
+    def->category                   = ConfigItemDef::Category::Print_Supports;
+    def->order                      = 2;
+    def->gui_type                   = ConfigItemDef::GUIType::textfield;
+    def->tooltip  = L("Expand the support base in the XY plane, so it extends slightly beyond the object contour "
+                      "instead of ending strictly at the object silhouette. This improves the support stability and "
+                      "makes the support easier to remove. The support is still trimmed by the object, so it does not "
+                      "collide with the model. Set to zero to keep the default behaviour.");
+    def->units = {L("mm")};
+    def->min      = 0;
+    def->init_fn  = init_with(0.);
+
     def = defs.add("support_material_interface_contact_loops", typeid(bool));
     def->location = Print;
     def->compatibility_rule = CompatibilityRule::IgnoreOverrides;
@@ -4150,7 +4167,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->label = L("Closing radius");
     def->option_group = ConfigItemDef::OptionGroup::Print_Supports_SupportGeometry;
     def->category = ConfigItemDef::Category::Print_Supports;
-    def->order = 2;
+    def->order = 3;
     def->gui_type = ConfigItemDef::GUIType::textfield;
     def->tooltip = L("For snug supports, the support regions will be merged using morphological closing operation."
                      " Gaps smaller than the closing radius will be filled in.");
@@ -4278,7 +4295,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->label = L("Synchronize with object layers");
     def->option_group = ConfigItemDef::OptionGroup::Print_Supports_SupportGeometry;
     def->category = ConfigItemDef::Category::Print_Supports;
-    def->order = 3;
+    def->order = 4;
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     // TRN PrintSettings : "Synchronize with object layers"
     def->tooltip = L("Synchronize support layers with the object print layers. This is useful "
@@ -4312,7 +4329,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->label = L("With sheath around the support");
     def->option_group = ConfigItemDef::OptionGroup::Print_Supports_SupportGeometry;
     def->category = ConfigItemDef::Category::Print_Supports;
-    def->order = 4;
+    def->order = 5;
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     def->tooltip = L("Add a sheath (a single perimeter line) around the base support. This makes "
                    "the support more reliable, but also more difficult to remove.");
