@@ -773,11 +773,6 @@ void PresetInteractor::save_user_preset_internal(
                     // preset to update it donwstream presets (print, tool and material) as these
                     // are distnict to runtime ones
                     select_printer_preset(selected_preset.hw_config.id, selected_preset.printer.id);
-                } else {
-                    // After reloading vendor presets, the original presets may be reorganized,
-                    // invalidating the cached original configurations.
-                    // Update the configurations in the ConfigBoxInteractors.
-                    fill_selected_material_cbis(selected_preset, true);
                 }
                 break;
 
@@ -802,6 +797,11 @@ void PresetInteractor::save_user_preset_internal(
                 fill_materials_presets(selected_preset, false, inner_bag);
                 break;
             }
+
+            // reload_vendor_presets() re-created all the evaluated presets, so the original
+            // config boxes cached by all the interactors are dangling now, not only the ones of
+            // the saved preset kind.
+            refresh_original_config_boxes(selected_preset);
         }, "save_user_preset_internal"
     );
 }
@@ -813,6 +813,19 @@ void PresetInteractor::reload_vendor_presets(const std::string& vendor_id)
     update_vendor_presets(mut, preset_bundle, vendor_id);
     Domain::Preset::VendorBundle& vendor_bundle = preset_bundle.vendor_bundles.at(vendor_id);
     vendor_bundle.preset_names = IO::collect_names(vendor_bundle.presets);
+}
+
+void PresetInteractor::refresh_original_config_boxes(
+    Domain::Preset::SelectedPreset& selected_preset
+)
+{
+    const auto& [original_printer_preset_ref, printer_is_runtime] =
+        get_printer_preset(selected_preset.hw_config.id, selected_preset.printer.id);
+    m_printer_cbi_accessor.set_original_config_box(
+        &original_printer_preset_ref.get().config_box()
+    );
+    update_print_tool_cbi(selected_preset, selected_config_container_context().config_container_id);
+    fill_selected_material_cbis(selected_preset, true);
 }
 
 const PresetInteractorConfigContainerContext& PresetInteractor::config_container_context(

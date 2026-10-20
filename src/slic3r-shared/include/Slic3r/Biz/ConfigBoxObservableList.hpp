@@ -32,6 +32,15 @@ public:
         const Domain::ConfigBox* original_config_box
     );
 
+    /**
+     * @brief Points the items to the config items of @p original_config_box without resetting
+     * the list, the observers get only an update of all items.
+     * @note Intended for the case when only the original config box was re-created (e.g. after
+     * the presets were reloaded). Falls back to set_config_box() if the items of the observed
+     * config box have changed since the last set_config_box().
+     */
+    void set_original_config_box(const Domain::ConfigBox* original_config_box);
+
     const ConfigItemContext& at(size_t index) const override;
 
     size_t size() const override;

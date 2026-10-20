@@ -915,6 +915,13 @@ private:
     void save_user_preset_internal(Domain::Preset::PresetKind kind, size_t slot_index, const KeySet& item_names_to_omit, std::string new_name, InvokeLaterBag& bag);
     void update_vendor_presets(std::mutex& mut, Domain::Preset::Bundle& preset_bundle, const std::string& vendor_id);
     void reload_vendor_presets(const std::string& vendor_id);
+    /**
+     * @brief Points all config box interactors of @p selected_preset to the current original
+     * presets.
+     * @note reload_vendor_presets() re-creates the evaluated presets, so the original config
+     * boxes cached in the interactors are dangling afterwards.
+     */
+    void refresh_original_config_boxes(Domain::Preset::SelectedPreset& selected_preset);
 
     void fill_config_container_with_selected_preset(
         Domain::ConfigContainer& cc,

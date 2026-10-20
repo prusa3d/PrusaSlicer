@@ -1,6 +1,8 @@
 #include "Slic3r/Biz/ConfigBoxObservableList.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
 
+#include <algorithm>
+
 namespace Slic3r::Biz {
 
 ConfigBoxObservableList::ConfigBoxObservableList(
@@ -48,6 +50,39 @@ void ConfigBoxObservableList::set_config_box(
     invoke_listeners<IListObserver<ConfigItemContext>>([&](IListObserver<ConfigItemContext>* l)
                                                         { l->on_reset(); });
     // }
+}
+
+void ConfigBoxObservableList::set_original_config_box(const Domain::ConfigBox* original_config_box)
+{
+    if (!m_config_box) {
+        return;
+    }
+
+    // The observers are bound to the items by index, so they can be kept only if the observed
+    // config items are still the same.
+    const bool same_items = std::ranges::equal(
+        m_config_box->items.all_items(),
+        m_items,
+        [](const Domain::ConfigItem& config_item, const ConfigItemContext& item)
+        { return &config_item == item.config_item; }
+    );
+    if (!same_items) {
+        set_config_box(m_config_box, original_config_box);
+        return;
+    }
+    if (m_items.empty()) {
+        return;
+    }
+
+    for (ConfigItemContext& item : m_items) {
+        item.original_config_item =
+            original_config_box ? original_config_box->find(item.name).item : nullptr;
+    }
+
+    invoke_listeners<IListObserver<ConfigItemContext>>(
+        [this](IListObserver<ConfigItemContext>* l)
+        { l->on_updated(IndexRange(0, m_items.size() - 1)); }
+    );
 }
 
 const ConfigItemContext& ConfigBoxObservableList::at(size_t index) const

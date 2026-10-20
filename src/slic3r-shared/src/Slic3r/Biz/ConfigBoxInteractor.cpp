@@ -50,6 +50,13 @@ void ConfigBoxInteractor::SetAccessor::set_config_box(
     m_config_box_list.lock()->set_config_box(config_box, original_config_box);
 }
 
+void ConfigBoxInteractor::SetAccessor::set_original_config_box(
+    const Domain::ConfigBox* original_config_box
+)
+{
+    m_config_box_list.lock()->set_original_config_box(original_config_box);
+}
+
 void ConfigBoxInteractor::SetAccessor::set_from_original_value(const std::string& key)
 {
     m_config_box_list.lock()->set_from_original_value(key);

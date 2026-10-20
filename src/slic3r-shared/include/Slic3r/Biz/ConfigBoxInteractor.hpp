@@ -30,6 +30,9 @@ public:
             const Domain::ConfigBox* original_config_box = nullptr
         );
 
+        /** @see ConfigBoxObservableList::set_original_config_box() */
+        void set_original_config_box(const Domain::ConfigBox* original_config_box);
+
         void set_from_original_value(const std::string& key);
 
     private:
