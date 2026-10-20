@@ -17,7 +17,7 @@ namespace fs = boost::filesystem;
 namespace {
 const std::unordered_map<PluginType, std::string> PLUGIN_TYPE_NAMES = {
     {PluginType::ProjectPlugin, "project.plugin"},
-    {PluginType::PrintMode, "print_mode"}
+    {PluginType::PrintMode, "print.print_mode"}
 };
 }
 

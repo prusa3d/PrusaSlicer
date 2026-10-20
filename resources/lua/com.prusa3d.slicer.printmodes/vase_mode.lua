@@ -1,6 +1,6 @@
 info = {
     id = "vase_mode",
-    type = "print_mode",
+    type = "print.print_mode",
     title = "Vase mode"
 }
 
