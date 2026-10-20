@@ -23,6 +23,7 @@ void append_printer_values(Expr::ValueMap& values, const Domain::Preset::HwPrint
 
     if (printer.feeders.empty()) {
         append_value(values, "feeder.", Domain::Preset::HwModel{});
+        append_value(values, "feeder.single_mode", true);
     } else {
         // At the moment only single feeder is supported
         ASSERT(printer.feeders.size() == 1);
