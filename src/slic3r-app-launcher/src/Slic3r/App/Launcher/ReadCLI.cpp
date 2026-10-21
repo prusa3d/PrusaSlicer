@@ -803,6 +803,8 @@ void add_plugin_subcommand(CLI::App& app, App::InitParams& params)
 {
     using namespace Slic3r::App;
     auto* plugin_app = app.add_subcommand("plugin", "Plugin tools");
+    // reset app options, which are otherwise inherited from parent app
+    plugin_app->option_defaults()->group("OPTIONS");
 
     // Command: plugin init
     {

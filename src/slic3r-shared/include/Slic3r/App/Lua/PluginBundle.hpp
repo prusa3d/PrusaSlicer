@@ -56,14 +56,25 @@ class PluginBundle
 public:
     using Plugins = std::vector<Plugin>;
 
-    explicit PluginBundle(Biz::Crypto::IContentProviderPtr&& content_provider) : m_content_provider(std::move(content_provider)) {}
+    PluginBundle(
+        Biz::Crypto::IContentProviderPtr&& content_provider,
+        const std::string& path,
+        bool is_protected
+    ) :
+        m_content_provider(std::move(content_provider)),
+        m_path(path),
+        m_protected(is_protected)
+    {}
 
     PluginInstallResult load_meta();
 
     const PluginBundleMeta& meta() const { return m_meta; }
+    bool is_protected() const { return m_protected; }
+    const std::string& path() const { return m_path; }
 
     bool verify(const Biz::Crypto::KeyPair& author_pub_key) const;
     PluginInstallResult install(const std::string& dest_base_dir);
+    PluginInstallResult uninstall(const std::string& base_dir);
 
     Plugins load_plugins();
 
@@ -72,6 +83,8 @@ public:
 private:
     PluginBundleMeta m_meta;
     Biz::Crypto::IContentProviderPtr m_content_provider;
+    std::string m_path;
+    bool m_protected;
 };
 
 }

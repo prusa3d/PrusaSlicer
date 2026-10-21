@@ -48,8 +48,9 @@ Slic3r::Biz::Crypto::KeyPair author_public_key()
 
 PluginBundle open_bundle(const std::string& zip_name)
 {
+    auto path = (bundle_dir() / zip_name).string();
     return PluginBundle{
-        Slic3r::Biz::Crypto::create_zip_source((bundle_dir() / zip_name).string())
+        Slic3r::Biz::Crypto::create_zip_source(path), path, true
     };
 }
 
@@ -156,7 +157,7 @@ TEST_CASE("Scanning records each bundle's id and version", "[plugin][marketplace
     }
 
     PluginRegistry registry;
-    registry.scan(root.string());
+    registry.scan(root.string(), true);
 
     // plugin_bundles() used to stay empty because scan() never stored the bundle,
     // which silently left the marketplace webview thinking nothing was installed.

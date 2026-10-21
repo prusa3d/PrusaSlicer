@@ -1,5 +1,7 @@
 #include "Slic3r/App/Lua/PluginBundle.hpp"
 #include "Slic3r/Biz/Crypto//Checksum.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
+
 #include <Slic3r/Assert.hpp>
 #include <Slic3r/Log.hpp>
 
@@ -289,6 +291,47 @@ PluginInstallResult PluginBundle::install(const std::string& dest_base_dir)
         catch (std::exception& e) {
             return tl::unexpected{e.what()};
         }
+    }
+
+    m_path = dest_base_dir;
+    m_protected = false;
+
+    return {};
+}
+
+PluginInstallResult PluginBundle::uninstall(const std::string& base_dir)
+{
+    if (is_protected()) {
+        return tl::unexpected{fmt::format(
+            // TRN First {} is a plugin bundle identifier, the second {} is version
+            fmt::runtime(Biz::_u8L("Plugin uninstall failed: Cannot uninstall app bundled plugin bundle '{}@{}'")),
+            m_meta.id,
+            m_meta.version.to_string()
+        )};
+
+    }
+
+    fs::path p{m_path};
+
+    if (!is_path_in_sandbox({base_dir}, p)) {
+        return tl::unexpected{fmt::format(
+            // TRN First {} is a plugin bundle identifier, the second {} is version
+            fmt::runtime(Biz::_u8L("Plugin uninstall failed: Cannot uninstall app bundled plugin bundle '{}@{}'")),
+            m_meta.id,
+            m_meta.version.to_string()
+        )};
+    }
+
+    boost::system::error_code ec;
+    fs::remove_all(p, ec);
+    if (ec.failed()) {
+        return tl::unexpected{fmt::format(
+            // TRN First {} is a plugin bundle identifier, the second {} is version, the last {} is an error message
+            fmt::runtime(Biz::_u8L("Plugin uninstall failed: Cannot uninstall app bundled plugin bundle '{}@{}': {}")),
+            m_meta.id,
+            m_meta.version.to_string(),
+            ec.message()
+        )};
     }
 
     return {};

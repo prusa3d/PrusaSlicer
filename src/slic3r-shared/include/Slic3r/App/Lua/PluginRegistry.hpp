@@ -25,9 +25,10 @@ public:
     PluginRegistry();
 
     void clear();
-    void scan(const std::string& path);
+    void scan(const std::string& path, bool is_protected);
 
     PluginInstallResult install(PluginBundle& bundle, PublicKeyLookupStrategy lookup_strategy);
+    PluginInstallResult uninstall(const std::string& bundle_id, const std::string& version);;
 
     const Plugins& plugins() const { return m_plugins; }
     const PluginBundles& plugin_bundles() const { return m_bundles; }

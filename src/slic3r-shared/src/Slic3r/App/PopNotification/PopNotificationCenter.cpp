@@ -1566,4 +1566,47 @@ void PopNotificationCenter::on_plugin_installation_succeeded(
 
 }
 
+void PopNotificationCenter::on_plugin_uninstallation_error(const std::string& error_message)
+{
+    m_notification_list.close_notifications_of_type(PopNotificationType::PluginInstallationError);
+    m_notification_list.close_notifications_of_type(PopNotificationType::PluginInstallationSuccess);
+
+    const std::string header{_u8L("Plugin uninstallation error")};
+    upsert_notification(
+        PopNotificationData{
+            PopNotificationType::PluginInstallationError,
+            PopNotificationLevel::Error,
+            0s,
+            PopNotificationLayoutHeaderText{header, error_message}
+        },
+        never_equal_matcher
+    );
+}
+
+void PopNotificationCenter::
+    on_plugin_uninstallation_succeeded(const std::string& bundle_id, const std::string& version)
+{
+    m_notification_list.close_notifications_of_type(PopNotificationType::PluginInstallationSuccess);
+    m_notification_list.close_notifications_of_type(PopNotificationType::PluginInstallationError);
+
+    const std::string header{_u8L("Plugin installation")};
+    upsert_notification(
+        PopNotificationData{
+            PopNotificationType::PluginInstallationSuccess,
+            PopNotificationLevel::Regular,
+            5s,
+            PopNotificationLayoutHeaderText{
+                header,
+                fmt::format(
+                    // TRN First {} is a plugin identifier, second {} is plugin version
+                    fmt::runtime(_u8L("Plugin {}@{} uninstalled successfully")),
+                    bundle_id,
+                    version
+                )
+            }
+        },
+        never_equal_matcher
+    );
+}
+
 } // namespace Slic3r::App::PopNotification

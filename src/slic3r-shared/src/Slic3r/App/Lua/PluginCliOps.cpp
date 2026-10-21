@@ -478,7 +478,7 @@ void plugin_sign(const PluginSignActionParams& params)
         // validate
         {
             auto content_provider = Biz::Crypto::create_directory_source(params.bundle_path);
-            PluginBundle plugin_bundle{std::move(content_provider)};
+            PluginBundle plugin_bundle{std::move(content_provider), params.bundle_path, true};
             auto result = plugin_bundle.load_meta();
             if (!result.has_value()) {
                 fail_error(result.error());

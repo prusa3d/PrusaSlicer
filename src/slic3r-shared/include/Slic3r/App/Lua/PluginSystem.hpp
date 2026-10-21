@@ -25,13 +25,20 @@ struct InstalledBundle
 {
     std::string id;
     std::string version;
+    bool is_protected;
 };
 
 class PluginSystem : public WithListeners<IPluginRescanListener, IPluginInstallationListener>, IMarketplaceClientListener
 {
 public:
-    explicit PluginSystem(
-        std::initializer_list<std::string> plugin_paths,
+    struct PluginPath
+    {
+        std::string path;
+        bool is_protected{false};
+    };
+
+    PluginSystem(
+        std::initializer_list<PluginPath> plugin_paths,
         Biz::ProjectInteractor& project_interactor,
         Biz::Emboss::IFontManager& font_manager
     );
@@ -56,6 +63,7 @@ public:
         const std::string& url
     );
     void install_marketplace_bundle(const BundleRequestConfig& config);
+    void uninstall_bundle(const std::string& bundle_id, const std::string& version);
 
     Yoga::Passthrough<PluginDialog>& init_dialog();
 
@@ -68,7 +76,7 @@ public:
     ) override;
 private:
     void clear();
-    void scan(const std::string& path);
+    void scan(const std::string& path, bool is_protected);
     void finalize_run();
 private:
     struct PluginData
@@ -78,7 +86,7 @@ private:
     };
 
     PluginRegistry m_registry;
-    std::vector<std::string> m_plugin_paths;
+    std::vector<PluginPath> m_plugin_paths;
     Biz::ProjectInteractor& m_project_interactor;
     Biz::Emboss::IFontManager& m_font_manager;
     Domain::FontList m_fav_fonts;

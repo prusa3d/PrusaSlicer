@@ -122,6 +122,9 @@ public:
     // Plugin Installation Listener
     void on_plugin_installation_error(const std::string& error_message) override;
     void on_plugin_installation_succeeded(const Lua::PluginBundleMeta& plugin_bundle_meta) override;
+    void on_plugin_uninstallation_error(const std::string& error_message) override;
+    void on_plugin_uninstallation_succeeded(const std::string& bundle_id, const std::string& version) override;
+
 private:
     void on_job_progress(
         const JobNotificationSpec& spec,

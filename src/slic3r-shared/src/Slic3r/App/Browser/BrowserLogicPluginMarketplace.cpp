@@ -139,6 +139,20 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_messag
         return {};
     }
 
+    if (action == "UNINSTALL_PLUGIN") {
+        std::string bundle_id, version;
+        try {
+            msg.at("pluginId").get_to(bundle_id);
+            msg.at("version").get_to(version);
+        } catch (std::exception& e) {
+            SPDLOG_ERROR("Plugin Marketplace: cannot parse UNINSTALL_PLUGIN: {}", e.what());
+            return {};
+        }
+        SPDLOG_INFO("Plugin Marketplace: uninstall {}@{}", bundle_id, version);
+        m_plugin_system.uninstall_bundle(bundle_id, version);
+        return {};
+    }
+
     if (action == "DOWNLOAD") {
         std::string url     = msg["url"].get<std::string>();
         std::string id      = msg["id"].get<std::string>();
@@ -147,6 +161,11 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_messag
         m_plugin_system.download_file(id, version, url);
 
         return {};
+    }
+
+    if (action == "OPEN_URL") {
+        std::string url = msg["url"].get<std::string>();
+        return {{BrowserLogicCommandType::OpenExternalBrowser, url}};
     }
 
     SPDLOG_INFO("Plugin Marketplace: unknown action {}", action);

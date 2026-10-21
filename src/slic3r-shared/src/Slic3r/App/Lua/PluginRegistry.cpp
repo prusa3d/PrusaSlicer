@@ -18,6 +18,15 @@ namespace Slic3r::App::Lua {
 
 namespace fs = boost::filesystem;
 
+namespace {
+
+fs::path get_bundle_base_path(const std::string& bundle_id)
+{
+    return fs::path{data_dir()} / "lua" / bundle_id;
+}
+
+}
+
 PluginRegistry::PluginRegistry() :
     m_key_registry(fs::path{data_dir()} / "authorized_authors")
 {}
@@ -28,7 +37,7 @@ void PluginRegistry::clear()
     m_plugins.clear();
 }
 
-void PluginRegistry::scan(const std::string& path)
+void PluginRegistry::scan(const std::string& path, bool is_protected)
 {
     struct PluginPath
     {
@@ -63,7 +72,8 @@ void PluginRegistry::scan(const std::string& path)
             continue;
         }
 
-        PluginBundle bundle{Biz::Crypto::create_directory_source(bundle_path)};
+        PluginBundle
+            bundle{Biz::Crypto::create_directory_source(bundle_path), bundle_path, is_protected};
         auto result = bundle.load_meta();
         if (!result.has_value()) {
             SPDLOG_ERROR("Error loading plugin bundle '{}': {}", bundle_path, result.error());
@@ -205,7 +215,7 @@ PluginInstallResult PluginRegistry::install(PluginBundle& bundle, PublicKeyLooku
         );
     }
 
-    auto dest_dir = fs::path{data_dir()} / "lua" / bundle.meta().id;
+    auto dest_dir = get_bundle_base_path(bundle.meta().id);
     if (fs::exists(dest_dir)) {
         fs::remove_all(dest_dir);
     }
@@ -216,5 +226,35 @@ PluginInstallResult PluginRegistry::install(PluginBundle& bundle, PublicKeyLooku
     return {};
 }
 
+PluginInstallResult
+PluginRegistry::uninstall(const std::string& bundle_id, const std::string& version)
+{
+    Semver ver;
+    if (auto ver_result = Semver::parse(version); !ver_result.has_value()) {
+        return tl::unexpected{fmt::format(
+            // TRN The {} is a string with version failed to parse
+            fmt::runtime(Biz::_u8L("Plugin uninstall failed: Cannot parse version '{}'")),
+            version
+        )};
+    } else {
+        ver = ver_result.value();
+    }
+
+    auto bundle_it = std::ranges::find_if(
+        m_bundles,
+        [&](const auto& b) { return b.meta().id == bundle_id && b.meta().version == ver; }
+    );
+    if (bundle_it == m_bundles.end()) {
+        return tl::unexpected{fmt::format(
+            // TRN First {} is a plugin bundle identifier, the second {} is version
+            fmt::runtime(Biz::_u8L("Plugin uninstall failed: Cannot find bundle '{}@{}'")),
+            bundle_id,
+            version
+        )};
+    }
+
+    auto base_dir = get_bundle_base_path(bundle_it->meta().id);
+    return bundle_it->uninstall(base_dir.string());
+}
 
 } // namespace Slic3r::App::Lua

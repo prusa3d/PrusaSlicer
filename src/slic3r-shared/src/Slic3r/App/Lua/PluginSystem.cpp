@@ -87,7 +87,7 @@ private:
 }
 
 PluginSystem::PluginSystem(
-    std::initializer_list<std::string> plugin_paths,
+    std::initializer_list<PluginPath> plugin_paths,
     Biz::ProjectInteractor& project_interactor,
     Biz::Emboss::IFontManager& font_manager
 ) :
@@ -118,7 +118,7 @@ void PluginSystem::
         return;
 
     }
-    PluginBundle plugin_bundle{std::move(zip_source)};
+    PluginBundle plugin_bundle{std::move(zip_source), zip_file_path, true};
     if (auto load_meta_result = plugin_bundle.load_meta(); !load_meta_result.has_value()) {
         invoke_listeners<IPluginInstallationListener>(
             [&load_meta_result](auto* listener)
@@ -173,7 +173,7 @@ std::vector<InstalledBundle> PluginSystem::installed_bundles() const
         if (meta.id.empty()) {
             continue;
         }
-        result.push_back({meta.id, meta.version.to_string()});
+        result.push_back({meta.id, meta.version.to_string(), bundle.is_protected()});
     }
     return result;
 }
@@ -181,6 +181,22 @@ std::vector<InstalledBundle> PluginSystem::installed_bundles() const
 void PluginSystem::install_marketplace_bundle(const BundleRequestConfig& config)
 {
     m_marketplace_client.download_bundle(config);
+}
+
+void PluginSystem::uninstall_bundle(const std::string& bundle_id, const std::string& version)
+{
+    if (auto result = m_registry.uninstall(bundle_id, version); result.has_value()) {
+        rescan();
+        invoke_listeners<IPluginInstallationListener>(
+            [&bundle_id, &version](auto* listener)
+            { listener->on_plugin_uninstallation_succeeded(bundle_id, version); }
+        );
+    } else {
+        invoke_listeners<IPluginInstallationListener>(
+            [&result](auto* listener)
+            { listener->on_plugin_uninstallation_error(result.error()); }
+        );
+    }
 }
 
 Yoga::Passthrough<PluginDialog>& PluginSystem::init_dialog()
@@ -296,16 +312,16 @@ void PluginSystem::clear()
     m_current_plugin_data = std::nullopt;
 }
 
-void PluginSystem::scan(const std::string& path)
+void PluginSystem::scan(const std::string& path, bool is_protected)
 {
-    m_registry.scan(path);
+    m_registry.scan(path, is_protected);
 }
 
 void PluginSystem::rescan()
 {
     clear();
     for (const auto& path : m_plugin_paths) {
-        scan(path);
+        scan(path.path, path.is_protected);
     }
     invoke_listeners<IPluginRescanListener>([this](auto* l) { l->on_plugins_scanned(m_registry); });
 }

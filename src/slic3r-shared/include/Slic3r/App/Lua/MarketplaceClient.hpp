@@ -30,7 +30,7 @@ struct VerifiedBundleData
 };
 
 /**
- * @brief Listner to MarketplaceClient events.
+ * @brief Listener to MarketplaceClient events.
  */
 class IMarketplaceClientListener
 {
