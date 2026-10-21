@@ -538,7 +538,7 @@ static void extract_pos_and_or_hwa(const MoveVertices& vertices, float travels_r
                 height = travels_radius;
                 width  = travels_radius;
             }
-            else if (v.is_wipe()) {
+            else if (v.is_wipe() || v.type == MoveType::MovingUnretract) {
                 height = wipes_radius;
                 width  = wipes_radius;
             }
@@ -744,7 +744,7 @@ void FdmViewer::update_enabled_entities()
             if (!m_settings.options_visibility[size_t(OptionType::Wipes)])
                 continue;
         }
-        else if (v.is_option()) {
+        else if (v.is_option() || v.type == MoveType::MovingUnretract) {
             if (!m_settings.options_visibility[size_t(move_type_to_option(v.type))])
                 continue;
         }
@@ -1200,8 +1200,14 @@ ColorRGB FdmViewer::vertex_color(const MoveVertex& v) const
     if (v.type == MoveType::Noop)
         return DUMMY_COLOR;
 
-    if ((v.is_wipe() && (m_settings.view_type != ViewType::Speed && m_settings.view_type != ViewType::ActualSpeed)) || v.is_option())
+    if ((v.is_wipe()
+         && (m_settings.view_type != ViewType::Speed
+             && m_settings.view_type != ViewType::ActualSpeed))
+        || v.is_option()
+        || v.type == MoveType::MovingUnretract)
+    {
         return option_color(move_type_to_option(v.type));
+    }
 
     switch (m_settings.view_type)
     {
@@ -1556,7 +1562,7 @@ void FdmViewer::update_heights_widths()
             buffer[i][0] = m_travels_radius;
             buffer[i][1] = m_travels_radius;
         }
-        else if (v.is_wipe()) {
+        else if (v.is_wipe() || v.type == MoveType::MovingUnretract) {
             buffer[i][0] = m_wipes_radius;
             buffer[i][1] = m_wipes_radius;
         }

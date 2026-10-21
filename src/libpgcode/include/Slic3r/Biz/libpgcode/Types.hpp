@@ -58,6 +58,7 @@ enum class MoveType : uint8_t
     Wipe,
     Extrude,
     Flush,
+    MovingUnretract,
     COUNT
 };
 
@@ -299,6 +300,8 @@ enum class Tags : uint8_t
     First_Line_M73_Placeholder,
     Last_Line_M73_Placeholder,
     Print_Statistics_Placeholder,
+    Moving_Unretract_Start,
+    Moving_Unretract_End,
     COUNT
 };
 
@@ -316,7 +319,9 @@ static const std::vector<std::string_view> RESERVED_TAGS = {
     "CUSTOM_GCODE"sv,
     "_GP_FIRST_LINE_M73_PLACEHOLDER"sv,
     "_GP_LAST_LINE_M73_PLACEHOLDER"sv,
-    "_GP_PRINT_STATISTICS_PLACEHOLDER"sv
+    "_GP_PRINT_STATISTICS_PLACEHOLDER"sv,
+    "MOVING_UNRETRACT_START"sv,
+    "MOVING_UNRETRACT_END"sv
 };
 
 enum class CustomTags : uint8_t

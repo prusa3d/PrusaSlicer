@@ -19,6 +19,7 @@
 #include "libslic3r/GCode/WipeTower.hpp"
 #include "libslic3r/Geometry/ArcWelder.hpp"
 #include "Slic3r/Biz/Algorithms/StringUtils.hpp"
+#include "Slic3r/Biz/libpgcode/Utils.hpp"
 
 namespace Slic3r::GCode {
 
@@ -150,10 +151,22 @@ std::string WipeTowerIntegration::append_tcr(
                 // unless the firmware returned the head here already.
                 deretraction_str += writer.travel_to_xy_force(*spread_start);
                 deretraction_str += writer.travel_to_z_force(z, "restore layer Z");
+
+                // Tagged so that the G-code preview shows the move as a de-retraction, not as an extrusion.
+                deretraction_str += ";"
+                    + std::string{Biz::libpgcode::reserved_tag(
+                        Biz::libpgcode::Tags::Moving_Unretract_Start
+                    )}
+                    + "\n";
                 deretraction_str += writer.unretract_while_moving(
                     spread_end.cast<double>(),
                     tcr.deretraction_spread->max_feedrate
                 );
+                deretraction_str += ";"
+                    + std::string{Biz::libpgcode::reserved_tag(
+                        Biz::libpgcode::Tags::Moving_Unretract_End
+                    )}
+                    + "\n";
             } else {
                 deretraction_str += writer.travel_to_z_force(z, "restore layer Z");
                 deretraction_str += gcodegen.unretract();
