@@ -1,11 +1,13 @@
-#include "Slic3r/App/Yoga/PrinterSettingsButton.hpp"
+#include "Slic3r/App/PrinterSettingsButton.hpp"
 
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Yoga/Icon.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
-namespace Slic3r::App::Yoga {
+using namespace Slic3r::App::Yoga;
+
+namespace Slic3r::App {
 
 PrinterSettingsButton::PrinterSettingsButton(const std::string& tooltip) : RectangleButton(tooltip)
 {
@@ -15,8 +17,8 @@ PrinterSettingsButton::PrinterSettingsButton(const std::string& tooltip) : Recta
 
     m_icon = emplace_back<Icon>(Render::Icon::None);
     m_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
+    m_icon->set_height(58_fpx);
     m_icon->set_aspect_ratio(1);
-    m_icon->set_width(64_fpx);
 
     m_texts_wrapper = emplace_back<Item>();
     m_texts_wrapper->set_orientation(Orientation::Vertical);
@@ -151,4 +153,4 @@ Icon* PrinterSettingsButton::add_extra_icon(Render::Icon icon)
     return extra_icon;
 }
 
-} // namespace Slic3r::App::Yoga
+} // namespace Slic3r::App

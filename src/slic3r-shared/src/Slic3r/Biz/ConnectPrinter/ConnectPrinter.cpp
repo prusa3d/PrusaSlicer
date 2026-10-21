@@ -85,6 +85,8 @@ std::optional<std::vector<ConnectPrinter>> parse_connect_printer_list(const std:
         printer.name       = string_field(printer_json, "name");
         printer.model      = string_field(printer_json, "model");
         printer.base_model = string_field(printer_json, "base_model");
+        printer.state      = parse_connect_printer_state(string_field(printer_json, "connect_state"))
+                            .value_or(ConnectPrinterState::Unknown);
         printer.json       = printer_json.dump();
         printers.push_back(std::move(printer));
     }

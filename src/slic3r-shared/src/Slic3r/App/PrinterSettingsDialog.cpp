@@ -16,10 +16,14 @@
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/PrinterAddDialog.hpp"
 #include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/AppConfig.hpp"
+#include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/IDialogManager.hpp"
 #include "Slic3r/App/PhysicalPrinterForm.hpp"
 #include "Slic3r/App/WarningPanel.hpp"
 #include "Slic3r/App/PrinterSearchFunction.hpp"
+
+#include <algorithm>
 
 using Slic3r::Biz::Preset::HwItemType;
 using Slic3r::Domain::ConfigContainer;
@@ -49,6 +53,10 @@ PrinterSettingsDialog::PrinterSettingsDialog(
         std::make_shared<Biz::ObservableListSearcher<Biz::PhysicalPrinter::PhysicalPrinterConfig>>(
             score_physical_printer
         )
+    ),
+    m_printer_filter(
+        std::make_shared<
+            Biz::ObservableListSortFilter<Biz::PhysicalPrinter::PhysicalPrinterConfig>>()
     ),
     m_printer_add_dialog(printer_add_dialog)
 {
@@ -128,6 +136,10 @@ void PrinterSettingsDialog::select_page_settings(
     const PhysicalPrinter::PhysicalPrinterConfig& printer
 )
 {
+    // Runtime printers are not configurable
+    if (printer.is_runtime) {
+        return;
+    }
     m_physical_printer_form->set_printer_config(printer);
     update_warning();
     m_stack_layout->set_current_index(1);
@@ -142,6 +154,54 @@ void PrinterSettingsDialog::create_page_list()
     m_page_list->set_orientation(Orientation::Vertical);
     m_page_list->set_gap(10_fpx);
     m_page_list->set_padding(Paddings{Padding, 10_fpx, Padding, Padding});
+
+    m_printer_filter_type = static_cast<PrinterFilter>(
+        AppServices::instance().app_config().get<int>("last_printer_settings_dialog_filter")
+    );
+
+    Item* filters_row = m_page_list->emplace_back<Item>();
+    filters_row->set_gap(5_fpx);
+    for (const std::string& filter_btn_name :
+         std::initializer_list<std::string>{_u8L("All"), _u8L("Local"), _u8L("Connect")})
+    {
+        LayoutButton* btn = filters_row->emplace_back<LayoutButton>(filter_btn_name);
+        btn->set_checkable(true);
+        btn->set_checked(
+            m_printer_filter_buttons.size() == static_cast<size_t>(m_printer_filter_type)
+        );
+        btn->set_content_padding(Paddings{10_fpx, 4_fpx});
+        m_printer_filter_buttons.push_back(btn);
+        m_printer_filter_button_group.insert_button(btn);
+    }
+    m_printer_filter_button_group.callbacks().checked_changed =
+        [this](AbstractButton* current_checked, AbstractButton*)
+    {
+        const auto it = std::ranges::find(m_printer_filter_buttons, current_checked);
+        m_printer_filter_type =
+            static_cast<PrinterFilter>(std::distance(m_printer_filter_buttons.begin(), it));
+        AppServices::instance().app_config_interactor().set_item_value(
+            "last_printer_settings_dialog_filter",
+            Domain::ConfigValue{static_cast<int>(m_printer_filter_type)}
+        );
+        m_printer_filter->invalidate();
+    };
+
+    m_printer_filter->set_filter_fn(
+        [this](const PhysicalPrinter::PhysicalPrinterConfig& printer) -> bool
+        {
+            const bool is_connect =
+                std::holds_alternative<PhysicalPrinter::ConnectUpload>(printer.payload);
+            switch (m_printer_filter_type) {
+            case PrinterFilter::Local:
+                return !is_connect;
+            case PrinterFilter::Connect:
+                return is_connect;
+            case PrinterFilter::All:
+                break;
+            }
+            return true;
+        }
+    );
 
     Item* search_row = m_page_list->emplace_back<Item>();
     search_row->set_gap(5_fpx);
@@ -186,23 +246,23 @@ void PrinterSettingsDialog::create_page_list()
                     }
                 }
             );
-        }
+        },
+        m_project_interactor.preset_interactor(),
+        m_project_interactor.physical_printer_interactor()
     );
     m_printer_list_view = m_page_list->emplace_back<PrinterListView>(std::move(factory));
     m_printer_list_view->set_flex_grow(1);
-    m_printer_list_view->set_padding(Paddings(0, 0, 10_fpx, 0));
-    m_printer_list_view->set_margin(Margins(0, 0, -10_fpx, 0));
-    m_printer_list_view->set_gap(8);
+    m_printer_list_view->set_padding(Paddings(0, 0, 15_fpx, 0));
+    m_printer_list_view->set_margin(Margins(0, 0, -20_fpx, 0));
+    m_printer_list_view->set_gap(8_fpx);
     m_printer_list_view->set_max_height(275);
     m_printer_list_view->set_orientation(Orientation::Vertical);
     m_printer_list_view->set_source_list(m_preset_searcher.get());
 
-    m_preset_searcher->set_source_model(
+    m_printer_filter->set_source_model(
         &m_project_interactor.physical_printer_interactor().observable_list()
     );
-
-    Separator* sep_bottom = content_area->emplace_back<Separator>(Orientation::Horizontal);
-    sep_bottom->set_margin(Margins{-Padding, 0});
+    m_preset_searcher->set_source_model(m_printer_filter.get());
 
     Item* row = m_page_list->emplace_back<Item>();
     row->set_justify_content(YGJustifySpaceBetween);
@@ -254,10 +314,13 @@ void PrinterSettingsDialog::create_page_settings()
     m_printer_icon->set_height(225_fpx);
     m_printer_icon->set_margin({0, 5_fpx});
     m_printer_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
+    // Page is scrollable, its content must not shrink to fit
+    m_printer_icon->set_flex_shrink(0);
 
     m_physical_printer_form =
         m_page_settings->emplace_back<PhysicalPrinterForm>(m_project_interactor);
     m_physical_printer_form->set_margin({-20_fpx, 0});
+    m_physical_printer_form->set_flex_shrink(0);
     m_physical_printer_form->callbacks().printer_saved =
         [this](const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer)
     {

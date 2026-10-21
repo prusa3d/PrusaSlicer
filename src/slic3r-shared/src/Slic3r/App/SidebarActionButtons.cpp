@@ -110,12 +110,7 @@ void SidebarActionButtons::refresh_physical_printer_button()
     update_buttons();
 }
 
-void SidebarActionButtons::on_printer_data_changed()
-{
-    refresh_physical_printer_button();
-}
-
-void SidebarActionButtons::on_selected_physical_printer_changed(const PhysicalPrinterConfig& printer)
+void SidebarActionButtons::on_selected_physical_printer_changed()
 {
     refresh_physical_printer_button();
 }

@@ -1056,6 +1056,7 @@ static Project convert_to_project(Loaded3MF&& loaded_3mf, IMessageDialogProvider
         auto& mutable_selected_preset = cc.mutable_selected_preset();
         mutable_selected_preset =
             Domain::Preset::SelectedPreset::make(cc_data.preset, cc_data.config_pack);
+        cc.physical_printer_selection() = cc_data.physical_printer;
 
         if (const auto& fdm_config_pack = std::get_if<Domain::ConfigPackFDM>(&cc_data.config_pack)) {
             cc.project_settings() = fdm_config_pack->project;

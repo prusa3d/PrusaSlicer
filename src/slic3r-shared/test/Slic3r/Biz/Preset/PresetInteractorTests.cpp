@@ -351,7 +351,7 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Unsaved SLA material changes a
     auto& preset_interactor = project_interactor.preset_interactor();
     preset_dialog_manager.operation = Slic3r::Biz::Preset::PresetDiffOperation::Discard;
 
-    const auto& printer_items = preset_interactor.printer_presets().items();
+    const auto& printer_items = preset_interactor.printer_configs().items();
     const Slic3r::Biz::Preset::PresetItem* sla_printer = nullptr;
     for (size_t i = 0, n = printer_items.size(); i < n; ++i) {
         const auto& item = printer_items.at(i);
@@ -362,7 +362,7 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Unsaved SLA material changes a
         }
     }
     REQUIRE(sla_printer != nullptr);
-    preset_interactor.select_printer_preset(sla_printer->hw_printer_config_id, sla_printer->id);
+    preset_interactor.select_printer_config(sla_printer->hw_printer_config_id);
     REQUIRE(preset_interactor.selected_printer_preset().technology() == Slic3r::Domain::PrinterTechnology::SLA);
 
     const auto& selected_preset = preset_interactor.selected_printer_preset();
@@ -412,7 +412,7 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Switching to an SLA printer cl
     REQUIRE(preset_interactor.sheet_items().items().size() > 0);
     REQUIRE(preset_interactor.sheet_items().selected_index() != Slic3r::Domain::INVALID_ID);
 
-    const auto& printer_items = preset_interactor.printer_presets().items();
+    const auto& printer_items = preset_interactor.printer_configs().items();
     const Slic3r::Biz::Preset::PresetItem* sla_printer = nullptr;
     for (size_t i = 0, n = printer_items.size(); i < n; ++i) {
         const auto& item = printer_items.at(i);
@@ -423,7 +423,7 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Switching to an SLA printer cl
         }
     }
     REQUIRE(sla_printer != nullptr);
-    preset_interactor.select_printer_preset(sla_printer->hw_printer_config_id, sla_printer->id);
+    preset_interactor.select_printer_config(sla_printer->hw_printer_config_id);
 
     // SLA printers have no sheets, so nothing may stay selected (a view created now reads it).
     CHECK(preset_interactor.sheet_items().items().size() == 0);

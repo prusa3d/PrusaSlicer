@@ -493,6 +493,8 @@ struct PrinterToAdd
 {
     Domain::Preset::HwPrinterConfig config;
     std::string preset_item_id;
+    /// Set for a local/upload printer, which is stored on finish.
+    std::optional<Biz::PhysicalPrinter::PhysicalPrinterConfig> physical_printer;
 };
 
 static const Domain::Preset::HwToolConfigDef* find_tool_config_def(
@@ -607,26 +609,15 @@ public:
             [this]() { show_dialog(false); },
             [this](const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer)
             {
-                // const Domain::Preset::VendorData& vendor_data{
-                //     m_project_interactor.workbench()
-                //         .preset_bundle()
-                //         .vendor_bundles.at(printer.default_config.vendor_id)
-                //         .vendor_data};
-
-                // Domain::Preset::HwPrinterConfig config{printer.default_config};
-                // config.sheet = Biz::Preset::from_def(
-                //     vendor_data,
-                //     printer.sheets.sheet_defs.at(printer.sheets.selected_sheet));
-                // config.tools.clear();
-                // for (std::size_t selected_tool : printer.tools.selected_tools) {
-                //     config.tools.push_back(
-                //         Biz::Preset::from_def(vendor_data,
-                //                               printer.tools.tool_defs.at(selected_tool)));
-                // }
-
-                // add_printer(PrinterToAdd{config, printer.preset_item_id});
-                // show_dialog(false);
+                const Biz::Preset::PresetItem* preset{
+                    printer.hw_config ? find_system_preset(printer.hw_config->id) : nullptr};
+                if (!preset) {
+                    return;
+                }
+                add_printer(PrinterToAdd{*printer.hw_config, preset->id, printer});
+                show_dialog(false);
             });
+        m_dialog->set_flex_grow(1);
         m_dialog->set_visible(false);
     }
 
@@ -679,21 +670,31 @@ public:
         update_navigation();
     }
 
-    void delete_printer(const std::string& preset_item_id)
+    void delete_printer(Item* printer_item)
     {
         ASSERT(m_printers_to_add.size() == m_printers->items().size());
 
-        auto it{std::ranges::find_if(m_printers_to_add,
-                                     [&](const PrinterToAdd& printer)
-                                     { return printer.preset_item_id == preset_item_id; })};
-
+        const auto it{std::ranges::find(m_printers->items(), printer_item)};
         const std::size_t index{
-            static_cast<std::size_t>(std::distance(m_printers_to_add.begin(), it))};
+            static_cast<std::size_t>(std::distance(m_printers->items().begin(), it))};
         ASSERT(index < m_printers_to_add.size());
 
-        m_printers->remove_later(m_printers->items().at(index));
-        m_printers_to_add.erase(it);
+        m_printers->remove_later(printer_item);
+        m_printers_to_add.erase(m_printers_to_add.begin() + index);
         clear_state();
+    }
+
+    const Biz::Preset::PresetItem* find_system_preset(const std::string& hw_config_id) const
+    {
+        const auto& presets{m_project_interactor.preset_interactor().printer_presets().items()};
+        for (std::size_t i{}; i < presets.size(); ++i) {
+            if (presets.at(i).hw_printer_config_id == hw_config_id
+                && presets.at(i).origin == Domain::Preset::PresetOrigin::System)
+            {
+                return &presets.at(i);
+            }
+        }
+        return nullptr;
     }
 
     void clear_printers()
@@ -737,16 +738,7 @@ public:
                 .vendor_bundles.at(config.vendor_id)
                 .vendor_data};
 
-        const auto& presets{preset_interactor.printer_presets().items()};
-        const Biz::Preset::PresetItem* preset{nullptr};
-        for (std::size_t i{}; i < presets.size(); ++i) {
-            if (presets.at(i).hw_printer_config_id == config.id
-                && presets.at(i).origin == Domain::Preset::PresetOrigin::System)
-            {
-                preset = &presets.at(i);
-                break;
-            }
-        }
+        const Biz::Preset::PresetItem* preset{find_system_preset(config.id)};
         if (!preset) {
             return std::nullopt;
         }
@@ -991,7 +983,12 @@ public:
         auto it{
             std::ranges::find_if(m_printers_to_add,
                                  [&](const PrinterToAdd& candidate)
-                                 { return candidate.preset_item_id == printer.preset_item_id; })};
+                                 {
+                                     // Physical printers of the same model are distinct printers
+                                     return !candidate.physical_printer
+                                         && !printer.physical_printer
+                                         && candidate.preset_item_id == printer.preset_item_id;
+                                 })};
 
         const std::size_t index{
             static_cast<std::size_t>(std::distance(m_printers_to_add.begin(), it))};
@@ -1021,7 +1018,8 @@ public:
         label->set_orientation(Orientation::Vertical);
         label->set_justify_content(YGJustifyCenter);
         label->set_flex_grow(1);
-        auto title{label->emplace_back<Text>(printer.config.short_name)};
+        auto title{label->emplace_back<Text>(
+            printer.physical_printer ? printer.physical_printer->name : printer.config.short_name)};
         title->set_font_type(Render::ImguiFontType::Bold);
         title->set_flex_shrink(0);
 
@@ -1046,8 +1044,7 @@ public:
             right_section->emplace_back<LayoutButton>("", Render::Icon::DeleteBtnIcon)};
         delete_button->set_width(19_fpx);
         delete_button->set_aspect_ratio(1);
-        delete_button->callbacks().action = [this, id = printer.preset_item_id]()
-        { delete_printer(id); };
+        delete_button->callbacks().action = [this, printer_item]() { delete_printer(printer_item); };
 
         clear_state();
     }
@@ -1497,8 +1494,17 @@ void WelcomeDialog::finalize(const std::vector<PrinterToAdd>& printers)
         app_settings_advanced.toggle_printer_favorite_preset(printer_preset_item_id, hw_config.id);
     }
 
+    Biz::PhysicalPrinter::PhysicalPrinterInteractor& physical_printer_interactor{
+        m_project_interactor.physical_printer_interactor()};
+    for (const PrinterToAdd& printer : printers) {
+        if (printer.physical_printer) {
+            physical_printer_interactor.save_physical_printer(*printer.physical_printer);
+        }
+    }
+
     m_project_interactor.preset_interactor().select_printer_preset(printer_configs.front().id,
                                                                    printer_preset_item_ids.front());
+    physical_printer_interactor.select_default();
 
     auto& app_config_interactor{AppServices::instance().app_config_interactor()};
     app_config_interactor.set_item_value("printers_only_favorites", Domain::ConfigValue{false});

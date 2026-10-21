@@ -1,12 +1,8 @@
 #pragma once
 
 #include "Slic3r/Domain/ConfigPhysical.hpp"
-#include "Slic3r/Biz/ObservableListWithSelection.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
-
-namespace Slic3r::Biz::ConnectPrinter {
-struct ConnectPrinter;
-} // namespace Slic3r::Biz::ConnectPrinter
+#include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
 
 namespace Slic3r::Biz::PhysicalPrinter {
 
@@ -15,7 +11,7 @@ struct ConnectUpload
     std::string team_id;
     std::string printer_uuid;
     std::string access_token; // needs to be filled before upload
-    std::string state;
+    ConnectPrinter::ConnectPrinterState state{ConnectPrinter::ConnectPrinterState::Unknown};
 };
 
 struct PrinterUpload
@@ -42,9 +38,12 @@ struct PhysicalPrinterConfig
     std::string name;
     std::string uuid;
     std::optional<Domain::Preset::HwPrinterConfig> hw_config;
+    /// Created for a project loaded from 3mf, never stored nor editable.
+    bool is_runtime{false};
 };
 
-PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinter& printer);
+/// Name for the UI, marks runtime printers.
+std::string ui_name(const PhysicalPrinterConfig& printer);
 
 /**
  * @brief Load external hw config from Connect JSON
@@ -59,7 +58,5 @@ bool is_physical_printer_compatible(
     const PhysicalPrinterConfig& physical_config,
     const Domain::Preset::HwPrinterConfig& hw_config
 );
-
-using PhysicalPrinterObservableList = ObservableListWithSelection<PhysicalPrinterConfig>;
 
 } // namespace Slic3r::Biz::PhysicalPrinter

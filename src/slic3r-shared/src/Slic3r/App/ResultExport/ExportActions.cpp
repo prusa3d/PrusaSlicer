@@ -122,10 +122,11 @@ std::function<void()> upload_gcode_to_print_host(Biz::ProjectInteractor& project
     auto upload_fn{
         [pi_raw = &project_interactor]()
         {
-            const auto& phys_printer =
+            const Biz::PhysicalPrinter::PhysicalPrinterConfig* phys_printer =
                 pi_raw->physical_printer_interactor().selected_physical_printer_data();
-            const auto* payload =
-                std::get_if<Biz::PhysicalPrinter::PrinterUpload>(&phys_printer.payload);
+            const auto* payload = phys_printer
+                ? std::get_if<Biz::PhysicalPrinter::PrinterUpload>(&phys_printer->payload)
+                : nullptr;
             if (payload == nullptr) {
                 SPDLOG_INFO(
                     "Upload to Print Host aborted - the selected destination is no longer a print host."
@@ -134,7 +135,7 @@ std::function<void()> upload_gcode_to_print_host(Biz::ProjectInteractor& project
             }
 
             auto print_host_config =
-                std::make_shared<const Biz::PhysicalPrinter::PhysicalPrinterConfig>(phys_printer);
+                std::make_shared<const Biz::PhysicalPrinter::PhysicalPrinterConfig>(*phys_printer);
 
             ExportPathSelect::show_upload_modal_dialog(
                 *pi_raw,

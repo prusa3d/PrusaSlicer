@@ -64,7 +64,7 @@ public:
         RemovableDrive::RemovableDriveStatus status
     ) override;
 
-    void on_selected_physical_printer_changed(const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer) override;
+    void on_selected_physical_printer_changed() override;
     void on_physical_printer_picked() override;
 
     void on_user_account_id_success(bool is_refresh, const std::string& username) override;

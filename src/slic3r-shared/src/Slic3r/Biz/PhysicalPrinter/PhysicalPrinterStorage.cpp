@@ -1,8 +1,6 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterStorage.hpp"
 
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterJson.hpp"
-#include "Slic3r/Domain/ConfigPhysical.hpp"
-#include "Slic3r/Domain/Preset/HwConfig.hpp"
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Log.hpp"
 
@@ -24,17 +22,6 @@ inline fs::path storage_dir()
 {
     static const fs::path dir = fs::path{data_dir()} / "physical_printer";
     return dir;
-}
-
-PhysicalPrinterConfig default_new_printer()
-{
-    PrinterUpload up;
-    up.type      = Domain::PrusaLink;
-    up.auth_type = Domain::PrintHostAuthType::ApiKey;
-
-    PhysicalPrinterConfig printer;
-    printer.payload = std::move(up);
-    return printer;
 }
 } // namespace
 
@@ -182,11 +169,6 @@ void PhysicalPrinterStorage::save_all()
 }
 
 const UuidPrinterMap& PhysicalPrinterStorage::all_printers() const
-{
-    return m_map;
-}
-
-UuidPrinterMap& PhysicalPrinterStorage::all_printers()
 {
     return m_map;
 }

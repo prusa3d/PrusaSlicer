@@ -3,6 +3,7 @@
 #include "Slic3r/App/Yoga/Dialog.hpp"
 #include "Slic3r/App/Yoga/ListView.hpp"
 #include "Slic3r/App/Yoga/ScrollArea.hpp"
+#include "Slic3r/App/Yoga/ButtonGroup.hpp"
 #include "Slic3r/App/LogicalPrinterSettingsButton.hpp"
 #include "Slic3r/App/PhysicalPrinterSettingsButton.hpp"
 
@@ -76,12 +77,17 @@ protected:
     void update_warning();
 
 private:
+    /// Order matches the filter buttons, value is stored in AppConfig
+    enum class PrinterFilter { All, Local, Connect };
+
     using PrinterListViewFactory = Yoga::ViewFactory<
         PhysicalPrinterSettingsButton,
         Biz::PhysicalPrinter::PhysicalPrinterConfig,
         PhysicalPrinterSettingsButton::FnIndexClicked,
         PhysicalPrinterSettingsButton::FnIndexClicked,
-        PhysicalPrinterSettingsButton::FnIndexClicked>;
+        PhysicalPrinterSettingsButton::FnIndexClicked,
+        const Biz::Preset::PresetInteractor&,
+        Biz::PhysicalPrinter::PhysicalPrinterInteractor&>;
 
     using PrinterListView = Yoga::ListView<
         PhysicalPrinterSettingsButton,
@@ -119,6 +125,12 @@ private:
     Yoga::LayoutButton* m_add_printer_button{nullptr};
     Biz::UnsharedPointer<Biz::ObservableListSearcher<Biz::PhysicalPrinter::PhysicalPrinterConfig>>
         m_preset_searcher;
+    Biz::UnsharedPointer<
+        Biz::ObservableListSortFilter<Biz::PhysicalPrinter::PhysicalPrinterConfig>>
+        m_printer_filter;
+    Yoga::ButtonGroup m_printer_filter_button_group;
+    std::vector<Yoga::LayoutButton*> m_printer_filter_buttons;
+    PrinterFilter m_printer_filter_type{PrinterFilter::All};
 
     // Page settings attributes
     Yoga::Item* m_page_settings{nullptr};

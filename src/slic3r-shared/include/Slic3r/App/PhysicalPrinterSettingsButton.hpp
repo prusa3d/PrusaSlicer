@@ -1,7 +1,9 @@
 #pragma once
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterConfig.hpp"
+#include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
+#include "Slic3r/Biz/Platform/ListenerScope.hpp"
 
-#include "Slic3r/App/Yoga/PrinterSettingsButton.hpp"
+#include "Slic3r/App/PrinterSettingsButton.hpp"
 #include "Slic3r/Biz/DataObserver.hpp"
 
 namespace Slic3r::App::Yoga {
@@ -9,11 +11,16 @@ class Icon;
 class LayoutButton;
 } // namespace Slic3r::App::Yoga
 
+namespace Slic3r::Biz::Preset {
+class PresetInteractor;
+} // namespace Slic3r::Biz::Preset
+
 namespace Slic3r::App {
 
 class PhysicalPrinterSettingsButton :
-    public Yoga::PrinterSettingsButton,
-    public Biz::DataObserver<Biz::PhysicalPrinter::PhysicalPrinterConfig>
+    public PrinterSettingsButton,
+    public Biz::DataObserver<Biz::PhysicalPrinter::PhysicalPrinterConfig>,
+    public Biz::PhysicalPrinter::IPhysicalPrinterChangedListener
 {
 public:
     using FnIndexClicked = std::function<void(size_t)>;
@@ -23,7 +30,9 @@ public:
         const Biz::PhysicalPrinter::PhysicalPrinterConfig& physical_printer,
         FnIndexClicked on_clicked,
         FnIndexClicked on_cog_clicked,
-        FnIndexClicked on_bin_clicked
+        FnIndexClicked on_bin_clicked,
+        const Biz::Preset::PresetInteractor& preset_interactor,
+        Biz::PhysicalPrinter::PhysicalPrinterInteractor& physical_printer_interactor
     );
 
     void update_button_text();
@@ -40,6 +49,8 @@ public:
 
     void set_compatible(bool compatible);
 
+    void on_selected_physical_printer_changed() override;
+
 protected:
     void on_data_update() override;
 
@@ -47,10 +58,22 @@ protected:
 
 private:
     void set_visible_bin(bool is_visible);
+    void set_printer_image();
+    void set_connect_state(Biz::ConnectPrinter::ConnectPrinterState state);
+    void update_tooltip();
+    void update_selected();
+
+    Biz::ListenerScope<
+        Biz::PhysicalPrinter::IPhysicalPrinterChangedListener,
+        Biz::PhysicalPrinter::PhysicalPrinterInteractor,
+        PhysicalPrinterSettingsButton>
+        m_physical_printer_changed_listener_scope;
 
     FnIndexClicked m_on_clicked;
     FnIndexClicked m_on_cog_clicked;
     FnIndexClicked m_on_bin_clicked;
+    const Biz::Preset::PresetInteractor& m_preset_interactor;
+    const Biz::PhysicalPrinter::PhysicalPrinterInteractor& m_physical_printer_interactor;
 
     Yoga::LayoutButton* m_bin_btn{nullptr};
     Yoga::Icon* m_expand_icon{nullptr};
@@ -58,6 +81,9 @@ private:
     bool m_is_bin_supported{true};
 
     Yoga::Icon* m_attention_icon{nullptr};
+    Yoga::Icon* m_connect_icon{nullptr};
+    Yoga::LayoutButton* m_state_btn{nullptr};
+    bool m_is_compatible{true};
 };
 
 } // namespace Slic3r::App

@@ -11,5 +11,6 @@ inline constexpr std::string_view CONFIGURATION          = "configuration";
 inline constexpr std::string_view OBJECTS                = "objects";
 inline constexpr std::string_view CONFIG_CONTAINERS      = "config_containers";
 inline constexpr std::string_view VIRTUAL_EXTRUDERS      = "virtual_extruders";
+inline constexpr std::string_view PHYSICAL_PRINTER       = "physical_printer";
 
 } // namespace Slic3r::Biz::Format::ProjectFileConstants

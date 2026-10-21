@@ -308,6 +308,22 @@ public:
         const Domain::Preset::HwPrinterConfig& printer
     );
 
+    /**
+     * @brief Create full hw config from the preset bundle for given external one
+     * @param printer External hw config
+     * @return Full hw config or error message why its creation failed.
+     */
+    tl::expected<Domain::Preset::HwPrinterConfig, std::string> evaluate_external_printer_config(
+        const Domain::Preset::HwPrinterConfig& printer
+    ) const;
+
+    /**
+     * @brief Human readable summary of hw config
+     * @param hw_config Hw config to describe
+     * @return "Printer model / Tools / Sheet / Feeders", missing parts are skipped.
+     */
+    std::string ui_hw_config_summary(const Domain::Preset::HwPrinterConfig& hw_config) const;
+
     ConfigBoxInteractor& printer_cbi();
     PrintToolConfigBoxInteractor& print_tool_cbi();
     OverridableCBIObservableList& material_cbi_list();

@@ -80,6 +80,7 @@ AddPrinterPanel::AddPrinterPanel(
 {
     const ImColor secondary_color{m_theme->color_imgui(Platform::Color::WindowBgAlternate)};
 
+    set_object_name("AddPrinterPanel");
     set_orientation(Orientation::Vertical);
     set_align_items(YGAlignStretch);
 
@@ -105,6 +106,7 @@ AddPrinterPanel::AddPrinterPanel(
 
     m_stack_layout = emplace_back<StackLayout>();
     m_stack_layout->set_orientation(Orientation::Vertical);
+    m_stack_layout->set_flex_grow(1);
 
     create_page_search();
 

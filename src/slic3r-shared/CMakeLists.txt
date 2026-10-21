@@ -230,6 +230,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/PhysicalPrinterSettingsButton.cpp
         include/Slic3r/App/LogicalPrinterSettingsButton.hpp
         src/Slic3r/App/LogicalPrinterSettingsButton.cpp
+        include/Slic3r/App/PrinterSettingsButton.hpp
+        src/Slic3r/App/PrinterSettingsButton.cpp
         include/Slic3r/App/PrinterAddDialog.hpp
         src/Slic3r/App/PrinterAddDialog.cpp
         include/Slic3r/App/PresetUpdater/PresetUpdaterActivityReporter.hpp
@@ -671,8 +673,6 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/App/Yoga/MenuItem.hpp
         src/Slic3r/App/Yoga/Menu.cpp
         include/Slic3r/App/Yoga/Menu.hpp
-        src/Slic3r/App/Yoga/PrinterSettingsButton.cpp
-        include/Slic3r/App/Yoga/PrinterSettingsButton.hpp
         src/Slic3r/App/Yoga/MaterialSettingsButton.cpp
         include/Slic3r/App/Yoga/MaterialSettingsButton.hpp
         include/Slic3r/App/Yoga/ButtonGroup.hpp

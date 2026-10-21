@@ -37,10 +37,7 @@ public:
 
     virtual void on_init(Biz::ProjectInteractor* project_interactor) = 0;
 
-    void on_printer_data_changed() override;
-    void on_selected_physical_printer_changed(
-        const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer
-    ) override;
+    void on_selected_physical_printer_changed() override;
 
     void on_export_destination_changed() override;
 

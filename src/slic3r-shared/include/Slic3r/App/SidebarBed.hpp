@@ -30,11 +30,11 @@ class PrinterSettingsDialog;
 class PrinterAddDialog;
 class MaterialSelectionDialog;
 class MaterialListView;
+class PrinterSettingsButton;
 
 namespace Yoga {
 class Text;
 class AbstractButton;
-class PrinterSettingsButton;
 } // namespace Yoga
 
 class SidebarBed :
@@ -74,7 +74,7 @@ public:
     ) override;
     void on_preset_bundles_loaded() override;
 
-    void on_selected_physical_printer_changed(const Biz::PhysicalPrinter::PhysicalPrinterConfig &printer) override;
+    void on_selected_physical_printer_changed() override;
 
     PrinterSettingsDialog& logical_printer_settings_dialog();
     PrinterAddDialog& printer_add_dialog();
@@ -113,7 +113,7 @@ private:
     Navigator& m_navigator;
 
     Yoga::Text* m_bed_name{nullptr};
-    Yoga::PrinterSettingsButton* m_logical_printer_button{nullptr};
+    PrinterSettingsButton* m_logical_printer_button{nullptr};
     PresetComboBox* m_preset_combo_box{nullptr};
 
     std::shared_ptr<Yoga::ButtonGroup> m_material_button_group;

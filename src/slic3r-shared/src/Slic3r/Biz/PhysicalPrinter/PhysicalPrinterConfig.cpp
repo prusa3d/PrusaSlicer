@@ -2,6 +2,9 @@
 
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
 #include "Slic3r/Biz/Preset/IO/HwConfigConnectJson.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
+
+#include <fmt/format.h>
 
 namespace Slic3r::Biz::PhysicalPrinter {
 
@@ -23,18 +26,13 @@ std::string physical_printer_type_to_string(const PhysicalPrinterConfig& data)
     );
 }
 
-PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinter& printer)
+std::string ui_name(const PhysicalPrinterConfig& printer)
 {
-    ConnectUpload upload;
-    upload.printer_uuid = printer.uuid;
-    upload.state        = ConnectPrinter::connect_printer_state_to_string(printer.state);
-    return {
-        std::move(upload),
-        {},
-        printer.name.empty() ? printer.model : printer.name,
-        printer.uuid,
-        hw_config_from_connect_json(printer.json)
-    };
+    if (printer.is_runtime) {
+        //TRN {} is printer name
+        return fmt::format(fmt::runtime(_u8L("(From 3mf) {}")), printer.name);
+    }
+    return printer.name;
 }
 
 std::optional<Domain::Preset::HwPrinterConfig> hw_config_from_connect_json(std::string_view json)

@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
+#include "Slic3r/Biz/ProjectScoped.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/Platform/IAppConfigProvider.hpp"
@@ -10,10 +11,16 @@
 #include "Slic3r/Biz/Platform/JobManager/JobManager.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
+#include "Slic3r/Domain/Workbench.hpp"
 
 #include "Slic3r/Log.hpp"
 #include "nlohmann/json.hpp"
 
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <variant>
@@ -33,13 +40,31 @@ bool auth_type_supported_by_host(Domain::PrintHostType type, Domain::PrintHostAu
     return auth_type != Domain::PrintHostAuthType::None;
 }
 
+PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinter& printer)
+{
+    ConnectUpload upload;
+    upload.printer_uuid = printer.uuid;
+    upload.state        = printer.state;
+    return {
+        std::move(upload),
+        {},
+        printer.name.empty() ? printer.model : printer.name,
+        printer.uuid,
+        hw_config_from_connect_json(printer.json)
+    };
+}
+
 } // namespace
 
 PhysicalPrinterInteractor::PhysicalPrinterInteractor(
+    Domain::Workbench& workbench,
+    ProjectInteractor& project_interactor,
     Platform::IMainThreadDispatcher& dispatcher,
     Preset::PresetInteractor& preset_interactor,
     UserAccount::UserAccountInteractor& user_account_interactor
 ) :
+    m_workbench(workbench),
+    m_project_contexts(std::make_unique<ProjectContexts>(project_interactor)),
     m_dispatcher(dispatcher),
     m_preset_interactor(preset_interactor),
     m_user_account_interactor(user_account_interactor),
@@ -48,12 +73,6 @@ PhysicalPrinterInteractor::PhysicalPrinterInteractor(
     m_printer_preset_selector(preset_interactor)
 {
     read_storage();
-    // TODO: @zaraka: I had to put the line in if to make at least some test run
-    // (like the one I was writing code against)
-    if (m_observable_list.size() > 0) {
-        m_selected_uuid  = m_observable_list.at(0).uuid;
-    }
-    m_selected_index = 0;
     restore_last_used_selection();
 }
 
@@ -91,7 +110,6 @@ void PhysicalPrinterInteractor::restore_last_used_selection()
         return;
     }
     m_selected_uuid      = m_last_used_uuid;
-    m_selected_index     = *index;
     m_explicit_selection = true;
 }
 
@@ -115,11 +133,6 @@ void PhysicalPrinterInteractor::remember_used_printer(const std::string& uuid)
     set_last_used(uuid);
 }
 
-bool PhysicalPrinterInteractor::can_be_selected(const std::string& uuid) const
-{
-    return can_be_selected_at(index_of(uuid));
-}
-
 bool PhysicalPrinterInteractor::can_be_selected_at(size_t index) const
 {
     const auto& printer = m_observable_list.at(index);
@@ -129,25 +142,45 @@ bool PhysicalPrinterInteractor::can_be_selected_at(size_t index) const
     return true;
 }
 
-void PhysicalPrinterInteractor::apply_selection(const std::string& uuid)
+void PhysicalPrinterInteractor::apply_selection(const std::string& uuid, bool apply_hw_config)
 {
-    m_selected_uuid                                      = uuid;
-    m_selected_index                                     = index_of(uuid);
-    m_container_to_printer_uuid_map[m_current_container] = m_selected_uuid;
-    const auto& physical_printer = m_storage.all_printers().at(uuid);
+    m_selected_uuid                              = uuid;
+    const PhysicalPrinterConfig physical_printer = printer_config_at(index_of(uuid));
+    if (Domain::ConfigContainer* config_container = current_config_container()) {
+        config_container->physical_printer_selection() = {
+            physical_printer.uuid,
+            physical_printer.name
+        };
+    }
 
-    ASSERT(physical_printer.hw_config.has_value());
-    m_preset_interactor.select_external_printer_config(physical_printer.hw_config.value());
+    // Hw config can be missing for Connect printers with incomplete data
+    if (apply_hw_config && physical_printer.hw_config.has_value()) {
+        if (physical_printer.is_runtime) {
+            m_preset_interactor.select_printer_config(physical_printer.hw_config->id);
+        } else {
+            m_preset_interactor.select_external_printer_config(physical_printer.hw_config.value());
+        }
+    }
 
     this->invoke_listeners<IPhysicalPrinterChangedListener>(
-        [&](auto* listener)
-        { listener->on_selected_physical_printer_changed(physical_printer); }
+        [](auto* listener) { listener->on_selected_physical_printer_changed(); }
+    );
+}
+
+void PhysicalPrinterInteractor::clear_selection()
+{
+    if (m_selected_uuid.empty()) {
+        return;
+    }
+    m_selected_uuid.clear();
+    this->invoke_listeners<IPhysicalPrinterChangedListener>(
+        [](auto* listener) { listener->on_selected_physical_printer_changed(); }
     );
 }
 
 void PhysicalPrinterInteractor::select_uuid(const std::string& uuid)
 {
-    apply_selection(uuid);
+    apply_selection(uuid, true);
     m_explicit_selection = true;
 
     this->invoke_listeners<IPhysicalPrinterChangedListener>(
@@ -159,7 +192,7 @@ void PhysicalPrinterInteractor::select_uuid_with_presets(const std::string& uuid
 {
     select_uuid(uuid);
 
-    const PhysicalPrinterConfig& printer = selected_physical_printer_data();
+    const PhysicalPrinterConfig& printer = *ASSERT_VAL(selected_physical_printer_data());
     if (const auto* upload = std::get_if<ConnectUpload>(&printer.payload)) {
         if (upload->printer_uuid.empty()) {
             return;
@@ -186,31 +219,43 @@ void PhysicalPrinterInteractor::select_uuid_with_presets(const std::string& uuid
 
 void PhysicalPrinterInteractor::select_default()
 {
-    if (m_observable_list.size() == 0) {
+    m_explicit_selection = false;
+
+    const Domain::ConfigContainer* config_container = current_config_container();
+    if (config_container == nullptr) {
+        if (!find_index(m_selected_uuid)) {
+            clear_selection();
+        }
         return;
     }
-    apply_selection(m_observable_list.at(0).uuid);
-    m_explicit_selection = false;
+
+    const Domain::Preset::HwPrinterConfig& hw_config =
+        config_container->selected_preset().hw_config;
+    const std::string uuid = config_container->physical_printer_selection().uuid;
+    if (std::optional<size_t> index = find_index(uuid);
+        index && can_be_selected_at(*index) && is_printer_compatible(*index, hw_config))
+    {
+        apply_selection(uuid, false);
+    } else if (std::optional<size_t> index = find_compatible_index(m_current_project_id, hw_config))
+    {
+        apply_selection(m_observable_list.at(*index).uuid, false);
+    } else {
+        clear_selection();
+    }
 }
 
 void PhysicalPrinterInteractor::remove_uuid(const std::string& uuid)
 {
     size_t index = index_of(uuid);
     ASSERT(!is_connect_printer_index(index));
+    ASSERT(!m_observable_list.at(index).is_runtime);
     bool was_selected = (uuid == m_selected_uuid);
 
     m_storage.remove_one(uuid);
     m_observable_list.remove({index, index});
-    std::erase_if(
-        m_container_to_printer_uuid_map,
-        [&uuid](const auto& entry) { return entry.second == uuid; }
-    );
 
-    // Always call some select method after removal to invoke listeners
     if (was_selected) {
         select_default();
-    } else {
-        apply_selection(m_selected_uuid);
     }
 
     if (uuid == m_last_used_uuid) {
@@ -220,17 +265,24 @@ void PhysicalPrinterInteractor::remove_uuid(const std::string& uuid)
 
 bool PhysicalPrinterInteractor::is_printer_upload_selected() const
 {
-    return std::holds_alternative<PrinterUpload>(selected_physical_printer_data().payload);
+    const PhysicalPrinterConfig* printer = selected_physical_printer_data();
+    return printer != nullptr && std::holds_alternative<PrinterUpload>(printer->payload);
 }
 
 bool PhysicalPrinterInteractor::is_connect_printer_selected() const
 {
-    return std::holds_alternative<ConnectUpload>(selected_physical_printer_data().payload);
+    const PhysicalPrinterConfig* printer = selected_physical_printer_data();
+    return printer != nullptr && std::holds_alternative<ConnectUpload>(printer->payload);
 }
 
 void PhysicalPrinterInteractor::create_or_save_physical_printer(
     const PhysicalPrinterConfig& printer
 )
+{
+    select_uuid(save_physical_printer(printer));
+}
+
+std::string PhysicalPrinterInteractor::save_physical_printer(const PhysicalPrinterConfig& printer)
 {
     const PhysicalPrinterConfig& processed_printer = m_storage.save_or_create(printer);
 
@@ -240,8 +292,7 @@ void PhysicalPrinterInteractor::create_or_save_physical_printer(
     } else {
         m_observable_list.append(processed_printer);
     }
-
-    select_uuid(processed_printer.uuid);
+    return processed_printer.uuid;
 }
 
 ObservableList<PhysicalPrinterConfig>& PhysicalPrinterInteractor::observable_list()
@@ -270,48 +321,196 @@ bool PhysicalPrinterInteractor::is_connect_printer_index(size_t index) const
         && index < CONNECT_PRINTERS_OFFSET + m_connect_printer_count;
 }
 
+PhysicalPrinterConfig PhysicalPrinterInteractor::printer_config_at(size_t index) const
+{
+    // Connect printers are not in the storage, they are owned by the Connect printer service
+    if (is_connect_printer_index(index)) {
+        return create_connect_printer_config(
+            m_connect_printer_service.at(index - CONNECT_PRINTERS_OFFSET)
+        );
+    }
+    const PhysicalPrinterConfig& printer = m_observable_list.at(index);
+    return printer.is_runtime ? printer : m_storage.all_printers().at(printer.uuid);
+}
+
+Domain::ConfigContainer* PhysicalPrinterInteractor::current_config_container()
+{
+    Domain::Project* project = m_workbench.find_project_by_id(m_current_project_id);
+    return project ? project->find_config_container(m_current_container_id) : nullptr;
+}
+
+void PhysicalPrinterInteractor::sync_runtime_printers(Domain::SelectionId project_id)
+{
+    const size_t offset = CONNECT_PRINTERS_OFFSET + m_connect_printer_count;
+    if (m_runtime_printer_count > 0) {
+        m_observable_list.remove({offset, offset + m_runtime_printer_count - 1});
+    }
+    const std::vector<PhysicalPrinterConfig>& runtime_printers =
+        m_project_contexts->project(project_id).runtime_printers;
+    for (size_t i = 0; i < runtime_printers.size(); ++i) {
+        m_observable_list.insert(runtime_printers[i], offset + i);
+    }
+    m_runtime_printer_count       = runtime_printers.size();
+    m_runtime_printers_project_id = project_id;
+}
+
+std::optional<size_t> PhysicalPrinterInteractor::find_compatible_index(
+    Domain::SelectionId project_id,
+    const Domain::Preset::HwPrinterConfig& hw_config
+) const
+{
+    auto is_compatible = [&](size_t index)
+    {
+        // Runtime printers in the list may belong to another project
+        return (!m_observable_list.at(index).is_runtime
+                || m_runtime_printers_project_id == project_id)
+            && can_be_selected_at(index)
+            && is_printer_compatible(index, hw_config);
+    };
+    if (std::optional<size_t> index = find_index(m_selected_uuid); index && is_compatible(*index)) {
+        return index;
+    }
+    for (size_t i = 0; i < m_observable_list.size(); ++i) {
+        if (is_compatible(i)) {
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
+const PhysicalPrinterConfig& PhysicalPrinterInteractor::get_or_create_runtime_printer(
+    Domain::SelectionId project_id,
+    const Domain::PhysicalPrinterSelection& selection,
+    const Domain::Preset::HwPrinterConfig& hw_config
+)
+{
+    const std::string& name = selection.name.empty() ? hw_config.name : selection.name;
+
+    std::vector<PhysicalPrinterConfig>& runtime_printers =
+        m_project_contexts->project(project_id).runtime_printers;
+    auto it = std::ranges::find_if(
+        runtime_printers,
+        [&](const PhysicalPrinterConfig& printer)
+        { return printer.name == name && printer.hw_config->id == hw_config.id; }
+    );
+    if (it != runtime_printers.end()) {
+        return *it;
+    }
+
+    // Uuid from 3mf is not reused, it may belong to a printer which is not available yet
+    PhysicalPrinterConfig printer;
+    printer.payload    = FileSystemExport{false};
+    printer.name       = name;
+    printer.uuid       = boost::uuids::to_string(boost::uuids::random_generator()());
+    printer.hw_config  = hw_config;
+    printer.is_runtime = true;
+    return runtime_printers.emplace_back(std::move(printer));
+}
+
+void PhysicalPrinterInteractor::load_physical_printers_from_3mf(Domain::SelectionId project_id)
+{
+    Domain::Project* project = m_workbench.find_project_by_id(project_id);
+    ASSERT(project != nullptr);
+
+    for (const std::unique_ptr<Domain::ConfigContainer>& config_container :
+         project->config_containers())
+    {
+        Domain::PhysicalPrinterSelection& selection =
+            config_container->physical_printer_selection();
+        const Domain::Preset::HwPrinterConfig& hw_config =
+            config_container->selected_preset().hw_config;
+
+        if (std::optional<size_t> index = find_index(selection.uuid); index
+            && !m_observable_list.at(*index).is_runtime
+            && is_printer_compatible(*index, hw_config))
+        {
+            continue;
+        }
+
+        if (selection.uuid.empty()) {
+            if (std::optional<size_t> index = find_compatible_index(project_id, hw_config)) {
+                const PhysicalPrinterConfig& printer = m_observable_list.at(*index);
+                selection = {printer.uuid, printer.name};
+                continue;
+            }
+        }
+
+        const PhysicalPrinterConfig& printer =
+            get_or_create_runtime_printer(project_id, selection, hw_config);
+        selection = {printer.uuid, printer.name};
+    }
+
+    m_runtime_printers_project_id.reset();
+}
+
 void PhysicalPrinterInteractor::sync_selection()
 {
-    if (std::optional<size_t> index = find_index(m_selected_uuid)) {
-        m_selected_index = *index;
-        return;
+    if (!find_index(m_selected_uuid)) {
+        select_default();
     }
-    select_default();
+}
+
+PhysicalPrinterConfig PhysicalPrinterInteractor::create_connect_printer_config(
+    const ConnectPrinter::ConnectPrinter& printer
+) const
+{
+    PhysicalPrinterConfig config = connect_printer_config(printer);
+    if (!config.hw_config.has_value()) {
+        return config;
+    }
+
+    // External hw config from Connect has no names and visual data, take them from the bundle.
+    auto full_hw_config = m_preset_interactor.evaluate_external_printer_config(*config.hw_config);
+    if (!full_hw_config.has_value()) {
+        SPDLOG_WARN(
+            "Cannot evaluate hw config of Connect printer '{}': {}",
+            printer.name,
+            full_hw_config.error()
+        );
+        return config;
+    }
+    Domain::Preset::HwPrinterConfig& hw_config = *config.hw_config;
+    hw_config.printer_id = full_hw_config->printer_id;
+    hw_config.repo_id    = full_hw_config->repo_id;
+    hw_config.vendor_id  = full_hw_config->vendor_id;
+    hw_config.name       = full_hw_config->name;
+    hw_config.short_name = full_hw_config->short_name;
+    hw_config.visual     = full_hw_config->visual;
+    hw_config.sheet      = full_hw_config->sheet;
+    for (size_t i = 0; i < std::min(hw_config.tools.size(), full_hw_config->tools.size()); ++i) {
+        hw_config.tools[i].name = full_hw_config->tools[i].name;
+    }
+    return config;
 }
 
 void
 PhysicalPrinterInteractor::on_inserted(const ConnectPrinter::ConnectPrinter& printer, size_t index)
 {
-    // TODO: @zaraka: verify if this is right, likely not, but I need to prevent it crashing
-    // on selection as the entry was looked up there and if not found ASSERTed...
-    auto cfg = connect_printer_config(printer);
-    m_storage.all_printers()[printer.uuid] = cfg;
+    auto cfg = create_connect_printer_config(printer);
 
     m_observable_list.insert(cfg, CONNECT_PRINTERS_OFFSET + index);
     ++m_connect_printer_count;
     sync_selection();
 
+    const Domain::ConfigContainer* config_container = current_config_container();
     if (!m_explicit_selection
         && printer.uuid == m_last_used_uuid
-        && m_selected_uuid != printer.uuid)
+        && m_selected_uuid != printer.uuid
+        && config_container != nullptr
+        && is_printer_compatible(
+            CONNECT_PRINTERS_OFFSET + index,
+            config_container->selected_preset().hw_config
+        ))
     {
-        apply_selection(printer.uuid);
+        apply_selection(printer.uuid, false);
     }
 }
 
 void PhysicalPrinterInteractor::on_removed(const IndexRange& index_range)
 {
-    for (size_t i = index_range.from; i <= index_range.to; ++i) {
-        const std::string& uuid = m_observable_list.at(CONNECT_PRINTERS_OFFSET + i).uuid;
-        std::erase_if(
-            m_container_to_printer_uuid_map,
-            [&uuid](const auto& entry) { return entry.second == uuid; }
-        );
-    }
     m_observable_list.remove(
         {CONNECT_PRINTERS_OFFSET + index_range.from, CONNECT_PRINTERS_OFFSET + index_range.to}
     );
-    // TODO: @zaraka: maybe sync the m_storage?
     m_connect_printer_count -= index_range.to - index_range.from + 1;
     sync_selection();
 }
@@ -319,14 +518,13 @@ void PhysicalPrinterInteractor::on_removed(const IndexRange& index_range)
 void PhysicalPrinterInteractor::on_updated(const IndexRange& index_range)
 {
     for (size_t i = index_range.from; i <= index_range.to; ++i) {
-        PhysicalPrinterConfig config = connect_printer_config(m_connect_printer_service.at(i));
+        PhysicalPrinterConfig config =
+            create_connect_printer_config(m_connect_printer_service.at(i));
         const PhysicalPrinterConfig& current = m_observable_list.at(CONNECT_PRINTERS_OFFSET + i);
         if (config.name != current.name
             || std::get<ConnectUpload>(config.payload).state
                 != std::get<ConnectUpload>(current.payload).state)
         {
-            // TODO: @zaraka: verify if this is right
-            m_storage.all_printers()[m_connect_printer_service.at(i).uuid] = config;
             m_observable_list.set(std::move(config), CONNECT_PRINTERS_OFFSET + i);
         }
     }
@@ -357,27 +555,23 @@ std::optional<size_t> PhysicalPrinterInteractor::find_index(const std::string& u
     return std::nullopt;
 }
 
-const PhysicalPrinterConfig& PhysicalPrinterInteractor::selected_physical_printer_data() const
+const PhysicalPrinterConfig* PhysicalPrinterInteractor::selected_physical_printer_data() const
 {
-    return m_observable_list.at(m_selected_index);
+    std::optional<size_t> index = find_index(m_selected_uuid);
+    return index ? &m_observable_list.at(*index) : nullptr;
 }
 
 bool PhysicalPrinterInteractor::is_printer_compatible(
-    const std::string& uuid,
+    size_t index,
     const Domain::Preset::HwPrinterConfig& config
 ) const
 {
-    const auto& printer = m_observable_list.at(index_of(uuid));
-
-    if (std::holds_alternative<ConnectUpload>(printer.payload)) {
+    const PhysicalPrinterConfig& printer = m_observable_list.at(index);
+    // Connect printer with incomplete data has no hw config to compare
+    if (std::holds_alternative<ConnectUpload>(printer.payload) && !printer.hw_config.has_value()) {
         return true;
     }
-
-    if (std::holds_alternative<PrinterUpload>(printer.payload)) {
-        return is_physical_printer_compatible(printer, config);
-    }
-
-    return false;
+    return is_physical_printer_compatible(printer, config);
 }
 
 void PhysicalPrinterInteractor::on_selected_config_container_changed(
@@ -385,27 +579,11 @@ void PhysicalPrinterInteractor::on_selected_config_container_changed(
     Domain::SelectionId container_id
 )
 {
-    m_current_container = ContainerKey{project_id, container_id};
-
-    // TODO: @zaraka: "fix" to make test run
-    if (m_observable_list.size() == 0) {
-        return;
+    m_current_project_id   = project_id;
+    m_current_container_id = container_id;
+    if (m_runtime_printers_project_id != project_id) {
+        sync_runtime_printers(project_id);
     }
-
-    bool hw_compatible =
-        is_printer_compatible(m_selected_uuid, m_preset_interactor.current_printer_config());
-    if (auto it = m_container_to_printer_uuid_map.find(m_current_container);
-        it != m_container_to_printer_uuid_map.end())
-    {
-        if (can_be_selected(it->second)) {
-            apply_selection(it->second);
-            return;
-        }
-    } else if (can_be_selected(m_selected_uuid) && hw_compatible) {
-        m_container_to_printer_uuid_map.emplace(m_current_container, m_selected_uuid);
-        return;
-    }
-
     select_default();
 }
 

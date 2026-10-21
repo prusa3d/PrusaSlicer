@@ -13,6 +13,7 @@
 #include "Slic3r/App/Theme.hpp"
 #include "Slic3r/App/Wildcards.hpp"
 #include "Slic3r/App/Yoga/Item.hpp"
+#include "Slic3r/App/Yoga/Icon.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Yoga/InputTextField.hpp"
 #include "Slic3r/App/Yoga/ComboBox.hpp"
@@ -119,6 +120,7 @@ PhysicalPrinterForm::PhysicalPrinterForm(Biz::ProjectInteractor& project_interac
 
 PhysicalPrinterForm::~PhysicalPrinterForm()
 {
+    m_nozzle_list_view->set_source_list(nullptr, true);
     m_physical_printer_interactor.cancel_edited_printer_connection_test();
 }
 
@@ -298,6 +300,7 @@ void PhysicalPrinterForm::build_form()
     m_connection_box->set_orientation(Orientation::Vertical);
     m_connection_box->set_gap(5_fpx);
     m_connection_box->set_padding(10_fpx);
+    m_connection_box->set_flex_shrink(0);
 
     Item* header = m_connection_box->emplace_back<Item>();
     header->set_orientation(Orientation::Horizontal);
@@ -474,7 +477,7 @@ void PhysicalPrinterForm::build_form()
 
     // TRN Button that verifies the connection to the configured print host.
     m_test_button = footer->emplace_back<LayoutButton>(_u8L("Test"));
-    m_test_button->set_content_padding({8_fpx, 4_fpx});
+    m_test_button->set_content_padding({10_fpx, 4_fpx});
     m_test_button->callbacks().action = [this]
     {
         m_test_button->set_enabled(false);
@@ -491,7 +494,11 @@ void PhysicalPrinterForm::build_form()
         Render::Icon::TobBarSave,
         Biz::_u8L("Save this printer configuration")
     );
-    m_save_button->set_content_padding({8_fpx, 4_fpx});
+    m_save_button->set_content_padding({10_fpx, 4_fpx});
+    m_save_button->set_content_align_items(YGAlignCenter);
+    // Icon has no intrinsic size, without it the icon collapses next to the label
+    m_save_button->icon_object()->set_width(14_fpx);
+    m_save_button->icon_object()->set_height(14_fpx);
     m_save_button->set_background_color(Platform::Color::AccentPrimary);
     m_save_button->set_label_font_type(Render::ImguiFontType::Bold);
     m_save_button->callbacks().action = [this] { commit_edits(); };

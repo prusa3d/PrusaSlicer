@@ -159,8 +159,7 @@ tl::expected<PhysicalPrinterConfig, std::string> printer_from_json(
         return tl::unexpected{"Invalid hw_config: " + hw_config.error()};
 
     PhysicalPrinterConfig printer;
-    std::string type;
-    get_str(json, "type");
+    const std::string type = get_str(json, "type");
 
     if (type.empty() || type == "PrinterUpload") {
         PrinterUpload up;

@@ -1,10 +1,10 @@
 #pragma once
 
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
-#include "Slic3r/Biz/ObservableList.hpp"
 #include "Slic3r/Biz/Platform/IMainThreadDispatcher.hpp"
 #include "Slic3r/Biz/UserAccount/IUserAccountListener.hpp"
 #include "Slic3r/Biz/Network/IHttp.hpp"
+#include "Slic3r/Biz/IObservableList.hpp"
 #include "Slic3r/Log.hpp"
 
 #include <functional>

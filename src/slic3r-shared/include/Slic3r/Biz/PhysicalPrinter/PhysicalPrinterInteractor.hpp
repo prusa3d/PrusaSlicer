@@ -14,13 +14,26 @@
 #include "Slic3r/Domain/SelectionId.hpp"
 
 #include <string>
-#include <map>
 #include <functional>
+#include <memory>
 #include <optional>
+#include <vector>
+
+namespace Slic3r::Domain {
+class ConfigContainer;
+class Workbench;
+struct PhysicalPrinterSelection;
+} // namespace Slic3r::Domain
 
 namespace Slic3r::Domain::Preset {
 struct HwPrinterConfig;
 } // namespace Slic3r::Domain::Preset
+
+namespace Slic3r::Biz {
+class ProjectInteractor;
+template <typename T>
+class ProjectScoped;
+} // namespace Slic3r::Biz
 
 namespace Slic3r::Biz::Preset {
 class PresetInteractor;
@@ -47,6 +60,8 @@ class PhysicalPrinterInteractor :
 {
 public:
     PhysicalPrinterInteractor(
+        Domain::Workbench& workbench,
+        ProjectInteractor& project_interactor,
         Platform::IMainThreadDispatcher& dispatcher,
         Preset::PresetInteractor& preset_interactor,
         UserAccount::UserAccountInteractor& user_account_interactor
@@ -61,16 +76,18 @@ public:
 
     Preset::PrinterPresetSelector& printer_preset_selector();
 
-    /// True if the printer may be selected (a Connect printer needs a login).
-    bool can_be_selected(const std::string& uuid) const;
-
     /// Explicit user selection for this session.
     void select_uuid(const std::string& uuid);
 
     /// Explicit user selection that also selects the presets matching the printer.
     void select_uuid_with_presets(const std::string& uuid);
 
-    /// Automatic fallback to the first entry.
+    /**
+     * @brief Automatic selection which keeps the presets untouched.
+     *
+     * Selects the printer remembered by the current config container, otherwise the first
+     * compatible one, otherwise none.
+     */
     void select_default();
 
     /// Persists the printer restored on the next start.
@@ -91,7 +108,14 @@ public:
      */
     void create_or_save_physical_printer(const PhysicalPrinterConfig& printer);
 
-    const PhysicalPrinterConfig& selected_physical_printer_data() const;
+    /**
+     * @brief Stores the printer without selecting it.
+     * @return Uuid of the stored printer, generated for a new one.
+     */
+    std::string save_physical_printer(const PhysicalPrinterConfig& printer);
+
+    /// @return Selected printer, nullptr when there is none (e.g. no printer exists).
+    const PhysicalPrinterConfig* selected_physical_printer_data() const;
 
     bool is_connection_testable(const PhysicalPrinterConfig& printer) const;
 
@@ -105,12 +129,16 @@ public:
     /// Discards the running test's result so a new one may start at once. Safe to call repeatedly.
     void cancel_edited_printer_connection_test();
 
-    bool is_printer_compatible(
-        const std::string& uuid,
-        const Domain::Preset::HwPrinterConfig& config
-    ) const;
+    /**
+     * @brief Resolves the physical printers of config containers of a project loaded from 3mf.
+     *
+     * Keeps the stored printer when it matches the container's hw config, otherwise picks
+     * a matching printer (only when 3mf names none) or creates a runtime printer for the project.
+     * @param project_id Project which config containers were loaded from 3mf.
+     */
+    void load_physical_printers_from_3mf(Domain::SelectionId project_id);
 
-    /// Restores the destination remembered for the newly active config container.
+    /// Restores the physical printer remembered by the newly active config container.
     void on_selected_config_container_changed(
         Domain::SelectionId project_id,
         Domain::SelectionId container_id
@@ -126,8 +154,12 @@ private:
     void read_storage();
 
     void restore_last_used_selection();
+    /// True if the printer may be selected (a Connect printer needs a login).
     bool can_be_selected_at(size_t index) const;
-    void apply_selection(const std::string& uuid);
+    bool is_printer_compatible(size_t index, const Domain::Preset::HwPrinterConfig& config) const;
+    /// Selects the printer and remembers it in the current config container.
+    void apply_selection(const std::string& uuid, bool apply_hw_config);
+    void clear_selection();
     void set_last_used(const std::string& uuid);
 
     size_t index_of(const std::string& uuid) const;
@@ -138,7 +170,38 @@ private:
     bool is_connect_printer_index(size_t index) const;
     void sync_selection();
 
+    PhysicalPrinterConfig printer_config_at(size_t index) const;
+    Domain::ConfigContainer* current_config_container();
+
+    /// Replaces runtime printers in the list with the ones of the given project.
+    void sync_runtime_printers(Domain::SelectionId project_id);
+
+    /// First selectable printer of the project compatible with the hw config, current one first.
+    std::optional<size_t> find_compatible_index(
+        Domain::SelectionId project_id,
+        const Domain::Preset::HwPrinterConfig& hw_config
+    ) const;
+
+    const PhysicalPrinterConfig& get_or_create_runtime_printer(
+        Domain::SelectionId project_id,
+        const Domain::PhysicalPrinterSelection& selection,
+        const Domain::Preset::HwPrinterConfig& hw_config
+    );
+
+    /// Connect printer config with visual data taken from the matching preset bundle printer.
+    PhysicalPrinterConfig create_connect_printer_config(
+        const ConnectPrinter::ConnectPrinter& printer
+    ) const;
+
 private:
+    struct ProjectContext
+    {
+        std::vector<PhysicalPrinterConfig> runtime_printers;
+    };
+    using ProjectContexts = Biz::ProjectScoped<ProjectContext>;
+
+    Domain::Workbench& m_workbench;
+    std::unique_ptr<ProjectContexts> m_project_contexts;
     Platform::IMainThreadDispatcher& m_dispatcher;
     Preset::PresetInteractor& m_preset_interactor;
     UserAccount::UserAccountInteractor& m_user_account_interactor;
@@ -152,13 +215,14 @@ private:
     Preset::PrinterPresetSelector m_printer_preset_selector;
     ObservableList<PhysicalPrinterConfig> m_observable_list;
     size_t m_connect_printer_count{0};
+    size_t m_runtime_printer_count{0};
+    /// Project which runtime printers are in the list, none when the list must be refreshed.
+    std::optional<Domain::SelectionId> m_runtime_printers_project_id;
 
-    using ContainerKey = std::pair<Domain::SelectionId, Domain::SelectionId>;
-    ContainerKey m_current_container{0, 0};
-    std::map<ContainerKey, std::string> m_container_to_printer_uuid_map;
+    Domain::SelectionId m_current_project_id{0};
+    Domain::SelectionId m_current_container_id{0};
 
     std::string m_selected_uuid;
-    size_t m_selected_index;
     bool m_explicit_selection{false};
     std::string m_last_used_uuid;
 

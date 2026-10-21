@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <queue>
 
 namespace Slic3r::Biz {
 class ProjectInteractor;

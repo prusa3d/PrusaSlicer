@@ -1,7 +1,7 @@
 #include "Slic3r/App/SidebarBed.hpp"
 
 #include "Slic3r/App/Yoga/Text.hpp"
-#include "Slic3r/App/Yoga/PrinterSettingsButton.hpp"
+#include "Slic3r/App/PrinterSettingsButton.hpp"
 #include "Slic3r/App/Yoga/ComboBox.hpp"
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/Material/MaterialSelectionDialog.hpp"
@@ -116,9 +116,8 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
 
     m_color_mix_dialog->attach_to_center();
 
-    m_color_mix_button = preset_row->emplace_back<LayoutButton>(
-        Biz::_u8L("CM"),
-        Render::Icon::None,
+    m_color_mix_button = preset_row->emplace_back<LayoutButton>(std::string{},
+        Render::Icon::Palette,
         Biz::_u8L("Color mix settings")
     );
     m_color_mix_button->set_background_color(Platform::Color::ButtonTransparent);
@@ -156,9 +155,11 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
     m_logical_printer_button->on_cog() = [toggle_printer_settings_dialog, this]()
     {
         toggle_printer_settings_dialog();
-        m_printer_settings_dialog->select_page_settings(
-            m_project_interactor.physical_printer_interactor().selected_physical_printer_data()
-        );
+        if (const Biz::PhysicalPrinter::PhysicalPrinterConfig* physical_printer =
+                m_project_interactor.physical_printer_interactor().selected_physical_printer_data())
+        {
+            m_printer_settings_dialog->select_page_settings(*physical_printer);
+        }
     };
 
     m_list_view = emplace_back<MaterialListView>(MaterialListViewFactory{
@@ -176,9 +177,12 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
         [toggle_printer_settings_dialog, this](size_t index)
         {
             toggle_printer_settings_dialog();
-            m_printer_settings_dialog->select_page_settings(
-                m_project_interactor.physical_printer_interactor().selected_physical_printer_data()
-            );
+            if (const Biz::PhysicalPrinter::PhysicalPrinterConfig* physical_printer =
+                    m_project_interactor.physical_printer_interactor()
+                        .selected_physical_printer_data())
+            {
+                m_printer_settings_dialog->select_page_settings(*physical_printer);
+            }
         },
         m_project_interactor
     });
@@ -349,10 +353,12 @@ void SidebarBed::update_printer_button()
         preset_item.id
     );
 
-    const Biz::PhysicalPrinter::PhysicalPrinterConfig& physical_printer =
+    const Biz::PhysicalPrinter::PhysicalPrinterConfig* physical_printer =
         m_project_interactor.physical_printer_interactor().selected_physical_printer_data();
 
-    m_selected_printer_preset_name = physical_printer.name;
+    m_selected_printer_preset_name = physical_printer
+        ? Biz::PhysicalPrinter::ui_name(*physical_printer)
+        : preset_item.ui_preset_name();
     m_logical_printer_button->set_printer_name(m_selected_printer_preset_name, is_modified_preset);
     m_logical_printer_button->set_preset_name(preset_item.ui_hw_config_name());
     m_logical_printer_button->set_tooltip(
@@ -432,9 +438,7 @@ void SidebarBed::on_preset_selection_changed(
     }
 }
 
-void SidebarBed::on_selected_physical_printer_changed(
-    const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer
-)
+void SidebarBed::on_selected_physical_printer_changed()
 {
     update_printer_button();
 }

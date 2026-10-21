@@ -90,6 +90,7 @@ enum class Icon : wchar_t
     // Gizmo Paint-on-Supports
     Triangle,
     Circle,
+    CircleFull,
     Square,
     Hexagon,
     Sphere,

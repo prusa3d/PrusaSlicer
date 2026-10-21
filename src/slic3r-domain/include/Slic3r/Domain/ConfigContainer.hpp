@@ -4,6 +4,7 @@
 #include "Slic3r/Domain/ConfigPack.hpp"
 #include "Slic3r/Domain/FindById.hpp"
 #include "Slic3r/Domain/ObjectID.hpp"
+#include "Slic3r/Domain/PhysicalPrinterSelection.hpp"
 #include "Slic3r/Domain/BedInstance.hpp"
 #include "Slic3r/Domain/Preset/SelectedPreset.hpp"
 #include "Slic3r/Domain/VirtualExtruder.hpp"
@@ -69,6 +70,16 @@ public:
         return m_virtual_extruders;
     }
 
+    PhysicalPrinterSelection& physical_printer_selection()
+    {
+        return m_physical_printer_selection;
+    }
+
+    const PhysicalPrinterSelection& physical_printer_selection() const
+    {
+        return m_physical_printer_selection;
+    }
+
     void set_bed(const Bed& bed)
     {
         m_bed = &bed;
@@ -113,6 +124,7 @@ private:
     Domain::ProjectSettings m_project_settings;
     Domain::SLAProjectSettings m_sla_project_settings;
     VirtualExtruders m_virtual_extruders;
+    PhysicalPrinterSelection m_physical_printer_selection;
 
     const Bed* m_bed{nullptr};
     BedInstanceList m_bed_instances;

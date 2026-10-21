@@ -4,12 +4,14 @@
 #include "Slic3r/App/Render/ImguiTypes.hpp"
 
 namespace Slic3r::App::Yoga {
-
 class Icon;
 class Text;
 class LayoutButton;
+} // namespace Slic3r::App::Yoga
 
-class PrinterSettingsButton : public RectangleButton
+namespace Slic3r::App {
+
+class PrinterSettingsButton : public Yoga::RectangleButton
 {
 public:
     explicit PrinterSettingsButton(const std::string& tooltip = {});
@@ -31,23 +33,23 @@ protected:
 
     virtual void update_btns_visibility();
 
-    LayoutButton* add_button(Render::Icon icon, const std::string& tooltip);
-    Icon* add_extra_icon(Render::Icon icon);
+    Yoga::LayoutButton* add_button(Render::Icon icon, const std::string& tooltip);
+    Yoga::Icon* add_extra_icon(Render::Icon icon);
 
 protected:
-    Icon* m_icon{nullptr};
-    Item* m_texts_wrapper{nullptr};
-    Item* m_btn_wrapper{nullptr};
-    Text* m_preset_name{nullptr};
-    LayoutButton* m_cog_btn{nullptr};
+    Yoga::Icon* m_icon{nullptr};
+    Yoga::Item* m_texts_wrapper{nullptr};
+    Yoga::Item* m_btn_wrapper{nullptr};
+    Yoga::Text* m_preset_name{nullptr};
+    Yoga::LayoutButton* m_cog_btn{nullptr};
 
     bool m_is_visible_cog{false};
 
 private:
-    Text* m_printer_name{nullptr};
-    LayoutButton* m_printers_btn{nullptr};
+    Yoga::Text* m_printer_name{nullptr};
+    Yoga::LayoutButton* m_printers_btn{nullptr};
 
     bool m_is_visible_printers{false};
 };
 
-} // namespace Slic3r::App::Yoga
+} // namespace Slic3r::App

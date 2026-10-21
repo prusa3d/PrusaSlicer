@@ -978,8 +978,7 @@ tl::expected<void, std::string> PresetInteractor::select_external_printer_config
         select_printer_config_internal(hw_config.id, false, bag);
     } else {
         // create new config
-        HwBundleEvaluator bundle_evaluator{m_workbench.preset_bundle()};
-        auto hw_config_result = bundle_evaluator.evaluate_config(printer);
+        auto hw_config_result = evaluate_external_printer_config(printer);
         if (!hw_config_result.has_value()) {
             // we didn't match the config
             return tl::unexpected{hw_config_result.error()};
@@ -989,6 +988,53 @@ tl::expected<void, std::string> PresetInteractor::select_external_printer_config
         select_printer_config_internal(hw_config.id, false, bag);
     }
     return {};
+}
+
+tl::expected<Domain::Preset::HwPrinterConfig, std::string>
+PresetInteractor::evaluate_external_printer_config(const Domain::Preset::HwPrinterConfig& printer) const
+{
+    if (!m_workbench.has_preset_bundle()) {
+        return tl::unexpected{std::string{"Preset bundle is not loaded"}};
+    }
+    return HwBundleEvaluator{m_workbench.preset_bundle()}.evaluate_config(printer);
+}
+
+std::string
+PresetInteractor::ui_hw_config_summary(const Domain::Preset::HwPrinterConfig& hw_config) const
+{
+    const Domain::Preset::VendorData* vendor_data = nullptr;
+    if (m_workbench.has_preset_bundle()) {
+        const auto& vendor_bundles = m_workbench.preset_bundle().vendor_bundles;
+        if (auto it = vendor_bundles.find(hw_config.vendor_id); it != vendor_bundles.end()) {
+            vendor_data = &it->second.vendor_data;
+        }
+    }
+
+    const Domain::Preset::HwPrinterConfigDef* printer_def =
+        vendor_data ? vendor_data->find_printer_config_def_by_id(hw_config.printer_id) : nullptr;
+
+    std::vector<std::string> tools;
+    for (const Domain::Preset::HwToolConfig& tool : hw_config.tools) {
+        if (!tool.name.empty()) {
+            tools.push_back(tool.name);
+        }
+    }
+
+    std::vector<std::string> feeders;
+    for (const Domain::Preset::HwFeederConfig& feeder : hw_config.feeders | std::views::values) {
+        const Domain::Preset::HwFeederConfigDef* feeder_def =
+            vendor_data ? vendor_data->find_feeder_config_def_by_id(feeder.id) : nullptr;
+        feeders.push_back(feeder_def ? feeder_def->name : feeder.model.model);
+    }
+
+    std::vector<std::string> parts{
+        printer_def ? printer_def->name : hw_config.model.model,
+        boost::algorithm::join(tools, ", "),
+        hw_config.sheet.name,
+        boost::algorithm::join(feeders, ", ")
+    };
+    std::erase_if(parts, [](const std::string& part) { return part.empty(); });
+    return boost::algorithm::join(parts, " / ");
 }
 
 bool PresetInteractor::update_changed_printer_configs(

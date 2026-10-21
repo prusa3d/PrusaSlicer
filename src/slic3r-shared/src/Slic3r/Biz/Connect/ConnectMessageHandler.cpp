@@ -124,8 +124,8 @@ void ConnectMessageHandler::do_select_printer_from_connect(
 
 std::string ConnectMessageHandler::uuid_for_upload()
 {
-    const auto& selected = m_physical_printer_interactor.selected_physical_printer_data();
-    const auto* upload = std::get_if<PhysicalPrinter::ConnectUpload>(&selected.payload);
+    const auto* selected = m_physical_printer_interactor.selected_physical_printer_data();
+    const auto* upload = selected ? std::get_if<PhysicalPrinter::ConnectUpload>(&selected->payload) : nullptr;
     if (upload && !upload->printer_uuid.empty()) {
         const ConnectPrinter::ConnectPrinter* printer = m_connect_printer_service.find(upload->printer_uuid);
         return printer ? uuid_if_compatible(printer->json) : std::string{};

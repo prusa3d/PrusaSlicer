@@ -209,6 +209,7 @@ tl::expected<SelectionId, std::string> ProjectInteractor::do_load_project(
                 return report_error(result.error());
             }
         }
+        m_physical_printer_interactor.load_physical_printers_from_3mf(project_id);
 
         if (added_project.config_containers().empty()) {
             added_project.config_containers().emplace_back(std::make_unique<ConfigContainer>());

@@ -330,8 +330,10 @@ void ConnectPrinterService::apply_printer_list(std::vector<ConnectPrinter> new_p
     for (ConnectPrinter& printer : new_printers) {
         if (std::optional<size_t> index = find_index(printer.uuid)) {
             ConnectPrinter& current = m_printers.at(*index);
+            // Keep the state received over MQTT, the list is only the initial one.
+            printer.state = current.state;
             if (printer != current) {
-                printer.state = current.state;
+                current = std::move(printer);
                 invoke_listeners<IListObserver<ConnectPrinter>>(
                     [&](IListObserver<ConnectPrinter>* l) { l->on_updated({index.value()}); }
                 );

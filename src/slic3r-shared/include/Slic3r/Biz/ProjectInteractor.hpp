@@ -121,7 +121,7 @@ public:
         m_removable_drive_service(dispatcher),
         m_file_downloader_interactor(dispatcher),
         m_file_opening_interactor(*this),
-        m_physical_printer_interactor(dispatcher, m_preset_interactor, m_user_account_interactor),
+        m_physical_printer_interactor(workbench, *this, dispatcher, m_preset_interactor, m_user_account_interactor),
         m_export_destination_interactor(m_physical_printer_interactor, m_user_account_interactor, m_removable_drive_service),
         m_connect_message_handler(dispatcher, m_preset_interactor, m_physical_printer_interactor.connect_printer_service(), m_physical_printer_interactor, m_export_destination_interactor),
         m_project_list(*this),
