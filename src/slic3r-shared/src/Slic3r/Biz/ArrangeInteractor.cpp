@@ -232,9 +232,6 @@ std::optional<std::vector<InputShape>> get_arrange_input(
         if (!outline) {
             return std::nullopt;
         }
-        if (outline->empty()) {
-            continue;
-        }
         result.push_back({instance.element_ref, *outline});
     }
 
