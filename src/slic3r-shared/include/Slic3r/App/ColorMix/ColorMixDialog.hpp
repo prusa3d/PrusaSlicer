@@ -26,6 +26,7 @@ class ProjectSettingsInteractor;
 namespace Slic3r::App {
 class LogicalPrinterSettingsDialog;
 class Navigator;
+class WarningPanel;
 } // namespace Slic3r::App
 
 namespace Slic3r::App::Yoga {
@@ -223,6 +224,7 @@ private:
     Yoga::ColorPickerButton* m_color_picker_button{nullptr};
     Yoga::LayoutButton* m_reset_display_color_button{nullptr};
     LayerSequenceBar* m_sequence_bar{nullptr};
+    WarningPanel* m_filament_types_warning{nullptr};
 
     ComponentControls m_two_component_controls;
     ComponentControls m_three_component_controls;

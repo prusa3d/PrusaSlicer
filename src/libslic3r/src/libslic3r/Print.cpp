@@ -68,10 +68,12 @@ using Slic3r::Domain::ModelVolume;
 using Slic3r::Domain::ObjectID;
 using Slic3r::Domain::SlicingId;
 using Slic3r::Domain::SupportMode;
+using Slic3r::Domain::VirtualExtruder;
 using Slic3r::Domain::VolumeSettings;
 
 using Slic3r::Biz::Algorithms::LayerHeight::check_object_layers_fixed;
 using Slic3r::Biz::Algorithms::VirtualExtruder::is_virtual_extruder;
+using Slic3r::Biz::Algorithms::VirtualExtruder::mixed_filament_types;
 
 template class PrintState<FDMPrintStep, psCount>;
 template class PrintState<FDMPrintObjectStep, posCount>;
@@ -368,6 +370,35 @@ static bool is_any_printable(const std::vector<Domain::ModelObject*>& objects)
     return false;
 }
 
+/**
+ * @brief Whether a region or the multi-material painting of the objects uses the virtual extruder.
+ */
+static bool
+uses_virtual_extruder(const PrintObjectPtrs& objects, const unsigned int virtual_extruder_id)
+{
+    for (const PrintObject* object : objects) {
+        for (const PrintRegion& region : object->all_regions()) {
+            if (region.source_virtual_extruder_id() == virtual_extruder_id) {
+                return true;
+            }
+        }
+
+        for (const ModelVolume* volume : object->model_object()->volumes) {
+            if (!volume->is_mm_painted()) {
+                continue;
+            }
+
+            const std::vector<bool>& used_states =
+                volume->mm_segmentation_facets.get_data().used_states;
+            if (virtual_extruder_id < used_states.size() && used_states[virtual_extruder_id]) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 Biz::Slicing::ApplyStatus::Status Print::update(
     Domain::Model& model,
     const ConfigPack& config,
@@ -657,6 +688,17 @@ Biz::Slicing::ValidationResult Print::validate() const
         }
 
 DONE:;
+    }
+
+    const std::vector<std::string> filament_types =
+        m_config.get<std::vector<std::string>>("filament_type");
+    for (const VirtualExtruder& virtual_extruder : m_virtual_extruders) {
+        if (!mixed_filament_types(virtual_extruder, filament_types).empty()
+            && uses_virtual_extruder(m_objects, virtual_extruder.id))
+        {
+            warnings.emplace_back(Warning{WarningCode::VirtualExtruderMixesFilamentTypes});
+            break;
+        }
     }
 
     if (extruders.empty() && !m_objects.empty()) {

@@ -42,6 +42,7 @@ struct RecipeRowData
     std::string subtitle_prefix;
     ImColor swatch_color{0x80, 0x80, 0x80};
     std::vector<RecipeBadgeData> badges;
+    std::string warning;
 };
 
 class BadgeView : public Biz::DataObserver<RecipeBadgeData>, public Yoga::Item
@@ -68,7 +69,8 @@ public:
 
     static RecipeRowData make_row_data(
         const Domain::VirtualExtruder& virtual_extruder,
-        const std::vector<std::string>& physical_colors
+        const std::vector<std::string>& physical_colors,
+        const std::vector<std::string>& physical_types
     );
 
     ColorMixRecipeRow(
@@ -90,6 +92,7 @@ private:
     Yoga::Rectangle* m_swatch_rect{nullptr};
     Yoga::Text* m_title_text{nullptr};
     Yoga::Item* m_subtitle_row{nullptr};
+    Yoga::LayoutButton* m_warning_button{nullptr};
     Yoga::LayoutButton* m_remove_button{nullptr};
 
     Biz::UnsharedPointer<Biz::ObservableList<RecipeBadgeData>> m_badges;
