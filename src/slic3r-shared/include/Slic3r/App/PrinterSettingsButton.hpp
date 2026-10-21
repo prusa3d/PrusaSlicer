@@ -40,13 +40,13 @@ protected:
     Yoga::Icon* m_icon{nullptr};
     Yoga::Item* m_texts_wrapper{nullptr};
     Yoga::Item* m_btn_wrapper{nullptr};
+    Yoga::Text* m_printer_name{nullptr};
     Yoga::Text* m_preset_name{nullptr};
     Yoga::LayoutButton* m_cog_btn{nullptr};
 
     bool m_is_visible_cog{false};
 
 private:
-    Yoga::Text* m_printer_name{nullptr};
     Yoga::LayoutButton* m_printers_btn{nullptr};
 
     bool m_is_visible_printers{false};

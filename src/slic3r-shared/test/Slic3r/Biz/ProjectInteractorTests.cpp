@@ -475,6 +475,7 @@ TEST_CASE_METHOD(
     "[ProjectInteractor][PhysicalPrinter]"
 )
 {
+    const SelectionId initial_project_id = project_interactor->selected_project_id();
     const fs::path path          = store_selected_project();
     const SelectionId project_id = load(path);
     const std::string uuid       = physical_printers().selected_uuid();
@@ -482,6 +483,8 @@ TEST_CASE_METHOD(
 
     const SelectionId other_project_id = project_interactor->new_project();
     CHECK(runtime_printer_count() == 0);
+    CHECK(physical_printers().selected_physical_printer_data() == nullptr);
+    CHECK(physical_printers().selected_uuid().empty());
 
     project_interactor->select_project(project_id);
     CHECK(runtime_printer_count() == 1);
@@ -489,6 +492,12 @@ TEST_CASE_METHOD(
 
     project_interactor->select_project(other_project_id);
     CHECK(runtime_printer_count() == 0);
+    CHECK(physical_printers().selected_uuid().empty());
+
+    project_interactor->select_project(project_id);
+    project_interactor->select_project(initial_project_id);
+    CHECK(runtime_printer_count() == 0);
+    CHECK(physical_printers().selected_uuid().empty());
 }
 
 TEST_CASE_METHOD(

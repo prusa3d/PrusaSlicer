@@ -108,6 +108,11 @@ private:
         Biz::Preset::PresetInteractor,
         SidebarBed>
         m_preset_changed_listener_scope;
+    Biz::ListenerScope<
+        Biz::PhysicalPrinter::IPhysicalPrinterChangedListener,
+        Biz::PhysicalPrinter::PhysicalPrinterInteractor,
+        SidebarBed>
+        m_physical_printer_changed_listener_scope;
 
     Biz::ProjectInteractor& m_project_interactor;
     Navigator& m_navigator;

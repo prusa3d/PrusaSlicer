@@ -27,6 +27,7 @@ namespace Slic3r::App {
 SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& navigator) :
     Window("SidebarBed"),
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
+    m_physical_printer_changed_listener_scope(project_interactor.physical_printer_interactor(), *this),
     m_project_interactor(project_interactor),
     m_navigator(navigator)
 {
@@ -360,6 +361,11 @@ void SidebarBed::update_printer_button()
         ? Biz::PhysicalPrinter::ui_name(*physical_printer)
         : preset_item.ui_preset_name();
     m_logical_printer_button->set_printer_name(m_selected_printer_preset_name, is_modified_preset);
+    m_logical_printer_button->set_visible_cog(
+        !physical_printer
+        || (!physical_printer->is_runtime
+            && !std::holds_alternative<Biz::PhysicalPrinter::ConnectUpload>(physical_printer->payload))
+    );
     m_logical_printer_button->set_preset_name(preset_item.ui_hw_config_name());
     m_logical_printer_button->set_tooltip(
         fmt::format(

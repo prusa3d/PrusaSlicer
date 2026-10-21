@@ -45,6 +45,13 @@ std::optional<Domain::Preset::HwPrinterConfig> hw_config_from_connect_json(std::
     return result.value();
 }
 
+bool has_unresolved_model(const PhysicalPrinterConfig& printer)
+{
+    // printer_id is filled only when the external hw config was matched against the bundle
+    return std::holds_alternative<ConnectUpload>(printer.payload)
+        && (!printer.hw_config.has_value() || printer.hw_config->printer_id.empty());
+}
+
 bool is_physical_printer_compatible(
     const PhysicalPrinterConfig& physical_config,
     const Domain::Preset::HwPrinterConfig& hw_config

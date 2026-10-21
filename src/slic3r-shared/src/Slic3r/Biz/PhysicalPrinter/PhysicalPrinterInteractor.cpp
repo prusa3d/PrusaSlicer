@@ -523,7 +523,10 @@ void PhysicalPrinterInteractor::on_updated(const IndexRange& index_range)
         const PhysicalPrinterConfig& current = m_observable_list.at(CONNECT_PRINTERS_OFFSET + i);
         if (config.name != current.name
             || std::get<ConnectUpload>(config.payload).state
-                != std::get<ConnectUpload>(current.payload).state)
+                != std::get<ConnectUpload>(current.payload).state
+            || config.hw_config.has_value() != current.hw_config.has_value()
+            || (config.hw_config.has_value()
+                && config.hw_config->printer_id != current.hw_config->printer_id))
         {
             m_observable_list.set(std::move(config), CONNECT_PRINTERS_OFFSET + i);
         }

@@ -31,6 +31,27 @@ PhysicalPrinterSettingsButton::PhysicalPrinterSettingsButton(
     m_preset_interactor(preset_interactor),
     m_physical_printer_interactor(physical_printer_interactor)
 {
+    // Unresolved model warning in front of the printer name
+    Item* name_row = m_texts_wrapper->emplace<Item>(0);
+    name_row->set_align_items(YGAlignCenter);
+    name_row->set_gap(4_fpx);
+
+    // Same size as the state circle
+    m_unresolved_model_icon = name_row->emplace_back<Icon>(Render::Icon::ExclamationTriangle);
+    m_unresolved_model_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
+    m_unresolved_model_icon->set_aspect_ratio(1);
+    m_unresolved_model_icon->set_tint(m_theme->color_imgui(Platform::Color::Error));
+    m_unresolved_model_icon->set_padding(1_fpx);
+    m_unresolved_model_icon->set_width(12_fpx);
+    m_unresolved_model_icon->set_height(12_fpx);
+    m_unresolved_model_icon->set_flex_shrink(0);
+    m_unresolved_model_icon->set_visible(false);
+
+    name_row->append(m_texts_wrapper->remove(m_printer_name));
+    // WrapElide text has no min width, without flex grow it collapses to zero in a row
+    m_printer_name->set_flex_grow(1);
+    m_printer_name->set_flex_shrink(1);
+
     // Connect state circle in front of the preset name
     Item* preset_row = m_texts_wrapper->emplace_back<Item>();
     preset_row->set_align_items(YGAlignCenter);
@@ -48,16 +69,6 @@ PhysicalPrinterSettingsButton::PhysicalPrinterSettingsButton(
     // WrapElide text has no min width, without flex grow it collapses to zero in a row
     m_preset_name->set_flex_grow(1);
     m_preset_name->set_flex_shrink(1);
-
-    m_attention_icon = m_icon->emplace_back<Icon>(Render::Icon::ErrorTick);
-    m_attention_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
-    m_attention_icon->set_aspect_ratio(1);
-    m_attention_icon->set_tint(m_theme->color_imgui(Platform::Color::Warning));
-    m_attention_icon->set_position_type(YGPositionTypeAbsolute);
-    m_attention_icon->set_width(22_fpx);
-    m_attention_icon->set_left(0_fpx);
-    m_attention_icon->set_bottom(0_fpx);
-    m_attention_icon->set_visible(false);
 
     m_connect_icon = m_icon->emplace_back<Icon>(Render::Icon::ConnectUpload);
     m_connect_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
@@ -110,6 +121,7 @@ void PhysicalPrinterSettingsButton::update()
     m_preset_name->set_visible(!preset_name.empty());
     m_state_btn->set_visible(false);
     set_printer_image();
+    m_unresolved_model_icon->set_visible(Biz::PhysicalPrinter::has_unresolved_model(*m_state));
 
     if (const auto* upload = std::get_if<Biz::PhysicalPrinter::ConnectUpload>(&m_state->payload)) {
         set_connect_state(upload->state);
@@ -173,8 +185,12 @@ void PhysicalPrinterSettingsButton::update_tooltip()
     if (const auto* upload = std::get_if<Biz::PhysicalPrinter::ConnectUpload>(&m_state->payload)) {
         tooltip += "\n" + Biz::ConnectPrinter::connect_printer_state_to_string(upload->state);
     }
-    if (!m_is_compatible) {
-        tooltip += "\n" + Biz::_u8L("Non-compatible with current selection");
+    if (Biz::PhysicalPrinter::has_unresolved_model(*m_state)) {
+        tooltip += "\n"
+            + Biz::_u8L(
+                       "Prusa Connect did not provide the printer model, it is unknown which "
+                       "printer preset belongs to this printer."
+            );
     }
     set_tooltip(tooltip);
 }
@@ -237,16 +253,6 @@ std::function<void()>& PhysicalPrinterSettingsButton::on_bin()
 std::string PhysicalPrinterSettingsButton::uuid() const
 {
     return m_state->uuid;
-}
-
-void PhysicalPrinterSettingsButton::set_compatible(bool compatible)
-{
-    const bool show_warning = !compatible
-        && std::holds_alternative<Slic3r::Biz::PhysicalPrinter::PrinterUpload>(m_state->payload);
-
-    m_attention_icon->set_visible(show_warning);
-    m_is_compatible = !show_warning;
-    update_tooltip();
 }
 
 } // namespace Slic3r::App

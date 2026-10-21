@@ -47,8 +47,6 @@ public:
 
     std::string uuid() const;
 
-    void set_compatible(bool compatible);
-
     void on_selected_physical_printer_changed() override;
 
 protected:
@@ -80,10 +78,9 @@ private:
     bool m_is_visible_bin{false};
     bool m_is_bin_supported{true};
 
-    Yoga::Icon* m_attention_icon{nullptr};
+    Yoga::Icon* m_unresolved_model_icon{nullptr};
     Yoga::Icon* m_connect_icon{nullptr};
     Yoga::LayoutButton* m_state_btn{nullptr};
-    bool m_is_compatible{true};
 };
 
 } // namespace Slic3r::App

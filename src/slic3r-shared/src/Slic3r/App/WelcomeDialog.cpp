@@ -609,12 +609,12 @@ public:
             [this]() { show_dialog(false); },
             [this](const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer)
             {
-                const Biz::Preset::PresetItem* preset{
-                    printer.hw_config ? find_system_preset(printer.hw_config->id) : nullptr};
-                if (!preset) {
+                const std::optional<std::string> preset_id{
+                    printer.hw_config ? find_system_preset_id(printer.hw_config->id) : std::nullopt};
+                if (!preset_id) {
                     return;
                 }
-                add_printer(PrinterToAdd{*printer.hw_config, preset->id, printer});
+                add_printer(PrinterToAdd{*printer.hw_config, *preset_id, printer});
                 show_dialog(false);
             });
         m_dialog->set_flex_grow(1);
@@ -684,17 +684,20 @@ public:
         clear_state();
     }
 
-    const Biz::Preset::PresetItem* find_system_preset(const std::string& hw_config_id) const
+    std::optional<std::string> find_system_preset_id(const std::string& hw_config_id) const
     {
-        const auto& presets{m_project_interactor.preset_interactor().printer_presets().items()};
-        for (std::size_t i{}; i < presets.size(); ++i) {
-            if (presets.at(i).hw_printer_config_id == hw_config_id
-                && presets.at(i).origin == Domain::Preset::PresetOrigin::System)
-            {
-                return &presets.at(i);
+        const auto& evaluated_presets{
+            m_project_interactor.workbench().preset_bundle().evaluated_presets};
+        const auto it{evaluated_presets.find(hw_config_id)};
+        if (it == evaluated_presets.end()) {
+            return std::nullopt;
+        }
+        for (const Domain::Preset::EvaluatedPrinterPreset& evaluated : it->second) {
+            if (evaluated.preset.origin == Domain::Preset::PresetOrigin::System) {
+                return evaluated.preset.id;
             }
         }
-        return nullptr;
+        return std::nullopt;
     }
 
     void clear_printers()
@@ -738,14 +741,14 @@ public:
                 .vendor_bundles.at(config.vendor_id)
                 .vendor_data};
 
-        const Biz::Preset::PresetItem* preset{find_system_preset(config.id)};
-        if (!preset) {
+        const std::optional<std::string> preset_id{find_system_preset_id(config.id)};
+        if (!preset_id) {
             return std::nullopt;
         }
 
         // SLA printers have no exchangeable tools, keep the default one.
         if (config.technology != Domain::PrinterTechnology::FFF) {
-            return PrinterToAdd{config, preset->id};
+            return PrinterToAdd{config, *preset_id};
         }
 
         const std::vector<Domain::Preset::HwToolConfigDef>& tool_defs{
@@ -781,7 +784,7 @@ public:
             }
         }
 
-        return PrinterToAdd{config, preset->id};
+        return PrinterToAdd{config, *preset_id};
     }
 
     void sync_printers()

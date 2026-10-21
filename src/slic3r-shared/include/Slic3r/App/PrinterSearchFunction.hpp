@@ -16,7 +16,7 @@ int score_preset_item(
 
 int score_physical_printer(
     std::function<const std::string&(const std::string&)> process_string,
-    const Biz::PhysicalPrinter::PhysicalPrinterConfig item,
+    const Biz::PhysicalPrinter::PhysicalPrinterConfig& item,
     const std::string& search_text
 );
 

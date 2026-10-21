@@ -153,8 +153,6 @@ ItemPtr AddPrinterPanel::create_printer_family(
             m_printer_image->set_image(get_thumbnail(entry->printer_config));
             m_printer_name->set_text(entry->preset_name);
             m_stack_layout->set_current_index(1);
-            // AddPrinterPanel::Printer printer{entry->printer};
-            // m_add_printer(printer);
         };
 
         auto printer_content{printer->emplace_back<Item>()};
@@ -304,6 +302,7 @@ void AddPrinterPanel::create_page_details()
         if (m_add_printer) {
             m_add_printer(printer);
         }
+        m_stack_layout->set_current_index(0);
     };
 }
 

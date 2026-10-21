@@ -24,6 +24,7 @@
 #include "Slic3r/App/PrinterSearchFunction.hpp"
 
 #include <algorithm>
+#include <limits>
 
 using Slic3r::Biz::Preset::HwItemType;
 using Slic3r::Domain::ConfigContainer;
@@ -211,6 +212,8 @@ void PrinterSettingsDialog::create_page_list()
     m_input_text_search = search_row->emplace_back<InputText>();
     m_input_text_search->set_hint(_u8L("Search..."));
     m_input_text_search->set_flex_grow(1);
+    // Default cap of the searcher would hide printers once something is typed
+    m_preset_searcher->set_max_found_items(std::numeric_limits<int>::max());
     m_input_text_search->callbacks().text_changed = [this]
     { m_preset_searcher->set_search_text(m_input_text_search->text()); };
 
@@ -253,7 +256,7 @@ void PrinterSettingsDialog::create_page_list()
     m_printer_list_view = m_page_list->emplace_back<PrinterListView>(std::move(factory));
     m_printer_list_view->set_flex_grow(1);
     m_printer_list_view->set_padding(Paddings(0, 0, 15_fpx, 0));
-    m_printer_list_view->set_margin(Margins(0, 0, -20_fpx, 0));
+    m_printer_list_view->set_margin(Margins(0, -10_fpx, -20_fpx, 0));
     m_printer_list_view->set_gap(8_fpx);
     m_printer_list_view->set_max_height(275);
     m_printer_list_view->set_orientation(Orientation::Vertical);

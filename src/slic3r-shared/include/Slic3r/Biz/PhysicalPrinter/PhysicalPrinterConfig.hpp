@@ -52,6 +52,10 @@ std::string ui_name(const PhysicalPrinterConfig& printer);
  */
 std::optional<Domain::Preset::HwPrinterConfig> hw_config_from_connect_json(std::string_view json);
 
+/// Connect printer whose data did not resolve to a known printer model, so it is unknown which
+/// logical printer preset belongs to it.
+bool has_unresolved_model(const PhysicalPrinterConfig& printer);
+
 std::string physical_printer_type_to_string(const PhysicalPrinterConfig& data);
 
 bool is_physical_printer_compatible(
