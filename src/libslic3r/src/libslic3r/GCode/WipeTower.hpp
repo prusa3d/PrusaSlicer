@@ -26,6 +26,8 @@ class WipeTower
 {
 public:
     static const std::string never_skip_tag() { return "_GCODE_WIPE_TOWER_NEVER_SKIP_TAG"; }
+    // Marks a travel that the G-code generator replaces by a travel with the print retraction and Z-hop.
+    static const std::string print_travel_tag() { return "_GCODE_WIPE_TOWER_PRINT_TRAVEL_TAG"; }
     // Marks the travel back to the purge start after the tool change. The G-code generator removes it when it travels to the start of the de-retraction spread instead.
     static const std::string toolchange_travel_tag() { return "_GCODE_WIPE_TOWER_TOOLCHANGE_TRAVEL_TAG"; }
 	static std::vector<std::vector<float>> extract_wipe_volumes(const PrintConfigView& config);

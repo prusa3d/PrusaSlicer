@@ -223,6 +223,21 @@ public:
 	WipeTowerWriter& travel(const Vec2f &dest, float f = 0.f) 
 		{ return extrude_explicit(dest.x(), dest.y(), 0.f, f); }
 
+    /**
+     * @brief Travel that the G-code generator prints like a travel of the print, i.e. with retraction and Z-hop.
+     */
+    WipeTowerWriter& print_travel(const Vec2f& dest, float f = 0.f)
+    {
+        const size_t gcode_length = m_gcode.size();
+        this->travel(dest, f);
+
+        if (m_gcode.size() > gcode_length) {
+            m_gcode.insert(m_gcode.size() - 1, " " + WipeTower::print_travel_tag());
+        }
+
+        return *this;
+    }
+
 	// Extrude a line from current position to x, y with the extrusion amount given by m_extrusion_flow.
 	WipeTowerWriter& extrude(float x, float y, float f = 0.f)
 	{
@@ -247,8 +262,7 @@ public:
         if (y()-ld.y() > ld.y()+height-y())   // closer to the top
             index_of_closest = (index_of_closest==0 ? 3 : 2);
 
-        travel(corners[index_of_closest].x(), y());      // travel to the closest corner
-        travel(x(),corners[index_of_closest].y());
+        print_travel(corners[index_of_closest]); // travel to the closest corner
 
         int i = index_of_closest;
         do {
@@ -1427,19 +1441,12 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
     float right = fill_box.ru.x() - 2 * m_perimeter_width;
     if (dy > m_perimeter_width)
     {
-        // we are in one of the corners, travel to ld along the perimeter:
-        if (writer.x() > fill_box.ld.x() + EPSILON) {
-            writer.travel(fill_box.ld.x(), writer.y());
-        }
-
-        if (writer.y() > fill_box.ld.y() + EPSILON) {
-            writer.travel(writer.x(), fill_box.ld.y());
-        }
-
-        writer.travel(fill_box.ld + Vec2f(m_perimeter_width * 2, 0.f))
-              .append(";--------------------\n"
-                      "; CP EMPTY GRID START\n")
-              .comment_with_value(" layer #", m_num_layer_changes + 1);
+        writer.print_travel(fill_box.ld + Vec2f(m_perimeter_width * 2, 0.f))
+            .append(
+                ";--------------------\n"
+                "; CP EMPTY GRID START\n"
+            )
+            .comment_with_value(" layer #", m_num_layer_changes + 1);
 
         // Is there a soluble filament wiped/rammed at the next layer?
         // If so, the infill should not be sparse.
@@ -1478,7 +1485,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
             const float dx = (right-left)/n;
             for (int i=1;i<=n;++i) {
                 float x=left+dx*i;
-                writer.travel(x,writer.y());
+                writer.print_travel(Vec2f(x, writer.y()));
                 writer.extrude(x,i%2 ? fill_box.rd.y() : fill_box.ru.y());
             }
         }
@@ -1565,7 +1572,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
                 }
             }
         }
-        writer.travel(pts[start_i].first);
+        writer.print_travel(pts[start_i].first);
 
         // Now actually extrude the boundary (and possibly infill):
         int i = start_i+1 == int(pts.size()) ? 0 : start_i + 1;
@@ -1577,11 +1584,21 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
                     // Extrude the infill and travel back to where we were.
                     bool mirror = ((pts[i].first.y() - center.y()) * (unscale(polylines.front().points.front()).y() - center.y())) < 0.;
                     for (const Polyline& line : polylines) {
-                        writer.travel(center - (mirror ? 1.f : -1.f) * (unscale(line.points.front()).cast<float>() - center));
-                        for (size_t i=0; i<line.points.size(); ++i)
-                            writer.extrude(center - (mirror ? 1.f : -1.f) * (unscale(line.points[i]).cast<float>() - center));
+                        writer.print_travel(
+                            center
+                            - (mirror ? 1.f : -1.f)
+                                * (unscale(line.points.front()).cast<float>() - center)
+                        );
+
+                        for (size_t i = 0; i < line.points.size(); ++i) {
+                            writer.extrude(
+                                center
+                                - (mirror ? 1.f : -1.f)
+                                    * (unscale(line.points[i]).cast<float>() - center)
+                            );
+                        }
                     }
-                    writer.travel(pts[i].first);
+                    writer.print_travel(pts[i].first);
                 }
             }
             if (++i == int(pts.size()))
@@ -1605,7 +1622,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
         for (size_t i = 0; i < loops_num; ++ i) {
             poly = offset(poly, scale_(spacing)).front();
             int cp = Algorithms::Polygon::closest_point_index(poly, scaled(Vec2d(writer.x(), writer.y())));
-            writer.travel(unscale(poly.points[cp]).cast<float>());
+            writer.print_travel(unscale(poly.points[cp]).cast<float>());
             for (int i=cp+1; true; ++i ) {
                 if (i==int(poly.points.size()))
                     i = 0;
@@ -1818,10 +1835,16 @@ static WipeTower::ToolChangeResult merge_tcr(WipeTower::ToolChangeResult& first,
 {
     assert(first.new_tool == second.initial_tool);
     WipeTower::ToolChangeResult out = first;
-    if (first.end_pos != second.start_pos)
-        out.gcode += "G1 X" + Slic3r::float_to_string_decimal_point(second.start_pos.x(), 3)
-                     + " Y" + Slic3r::float_to_string_decimal_point(second.start_pos.y(), 3)
-                     + " F7200\n";
+    if (first.end_pos != second.start_pos) {
+        out.gcode += "G1 X"
+            + Slic3r::float_to_string_decimal_point(second.start_pos.x(), 3)
+            + " Y"
+            + Slic3r::float_to_string_decimal_point(second.start_pos.y(), 3)
+            + " F7200 "
+            + WipeTower::print_travel_tag()
+            + "\n";
+    }
+
     out.gcode += second.gcode;
     out.extrusions.insert(out.extrusions.end(), second.extrusions.begin(), second.extrusions.end());
     out.end_pos = second.end_pos;

@@ -1,5 +1,6 @@
 #include "WipeTowerIntegration.hpp"
 
+#include <LocalesUtils.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <cmath>
@@ -15,6 +16,7 @@
 #include "boost/algorithm/string/replace.hpp"
 #include "Slic3r/Exception.hpp"
 #include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/GCode/Travels.hpp"
 #include "libslic3r/GCode/Wipe.hpp"
 #include "libslic3r/GCode/WipeTower.hpp"
 #include "libslic3r/Geometry/ArcWelder.hpp"
@@ -106,6 +108,31 @@ std::string WipeTowerIntegration::append_tcr(
         gcode += gcodegen.writer().unretract();
     }
 
+    // Travels before the tool change belong to the old extruder, so they are expanded before set_extruder().
+    const Biz::Slicing::ExtrudeConfig travel_config{config};
+    const int tower_extruder{new_extruder_id > -1 ? new_extruder_id : tcr.initial_tool};
+    const unsigned int tower_print_acceleration{
+        config.get<std::vector<double>>("default_acceleration").at(tower_extruder) > 0 ?
+            fast_round_up<unsigned int>(config.get<double>("wipe_tower_acceleration")) :
+            0
+    };
+
+    // Set before the travels inside the wipe tower, the writer would skip it after they restore it.
+    gcode += gcodegen.writer().set_print_acceleration(tower_print_acceleration);
+
+    const size_t toolchange_position{
+        tcr_rotated_gcode.find("[toolchange_gcode_from_wipe_tower_generator]")
+    };
+    Vec2f travel_position{start_pos - m_extruder_offsets[tcr.initial_tool].cast<float>()};
+    const std::string gcode_before_toolchange{expand_print_travels(
+        gcodegen,
+        travel_config,
+        tcr_rotated_gcode.substr(0, toolchange_position),
+        tower_print_acceleration,
+        travel_position,
+        z
+    )};
+
     std::string toolchange_gcode_str;
     std::string deretraction_str;
     bool spreads_deretraction{false};
@@ -174,6 +201,20 @@ std::string WipeTowerIntegration::append_tcr(
         }
     }
 
+    const std::string gcode_after_toolchange{
+        toolchange_position == std::string::npos ?
+            std::string{} :
+            expand_print_travels(
+                gcodegen,
+                travel_config,
+                tcr_rotated_gcode.substr(toolchange_position),
+                tower_print_acceleration,
+                travel_position,
+                z
+            )
+    };
+    tcr_rotated_gcode = gcode_before_toolchange + gcode_after_toolchange;
+
     assert(toolchange_gcode_str.empty() || toolchange_gcode_str.back() == '\n');
     assert(deretraction_str.empty() || deretraction_str.back() == '\n');
 
@@ -203,8 +244,6 @@ std::string WipeTowerIntegration::append_tcr(
     Biz::Algorithms::unescape_string_cstyle(tcr_rotated_gcode, tcr_gcode);
 
     const int acceleation_extruder{new_extruder_id > -1 ? new_extruder_id : tcr.initial_tool};
-    if (config.get<std::vector<double>>("default_acceleration").at(acceleation_extruder) > 0)
-        gcode += gcodegen.writer().set_print_acceleration(fast_round_up<unsigned int>(config.get<double>("wipe_tower_acceleration")));
     gcode += tcr_gcode;
     gcode += gcodegen.writer().set_print_acceleration(
         fast_round_up<unsigned int>(
@@ -317,6 +356,138 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
     return gcode_out;
 }
 
+/**
+ * @brief Offset of the last G1 line of the wipe tower G-code that moves the extruder, npos if there is none.
+ */
+static size_t find_last_extruder_move(const std::string& tower_gcode)
+{
+    size_t last_extruder_move_start{std::string::npos};
+    size_t next_line_start{0};
+    std::istringstream tower_lines{tower_gcode};
+    std::string line;
+    while (std::getline(tower_lines, line)) {
+        const size_t line_start{next_line_start};
+        next_line_start += line.size() + 1;
+        if (!boost::starts_with(line, "G1 ")) {
+            continue;
+        }
+
+        std::istringstream words{line};
+        std::string word;
+        while (words >> word && word.front() != ';') {
+            if (word.front() == 'E') {
+                last_extruder_move_start = line_start;
+            }
+        }
+    }
+
+    return last_extruder_move_start;
+}
+
+std::string WipeTowerIntegration::expand_print_travels(
+    GCodeGenerator& gcodegen,
+    const Biz::Slicing::ExtrudeConfig& config,
+    const std::string& tower_gcode,
+    const unsigned int tower_print_acceleration,
+    Vec2f& position,
+    const double z
+) const
+{
+    const std::string print_travel_tag{WipeTower::print_travel_tag()};
+    const size_t last_extruder_move_start{find_last_extruder_move(tower_gcode)};
+
+    std::string result;
+    std::string feedrate_word;
+    std::istringstream tower_lines{tower_gcode};
+    std::string line;
+    size_t next_line_start{0};
+    while (std::getline(tower_lines, line)) {
+        const size_t line_start{next_line_start};
+        const Vec2f travel_start{position};
+
+        next_line_start += line.size() + 1;
+
+        if (boost::starts_with(line, "G1 ")) {
+            std::istringstream words{line};
+            std::string word;
+            while (words >> word && word.front() != ';') {
+                if (word.front() == 'X') {
+                    position.x() = string_to_float_decimal_point(std::string_view{word}.substr(1));
+                } else if (word.front() == 'Y') {
+                    position.y() = string_to_float_decimal_point(std::string_view{word}.substr(1));
+                } else if (word.front() == 'F') {
+                    feedrate_word = word;
+                }
+            }
+        }
+
+        const size_t tag_position{line.find(print_travel_tag)};
+        if (tag_position == std::string::npos) {
+            result += line + "\n";
+            continue;
+        }
+
+        line.erase(tag_position);
+        boost::trim_right(line);
+
+        GCodeWriter& writer = gcodegen.writer();
+        if (writer.extruder() == nullptr
+            || (position - travel_start).norm()
+                < float(config.retract_before_travel.at(writer.extruder()->id())))
+        {
+            result += line + "\n";
+            continue;
+        }
+
+        // The same retraction and lift as GCodeGenerator::travel_to() does for the print.
+        const unsigned int extruder_id{writer.extruder()->id()};
+        const Polyline xy_path{
+            gcodegen.gcode_to_point(travel_start.cast<double>()),
+            gcodegen.gcode_to_point(position.cast<double>())
+        };
+
+        writer.update_position(Vec3d{travel_start.x(), travel_start.y(), z});
+        result += writer.retract();
+
+        Points3 travel{
+            config.retract_length.at(extruder_id) == 0. ?
+                Impl::Travels::generate_flat_travel(xy_path.points, float(z)) :
+                Impl::Travels::generate_travel_to_extrusion(
+                    xy_path,
+                    config,
+                    extruder_id,
+                    z,
+                    gcodegen.m_travel_obstacle_tracker,
+                    scaled(gcodegen.origin())
+                )
+        };
+
+        travel.emplace_back(to_3d(xy_path.points.back(), scaled(z)));
+        result +=
+            gcodegen
+                .generate_travel_gcode(travel, "wipe tower travel", []() { return ""; }, config);
+        result += writer.set_print_acceleration(tower_print_acceleration);
+
+        // De-retract after the travel, unless only the tool change follows and its retraction
+        // is longer than the travel retraction. The tool change then retracts just the rest.
+        const bool is_extruder_move_following{
+            last_extruder_move_start != std::string::npos && last_extruder_move_start > line_start
+        };
+        if (is_extruder_move_following
+            || writer.extruder()->retract_length_toolchange()
+                <= writer.extruder()->retract_length())
+        {
+            result += writer.unretract();
+        }
+
+        if (!feedrate_word.empty()) {
+            // The wipe tower expects its last feedrate to be still active.
+            result += "G1 " + feedrate_word + "\n";
+        }
+    }
+
+    return result;
+}
 
 std::string WipeTowerIntegration::prime(GCodeGenerator &gcodegen, const Domain::ConfigView& config)
 {
