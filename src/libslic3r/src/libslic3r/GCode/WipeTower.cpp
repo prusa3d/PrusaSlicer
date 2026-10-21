@@ -639,6 +639,14 @@ WipeTower::WipeTower(
         default_speed
     );
 
+    const float max_purge_speed = float(config.get<double>("wipe_tower_max_purge_speed"));
+    if (max_purge_speed > 0.f) {
+        m_infill_speed                = std::min(m_infill_speed, max_purge_speed);
+        m_perimeter_speed             = std::min(m_perimeter_speed, max_purge_speed);
+        m_first_layer_infill_speed    = std::min(m_first_layer_infill_speed, max_purge_speed);
+        m_first_layer_perimeter_speed = std::min(m_first_layer_perimeter_speed, max_purge_speed);
+    }
+
     // If this is a single extruder MM printer, we will use all the SE-specific config values.
     // Otherwise, the defaults will be used to turn off the SE stuff.
     if (m_semm) {

@@ -541,6 +541,7 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"wipe_tower_extra_flow", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"wipe_tower_extra_spacing", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"wipe_tower_extruder", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
+    {"wipe_tower_max_purge_speed", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"wipe_tower_no_sparse_layers", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"wipe_tower_width", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"wiping_volumes_matrix", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},

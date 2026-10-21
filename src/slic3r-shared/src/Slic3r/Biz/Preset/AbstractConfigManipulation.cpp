@@ -340,8 +340,19 @@ void AbstractConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* co
     toggle_field("standby_temperature_delta", have_ooze_prevention);
 
     bool have_wipe_tower = config->opt_bool("wipe_tower");
-    for (auto el : { "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_brim_width", "wipe_tower_cone_angle",
-                     "wipe_tower_extra_spacing", "wipe_tower_extra_flow", "wipe_tower_bridging", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming" })
+    for (auto el :
+         {"wipe_tower_x",
+          "wipe_tower_y",
+          "wipe_tower_width",
+          "wipe_tower_rotation_angle",
+          "wipe_tower_brim_width",
+          "wipe_tower_cone_angle",
+          "wipe_tower_extra_spacing",
+          "wipe_tower_extra_flow",
+          "wipe_tower_bridging",
+          "wipe_tower_no_sparse_layers",
+          "single_extruder_multi_material_priming",
+          "wipe_tower_max_purge_speed"})
         toggle_field(el, have_wipe_tower);
 
     bool have_non_zero_mmu_segmented_region_max_width = config->opt_float("mmu_segmented_region_max_width") > 0.;
