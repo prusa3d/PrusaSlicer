@@ -303,11 +303,7 @@ void PrintModeInteractor::on_background_process_state_changed(const Domain::Slic
     if (id != m_project_interactor.selected_bed_slicing_id()) {
         return;
     }
-    if (reload_config_values()) {
-        reevaluate();
-        invoke_listeners<IPrintModesChangedListener>(
-            [](auto* listener) { listener->on_print_modes_changed(); });
-    }
+    reload_all();
 }
 
 } // namespace Slic3r::Biz
