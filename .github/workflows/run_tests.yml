@@ -1,0 +1,11 @@
+name: Run tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run_tests:
+    uses: Prusa-Development/PrusaSlicer-Testing/.github/workflows/run_tests.yml@main
+    secrets: inherit
+    with:
+      testing_branch: main
