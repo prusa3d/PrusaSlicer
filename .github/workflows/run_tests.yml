@@ -2,10 +2,16 @@ name: Run tests
 
 on:
   workflow_dispatch:
+    inputs:
+      buildname:
+        description: 'Buildname'
+        type: string
+        required: true
 
 jobs:
   run_tests:
     uses: Prusa-Development/PrusaSlicer-Testing/.github/workflows/run_tests.yml@main
     secrets: inherit
     with:
+      buildname: ${{ inputs.buildname }}
       testing_branch: main
