@@ -157,6 +157,150 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_General_Application;
     def->init_fn = []() { return Domain::ConfigValue(false); };
 
+    def           = defs.add("use_free_camera", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->gui_type = GUIType::checkbox;
+    def->label    = L("Use free camera");
+    def->tooltip  = L(
+        "If enabled, the mouse rotates the camera freely in all directions (trackball). "
+         "If not enabled, the camera keeps the Z axis pointing up (turntable)."
+    );
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_General;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_General_Application;
+    def->init_fn      = []() { return Domain::ConfigValue(false); };
+
+    def               = defs.add("mouse_3d_translation_speed", typeid(double));
+    def->location     = Domain::AppConfigLocation{};
+    def->gui_type     = GUIType::textfield;
+    def->label        = L("Translation");
+    def->tooltip      = L("Speed of moving the view with the 3D mouse.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Speed;
+    def->order        = 0;
+    def->min          = 0.1;
+    def->max          = 30.;
+    def->init_fn      = []() { return Domain::ConfigValue(1.); };
+
+    def               = defs.add("mouse_3d_rotation_speed", typeid(double));
+    def->location     = Domain::AppConfigLocation{};
+    def->gui_type     = GUIType::textfield;
+    def->label        = L("Rotation");
+    def->tooltip      = L("Speed of rotating the view with the 3D mouse.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Speed;
+    def->order        = 1;
+    def->min          = 0.1;
+    def->max          = 30.;
+    def->init_fn      = []() { return Domain::ConfigValue(1.); };
+
+    def               = defs.add("mouse_3d_zoom_speed", typeid(double));
+    def->location     = Domain::AppConfigLocation{};
+    def->gui_type     = GUIType::textfield;
+    def->label        = L("Zoom");
+    def->tooltip      = L("Speed of zooming the view with the 3D mouse.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Speed;
+    def->order        = 2;
+    def->min          = 0.1;
+    def->max          = 30.;
+    def->init_fn      = []() { return Domain::ConfigValue(1.); };
+
+    def           = defs.add("mouse_3d_translation_deadzone", typeid(double));
+    def->location = Domain::AppConfigLocation{};
+    def->gui_type = GUIType::textfield;
+    def->label    = L("Translation/Zoom");
+    def->tooltip =
+        L("Motions of the 3D mouse moving or zooming the view below this value are ignored.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Deadzone;
+    def->order        = 0;
+    def->min          = 0.;
+    def->max          = 0.2;
+    def->init_fn      = []() { return Domain::ConfigValue(0.); };
+
+    def           = defs.add("mouse_3d_rotation_deadzone", typeid(double));
+    def->location = Domain::AppConfigLocation{};
+    def->gui_type = GUIType::textfield;
+    def->label    = L("Rotation");
+    def->tooltip  = L("Motions of the 3D mouse rotating the view below this value are ignored.");
+    def->category = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Deadzone;
+    def->order        = 1;
+    def->min          = 0.;
+    def->max          = 0.2;
+    def->init_fn      = []() { return Domain::ConfigValue(0.); };
+
+    def           = defs.add("mouse_3d_swap_yz", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->gui_type = GUIType::checkbox;
+    def->label    = L("Swap Y/Z axes");
+    def->tooltip =
+        L("Swaps the Y and Z axes of the 3D mouse for both moving and rotating the view.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Options;
+    def->order        = 0;
+    def->init_fn      = []() { return Domain::ConfigValue(false); };
+
+    def               = defs.add("mouse_3d_invert_x", typeid(bool));
+    def->location     = Domain::AppConfigLocation{};
+    def->gui_type     = GUIType::checkbox;
+    def->label        = L("Invert X axis");
+    def->tooltip      = L("Inverts pushing the cap of the 3D mouse left and right.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Options;
+    def->order        = 1;
+    def->init_fn      = []() { return Domain::ConfigValue(false); };
+
+    def               = defs.add("mouse_3d_invert_y", typeid(bool));
+    def->location     = Domain::AppConfigLocation{};
+    def->gui_type     = GUIType::checkbox;
+    def->label        = L("Invert Y axis");
+    def->tooltip      = L("Inverts pushing the cap of the 3D mouse forward and backward.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Options;
+    def->order        = 2;
+    def->init_fn      = []() { return Domain::ConfigValue(false); };
+
+    def               = defs.add("mouse_3d_invert_z", typeid(bool));
+    def->location     = Domain::AppConfigLocation{};
+    def->gui_type     = GUIType::checkbox;
+    def->label        = L("Invert Z axis");
+    def->tooltip      = L("Inverts pulling the cap of the 3D mouse up and pushing it down.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Options;
+    def->order        = 3;
+    def->init_fn      = []() { return Domain::ConfigValue(false); };
+
+    def               = defs.add("mouse_3d_invert_yaw", typeid(bool));
+    def->location     = Domain::AppConfigLocation{};
+    def->gui_type     = GUIType::checkbox;
+    def->label        = L("Invert yaw axis");
+    def->tooltip      = L("Inverts twisting the cap of the 3D mouse.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Options;
+    def->order        = 4;
+    def->init_fn      = []() { return Domain::ConfigValue(false); };
+
+    def               = defs.add("mouse_3d_invert_pitch", typeid(bool));
+    def->location     = Domain::AppConfigLocation{};
+    def->gui_type     = GUIType::checkbox;
+    def->label        = L("Invert pitch axis");
+    def->tooltip      = L("Inverts tilting the cap of the 3D mouse forward and backward.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Options;
+    def->order        = 5;
+    def->init_fn      = []() { return Domain::ConfigValue(false); };
+
+    def               = defs.add("mouse_3d_invert_roll", typeid(bool));
+    def->location     = Domain::AppConfigLocation{};
+    def->gui_type     = GUIType::checkbox;
+    def->label        = L("Invert roll axis");
+    def->tooltip      = L("Inverts tilting the cap of the 3D mouse left and right.");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Mouse3D;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Options;
+    def->order        = 6;
+    def->init_fn      = []() { return Domain::ConfigValue(false); };
+
     def               = defs.add("graphics_quality", typeid(Domain::EnumWrapper));
     def->location     = Domain::AppConfigLocation{};
     def->label        = L("Graphics quality");

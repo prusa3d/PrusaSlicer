@@ -101,9 +101,15 @@ void ScenePresenterBase<ProjectContextT>::update_cameras(const std::function<voi
 template <typename ProjectContextT>
 void ScenePresenterBase<ProjectContextT>::on_app_config_changed(const std::string& key)
 {
+    const AppConfig& app_config = AppServices::instance().app_config();
+
     if (key == "camera_projection_type") {
-        auto type = AppServices::instance().app_config().get<CameraProjectionType>("camera_projection_type");
+        auto type = app_config.get<CameraProjectionType>("camera_projection_type");
         update_cameras([type](Camera& cam) { cam.set_projection_type(type); });
+    } else if (key == "use_free_camera" && !app_config.get<bool>("use_free_camera")) {
+        for (auto& [project_id, context] : m_projects) {
+            context.scene().camera_trackball().recover_from_free_rotation();
+        }
     }
 }
 

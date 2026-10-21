@@ -14,11 +14,11 @@ brew update && brew install automake cmake git gettext libtool texinfo
 ### Linux
 For example on Ubuntu 26.04:
 ```bash
-sudo apt install git build-essential autoconf cmake libtool libglu1-mesa-dev libgtk-3-dev libdbus-1-dev libwebkit2gtk-4.1-dev texinfo
+sudo apt install git build-essential autoconf cmake libtool libglu1-mesa-dev libgtk-3-dev libdbus-1-dev libwebkit2gtk-4.1-dev libhidapi-dev texinfo
 ```
 or for Fedora 44:
 ```bash
-sudo dnf install cmake g++ git-core m4 texinfo autoconf automake libtool perl-FindBin perl-lib perl-IPC-Cmd perl-Time-Piece webkit2gtk4.1-devel zlib-devel zlib-static libpng-static
+sudo dnf install cmake g++ git-core m4 texinfo autoconf automake libtool perl-FindBin perl-lib perl-IPC-Cmd perl-Time-Piece webkit2gtk4.1-devel zlib-devel zlib-static libpng-static hidapi-devel
 ```
 Adapt it for your package manager and packages provided by your operating system.
 ## 1. Build dependencies

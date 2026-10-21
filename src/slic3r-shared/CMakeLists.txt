@@ -309,6 +309,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/PreferencesDialog.cpp
         include/Slic3r/App/NumberEntryDialog.hpp
         src/Slic3r/App/NumberEntryDialog.cpp
+        include/Slic3r/App/Mouse3D/Mouse3DController.hpp
+        src/Slic3r/App/Mouse3D/Mouse3DController.cpp
         include/Slic3r/App/InvalidDataDialog.hpp
         src/Slic3r/App/InvalidDataDialog.cpp
         include/Slic3r/App/SidebarStackLayout.hpp
@@ -1616,8 +1618,9 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/App/Scene/Node.cpp
             test/Slic3r/App/Scene/Ray.cpp
+            test/Slic3r/App/Scene/CameraTrackballControllerTests.cpp
             test/Slic3r/App/Scene/ClipperTests.cpp
-        test/Slic3r/App/Scene/MouseBindingScheme.cpp
+            test/Slic3r/App/Scene/MouseBindingScheme.cpp
 
             test/Slic3r/App/Plater/SurfaceMesh.cpp
 

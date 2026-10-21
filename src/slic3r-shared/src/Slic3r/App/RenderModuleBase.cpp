@@ -5,6 +5,9 @@
 #include "Slic3r/App/ObjectListWindow.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
 #include "Slic3r/App/Scene/GizmoManager.hpp"
+#include "Slic3r/App/Scene/Scene.hpp"
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/Mouse3D/Mouse3DController.hpp"
 
 namespace Slic3r::App {
 
@@ -14,6 +17,16 @@ void RenderModuleBase::on_scene_keyboard_event(const Platform::KeyboardEvent& e)
         && !m_gizmo_manager->on_scene_keyboard_event(e))
     {
         Platform::AbstractRenderModule::on_scene_keyboard_event(e);
+    }
+}
+
+void RenderModuleBase::apply_mouse_3d_input(Scene::Scene& scene)
+{
+    const AppServices& app_services = AppServices::instance();
+    if (app_services.has_mouse_3d_controller()
+        && app_services.mouse_3d_controller().apply(scene.camera(), scene.camera_trackball()))
+    {
+        this->request_render();
     }
 }
 

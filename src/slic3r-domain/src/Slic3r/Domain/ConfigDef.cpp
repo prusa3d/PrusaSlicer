@@ -86,6 +86,8 @@ std::string ConfigItemDef::translate_category(Category category, const PrinterTe
         return L("General");
     case ConfigItemDef::Category::AppConfig_Services:
         return L("Services");
+    case ConfigItemDef::Category::AppConfig_Mouse3D:
+        return L("3D mouse");
     case ConfigItemDef::Category::PhysicalPrinter_General:
         return L("General");
     }
@@ -317,6 +319,12 @@ std::string ConfigItemDef::translate_option_group(OptionGroup option_group)
         return L("General");
     case ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup:
         return L("Services Setup");
+    case ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Speed:
+        return L("Speed");
+    case ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Deadzone:
+        return L("Deadzone");
+    case ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Options:
+        return L("Options");
     }
 
     return {};

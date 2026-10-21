@@ -1361,6 +1361,13 @@ void PlaterRenderModule::on_scene_mouse_event(const Platform::MouseEvent& e)
     }
 }
 
+void PlaterRenderModule::on_frame_begin()
+{
+    if (m_scene_presenter->project_ready()) {
+        this->apply_mouse_3d_input(m_scene_presenter->scene());
+    }
+}
+
 void PlaterRenderModule::on_activated()
 {
     if (m_scene_presenter != nullptr) {

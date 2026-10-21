@@ -330,8 +330,14 @@ GizmoActivationState AbstractCameraGizmo::on_mouse(GizmoEventContext& ctx, bool 
             m_was_activated = true;
         }
 
+        const bool free_camera = AppServices::instance().app_config().get<bool>("use_free_camera");
+        if (!free_camera) {
+            // The 3D mouse tilts the horizon, the constrained navigation expects it level (#3816).
+            m_scene_provider.scene().camera_trackball().recover_from_free_rotation();
+        }
+
         if (m_state == State::Rotating)
-            update_rotation(delta_x, delta_y, 0.25);
+            update_rotation(delta_x, delta_y, 0.25, free_camera);
         else if (m_state == State::Panning) {
             Vec3d current_mouse_world_pos;
             Vec3d last_mouse_world_pos;
@@ -405,13 +411,22 @@ void AbstractCameraGizmo::update_zoom(float wheel_delta_y)
         m_scene_provider.scene().camera_trackball().update_zoom(wheel_delta_y / std::abs(wheel_delta_y));
 }
 
-void AbstractCameraGizmo::update_rotation(float delta_x, float delta_y, float delta_for_180_rotation)
+void AbstractCameraGizmo::
+    update_rotation(float delta_x, float delta_y, float delta_for_180_rotation, bool free_camera)
 {
     auto& scene     = m_scene_provider.scene();
     auto& trackball = scene.camera_trackball();
 
     const double delta_to_angle_factor{1.0 / delta_for_180_rotation * M_PI};
-    trackball.add_azimuth_and_zenith(delta_x * delta_to_angle_factor, delta_y * delta_to_angle_factor, true);
+    if (free_camera) {
+        trackball.rotate_around_pivot(Vec3d(delta_y, delta_x, 0.) * delta_to_angle_factor);
+    } else {
+        trackball.add_azimuth_and_zenith(
+            delta_x * delta_to_angle_factor,
+            delta_y * delta_to_angle_factor,
+            true
+        );
+    }
 }
 
 void AbstractCameraGizmo::look_at(const Vec3d& pos, double azimuth, double zenith)

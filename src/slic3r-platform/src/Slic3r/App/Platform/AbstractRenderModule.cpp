@@ -10,6 +10,8 @@ void AbstractRenderModule::on_scene_keyboard_event(const KeyboardEvent& e)
     m_command_registry.process_keyboard_event(e);
 }
 
+void AbstractRenderModule::on_frame_begin() {}
+
 void AbstractRenderModule::on_activated() {}
 
 void AbstractRenderModule::on_deactivated() {}

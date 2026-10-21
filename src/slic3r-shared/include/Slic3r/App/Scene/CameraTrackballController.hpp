@@ -51,6 +51,17 @@ public:
 
     void add_azimuth_and_zenith(double delta_azimuth, double delta_zenith, bool apply_limits = false);
 
+    /**
+     * @brief Rotates the camera around the pivot without keeping the Z axis pointing up.
+     * @param rotation_in_camera_axes Axis in camera coordinates scaled by the angle in radians.
+     */
+    void rotate_around_pivot(const Domain::Vec3d& rotation_in_camera_axes);
+
+    /**
+     * @brief Rolls the camera around its view direction to level the horizon after a free rotation.
+     */
+    void recover_from_free_rotation();
+
     const Eigen::Quaterniond& view_rotation() const { return m_view_rotation; }
     void set_view_rotation(const Eigen::Quaterniond& view_rotation) { m_view_rotation = view_rotation; }
 
@@ -60,6 +71,7 @@ public:
 private:
     void set_camera_orientation();
     void normalize_azimuth_and_zenith();
+    void update_azimuth_and_zenith_from_camera();
 
 private:
     Camera& m_camera;

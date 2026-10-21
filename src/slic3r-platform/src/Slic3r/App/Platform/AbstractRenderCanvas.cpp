@@ -102,6 +102,7 @@ void AbstractRenderCanvas::render()
             return;
         }
         assert_no_gl_error();
+        m_render_module->on_frame_begin();
         emit_enqueued_events();
         assert_no_gl_error();
         begin_imgui_frame();
