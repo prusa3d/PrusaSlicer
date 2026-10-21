@@ -9,6 +9,7 @@
 #include <limits>
 #include <vector>
 #include <cstddef>
+#include <optional>
 
 #include "Slic3r/Domain/FullConfigFDM.hpp"
 #include "Slic3r/Domain/GCodeFlavor.hpp"
@@ -172,6 +173,7 @@ public:
 		m_layer_height			= layer_height;
 		m_depth_traversed  = 0.f;
         m_current_layer_finished = false;
+        m_purge_end.reset();
 
 		
         // Advance m_layer_info iterator, making sure we got it right
@@ -334,6 +336,9 @@ private:
 	float			m_extra_flow      = 1.f;
 	float			m_extra_spacing_wipe    = 1.f;
 	float			m_extra_spacing_ramming = 1.f;
+
+    // Nozzle position after the last purge on the current layer.
+    std::optional<Domain::Vec2f> m_purge_end;
 
     bool is_first_layer() const { return size_t(m_layer_info - m_plan.begin()) == m_first_layer_idx; }
 

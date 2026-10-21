@@ -920,7 +920,8 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool)
             writer.travel(writer.x(), writer.y() - m_perimeter_width); // cooling and loading were done a bit down the road
         }
         toolchange_Wipe(writer, cleaning_box, wipe_volume);     // Wipe the newly loaded filament until the end of the assigned wipe area.
-        ++ m_num_tool_changes;
+        m_purge_end = writer.pos();
+        ++m_num_tool_changes;
     } else
         toolchange_Unload(writer, cleaning_box, m_filpar[m_current_tool].material, m_filpar[m_current_tool].temperature, m_filpar[m_current_tool].temperature);
 
@@ -1278,7 +1279,6 @@ void WipeTower::toolchange_Wipe(
 		traversed_x -= writer.x();
         x_to_wipe -= std::abs(traversed_x);
 		if (x_to_wipe < WT_EPSILON) {
-            writer.travel(m_left_to_right ? xl + 1.5f*line_width : xr - 1.5f*line_width, writer.y(), 7200);
 			break;
 		}
 		// stepping to the next line:
@@ -1326,9 +1326,20 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
     box_coordinates fill_box(Vec2f(m_perimeter_width, m_layer_info->depth-(current_depth-m_perimeter_width)),
                              m_wipe_tower_width - 2 * m_perimeter_width, current_depth-m_perimeter_width);
 
+    Vec2f start_position =
+        m_left_to_right ? fill_box.ru : fill_box.lu; // So there is never a diagonal travel.
+    if (m_purge_end.has_value()) {
+        // Start where the last purge ended. The tool change writer is shifted by the layer depth on reversed layers.
+        start_position = *m_purge_end
+            + Vec2f(0.f, m_current_shape == SHAPE_REVERSED ? m_layer_info->depth : 0.f);
+    }
 
-    writer.set_initial_position((m_left_to_right ? fill_box.ru : fill_box.lu), // so there is never a diagonal travel
-                                 m_wipe_tower_width, m_wipe_tower_depth, m_internal_rotation);
+    writer.set_initial_position(
+        start_position,
+        m_wipe_tower_width,
+        m_wipe_tower_depth,
+        m_internal_rotation
+    );
 
     bool toolchanges_on_layer = m_layer_info->toolchanges_depth() > WT_EPSILON;
     box_coordinates wt_box(Vec2f(0.f, (m_current_shape == SHAPE_REVERSED ? m_layer_info->toolchanges_depth() : 0.f)),
@@ -1338,16 +1349,21 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
     if (fill_box.ru.y() - fill_box.rd.y() > m_perimeter_width - WT_EPSILON)
         writer.rectangle(fill_box.ld, fill_box.rd.x()-fill_box.ld.x(), fill_box.ru.y()-fill_box.rd.y(), feedrate);
 
-    // we are in one of the corners, travel to ld along the perimeter:
-    if (writer.x() > fill_box.ld.x()+EPSILON) writer.travel(fill_box.ld.x(),writer.y());
-    if (writer.y() > fill_box.ld.y()+EPSILON) writer.travel(writer.x(),fill_box.ld.y());
-
     // Extrude infill to support the material to be printed above.
     const float dy = (fill_box.lu.y() - fill_box.ld.y() - m_perimeter_width);
     float left = fill_box.lu.x() + 2*m_perimeter_width;
     float right = fill_box.ru.x() - 2 * m_perimeter_width;
     if (dy > m_perimeter_width)
     {
+        // we are in one of the corners, travel to ld along the perimeter:
+        if (writer.x() > fill_box.ld.x() + EPSILON) {
+            writer.travel(fill_box.ld.x(), writer.y());
+        }
+
+        if (writer.y() > fill_box.ld.y() + EPSILON) {
+            writer.travel(writer.x(), fill_box.ld.y());
+        }
+
         writer.travel(fill_box.ld + Vec2f(m_perimeter_width * 2, 0.f))
               .append(";--------------------\n"
                       "; CP EMPTY GRID START\n")
