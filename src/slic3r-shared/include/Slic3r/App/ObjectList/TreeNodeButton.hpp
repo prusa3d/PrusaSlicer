@@ -19,6 +19,7 @@ class Icon;
 } // namespace Yoga
 
 class ExtruderIcon;
+class ContextMenuRequester;
 
 namespace ObjectList {
 
@@ -62,6 +63,11 @@ class TreeNodeButton : public Yoga::RectangleButton
 {
 public:
     void update_state();
+
+    /**
+     * @brief Expands the node (shows its collapsible area), as a click on the collapse button.
+     */
+    void expand();
 
 protected:
     TreeNodeButton(NodeLevel level, CollapsibleArea* collapsible_item);
@@ -121,6 +127,22 @@ ExtruderIcon* add_extruder_icon(Yoga::Item* parent, Yoga::Unit size = Yoga::Unit
  * @param selection Exactly the clicked row's own selection payload (mode + one element).
  */
 void select_elements(Biz::ProjectInteractor& project_interactor, Biz::Scene::ObjectSelection selection);
+
+/**
+ * @brief Right-click on a row: a checked row whose selection mode matches the current selection
+ * keeps the selection (so the menu applies to a whole multi-selection), otherwise the selection
+ * is replaced by just this row (no Ctrl/Shift handling). Then the context menu matching the
+ * resulting selection is requested at the mouse position.
+ * @param row_checked Whether the clicked row is highlighted as selected (which is also the case
+ * when only a child of the row is selected, e.g. a volume of the object).
+ * @param selection Exactly the clicked row's own selection payload (mode + one element).
+ */
+void request_context_menu(
+    Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester,
+    bool row_checked,
+    Biz::Scene::ObjectSelection selection
+);
 
 } // namespace ObjectList
 } // namespace Slic3r::App

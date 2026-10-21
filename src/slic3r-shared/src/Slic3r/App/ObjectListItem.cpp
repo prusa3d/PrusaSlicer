@@ -9,6 +9,7 @@
 
 #include "Slic3r/Domain/ConfigContainer.hpp"
 #include "Slic3r/Domain/BedInstance.hpp"
+#include "Slic3r/Domain/ElementRef.hpp"
 
 namespace Slic3r::App {
 
@@ -16,7 +17,10 @@ using namespace Yoga;
 
 namespace ObjectList {
 
-OutOfBedsItem::OutOfBedsItem(Biz::ProjectInteractor& project_interactor)
+OutOfBedsItem::OutOfBedsItem(
+    Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester
+)
 {
     set_object_name("OutOfBedsItem");
     set_orientation(Orientation::Vertical);
@@ -28,7 +32,9 @@ OutOfBedsItem::OutOfBedsItem(Biz::ProjectInteractor& project_interactor)
     Text* label = label_wrapper->emplace_back<Text>(Biz::_u8L("Out of bed"));
     label->set_font_type(Render::ImguiFontType::Bold);
 
-    m_objects_list_view = emplace_back<ObjectListView>(ObjectListViewFactory(project_interactor));
+    m_objects_list_view = emplace_back<ObjectListView>(
+        ObjectListViewFactory(project_interactor, context_menu_requester)
+    );
     m_objects_list_view->set_object_name("OutOfBedObjectListView");
     m_objects_list_view->set_orientation(Orientation::Vertical);
 }
@@ -56,9 +62,24 @@ void OutOfBedsItem::set_source_list(
     update_visibility();
 }
 
+bool OutOfBedsItem::start_renaming(const Domain::ElementRef& element)
+{
+    for (size_t i = 0; i < m_objects_list_view->list_item_count(); ++i) {
+        if (m_objects_list_view->item_at(i)->start_renaming(element)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void OutOfBedsItem::update_visibility()
 {
     set_visible(m_objects_list_view->list_item_count() > 0);
+}
+
+void OutOfBedsItem::on_inserted(const Biz::ObjectList::Object& data, size_t index)
+{
+    update_visibility();
 }
 
 void OutOfBedsItem::on_updated(const Biz::IndexRange& index_range)
@@ -67,6 +88,11 @@ void OutOfBedsItem::on_updated(const Biz::IndexRange& index_range)
 }
 
 void OutOfBedsItem::on_removed(const Biz::IndexRange& index_range)
+{
+    update_visibility();
+}
+
+void OutOfBedsItem::on_reset()
 {
     update_visibility();
 }
@@ -157,8 +183,9 @@ ObjectListItem::ObjectListItem(Biz::ProjectInteractor& project_interactor, Mode 
     set_min_height(100);
     set_padding(Paddings{0,0,0, 25_fpx});
 
-    m_printer_group_list_view =
-        emplace_back<PrinterGroupListView>(PrinterGroupListViewFactory(project_interactor, m_mode));
+    m_printer_group_list_view = emplace_back<PrinterGroupListView>(
+        PrinterGroupListViewFactory(project_interactor, m_context_menu_requester, m_mode)
+    );
     m_printer_group_list_view->set_object_name("PrinterGroups");
     m_printer_group_list_view->set_orientation(Yoga::Orientation::Vertical);
     m_printer_group_list_view->set_source_list(
@@ -167,7 +194,10 @@ ObjectListItem::ObjectListItem(Biz::ProjectInteractor& project_interactor, Mode 
     m_printer_group_list_view->set_flex_shrink(0);
 
     if (m_mode == Mode::Plater) {
-        m_out_of_beds_item = emplace_back<ObjectList::OutOfBedsItem>(project_interactor);
+        m_out_of_beds_item = emplace_back<ObjectList::OutOfBedsItem>(
+            project_interactor,
+            m_context_menu_requester
+        );
         m_out_of_beds_item->set_source_list(
             m_object_list_interactor.out_of_bed_objects(project_interactor.selected_project_id())
         );
@@ -196,6 +226,35 @@ void ObjectListItem::set_bed_instance_icons(const Plater::BedThumbnailTextures& 
                 break;
             }
         }
+    }
+}
+
+void ObjectListItem::add_context_menu_listener(IShowContextMenuListener* listener)
+{
+    m_context_menu_requester.add_listener<IShowContextMenuListener>(listener);
+}
+
+void ObjectListItem::start_renaming_selected()
+{
+    const Biz::Scene::ObjectSelection& selection =
+        m_project_interactor.scene_interactor().object_selection();
+    if (selection.empty()) {
+        return;
+    }
+
+    // Object rows are identified by the object id only, volume rows also by the volume id.
+    const Domain::ElementRef& selected = selection.elements.front();
+    const Domain::ElementRef element = selection.mode == Biz::Scene::SelectionMode::Volume ?
+        Domain::ElementRef(selected.object_id, 0, selected.volume_id) :
+        Domain::ElementRef(selected.object_id);
+
+    for (size_t i = 0; i < m_printer_group_list_view->list_item_count(); ++i) {
+        if (m_printer_group_list_view->item_at(i)->start_renaming(element)) {
+            return;
+        }
+    }
+    if (m_out_of_beds_item) {
+        m_out_of_beds_item->start_renaming(element);
     }
 }
 

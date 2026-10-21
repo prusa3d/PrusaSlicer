@@ -458,6 +458,29 @@ void PlaterRenderModule::register_commands()
                 }
             )
         )
+        // Command for renaming the selected object/volume in the object list
+        .register_command(
+            std::make_unique<UIItemCommand>(
+                CommandName::RenameSelected,
+                [this]() { m_object_list->start_renaming_selected(); },
+                UIItemCommandExtraOpts{
+                    .enabled =
+                        [this]()
+                    {
+                        const Biz::Scene::ObjectSelection& selection =
+                            m_project_interactor.scene_interactor().object_selection();
+                        if (selection.empty()) {
+                            return false;
+                        }
+                        if (selection.mode == Slic3r::Biz::Scene::SelectionMode::Volume) {
+                            return selection.elements.size() == 1;
+                        }
+                        return selection.mode == Slic3r::Biz::Scene::SelectionMode::Instance
+                            && selection.only_single_object();
+                    }
+                }
+            )
+        )
         .register_command(
             std::make_unique<UIItemCommand>(
                 CommandName::DeactivateCurrentGizmo,
@@ -569,6 +592,7 @@ void PlaterRenderModule::init_scene_layout()
 
     m_object_list = Passthrough(std::make_unique<ObjectListWindow>(m_project_interactor, true));
     m_object_list->set_gizmo_controller(m_gizmo_manager.get());
+    m_object_list->add_context_menu_listener(this);
     m_object_list->on_config_container_added = [this]()
     {
         m_render_module_navigator->set_opened_dialog(

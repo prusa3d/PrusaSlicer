@@ -125,12 +125,13 @@ private:
     ImGuiWindowFlags m_window_flags = 0;
     ////////////////////////////////////////////////////////////////
 
-    bool m_active        = false;
-    bool m_updated       = false; ///< Input was edited but not yet lost focus
-    bool m_request_focus = false;
-    bool m_has_focus     = false;
-    bool m_hovered       = false;
-    bool m_resizable     = false; ///< If true, height of the input text can be adjusted
+    bool m_active          = false;
+    bool m_updated         = false; ///< Input was edited but not yet lost focus
+    bool m_request_focus   = false;
+    bool m_hide_nav_cursor = false; ///< Hide the nav cursor once the requested focus is lost
+    bool m_has_focus       = false;
+    bool m_hovered         = false;
+    bool m_resizable       = false; ///< If true, height of the input text can be adjusted
 };
 
 } // namespace Slic3r::App::Yoga

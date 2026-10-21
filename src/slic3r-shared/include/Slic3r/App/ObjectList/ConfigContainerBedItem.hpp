@@ -72,6 +72,7 @@ public:
     void set_selected(bool selected);
     void set_selection_callbacks(
         Biz::Scene::SceneInteractor& scene_interactor,
+        ContextMenuRequester& context_menu_requester,
         std::function<Domain::BedRef()> get_bed_ref
     );
     void set_thumbnail(Render::TexturePtr texture);
@@ -120,6 +121,7 @@ public:
         size_t index,
         const Biz::ObjectList::Bed& state,
         Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester,
         RemoveBedFn m_remove_bed_fn,
         Mode mode
     );
@@ -131,12 +133,21 @@ public:
 
     void set_thumbnail(Render::TexturePtr texture);
 
+    /**
+     * @brief Shows the name editor on the row of the object or volume @p element.
+     * @return true if a row of this bed took it (the bed is expanded then).
+     */
+    bool start_renaming(const Domain::ElementRef& element);
+
 private:
     void on_data_update() override;
     void refresh_from_state();
 
-    using ObjectListViewFactory = Yoga::
-        ViewFactory<ObjectItem, Biz::ObjectList::Object, Biz::ProjectInteractor&>;
+    using ObjectListViewFactory = Yoga::ViewFactory<
+        ObjectItem,
+        Biz::ObjectList::Object,
+        Biz::ProjectInteractor&,
+        ContextMenuRequester&>;
     using ObjectListView =
         Yoga::ListView<ObjectItem, Biz::ObjectList::Object, ObjectListViewFactory>;
 

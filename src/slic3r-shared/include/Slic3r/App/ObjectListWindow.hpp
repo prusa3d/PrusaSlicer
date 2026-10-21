@@ -26,6 +26,7 @@ class ScrollArea;
 } // namespace Yoga
 
 class ObjectListItem;
+class IShowContextMenuListener;
 
 class ObjectListWindow : public Yoga::CollapsibleWindow
 {
@@ -35,6 +36,18 @@ public:
 
     void set_bed_instance_icons(const Plater::BedThumbnailTextures& icons);
     void set_gizmo_controller(Scene::IGizmoController* controller);
+
+    /**
+     * @brief Adds a listener showing the context menus requested by right-clicks on the object
+     * list rows.
+     */
+    void add_context_menu_listener(IShowContextMenuListener* listener);
+
+    /**
+     * @brief Shows the name editor on the row of the single selected object or volume. The window
+     * and the collapsed parents of the row are expanded, so the editor is visible.
+     */
+    void start_renaming_selected();
 
     std::function<void()> on_config_container_added{nullptr};
 

@@ -24,10 +24,12 @@ struct ElementRef;
 namespace Slic3r::App {
 
 namespace Yoga {
+class Text;
 class InputTextField;
 } // namespace Yoga
 
 class ExtruderIcon;
+class ContextMenuRequester;
 
 namespace ObjectList {
 
@@ -40,6 +42,7 @@ public:
     void set_printable(bool printable);
     void set_callbacks(
         Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester,
         std::function<Biz::Scene::ObjectSelection()> get_selection
     );
     void set_selected(bool selected);
@@ -50,11 +53,18 @@ public:
     );
     void refresh_extruder(std::optional<size_t> config_container_id);
 
+    /**
+     * @brief Replaces the name label by the name editor until the editing is finished.
+     */
+    void start_renaming();
+
 private:
     void hovered_updated_internal() override;
     void update_printable_visibility();
+    void finish_renaming();
 
-    Yoga::InputTextField* m_name{nullptr};
+    Yoga::Text* m_name{nullptr};
+    Yoga::InputTextField* m_name_editing{nullptr};
     ActionButton* m_printable_button{nullptr};
     ExtruderIcon* m_extruder_icon{nullptr};
     std::function<void(bool)> m_on_printable_toggled;
@@ -82,8 +92,16 @@ public:
     ObjectItem(
         size_t index,
         const Biz::ObjectList::Object& state,
-        Biz::ProjectInteractor& project_interactor
+        Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester
     );
+
+    /**
+     * @brief Shows the name editor on this object's row or on the row of its volume, if
+     * @p element refers to this object.
+     * @return true if a row of this object took it (the object is expanded for a volume).
+     */
+    bool start_renaming(const Domain::ElementRef& element);
 
 private:
     void on_data_update() override;

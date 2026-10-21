@@ -74,6 +74,7 @@ PrinterGroupItem::PrinterGroupItem(
     size_t index,
     const Biz::ObjectList::PrinterGroup& state,
     Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester,
     Mode mode
 ) :
     Biz::DataObserver<Biz::ObjectList::PrinterGroup>(index, state),
@@ -96,6 +97,7 @@ PrinterGroupItem::PrinterGroupItem(
 
     m_beds_list_view = emplace_back<BedListView>(BedListViewFactory(
         project_interactor,
+        context_menu_requester,
         [this](size_t config_container_id, size_t bed_id)
         { remove_bed(config_container_id, bed_id); },
         m_mode
@@ -170,6 +172,16 @@ bool PrinterGroupItem::set_bed_thumbnail(size_t bed_id, Render::TexturePtr textu
         ConfigContainerBedItem* bed_item = m_beds_list_view->item_at(i);
         if (bed_item->bed_id() == bed_id) {
             bed_item->set_thumbnail(std::move(texture));
+            return true;
+        }
+    }
+    return false;
+}
+
+bool PrinterGroupItem::start_renaming(const Domain::ElementRef& element)
+{
+    for (size_t i = 0; i < m_beds_list_view->list_item_count(); ++i) {
+        if (m_beds_list_view->item_at(i)->start_renaming(element)) {
             return true;
         }
     }

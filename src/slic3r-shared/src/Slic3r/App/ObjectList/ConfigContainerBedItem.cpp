@@ -3,6 +3,8 @@
 #include "Slic3r/App/Yoga/Icon.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 
+#include "Slic3r/App/ContextMenu.hpp"
+
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
@@ -102,9 +104,25 @@ void CCBedButton::set_selected(bool selected)
 
 void CCBedButton::set_selection_callbacks(
     Biz::Scene::SceneInteractor& scene_interactor,
+    ContextMenuRequester& context_menu_requester,
     std::function<Domain::BedRef()> get_bed_ref
 )
 {
+    callbacks().secondary_action =
+        [this, &scene_interactor, &context_menu_requester, get_bed_ref]()
+    {
+        // A bed which is part of the current selection keeps the selection.
+        if (!checked()) {
+            scene_interactor.bed_selection()
+                .select_one(get_bed_ref(), Biz::Scene::CameraActionOnBedSelection::CenterOnBed);
+        }
+        const ImVec2 mouse_pos = ImGui::GetMousePos();
+        context_menu_requester.request_context_menu(
+            ContextMenuType::Bed,
+            Domain::Vec2f(mouse_pos.x, mouse_pos.y)
+        );
+    };
+
     callbacks().action = [&scene_interactor, get_bed_ref]()
     {
         if (ImGui::GetIO().KeyCtrl) {
@@ -226,6 +244,7 @@ ConfigContainerBedItem::ConfigContainerBedItem(
     size_t index,
     const Biz::ObjectList::Bed& state,
     Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester,
     RemoveBedFn remove_bed_fn,
     Mode mode
 ) :
@@ -258,7 +277,7 @@ ConfigContainerBedItem::ConfigContainerBedItem(
     );
 
     m_objects_list_view = m_collapsible_content->emplace_back<ObjectListView>(
-        ObjectListViewFactory(project_interactor)
+        ObjectListViewFactory(project_interactor, context_menu_requester)
     );
     m_objects_list_view->set_object_name("ObjectListView");
     m_objects_list_view->set_orientation(Orientation::Vertical);
@@ -278,6 +297,7 @@ ConfigContainerBedItem::ConfigContainerBedItem(
     m_cc_bed_button->set_name(state.name);
     m_cc_bed_button->set_selection_callbacks(
         project_interactor.scene_interactor(),
+        context_menu_requester,
         [this]() { return Domain::BedRef{this->state()->config_container_id, this->state()->id}; }
     );
 
@@ -315,6 +335,17 @@ void ConfigContainerBedItem::refresh_from_state()
 void ConfigContainerBedItem::set_thumbnail(Render::TexturePtr texture)
 {
     m_cc_bed_button->set_thumbnail(std::move(texture));
+}
+
+bool ConfigContainerBedItem::start_renaming(const Domain::ElementRef& element)
+{
+    for (size_t i = 0; i < m_objects_list_view->list_item_count(); ++i) {
+        if (m_objects_list_view->item_at(i)->start_renaming(element)) {
+            m_cc_bed_button->expand();
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace Slic3r::App::ObjectList

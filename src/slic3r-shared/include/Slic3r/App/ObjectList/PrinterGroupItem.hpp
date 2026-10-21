@@ -62,6 +62,7 @@ public:
         size_t index,
         const Biz::ObjectList::PrinterGroup& state,
         Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester,
         Mode mode
     );
     ~PrinterGroupItem() override;
@@ -72,6 +73,12 @@ public:
      * @return true if the bed was found (and set_thumbnail was called).
      */
     bool set_bed_thumbnail(size_t bed_id, Render::TexturePtr texture);
+
+    /**
+     * @brief Shows the name editor on the row of the object or volume @p element.
+     * @return true if a row of this group took it.
+     */
+    bool start_renaming(const Domain::ElementRef& element);
 
 private:
     void on_data_update() override;
@@ -84,6 +91,7 @@ private:
         ConfigContainerBedItem,
         Biz::ObjectList::Bed,
         Biz::ProjectInteractor&,
+        ContextMenuRequester&,
         RemoveBedFn,
         Mode>;
     using BedListView =

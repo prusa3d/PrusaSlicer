@@ -104,8 +104,13 @@ public:
      * @remark The callee is responsible to create volume representations of @p volumes for all existing instances.
      * @param project_id Project the volumes belong to
      * @param volumes Set of volumes to add.
+     * @param bed_tracking_changes Information on changed bed instances
      */
-    virtual void on_volume_added(Domain::SelectionId project_id, const Domain::ElementRefs& volumes)
+    virtual void on_volume_added(
+        Domain::SelectionId project_id,
+        const Domain::ElementRefs& volumes,
+        const BedTrackingChanges& bed_tracking_changes
+    )
     {}
 
     /**
@@ -113,9 +118,13 @@ public:
      * @remark The callee is responsible to remove volume representations of @p volumes from all existing instances.
      * @param project_id Project the volumes belong to
      * @param volumes Set of volumes to add.
+     * @param bed_tracking_changes Information on changed bed instances
      */
-    virtual void
-    on_volume_removed(Domain::SelectionId project_id, const Domain::ElementRefs& volumes)
+    virtual void on_volume_removed(
+        Domain::SelectionId project_id,
+        const Domain::ElementRefs& volumes,
+        const BedTrackingChanges& bed_tracking_changes
+    )
     {}
 
     /**
@@ -137,10 +146,12 @@ public:
      * @brief Called whenever volumes type is changed.
      * @param project_id Project the instances belong to
      * @param volumes List of volumes with changed type
+     * @param bed_tracking_changes Information on changed bed instances
      */
     virtual void on_volume_type_changed(
         Domain::SelectionId project_id,
-        const Domain::ElementRefs& volumes
+        const Domain::ElementRefs& volumes,
+        const BedTrackingChanges& bed_tracking_changes
     )
     {}
 

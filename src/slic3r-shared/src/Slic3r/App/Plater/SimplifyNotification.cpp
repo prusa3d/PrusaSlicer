@@ -195,7 +195,10 @@ void SimplifyNotification::recreate_notification(
 }
 
 void SimplifyNotification::on_volume_added(
-    Domain::SelectionId project_id, const Domain::ElementRefs& volumes)
+    Domain::SelectionId project_id,
+    const Domain::ElementRefs& volumes,
+    const Biz::BedTrackingChanges& /*bed_tracking_changes*/
+)
 {
     bool exist_change = false;
     const Domain::Project& project = m_project_interactor.project(project_id);
@@ -222,7 +225,10 @@ void SimplifyNotification::on_volume_added(
 }
 
 void SimplifyNotification::on_volume_removed(
-    Domain::SelectionId project_id, const Domain::ElementRefs& volumes)
+    Domain::SelectionId project_id,
+    const Domain::ElementRefs& volumes,
+    const Biz::BedTrackingChanges& /*bed_tracking_changes*/
+)
 {
     bool exist_change = false;
     for (const Domain::ElementRef& el : volumes) {
@@ -261,7 +267,7 @@ void SimplifyNotification::on_instance_added(
         return; // no added volume
     }
 
-    on_volume_added(project_id, el_volumes);
+    on_volume_added(project_id, el_volumes, {});
 }
 
 void SimplifyNotification::on_instance_removed(

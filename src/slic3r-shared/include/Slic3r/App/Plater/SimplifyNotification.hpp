@@ -38,14 +38,22 @@ public:
      * 
      * @brief Check need for simplification
      */
-    void on_volume_added(Domain::SelectionId project_id, const Domain::ElementRefs& volumes) override;
+    void on_volume_added(
+        Domain::SelectionId project_id,
+        const Domain::ElementRefs& volumes,
+        const Biz::BedTrackingChanges& bed_tracking_changes
+    ) override;
 
     /**
      * @brief Update list of object need simplify.
      * Close notification if last one
      * Remove volume from list of huge meshes
      */
-    void on_volume_removed(Domain::SelectionId project_id, const Domain::ElementRefs& volumes) override;
+    void on_volume_removed(
+        Domain::SelectionId project_id,
+        const Domain::ElementRefs& volumes,
+        const Biz::BedTrackingChanges& bed_tracking_changes
+    ) override;
 
     /**
      * @brief When add object, first instance is created.

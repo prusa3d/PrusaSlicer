@@ -4,6 +4,7 @@
 #include "Slic3r/App/Yoga/ListView.hpp"
 
 #include "Slic3r/App/ObjectList/PrinterGroupItem.hpp"
+#include "Slic3r/App/ContextMenu.hpp"
 
 #include "Slic3r/Biz/ObjectList/ConfigContainerObservableList.hpp"
 #include "Slic3r/Biz/ObjectList/ObjectListInteractor.hpp"
@@ -17,6 +18,7 @@
 
 namespace Slic3r::Domain {
 class ConfigContainer;
+struct ElementRef;
 } // namespace Slic3r::Domain
 
 namespace Slic3r::Biz {
@@ -41,20 +43,32 @@ namespace ObjectList {
 class OutOfBedsItem : public Yoga::Item, public Biz::IListObserver<Biz::ObjectList::Object>
 {
 public:
-    OutOfBedsItem(Biz::ProjectInteractor& project_interactor);
+    OutOfBedsItem(
+        Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester
+    );
     ~OutOfBedsItem();
 
     void set_source_list(std::weak_ptr<Biz::ObjectList::ObjectObservableList> out_of_bed_objects);
 
+    /**
+     * @brief Shows the name editor on the row of the object or volume @p element.
+     * @return true if a row of this section took it.
+     */
+    bool start_renaming(const Domain::ElementRef& element);
+
 private:
     void update_visibility();
+    void on_inserted(const Biz::ObjectList::Object& data, size_t index) override;
     void on_updated(const Biz::IndexRange& index_range) override;
     void on_removed(const Biz::IndexRange& index_range) override;
+    void on_reset() override;
 
     using ObjectListViewFactory = Yoga::ViewFactory<
         ObjectItem,
         Biz::ObjectList::Object,
-        Biz::ProjectInteractor&>;
+        Biz::ProjectInteractor&,
+        ContextMenuRequester&>;
     using ObjectListView =
         Yoga::ListView<ObjectItem, Biz::ObjectList::Object, ObjectListViewFactory>;
 
@@ -96,6 +110,17 @@ public:
 
     void set_bed_instance_icons(const Plater::BedThumbnailTextures& icons);
 
+    /**
+     * @brief Adds a listener showing the context menus requested by right-clicks on the rows.
+     */
+    void add_context_menu_listener(IShowContextMenuListener* listener);
+
+    /**
+     * @brief Shows the name editor on the row of the single selected object or volume. For an
+     * object listed on several beds, the first row in the list is used.
+     */
+    void start_renaming_selected();
+
     void on_selected_project_changed(size_t index) override;
 
 private:
@@ -103,6 +128,7 @@ private:
         ObjectList::PrinterGroupItem,
         Biz::ObjectList::PrinterGroup,
         Biz::ProjectInteractor&,
+        ContextMenuRequester&,
         Mode>;
     using PrinterGroupListView = Yoga::ListView<
         ObjectList::PrinterGroupItem,
@@ -114,6 +140,9 @@ private:
     ObjectList::AllBedsItem* m_all_beds_item{nullptr};
 
     Biz::ObjectList::ObjectListInteractor& m_object_list_interactor;
+
+    /// Shared by all rows (passed through the view factories) to request their context menus.
+    ContextMenuRequester m_context_menu_requester;
 
     Mode m_mode;
     Biz::ProjectInteractor& m_project_interactor;

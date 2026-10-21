@@ -236,4 +236,15 @@ void ObjectListWindow::set_gizmo_controller(Scene::IGizmoController* controller)
     m_gizmo_controller = controller;
 }
 
+void ObjectListWindow::add_context_menu_listener(IShowContextMenuListener* listener)
+{
+    m_object_list->add_context_menu_listener(listener);
+}
+
+void ObjectListWindow::start_renaming_selected()
+{
+    set_collapsed(false);
+    m_object_list->start_renaming_selected();
+}
+
 } // namespace Slic3r::App
