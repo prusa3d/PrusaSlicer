@@ -352,7 +352,8 @@ void AbstractConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* co
           "wipe_tower_bridging",
           "wipe_tower_no_sparse_layers",
           "single_extruder_multi_material_priming",
-          "wipe_tower_max_purge_speed"})
+          "wipe_tower_max_purge_speed",
+          "wipe_tower_deretraction_spread_ratio"})
         toggle_field(el, have_wipe_tower);
 
     bool have_non_zero_mmu_segmented_region_max_width = config->opt_float("mmu_segmented_region_max_width") > 0.;

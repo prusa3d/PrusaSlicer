@@ -10,6 +10,7 @@
 #include <cmath>
 #include <vector>
 #include <cstring>
+#include <optional>
 
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Domain/GCodeFlavor.hpp"
@@ -60,7 +61,7 @@ public:
     // Prefix of the toolchange G-code line, to be used by the CoolingBuffer to separate sections of the G-code
     // printed with the same extruder.
     std::string toolchange_prefix() const;
-    std::string toolchange(unsigned int extruder_id);
+    std::string toolchange(unsigned int extruder_id, const std::optional<Domain::Vec2d> &return_position = std::nullopt);
     std::string set_speed(double F, const std::string_view comment = {}, const std::string_view cooling_marker = {}) const;
 
     /**
@@ -106,6 +107,18 @@ public:
     std::string retract(bool before_wipe = false);
     std::string retract_for_toolchange(bool before_wipe = false);
     std::string unretract();
+    /**
+     * @brief Whether unretract() would de-retract the extruder and the de-retraction can be done while moving.
+     */
+    bool can_unretract_while_moving(unsigned int extruder_id) const;
+
+    /**
+     * @brief Unretracts while moving from the current position to the end point, so the de-retracted material is spread
+     * along the move.
+     *
+     * @param max_feedrate Upper limit of the feedrate (mm/min) that would keep the de-retraction speed.
+     */
+    std::string unretract_while_moving(const Domain::Vec2d &end, double max_feedrate);
 
     // Current position of the printer, in G-code coordinates.
     // Z coordinate of current position contains zhop. If zhop is applied (this->zhop() > 0),

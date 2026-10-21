@@ -147,6 +147,7 @@ public:
 	const Vec2f& 		 pos()   const { return m_current_pos; }
 	const Vec2f	 		 start_pos_rotated() const { return m_start_pos; }
 	const Vec2f  		 pos_rotated() const { return this->rotate(m_current_pos); }
+	const Vec2f  		 rotated(const Vec2f &point) const { return this->rotate(point); }
 	float 				 elapsed_time() const { return m_elapsed_time; }
     float                get_and_reset_used_filament_length() { float temp = m_used_filament_length; m_used_filament_length = 0.f; return temp; }
 
@@ -609,6 +610,9 @@ WipeTower::WipeTower(
     m_infill_speed(get_min_speed(config.get<std::vector<double>>("infill_speed"), extruder_candidates)),
     m_perimeter_speed(get_min_speed(config.get<std::vector<double>>("perimeter_speed"), extruder_candidates)),
     m_bridging(config.get<double>("wipe_tower_bridging")),
+    m_deretraction_spread_ratio(
+        static_cast<float>(config.get<double>("wipe_tower_deretraction_spread_ratio"))
+    ),
     m_no_sparse_layers(config.get<bool>("wipe_tower_no_sparse_layers")),
     m_gcode_flavor(config.get<GCodeFlavor>("gcode_flavor")),
     m_current_tool(initial_tool),
@@ -748,7 +752,8 @@ void WipeTower::set_extruder(size_t idx, const PrintConfigView& config)
         // ramming_speed vector that would respect both the volume and flow (because of 
         // rounding issues with small volumes and high flow).
         m_filpar[idx].ramming_speed.push_back(flow);
-        m_filpar[idx].multitool_ramming_time = vol/flow;
+        m_filpar[idx].multitool_ramming_time   = vol / flow;
+        m_filpar[idx].multitool_ramming_volume = vol;
     }
 
     m_used_filament_length.resize(std::max(m_used_filament_length.size(), idx + 1)); // makes sure that the vector is big enough so we don't have to check later
@@ -909,12 +914,31 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool)
 	if (m_set_extruder_trimpot)
 		writer.set_extruder_trimpot(750);
 
+    std::optional<ToolChangeResult::DeretractionSpread> deretraction_spread;
+
     // Ram the hot material out of the melt zone, retract the filament into the cooling tubes and let it cool.
     if (tool != (unsigned int)-1){ 			// This is not the last change.
         toolchange_Unload(writer, cleaning_box, m_filpar[m_current_tool].material,
                           (is_first_layer() ? m_filpar[m_current_tool].first_layer_temperature : m_filpar[m_current_tool].temperature),
                           (is_first_layer() ? m_filpar[tool].first_layer_temperature : m_filpar[tool].temperature));
+
+        const Vec2f purge_start   = writer.pos();
+        const float spread_length = deretraction_spread_length(cleaning_box, purge_start.x(), tool);
         toolchange_Change(writer, tool, m_filpar[tool].material); // Change the tool, set a speed override for soluble and flex materials.
+
+        if (spread_length > 0.f) {
+            const Vec2f spread_start =
+                purge_start + Vec2f((m_left_to_right ? 1.f : -1.f) * spread_length, 0.f);
+            const float purge_speed =
+                is_first_layer() ? m_first_layer_infill_speed : m_infill_speed;
+
+            deretraction_spread = ToolChangeResult::DeretractionSpread{
+                writer.rotated(spread_start),
+                writer.pos_rotated(),
+                purge_speed * 60.f
+            };
+        }
+
         toolchange_Load(writer, cleaning_box);
         if (has_semm_loading_move()) {
             writer.travel(writer.x(), writer.y() - m_perimeter_width); // cooling and loading were done a bit down the road
@@ -941,7 +965,9 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool)
     if (m_current_tool < m_used_filament_length.size())
         m_used_filament_length[m_current_tool] += writer.get_and_reset_used_filament_length();
 
-   return construct_tcr(writer, false, old_tool);
+    ToolChangeResult result    = construct_tcr(writer, false, old_tool);
+    result.deretraction_spread = deretraction_spread;
+    return result;
 }
 
 
@@ -1171,11 +1197,19 @@ void WipeTower::toolchange_Change(
     // gcode could have left the extruder somewhere, we cannot just start extruding. We should also inform the
     // postprocessor that we absolutely want to have this in the gcode, even if it thought it is the same as before.
     Vec2f current_pos = writer.pos_rotated();
-    writer.feedrate(m_travel_speed * 60.f) // see https://github.com/prusa3d/PrusaSlicer/issues/5483
-          .append(std::string("G1 X") + Slic3r::float_to_string_decimal_point(current_pos.x())
-                             +  " Y"  + Slic3r::float_to_string_decimal_point(current_pos.y())
-                             + never_skip_tag() + "\n"
-    );
+    writer
+        .feedrate(m_travel_speed * 60.f) // see https://github.com/prusa3d/PrusaSlicer/issues/5483
+        .append(
+            std::string("G1 X")
+            + Slic3r::float_to_string_decimal_point(current_pos.x())
+            + " Y"
+            + Slic3r::float_to_string_decimal_point(current_pos.y())
+            // The postprocessor removes the never skip tag up to the line end, so it goes last.
+            + " "
+            + toolchange_travel_tag()
+            + never_skip_tag()
+            + "\n"
+        );
 
     writer.append("[deretraction_from_wipe_tower_generator]");
 
@@ -1297,6 +1331,44 @@ void WipeTower::toolchange_Wipe(
 
     writer.set_extrusion_flow(m_extrusion_flow); // Reset the extrusion flow.
     writer.change_analyzer_line_width(m_perimeter_width);
+}
+
+// Length of the purge line start over which the de-retraction after a tool change is spread.
+float WipeTower::deretraction_spread_length(
+    const box_coordinates& cleaning_box,
+    const float purge_start_x,
+    const size_t new_tool
+) const
+{
+    if (m_semm
+        || m_deretraction_spread_ratio <= 0.f
+        || m_filpar[new_tool].multitool_ramming_volume <= 0.f)
+    {
+        return 0.f;
+    }
+
+    // Mirrors the start of toolchange_Wipe(): close to the edge it advances to the next line, otherwise it purges up to the edge.
+    const float line_width = m_perimeter_width * m_extra_flow;
+    const float distance_to_edge =
+        m_left_to_right ? cleaning_box.rd.x() - purge_start_x : purge_start_x - cleaning_box.ld.x();
+    if (distance_to_edge < 2.5f * line_width) {
+        return 0.f;
+    }
+
+    // The first purge line ends at the edge, or 1.5 line widths before it when purging to the left.
+    const float max_spread_length =
+        m_left_to_right ? distance_to_edge : distance_to_edge - 1.5f * line_width;
+
+    const float spread_length =
+        volume_to_length(
+            m_filpar[new_tool].multitool_ramming_volume,
+            m_perimeter_width,
+            m_layer_height
+        )
+        / m_extra_flow
+        * m_deretraction_spread_ratio;
+
+    return std::min(spread_length, max_spread_length);
 }
 
 bool WipeTower::has_semm_loading_move() const {
@@ -1755,7 +1827,12 @@ static WipeTower::ToolChangeResult merge_tcr(WipeTower::ToolChangeResult& first,
     out.end_pos = second.end_pos;
     out.wipe_path = second.wipe_path;
     out.initial_tool = first.initial_tool;
-    out.new_tool = second.new_tool;
+    out.new_tool     = second.new_tool;
+
+    if (!out.deretraction_spread.has_value()) {
+        out.deretraction_spread = second.deretraction_spread;
+    }
+
     return out;
 }
 

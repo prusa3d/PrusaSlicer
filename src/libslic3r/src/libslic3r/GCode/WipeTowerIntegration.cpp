@@ -107,17 +107,81 @@ std::string WipeTowerIntegration::append_tcr(
 
     std::string toolchange_gcode_str;
     std::string deretraction_str;
+    bool spreads_deretraction{false};
+
     if (tcr.priming || (new_extruder_id >= 0 && needs_toolchange)) {
-        if (is_ramming)
+        if (is_ramming) {
             gcodegen.m_wipe.reset_path(); // We don't want wiping on the ramming lines.
-        toolchange_gcode_str = gcodegen.set_extruder(new_extruder_id, tcr.print_z, config); // TODO: toolchange_z vs print_z
+        }
+
+        // The placeholder is replaced after post_process_wipe_tower_moves(), transform the points here.
+        const Vec2f new_extruder_offset{m_extruder_offsets[tcr.new_tool].cast<float>()};
+        std::optional<Vec2d> spread_start;
+        if (tcr.deretraction_spread.has_value()) {
+            spread_start =
+                (transform_wt_pt(tcr.deretraction_spread->start) - new_extruder_offset)
+                    .cast<double>();
+        }
+
+        // The firmware returns the head right to the start of the spread, not to the purge start next to the ramming end.
+        // Without the ramming the wipe tower G-code travels to the start of its block after the tool change.
+        std::optional<Vec2d> toolchange_return_position;
+        if (is_ramming
+            && spread_start.has_value()
+            && gcodegen.writer().can_unretract_while_moving(tcr.new_tool))
+        {
+            toolchange_return_position = spread_start;
+        }
+
+        toolchange_gcode_str =
+            gcodegen.set_extruder(new_extruder_id, tcr.print_z, config, toolchange_return_position); // TODO: toolchange_z vs print_z
         if (config.get<bool>("wipe_tower")) {
-            deretraction_str += gcodegen.writer().travel_to_z_force(z, "restore layer Z");
-            deretraction_str += gcodegen.unretract();
+            GCodeWriter& writer = gcodegen.writer();
+
+            // The custom tool change G-code may have changed the retraction.
+            spreads_deretraction =
+                spread_start.has_value() && writer.can_unretract_while_moving(tcr.new_tool);
+
+            if (spreads_deretraction) {
+                const Vec2f spread_end =
+                    transform_wt_pt(tcr.deretraction_spread->end) - new_extruder_offset;
+
+                // Replaces the travel of the wipe tower to the purge start, still at the height of the tool change
+                // unless the firmware returned the head here already.
+                deretraction_str += writer.travel_to_xy_force(*spread_start);
+                deretraction_str += writer.travel_to_z_force(z, "restore layer Z");
+                deretraction_str += writer.unretract_while_moving(
+                    spread_end.cast<double>(),
+                    tcr.deretraction_spread->max_feedrate
+                );
+            } else {
+                deretraction_str += writer.travel_to_z_force(z, "restore layer Z");
+                deretraction_str += gcodegen.unretract();
+            }
         }
     }
+
     assert(toolchange_gcode_str.empty() || toolchange_gcode_str.back() == '\n');
     assert(deretraction_str.empty() || deretraction_str.back() == '\n');
+
+    // The travel of the wipe tower back to the purge start after the tool change, the de-retraction spread replaces it.
+    const std::string toolchange_travel_tag{" " + WipeTower::toolchange_travel_tag()};
+    if (const size_t tag_position{tcr_rotated_gcode.find(toolchange_travel_tag)};
+        tag_position != std::string::npos)
+    {
+        if (spreads_deretraction) {
+            const size_t line_start{tcr_rotated_gcode.rfind('\n', tag_position) + 1};
+            const size_t line_end{tcr_rotated_gcode.find('\n', tag_position)};
+            tcr_rotated_gcode.erase(
+                line_start,
+                line_end == std::string::npos ? std::string::npos : line_end + 1 - line_start
+            );
+        } else {
+            tcr_rotated_gcode.erase(tag_position, toolchange_travel_tag.size());
+        }
+    } else {
+        assert(!spreads_deretraction);
+    }
 
     // Insert the toolchange and deretraction gcode into the generated gcode.
     boost::replace_first(tcr_rotated_gcode, "[toolchange_gcode_from_wipe_tower_generator]", toolchange_gcode_str);

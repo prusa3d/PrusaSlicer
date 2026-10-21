@@ -293,7 +293,8 @@ std::string GCodeWriter::toolchange_prefix() const
            FLAVOR_IS(gcfSailfish)  ? "M108 T" : "T";
 }
 
-std::string GCodeWriter::toolchange(unsigned int extruder_id)
+std::string GCodeWriter::
+    toolchange(unsigned int extruder_id, const std::optional<Domain::Vec2d>& return_position)
 {
     // set the new extruder
 	auto it_extruder = Slic3r::lower_bound_by_predicate(m_extruders.begin(), m_extruders.end(), [extruder_id](const Extruder &e) { return e.id() < extruder_id; });
@@ -302,15 +303,23 @@ std::string GCodeWriter::toolchange(unsigned int extruder_id)
 
     // return the toolchange command
     // if we are running a single-extruder setup, just set the extruder and return nothing
-    std::ostringstream gcode;
-    if (this->multiple_extruders) {
-        gcode << this->toolchange_prefix() << extruder_id;
-        if (this->config.gcode_comments)
-            gcode << " ; change extruder";
-        gcode << "\n";
-        gcode << this->reset_e(true);
+    if (!this->multiple_extruders) {
+        return {};
     }
-    return gcode.str();
+
+    GCodeFormatter w;
+    w.emit_string(this->toolchange_prefix() + std::to_string(extruder_id));
+
+    // Other firmwares ignore the position or do not accept parameters of the tool command.
+    if (return_position.has_value()
+        && (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfPrusaFirmwareBuddy)))
+    {
+        w.emit_xy(*return_position);
+    }
+
+    w.emit_comment(this->config.gcode_comments, "change extruder");
+
+    return w.string() + this->reset_e(true);
 }
 
 std::string GCodeWriter::set_speed(double F, const std::string_view comment, const std::string_view cooling_marker) const
@@ -574,6 +583,46 @@ std::string GCodeWriter::unretract()
     }
     
     return gcode;
+}
+
+bool GCodeWriter::can_unretract_while_moving(const unsigned int extruder_id) const
+{
+    const auto it_extruder = Slic3r::lower_bound_by_predicate(
+        m_extruders.begin(),
+        m_extruders.end(),
+        [extruder_id](const Extruder& e) { return e.id() < extruder_id; }
+    );
+
+    // Firmware de-retraction cannot move and MakerWare needs its extruder-on command. Without a retraction there is
+    // nothing to spread.
+    return !this->config.use_firmware_retraction
+        && FLAVOR_IS_NOT(gcfMakerWare)
+        && it_extruder != m_extruders.end()
+        && it_extruder->id() == extruder_id
+        && GCodeFormatter::quantize_e(it_extruder->retracted() + it_extruder->restart_extra())
+        != 0.;
+}
+
+std::string GCodeWriter::unretract_while_moving(const Domain::Vec2d& end, const double max_feedrate)
+{
+    assert(m_extruder != nullptr && this->can_unretract_while_moving(m_extruder->id()));
+    const auto [dE, emitE] = m_extruder->unretract();
+    const double deretraction_length =
+        this->config.use_volumetric_e ? dE / m_extruder->filament_crossection() : dE;
+    const double move_length = (end.head<2>() - m_pos.head<2>()).norm();
+    const double feedrate    = std::min(
+        max_feedrate,
+        move_length / std::abs(deretraction_length) * m_extruder->deretract_speed() * 60.
+    );
+
+    m_pos.head<2>() = end.head<2>();
+
+    GCodeG1Formatter w;
+    w.emit_xy(end);
+    w.emit_e(config.extrusion_axis, emitE);
+    w.emit_f(feedrate);
+    w.emit_comment(this->config.gcode_comments, " ; unretract");
+    return w.string();
 }
 
 void GCodeWriter::update_position(const Domain::Vec3d &new_pos)
