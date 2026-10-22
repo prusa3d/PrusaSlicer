@@ -1,5 +1,6 @@
 #pragma once
 #include <Slic3r/Domain/Config.hpp>
+#include "Slic3r/Biz/EffectiveValueStatus.hpp"
 
 namespace Slic3r::Biz {
 
@@ -8,6 +9,7 @@ struct ConfigItemContext
     std::string name;
     const Domain::ConfigItem* config_item{nullptr};
     const Domain::ConfigItem* original_config_item{nullptr};
+    EffectiveValueStatus effective_value_status;
 
     inline bool is_dirty() const
     {

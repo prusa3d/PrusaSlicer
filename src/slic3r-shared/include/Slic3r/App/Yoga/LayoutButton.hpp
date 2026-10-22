@@ -31,6 +31,9 @@ public:
     Text::WrapMode text_wrap_mode() const;
     void set_text_wrap_mode(Text::WrapMode wrap_mode);
 
+    void set_label_size(const Unit& width, const Unit& height);
+    void set_label_align(const Yoga::Align& align);
+
     Text* label_object() const;
     Icon* icon_object() const;
 

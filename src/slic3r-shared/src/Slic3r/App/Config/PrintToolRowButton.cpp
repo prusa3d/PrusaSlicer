@@ -5,6 +5,7 @@
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
 #include "Slic3r/App/Yoga/Text.hpp"
+#include "Slic3r/App/Yoga/StrikethroughText.hpp"
 #include "Slic3r/App/Yoga/Icon.hpp"
 #include "Slic3r/App/Yoga/Rectangle.hpp"
 #include "Slic3r/App/Config/ConfigItemPreview.hpp"
@@ -27,7 +28,7 @@ PrintToolRowButton::PrintToolRowButton(Biz::IConfigBoxSetter& cb_setter) : m_cb_
     m_icon_caret = emplace_back<Icon>(Render::Icon::CloseArrow);
     m_icon_caret->set_width(22);
     m_icon_caret->set_height(22);
-    m_label = emplace_back<Text>(std::string{});
+    m_label = emplace_back<StrikethroughText>(std::string{});
     m_label->set_flex_grow(1);
     m_label->set_wrap_mode(Text::WrapMode::WrapElide);
 
@@ -142,6 +143,9 @@ void PrintToolRowButton::update_data(const Biz::PrintToolItem* print_tool_item)
     m_label->set_text_color(
         m_theme->color_imgui(can_revert ? Platform::Color::AccentTertiary : Platform::Color::Text)
     );
+
+    m_label->set_strikethrough(
+        print_tool_item->effective_value_status == Biz::EffectiveValueStatus::Overriden);
 }
 
 void PrintToolRowButton::checked_updated_internal()

@@ -8,6 +8,8 @@
 #include "Slic3r/App/ModalDialog.hpp"
 
 #include <memory>
+#include <optional>
+#include <string>
 
 namespace Slic3r::App {
 
@@ -15,6 +17,7 @@ class Navigator;
 class ObjectListWindow;
 class InvalidDataDialog;
 class MsgBoxHandler;
+class EffectiveValuesDialog;
 
 namespace Scene {
 class GizmoManager;
@@ -43,6 +46,7 @@ public:
     bool is_gizmo_manager_completed() const override;
 
     void set_opened_dialog(Yoga::Dialog* opened_dialog);
+    void set_effective_values_key(std::optional<std::string> key);
     void set_object_list_collapsed(bool collapsed);
 
     virtual void set_modal_dialog(ModalDialog dialog);
@@ -57,6 +61,7 @@ protected:
     DialogNavigation m_dialog_navigation;
     Yoga::Passthrough<ObjectListWindow> m_object_list;
     Yoga::Passthrough<InvalidDataDialog> m_invalid_data_dialog;
+    Yoga::Passthrough<EffectiveValuesDialog> m_effective_values_dialog;
     MenuManager m_menu_manager{m_command_registry};
     CommandBindingManager m_command_binding_manager{m_command_registry};
 };

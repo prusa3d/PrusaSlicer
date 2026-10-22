@@ -15,6 +15,7 @@ class DoubleSliderForGcode;
 
 namespace Slic3r::App {
 class InvalidDataDialog;
+class EffectiveValuesDialog;
 }
 
 namespace Slic3r::App::Preview {
@@ -39,6 +40,7 @@ public:
         std::unique_ptr<DoubleSliderForGcode> double_slider_gcode,
         std::unique_ptr<SidebarAutoReslice> sidebar_auto_reslice,
         std::unique_ptr<InvalidDataDialog> invalid_data_dialog,
+        std::unique_ptr<EffectiveValuesDialog> effective_values_dialog,
         std::unique_ptr<CrashedProjectsDialog> crashed_projects_dialog,
         std::unique_ptr<PresetUpdaterDialog> preset_updater_dialog
     );
@@ -61,6 +63,7 @@ private:
     Yoga::Passthrough<SidebarAutoReslice> m_sidebar_auto_reslice;
     Yoga::Passthrough<SidebarPreviewActionButtons> m_sidebar_action_buttons;
     Yoga::Passthrough<InvalidDataDialog> m_invalid_data_dialog;
+    Yoga::Passthrough<EffectiveValuesDialog> m_effective_values_dialog;
 };
 
 } // namespace Slic3r::App::Preview

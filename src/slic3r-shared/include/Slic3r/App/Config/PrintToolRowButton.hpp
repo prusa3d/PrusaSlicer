@@ -10,6 +10,7 @@ class IConfigBoxSetter;
 namespace Slic3r::App::Yoga {
 class Icon;
 class Text;
+class StrikethroughText;
 class LayoutButton;
 } // namespace Slic3r::App::Yoga
 
@@ -33,7 +34,7 @@ private:
 
     const Biz::PrintToolItem* m_last_print_tool_item{nullptr};
     Yoga::Icon* m_icon_caret{nullptr};
-    Yoga::Text* m_label{nullptr};
+    Yoga::StrikethroughText* m_label{nullptr};
     Yoga::LayoutButton* m_revert_button{nullptr};
     Yoga::Rectangle* m_compatibility_rule_rect{nullptr};
     Yoga::Text* m_compatibility_rule_label{nullptr};

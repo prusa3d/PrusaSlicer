@@ -39,9 +39,6 @@ using Biz::Parser::PlaceholderParser;
 using Domain::FullConfigFDMPtr;
 using Domain::ModelWipeTower;
 using Domain::ObjectID;
-using Domain::PartialObjectConfigFDMPtr;
-using Domain::PartialVolumeConfigFDM;
-using Domain::PartialVolumeConfigFDMPtr;
 using Domain::VolumeSettings;
 using SlicingSync::AllOrSome;
 using SlicingSync::AllSteps;
@@ -161,8 +158,7 @@ class LayerRanges
 public:
     struct LayerRange {
         Domain::LayerHeightRange  layer_height_range;
-        // Config is owned by the associated ModelObject.
-        PartialVolumeConfigFDMPtr config;
+        Domain::PartialConfig config;
 
         bool operator<(const LayerRange &rhs) const throw() { return this->layer_height_range < rhs.layer_height_range; }
     };
@@ -194,22 +190,19 @@ public:
                     last_z = min_z;
                 }
                 if (range.first.second > last_z + EPSILON) {
-                    const auto cfg{prepare_slicing_volume_input(range.second, hw_config, hw_config.material_slot_count())};
                     m_ranges.push_back(
-                        {Domain::LayerHeightRange(last_z, range.first.second), cfg.value()}
-                    );
+                        {Domain::LayerHeightRange(last_z, range.first.second),
+                         Domain::PartialConfig{{range.second}, hw_config}});
                     last_z = range.first.second;
                 }
             }
         if (m_ranges.empty())
             m_ranges.push_back({ Domain::LayerHeightRange(0, DBL_MAX) });
-        else if (m_ranges.back().config == nullptr)
-            m_ranges.back().layer_height_range.second = DBL_MAX;
         else
             m_ranges.push_back({ Domain::LayerHeightRange(m_ranges.back().layer_height_range.second, DBL_MAX) });
     }
 
-    PartialVolumeConfigFDMPtr config(const Domain::LayerHeightRange &range) const {
+    const Domain::PartialConfig* config(const Domain::LayerHeightRange &range) const {
         auto it = std::lower_bound(m_ranges.begin(), m_ranges.end(), LayerRange{ { range.first - EPSILON, range.second - EPSILON } });
         // #ys_FIXME_COLOR
         // assert(it != m_ranges.end());
@@ -219,7 +212,7 @@ public:
             std::abs(it->layer_height_range.first - range.first) > EPSILON ||
             std::abs(it->layer_height_range.second - range.second) > EPSILON )
             return nullptr; // desired range doesn't found
-        return it == m_ranges.end() ? nullptr : it->config;
+        return it == m_ranges.end() ? nullptr : &it->config;
     }
 
     std::vector<LayerRange>::const_iterator begin() const { return m_ranges.cbegin(); }
@@ -496,13 +489,11 @@ PrintRegionConfigView create_mm_painted_region_config(
     volume_settings.overrides.set("solid_infill_extruder", painted_extruder_id);
 
     PrintRegionConfigView painted_region_cfg = parent_config;
-    const PartialVolumeConfigFDM squashed_volume_config{
-        volume_settings,
+    const Domain::PartialConfig squashed_volume_config{
+        {volume_settings},
         parent_config.hw_config()
     };
-    painted_region_cfg.add_override(
-        std::make_shared<PartialVolumeConfigFDM>(squashed_volume_config)
-    );
+    painted_region_cfg.add_override(squashed_volume_config);
 
     return painted_region_cfg;
 };
@@ -515,13 +506,11 @@ PrintRegionConfigView create_fuzzy_skin_painted_region_config(
     volume_settings.overrides.set("fuzzy_skin", Domain::FuzzySkinType::All);
 
     PrintRegionConfigView painted_region_cfg = parent_config;
-    const PartialVolumeConfigFDM squashed_volume_config{
-        volume_settings,
+    const Domain::PartialConfig squashed_volume_config{
+        {volume_settings},
         parent_config.hw_config()
     };
-    painted_region_cfg.add_override(
-        std::make_shared<PartialVolumeConfigFDM>(squashed_volume_config)
-    );
+    painted_region_cfg.add_override(squashed_volume_config);
 
     return painted_region_cfg;
 };
@@ -532,8 +521,9 @@ generate_print_object_regions(
     std::shared_ptr<PrintObjectRegions> print_object_regions_old,
     const Domain::ModelVolumePtrs& model_volumes,
     const LayerRanges& model_layer_ranges,
-    const PartialObjectConfigFDMPtr& new_object_settings,
+    const Domain::PartialConfig& new_object_settings,
     const FullConfigFDMPtr& new_full_config,
+    const Domain::PartialConfig& macro_overrides,
     const Transform3d& trafo,
     size_t num_physical_extruders,
     const VirtualExtruders& virtual_extruders,
@@ -598,25 +588,14 @@ generate_print_object_regions(
             for (PrintObjectRegions::LayerRangeRegions &layer_range : layer_ranges_regions)
                 if (const PrintObjectRegions::BoundingBox *bbox = find_volume_extents(layer_range, volume); bbox) {
                     if (volume.is_model_part()) {
-                        std::vector<PartialVolumeConfigFDMPtr> new_volume_settings;
-                        if (layer_range.config) {
-                            new_volume_settings.push_back(std::make_shared<const PartialVolumeConfigFDM>(*layer_range.config));
-                        }
-                        const auto squashed_settings{prepare_slicing_volume_input(
-                            volume.volume_settings,
-                            new_full_config->hw_config(),
-                            new_full_config->hw_config().material_slot_count()
-                        )};
-                        if (!squashed_settings.has_value()) {
-                            return tl::unexpected{squashed_settings.error()};
-                        }
-                        new_volume_settings.push_back(squashed_settings.value());
+                        std::vector<Domain::PartialConfig> new_volume_settings;
+                        new_volume_settings.push_back(layer_range.config);
+                        new_volume_settings.push_back(Domain::PartialConfig{
+                            {volume.volume_settings},
+                            new_full_config->hw_config()});
 
-                        const PrintRegionConfigView new_config{
-                            new_full_config,
-                            new_object_settings,
-                            new_volume_settings
-                        };
+                        const PrintRegionConfigView
+                            new_config{new_full_config, new_object_settings, new_volume_settings};
 
                         // Add a model volume, assign an existing region or generate a new one.
                         layer_range.volume_regions.push_back({
@@ -639,17 +618,10 @@ generate_print_object_regions(
                                 if (PrintObjectRegions::BoundingBox parent_bbox = find_modifier_volume_extents(layer_range, parent_region_id); parent_bbox.intersects(*bbox)) {
                                     PrintRegionConfigView new_config{parent_region.region->config()};
 
-                                    const auto squashed_settings{
-                                        prepare_slicing_volume_input(
-                                            volume.volume_settings,
-                                            new_full_config->hw_config(),
-                                            new_full_config->hw_config().material_slot_count()
-                                        )
-                                    };
-                                    if (!squashed_settings.has_value()) {
-                                        return tl::unexpected{squashed_settings.error()};
-                                    }
-                                    new_config.add_override(squashed_settings.value());
+                                    const Domain::PartialConfig squashed_settings{
+                                        {volume.volume_settings},
+                                        new_full_config->hw_config()};
+                                    new_config.add_override(squashed_settings);
                                     // Only create new region for a modifier, which actually modifies config of it's parent.
                                     if (new_config != parent_region.region->config()) {
                                         added = true;
@@ -780,6 +752,7 @@ generate_print_object_regions(
     }
 
     for (std::unique_ptr<PrintRegion>& region : all_regions) {
+        region->add_config_override(macro_overrides);
         region->finalize_config();
     }
 
@@ -1137,6 +1110,7 @@ tl::expected<PrintObjectsSyncResult, Errors> sync_print_objects(
     const Domain::ModelObjectPtrs& model_objects,
     const std::map<PrintObjectUniqueId, PrintObject*>& reuse_candidates,
     const FullConfigFDMPtr& new_full_config,
+    const Domain::PartialConfig& macro_overrides,
     const std::size_t num_extruders,
     const Vec3d& shrinkage_compensation,
     Print* print
@@ -1150,15 +1124,10 @@ tl::expected<PrintObjectsSyncResult, Errors> sync_print_objects(
             shrinkage_compensation
         );
 
-        const auto object_settings{prepare_slicing_object_input(
-            model_object->object_settings,
-            new_full_config->hw_config(),
-            new_full_config->hw_config().material_slot_count()
-        )};
-        if (!object_settings.has_value()) {
-            return tl::unexpected{object_settings.error()};
-        }
-        const PrintObjectConfigView new_config{new_full_config, object_settings.value()};
+        const Domain::PartialConfig
+            object_settings{{model_object->object_settings}, new_full_config->hw_config()};
+
+        const PrintObjectConfigView new_config{new_full_config, object_settings, macro_overrides};
 
         for (PrintObjectTrafoAndInstances& new_instances : print_instances) {
             const auto current_instace_it{
@@ -1201,7 +1170,8 @@ tl::expected<RegionsSyncResult, Errors> sync_regions(
     const PrintObjectPtrs& print_objects,
     const std::size_t num_extruders,
     const VirtualExtruders& virtual_extruders,
-    const FullConfigFDMPtr& new_full_config
+    const FullConfigFDMPtr& new_full_config,
+    const Domain::PartialConfig& macro_overrides
 )
 {
     RegionsSyncResult result;
@@ -1221,6 +1191,7 @@ tl::expected<RegionsSyncResult, Errors> sync_regions(
             LayerRanges(print_object.model_object()->layer_config_ranges, new_full_config->hw_config()),
             print_object.config().object_settings(),
             new_full_config,
+            macro_overrides,
             print_object.trafo(),
             num_extruders,
             virtual_extruders,
@@ -1327,6 +1298,7 @@ tl::expected<ModelSyncResult, Errors> sync_model(
     const Domain::Model& new_model,
     const PrintObjectPtrs& current_objects,
     const FullConfigFDMPtr& new_full_config,
+    const Domain::PartialConfig& macro_overrides,
 
     // TODO: Get rid of all these arguments. This is madness.
     Print* print,
@@ -1363,6 +1335,7 @@ tl::expected<ModelSyncResult, Errors> sync_model(
         model_objects_sync_result.objects,
         reuse_candidates,
         new_full_config,
+        macro_overrides,
         num_extruders,
         shrinkage_compensation,
         print
@@ -1371,9 +1344,12 @@ tl::expected<ModelSyncResult, Errors> sync_model(
         return tl::unexpected{print_objects_sync_result.error()};
     }
 
-    const auto regions_sync_result{
-        sync_regions(print_objects_sync_result->objects, num_extruders, virtual_extruders, new_full_config)
-    };
+    const auto regions_sync_result{sync_regions(
+        print_objects_sync_result->objects,
+        num_extruders,
+        virtual_extruders,
+        new_full_config,
+        macro_overrides)};
     if (!regions_sync_result) {
         return tl::unexpected{regions_sync_result.error()};
     }
@@ -1536,9 +1512,36 @@ InvalidatedSteps invalidate_for_virtual_extruders_change(const PrintObjectPtrs& 
     return result;
 }
 
-Biz::Slicing::ApplyStatus::Status Print::apply(
+static Domain::EffectiveValues collect_effective_values(
+    const PrintConfigView& print_config,
+    const PrintObjectPtrs& objects,
+    const FullConfigFDMPtr& full_config,
+    const Domain::PartialConfig& macro_overrides)
+{
+    Domain::EffectiveValues out;
+    out.print = print_config.effective_values();
+
+    for (const PrintObject* object : objects) {
+        out.objects.emplace(object->model_object()->id(), object->config().effective_values());
+
+        for (const Domain::ModelVolume* volume : object->model_object()->volumes) {
+            const Domain::PartialConfig
+                volume_partial{{volume->volume_settings}, full_config->hw_config()};
+            PrintRegionConfigView
+                view{full_config, object->config().object_settings(), {volume_partial}};
+            view.add_override(macro_overrides);
+            view.finalize();
+            out.volumes.emplace(volume->id(), view.effective_values());
+        }
+    }
+
+    return out;
+}
+
+Biz::Slicing::UpdateResult Print::apply(
     const Domain::Model& model,
     const FullConfigFDMPtr& new_full_config_ptr,
+    const Domain::PartialConfig& macro_overrides,
     const Domain::Preset::SelectedPresetMetadata& metadata,
     const std::string& bed_name,
     const MetadataSerializeFn& serializer,
@@ -1595,6 +1598,7 @@ Biz::Slicing::ApplyStatus::Status Print::apply(
         model,
         m_objects,
         new_full_config_ptr,
+        macro_overrides,
         this,
         shrinkage_compensation,
         num_extruders,
@@ -1602,7 +1606,8 @@ Biz::Slicing::ApplyStatus::Status Print::apply(
         num_extruders_changed
     )};
     if (!model_sync_result) {
-        return Biz::Slicing::ApplyStatus::InvalidData{model_sync_result.error()};
+        m_extruder_candidates.clear();
+        return {Biz::Slicing::ApplyStatus::InvalidData{model_sync_result.error()}};
     }
 
     m_extruder_candidates = extruder_candidates;
@@ -1724,12 +1729,15 @@ Biz::Slicing::ApplyStatus::Status Print::apply(
         object->update_slicing_parameters();
     }
 
+    const Domain::EffectiveValues effective_values{
+        collect_effective_values(m_config, m_objects, new_full_config_ptr, macro_overrides)};
+
     if (changed) {
         this->cleanup();
-        return Biz::Slicing::ApplyStatus::Changed{warnings};
+        return {Biz::Slicing::ApplyStatus::Changed{warnings}, m_extruder_candidates, effective_values};
     }
 
-    return Biz::Slicing::ApplyStatus::Unchanged{};
+    return {Biz::Slicing::ApplyStatus::Unchanged{}, m_extruder_candidates, effective_values};
 }
 
 void Print::cleanup()

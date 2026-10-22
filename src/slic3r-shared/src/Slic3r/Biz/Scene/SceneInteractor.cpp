@@ -3458,43 +3458,6 @@ const WipeTowerGeometry* SceneInteractor::wipe_tower_geometry(
     return &it->second;
 }
 
-void SceneInteractor::on_extruder_candidates_changed(
-    std::vector<unsigned> extruder_candidates,
-    const Domain::SlicingId slicing_id
-)
-{
-    auto it{m_projects.find(slicing_id.project_id)};
-    if (it == m_projects.end()) {
-        return;
-    }
-    SceneInteractorProjectContext& project{it->second};
-
-    const Domain::ConfigContainer* config_container{
-        project.project.find_config_container_by_bed_instance_id(slicing_id.bed_instance_id)
-    };
-    if (config_container == nullptr) {
-        return;
-    }
-    Domain::BedInstance* bed_instance{
-        project.project.find_bed_instance_by_id(slicing_id.bed_instance_id)
-    };
-    if (bed_instance == nullptr) {
-        return;
-    }
-
-    bed_instance->extruder_candidates = std::move(extruder_candidates);
-    invoke_listeners<ISceneBedInstanceChangedListener>(
-        [&](auto* l)
-        {
-            l->on_bed_instance_extruder_candidates_changed(
-                slicing_id.project_id,
-                Domain::BedRef{config_container->id().id, slicing_id.bed_instance_id},
-                bed_instance->extruder_candidates
-            );
-        }
-    );
-}
-
 static std::set<Domain::ElementRef> get_instance_refs(const Model& model)
 {
     std::set<Domain::ElementRef> result;

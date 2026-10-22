@@ -163,6 +163,7 @@ void BackgroundProcess::update(
         if (!apply_status) {
             status_update.code = StatusCode::InvalidData;
             status_update.errors_to_append = {Error()};
+            m_state = {};
             return;
         }
 
@@ -195,13 +196,16 @@ void BackgroundProcess::update(
 
     Domain::GCodeMetadata metadata{build_gcode_metadata(project_metadata, preset_metadata, config)};
 
-    apply_status = this->m_print->update(
+    const UpdateResult update_result = this->m_print->update(
         model,
         config,
         bed,
         preset_metadata,
-        build_metadata_serializer(metadata, preset_metadata, config)
-    );
+        build_metadata_serializer(metadata, preset_metadata, config));
+
+    apply_status = update_result.status;
+    m_state.extruder_candidates = update_result.extruder_candidates;
+    m_state.effective_values = update_result.effective_values;
 }
 
 void BackgroundProcess::slice(
@@ -287,6 +291,11 @@ void BackgroundProcess::stop()
 
 std::string BackgroundProcess::get_hw_printer_id() const {
     return m_hw_config_id;
+}
+
+const BackgroundProcessState& BackgroundProcess::state() const
+{
+    return m_state;
 }
 
 void BackgroundProcess::queue_action(const std::function<void()>& action)

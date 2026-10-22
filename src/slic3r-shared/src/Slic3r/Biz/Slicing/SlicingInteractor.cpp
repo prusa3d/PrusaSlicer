@@ -61,6 +61,7 @@ void SlicingInteractor::create_process(
             id
         )
     );
+    invoke_background_process_state_changed(id);
 }
 
 void SlicingInteractor::update_process(
@@ -103,6 +104,8 @@ void SlicingInteractor::remove_bed(const Domain::SelectionId bed_instance_id)
         const LoggingScopeLock lock{m_status_mutex, "slicing statuses"};
         m_statuses.erase(id);
     }
+    invoke_background_process_state_changed(id);
+
     process_slicing_queue();
 
     notify_bed_outputs_cleared(id);
@@ -124,6 +127,10 @@ void SlicingInteractor::notify_bed_outputs_cleared(const SlicingId& id)
 
     invoke_listener<IGeneratedSupportPointsListener>(
         [&id](auto* listener) { listener->on_generated_support_points_changed({}, id); }
+    );
+
+    invoke_listeners<IBackgroundProcessStateListener>(
+        [&id](auto* listener) { listener->on_background_process_state_changed(id); }
     );
 }
 
@@ -304,22 +311,18 @@ void SlicingInteractor::on_wipe_tower_geometry(
     }
 }
 
-void SlicingInteractor::on_extruder_candidates(
-    std::vector<unsigned>&& extruder_candidates,
-    const Domain::SlicingId id
-)
+void SlicingInteractor::invoke_background_process_state_changed(const Domain::SlicingId& id)
 {
-    SPDLOG_TRACE("{}: extruder_candidates", fmt::streamed(id));
-    if (!m_dispatcher.dispatch_on_main_thread(
-            [this, id, candidates = std::move(extruder_candidates)]() mutable {
-        invoke_listeners<IExtruderCandidatesListener>([&](auto* listener) {
-            listener->on_extruder_candidates_changed(candidates, id);
-        });
-    }
-        ))
-    {
-        SPDLOG_TRACE("{}: extruder_candidates not dispatched", fmt::streamed(id));
-    }
+    invoke_listeners<IBackgroundProcessStateListener>([&](auto* listener) {
+        listener->on_background_process_state_changed(id);
+    });
+}
+
+const BackgroundProcessState*
+SlicingInteractor::find_process_state(const Domain::SlicingId id) const
+{
+    const auto it{m_processes.find(id)};
+    return it == m_processes.end() ? nullptr : &it->second.state();
 }
 
 void SlicingInteractor::on_generated_support_points(
@@ -404,10 +407,18 @@ void SlicingInteractor::process_update_requests()
 
     SPDLOG_TRACE("update_requests: {}", m_update_requests.size());
 
-    std::set<SlicingId> to_remove;
-    for (auto& [id, request] : m_update_requests) {
-        BackgroundProcess& process{m_processes.at(id)};
+    // Listeners may queue new requests and re-enter, so iterate a detached copy. Requests
+    // postponed for an active thread go back, unless a newer one arrived meanwhile.
+    std::map<SlicingId, UpdateRequest> requests{std::move(m_update_requests)};
+    m_update_requests.clear();
+    for (auto& [id, request] : requests) {
+        const auto process_it{m_processes.find(id)};
+        if (process_it == m_processes.end()) {
+            continue;
+        }
+        BackgroundProcess& process{process_it->second};
         if (is_thread_active(get_status(id))) {
+            m_update_requests.try_emplace(id, std::move(request));
             continue;
         }
 
@@ -419,7 +430,6 @@ void SlicingInteractor::process_update_requests()
                 SPDLOG_TRACE("{}: clearing of the bed outputs not dispatched", fmt::streamed(id));
             }
             // Not a part of the removal, where the bed is going away.
-            on_extruder_candidates({}, id);
             create_process(
                 request.model.get(),
                 request.project_metadata,
@@ -436,14 +446,9 @@ void SlicingInteractor::process_update_requests()
                 request.config,
                 request.bed.get()
             );
+            invoke_background_process_state_changed(id);
         }
-        to_remove.insert(id);
     }
-
-    std::erase_if(m_update_requests, [&](const auto& pair) {
-        const SlicingId id{pair.first};
-        return to_remove.contains(id);
-    });
 }
 
 void SlicingInteractor::update_status(const SlicingId id, const StatusCode status)

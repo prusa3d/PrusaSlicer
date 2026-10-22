@@ -2,6 +2,8 @@
 #include "Slic3r/Biz/Config/ConfigSerialize.hpp"
 
 #include "Slic3r/Domain/Types.hpp"
+#include "Slic3r/Domain/FullConfigFDM.hpp"
+#include "Slic3r/Domain/FullConfigSLA.hpp"
 #include "Slic3r/Biz/Config/ConfigJson.hpp" // IWYU pragma: keep
 #include "boost/algorithm/string.hpp"
 
@@ -107,6 +109,18 @@ void to_json(
             std::string location_name;
             if constexpr(std::is_same_v<ValueType, BoxRef>) {
                 location_name = get_location_name(box_or_boxes.get().location);
+            } else if constexpr(std::is_same_v<ValueType, NamedBoxRefs>) {
+                // Serialized as an object keyed by the box name. Nothing to write when empty.
+                if (box_or_boxes.empty()) {
+                    return;
+                }
+                location_name = get_location_name(box_or_boxes.front().second.get().location);
+                nlohmann::ordered_json named_boxes = nlohmann::ordered_json::object();
+                for (const auto& [name, box] : box_or_boxes) {
+                    named_boxes[name] = box.get();
+                }
+                json_value[location_name] = std::move(named_boxes);
+                return;
             } else {
                 location_name = get_location_name(box_or_boxes.front().get().location);
             }
@@ -115,6 +129,41 @@ void to_json(
     }
 }
 }
+
+namespace Slic3r::Biz::Config {
+
+nlohmann::ordered_json to_json(const Domain::ConfigPackFDM& config_pack)
+{
+    nlohmann::ordered_json json(Domain::as_boxes(config_pack));
+    const std::string location{
+        Domain::get_location_name(Domain::FDMConfigLocation::MacroOverrides)};
+    json.erase(location);
+    if (config_pack.macro_overrides.empty()) {
+        return json;
+    }
+
+    nlohmann::ordered_json layers = nlohmann::ordered_json::object();
+    for (const auto& [id, layer] : config_pack.macro_overrides) {
+        nlohmann::ordered_json params = nlohmann::ordered_json::object();
+        for (const auto& [name, value] : layer.params) {
+            params[name] = print_mode_param_to_json(value);
+        }
+        nlohmann::ordered_json& layer_json{layers[id]};
+        layer_json["name"] = layer.name;
+        layer_json["params"] = std::move(params);
+        layer_json["overrides"] = layer.overrides;
+    }
+    json[location] = std::move(layers);
+    return json;
+}
+
+nlohmann::ordered_json to_json(const Domain::ConfigPackSLA& config_pack)
+{
+    // SLA has no macro overrides layers in the project file yet.
+    return nlohmann::ordered_json(Domain::as_boxes(config_pack));
+}
+
+} // namespace Slic3r::Biz::Config
 
 namespace Slic3r::Biz {
 

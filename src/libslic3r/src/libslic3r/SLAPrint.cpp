@@ -739,13 +739,13 @@ PrintObjectsSyncResult sync_print_objects(
 
         const auto it{reuse_candidates.find(model_object->id())};
 
-        const auto object_settings_ptr{std::make_shared<PartialObjectConfigSLA>(
-            model_object->object_settings_sla,
+        const Domain::PartialConfig object_settings{
+            {model_object->object_settings_sla},
             new_full_config->hw_config()
-        )};
+        };
         const SLAPrintObjectConfigView new_config{
             new_full_config,
-            object_settings_ptr
+            object_settings
         };
 
         if (it == reuse_candidates.end()) {
@@ -911,7 +911,7 @@ InstanceTrafos get_instance_trafos(const SLAPrintObject& object) {
     return instance_trafos;
 }
 
-Biz::Slicing::ApplyStatus::Status SLAPrint::update(
+Biz::Slicing::UpdateResult SLAPrint::update(
     Domain::Model& model,
     const ConfigPack& config,
     const Domain::BedInstance& bed,
@@ -946,7 +946,7 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
     });
     const bool changed{!invalidated_steps.empty()};
     if (!changed) {
-        return empty ? ApplyStatus::Status{ApplyStatus::Empty{}} : ApplyStatus::Unchanged{};
+        return Biz::Slicing::UpdateResult{empty ? ApplyStatus::Status{ApplyStatus::Empty{}} : ApplyStatus::Unchanged{}};
     }
 
     m_on_sla_result({});
@@ -972,9 +972,9 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
     }
 
     if (empty) {
-        return ApplyStatus::Empty{};
+        return Biz::Slicing::UpdateResult{ApplyStatus::Empty{}};
     }
-    return ApplyStatus::Changed{};
+    return Biz::Slicing::UpdateResult{ApplyStatus::Changed{}};
 }
 
 InvalidatedSteps SLAPrint::apply(

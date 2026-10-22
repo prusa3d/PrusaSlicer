@@ -2,12 +2,31 @@
 
 #include <Slic3r/Biz/ConfigItemContext.hpp>
 #include <Slic3r/Biz/IObservableList.hpp>
+#include "Slic3r/Biz/ISelectedBedInstanceChangedListener.hpp"
+#include "Slic3r/Biz/Slicing/SlicingInteractor.hpp"
 
 namespace Slic3r::Biz {
 
-class ConfigBoxObservableList : public IObservableList<ConfigItemContext>
+namespace Slicing {
+class SlicingInteractor;
+} // namespace Slicing
+
+namespace Scene {
+class SceneInteractor;
+}
+
+class ConfigBoxObservableList :
+    public IObservableList<ConfigItemContext>,
+    public ISelectedBedInstancesChangedListener,
+    public Slicing::IBackgroundProcessStateListener
 {
 public:
+    ConfigBoxObservableList(
+        Scene::SceneInteractor* scene_interctor,
+        Slicing::SlicingInteractor* slicing_interactor);
+
+    ~ConfigBoxObservableList();
+
     void set_config_box(
         Domain::ConfigBox* observable_config_box,
         const Domain::ConfigBox* original_config_box
@@ -26,8 +45,18 @@ public:
 
     void set_from_original_value(const std::string& key);
 
+    void on_selected_bed_instances_changed(
+        Domain::SelectionId project_id,
+        const Scene::BedSelection& bed_selection) override;
+
+    void on_background_process_state_changed(const Domain::SlicingId) override;
+
 private:
+    void update_effective_value_statuses(const Domain::SlicingId slicing_id);
+
     Domain::ConfigBox* m_config_box{nullptr};
+    Scene::SceneInteractor* m_scene_interactor{nullptr};
+    Slicing::SlicingInteractor* m_slicing_interactor{nullptr};
 
     using Items = std::vector<ConfigItemContext>;
     Items m_items;

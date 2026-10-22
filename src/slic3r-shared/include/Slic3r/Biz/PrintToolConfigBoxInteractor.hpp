@@ -24,6 +24,10 @@ namespace Slic3r::Biz::Scene {
 class SceneInteractor;
 } // namespace Slic3r::Biz::Scene
 
+namespace Slic3r::Biz::Slicing {
+class SlicingInteractor;
+} // namespace Slic3r::Biz::Slicing
+
 namespace Slic3r::Biz {
 
 class PrintToolConfigObservableList;
@@ -75,6 +79,7 @@ public:
     explicit PrintToolConfigBoxInteractor(
         const Domain::Workbench& workbench,
         Scene::SceneInteractor& scene_interactor,
+        Biz::Slicing::SlicingInteractor& slicing_interactor,
         SetAccessor& set_accessor
     );
 

@@ -11,6 +11,7 @@ class PluginDialog;
 
 namespace Slic3r::App {
 class InvalidDataDialog;
+class EffectiveValuesDialog;
 }
 
 namespace Slic3r::App::Plater {
@@ -35,6 +36,7 @@ public:
         std::unique_ptr<History> history,
         std::unique_ptr<WelcomeDialog> welcome_dialog,
         std::unique_ptr<InvalidDataDialog> invalid_data_dialog,
+        std::unique_ptr<EffectiveValuesDialog> effective_values_dialog,
         std::unique_ptr<Lua::PluginDialog> plugin_dialog,
         std::unique_ptr<CrashedProjectsDialog> crashed_projects_dialog,
         std::unique_ptr<PresetUpdaterDialog> preset_updater_dialog
@@ -51,6 +53,7 @@ private:
     Yoga::Passthrough<History> m_history;
     Yoga::Passthrough<WelcomeDialog> m_welcome_dialog;
     Yoga::Passthrough<InvalidDataDialog> m_invalid_data_dialog;
+    Yoga::Passthrough<EffectiveValuesDialog> m_effective_values_dialog;
     Yoga::Passthrough<Lua::PluginDialog> m_plugin_dialog;
 };
 

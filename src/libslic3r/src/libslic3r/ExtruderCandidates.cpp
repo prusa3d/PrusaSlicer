@@ -57,16 +57,39 @@ std::vector<unsigned int> get_painting_extruders(
     return Algorithms::VirtualExtruder::expand_virtual_extruders_1based(result, virtual_extruders);
 }
 
+// Macro overrides are applied last when slicing, so they win over object and volume settings.
+static std::optional<Domain::ConfigItem> macro_override(
+    const Domain::MacroOverridesMapFDM& macro_overrides,
+    const std::string& key
+)
+{
+    std::optional<Domain::ConfigItem> result;
+    for (const auto& [id, layer] : macro_overrides) {
+        if (std::optional<Domain::ConfigItem> item{layer.overrides.overrides.get(key)}) {
+            result = std::move(item);
+        }
+    }
+    return result;
+}
+
 static std::set<unsigned> get_extra_support_extruders(
     const Domain::ObjectSettings& object_settings,
-    const Domain::PrintSettings& print_settings
+    const Domain::PrintSettings& print_settings,
+    const Domain::MacroOverridesMapFDM& macro_overrides
 )
 {
     const bool support_material{
-        print_settings.items.opt("support_material").get<Domain::SupportMode>()
+        macro_override(macro_overrides, "support_material")
+            .value_or(print_settings.items.opt("support_material"))
+            .get<Domain::SupportMode>()
         != Domain::SupportMode::None
     };
-    const bool raft{print_settings.items.opt("raft_layers").get<int>() > 0};
+    const bool raft{
+        macro_override(macro_overrides, "raft_layers")
+            .value_or(print_settings.items.opt("raft_layers"))
+            .get<int>()
+        > 0
+    };
 
     std::optional<Domain::ConfigItem> object_support_material_opt{
         object_settings.overrides.get("support_material")
@@ -84,6 +107,13 @@ static std::set<unsigned> get_extra_support_extruders(
     for (const std::string key :
          {"support_material_extruder", "support_material_interface_extruder"})
     {
+        const std::optional<Domain::ConfigItem> macro_supports_extruder{
+            macro_override(macro_overrides, key)
+        };
+        if (macro_supports_extruder && macro_supports_extruder->get<int>() > 0) {
+            result.insert(static_cast<unsigned>(macro_supports_extruder->get<int>() - 1));
+            continue;
+        }
         const std::optional<Domain::ConfigItem> object_supports_extruder_item{
             object_settings.overrides.get(key)
         };
@@ -106,6 +136,7 @@ std::set<unsigned> get_volume_extruder_candidates(
     const Domain::VolumeSettings& volume_settings,
     const Domain::ObjectSettings& object_settings,
     const Domain::PrintSettings& print_settings,
+    const Domain::MacroOverridesMapFDM& macro_overrides,
     const VirtualExtruders& virtual_extruders
 )
 {
@@ -121,6 +152,11 @@ std::set<unsigned> get_volume_extruder_candidates(
     };
     for (const std::string key : {"perimeter_extruder", "infill_extruder", "solid_infill_extruder"})
     {
+        const std::optional<Domain::ConfigItem> macro_extruder{macro_override(macro_overrides, key)};
+        if (macro_extruder && macro_extruder->get<int>() > 0) {
+            result.insert(static_cast<unsigned>(macro_extruder->get<int>() - 1));
+            continue;
+        }
         const std::optional<Domain::ConfigItem> volume_extruder{volume_settings.overrides.get(key)};
         if (volume_extruder && volume_extruder->get<int>() > 0) {
             result.insert(static_cast<unsigned>(volume_extruder->get<int>() - 1));
@@ -211,6 +247,7 @@ std::set<unsigned> get_object_extruder_candidates(
             volume_settings,
             object_settings,
             print_settings,
+            config.get_macro_overrides(),
             virtual_extruders
         ));
     }
@@ -239,6 +276,7 @@ std::set<unsigned> get_object_extruder_candidates(
             volume->volume_settings,
             object.object_settings,
             config.get_print(),
+            config.get_macro_overrides(),
             virtual_extruders
         ));
     }
@@ -250,7 +288,7 @@ std::set<unsigned> get_object_extruder_candidates(
     }
 
     std::set<unsigned> support_extruders{
-        get_extra_support_extruders(object_settings, config.get_print())
+        get_extra_support_extruders(object_settings, config.get_print(), config.get_macro_overrides())
     };
     extruders.merge(support_extruders);
 
@@ -280,16 +318,18 @@ std::vector<unsigned> get_extruder_candidates(
         extruders.merge(get_object_extruder_candidates(*object, config, virtual_extruders));
     }
 
+    const auto effective{[&](const std::string& key) {
+        return macro_override(config.get_macro_overrides(), key)
+            .value_or(config.get_print().items.opt(key));
+    }};
     const bool can_have_wipe_tower{
-        !config.get_print().items.opt("spiral_vase").get<bool>()
-        && config.get_print().items.opt("wipe_tower").get<bool>()
+        !effective("spiral_vase").get<bool>()
+        && effective("wipe_tower").get<bool>()
         && extruders.size() > 1
     };
 
     if (can_have_wipe_tower) {
-        const int wipe_tower_extruder{
-            config.get_print().items.opt("wipe_tower_extruder").get<int>()
-        };
+        const int wipe_tower_extruder{effective("wipe_tower_extruder").get<int>()};
         if (wipe_tower_extruder > 0
             && static_cast<size_t>(wipe_tower_extruder) < config.filament_size() + 1)
         {

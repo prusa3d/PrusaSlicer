@@ -192,6 +192,9 @@ add_library(slic3r-domain STATIC
 
     include/Slic3r/Domain/Preset/MatDbMatchRule.hpp
     src/Slic3r/Domain/Preset/MatDbMatchRule.cpp
+
+    include/Slic3r/Domain/MacroOverrides.hpp
+    src/Slic3r/Domain/MacroOverrides.cpp
 )
 
 target_include_directories(slic3r-domain PUBLIC include)

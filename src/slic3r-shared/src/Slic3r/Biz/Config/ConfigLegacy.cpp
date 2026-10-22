@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/Config/ConfigLegacy.hpp"
 #include "Slic3r/Domain/Config.hpp"
 #include "Slic3r/Domain/Types.hpp"
+#include "Slic3r/Domain/MacroOverrides.hpp"
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Log.hpp"
 
@@ -684,6 +685,15 @@ ConfigPack convert_dynamic_print_config_to_new(Slic3rLegacy::DynamicPrintConfig&
             }
 
             fill_config_box_from_legacy(cfg, out.project, legacy_data);
+
+            ConfigItem& spiral_vase{out.print.items.opt("spiral_vase")};
+            if (spiral_vase.get<bool>()) {
+                spiral_vase.set(false);
+                out.macro_overrides.insert_or_assign(
+                    Domain::vase_mode_layer_id(),
+                    Domain::make_vase_mode_layer()
+                );
+            }
             return out;
         }
         else if (pt == Slic3rLegacy::ptSLA) {

@@ -31,6 +31,11 @@ BoxOrBoxesVector as_boxes(const ConfigPackFDM& config_pack) {
     result.push_back(config_pack.printer);
     result.push_back(convert_to_box_refs(config_pack.filament));
     result.push_back(config_pack.project);
+    NamedBoxRefs macro_overrides;
+    for (const auto& [id, layer] : config_pack.macro_overrides) {
+        macro_overrides.emplace_back(id, layer.overrides);
+    }
+    result.push_back(std::move(macro_overrides));
     return result;
 }
 
@@ -41,6 +46,11 @@ MutBoxOrBoxesVector as_mut_boxes(ConfigPackFDM& config_pack) {
     result.push_back(config_pack.printer);
     result.push_back(convert_to_mut_box_refs(config_pack.filament));
     result.push_back(config_pack.project);
+    MutNamedBoxRefs macro_overrides;
+    for (auto& [id, layer] : config_pack.macro_overrides) {
+        macro_overrides.emplace_back(id, layer.overrides);
+    }
+    result.push_back(std::move(macro_overrides));
     return result;
 }
 
@@ -78,25 +88,4 @@ FullConfigFDM FullConfigFDM::defaults()
 
     return {ConfigPackFDM{}, {0}, hw_config};
 }
-
-PartialObjectConfigFDM::PartialObjectConfigFDM(
-    const ObjectSettings& object_settings,
-    const Preset::HwPrinterConfig& hw_config
-) :
-    PartialConfig{
-        {object_settings},
-        hw_config
-    }
-{}
-
-PartialVolumeConfigFDM::PartialVolumeConfigFDM(
-    const VolumeSettings& volume_settings,
-    const Preset::HwPrinterConfig& hw_config
-) :
-    PartialConfig{
-        {volume_settings},
-        hw_config
-    }
-{}
-
 } // namespace Slic3r::Domain

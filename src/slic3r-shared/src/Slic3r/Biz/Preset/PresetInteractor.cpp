@@ -1,5 +1,6 @@
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 
+#include "Slic3r/Domain/ConfigDefsFDM.hpp"
 #include "Slic3r/Domain/ConfigContainer.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Assert.hpp"
@@ -163,9 +164,12 @@ std::string PresetItem::ui_hw_config_name() const
 PresetInteractor::PresetInteractor(
     Domain::Workbench& workbench,
     Scene::SceneInteractor& scene_interactor,
-    BackupStore& backup_store
+    BackupStore& backup_store,
+    Slicing::SlicingInteractor& slicing_interactor
 ) :
     m_workbench(workbench),
+    m_scene_interactor(scene_interactor),
+    m_slicing_interactor(slicing_interactor),
     m_backup_store(backup_store),
     m_object_settings_interactor(
         m_object_settings_interactor_accessor,
@@ -173,9 +177,9 @@ PresetInteractor::PresetInteractor(
         scene_interactor,
         *this
     ),
-    m_print_tool_cbi(m_workbench, scene_interactor, m_print_tool_cbi_accessor)
+    m_printer_cbi(&scene_interactor, &slicing_interactor, m_printer_cbi_accessor),
+    m_print_tool_cbi(m_workbench, scene_interactor, slicing_interactor, m_print_tool_cbi_accessor)
 {
-    m_printer_cbi = ConfigBoxInteractor(m_printer_cbi_accessor);
 
     add_listener<IPresetChangedListener>(&m_object_settings_interactor);
 }
@@ -1334,6 +1338,15 @@ Domain::Preset::SelectedPreset& PresetInteractor::mutable_selected_printer_prese
 
 namespace {
 
+/// An empty macro overrides map holding the alternative of the given technology.
+Domain::MacroOverridesMap empty_macro_overrides(const Domain::PrinterTechnology technology)
+{
+    if (technology == Domain::PrinterTechnology::SLA) {
+        return Domain::MacroOverridesMapSLA{};
+    }
+    return Domain::MacroOverridesMapFDM{};
+}
+
 void update_hw_config_tools_and_materials_features_from_preset(
     Domain::Preset::SelectedPreset& preset
 )
@@ -1428,6 +1441,10 @@ void PresetInteractor::fill_config_container_with_selected_preset(
             get_printer_preset(printer_hw_config_id, printer_preset_id).first.get();
         selected_preset.hw_config = hw_config;
         selected_preset.printer   = printer_preset;
+        if (selected_preset.macro_overrides.index()
+            != empty_macro_overrides(hw_config.technology).index()) {
+            selected_preset.macro_overrides = empty_macro_overrides(hw_config.technology);
+        }
 
         resize_tool_dependant_presets(hw_config, selected_preset.tools);
         resize_tool_dependant_presets(hw_config, selected_preset.materials);
@@ -1502,7 +1519,8 @@ void PresetInteractor::fill_config_container_with_selected_preset(
         .print     = reloaded_print,
         .tools     = std::move(tools),
         .materials = std::move(materials),
-        .material_matdb_uuids = Domain::Preset::MatDbUuids{mat_size}
+        .material_matdb_uuids = Domain::Preset::MatDbUuids{mat_size},
+        .macro_overrides = empty_macro_overrides(hw_config.technology),
     };
 
     // Set transfered values after switch to new selected preset
@@ -1971,7 +1989,8 @@ void PresetInteractor::fill_selected_material_cbis(
         }
     );
 
-    SetAccessorMap accessors = m_material_cbi_list.set_items(material_cbs);
+    SetAccessorMap accessors =
+        m_material_cbi_list.set_items(m_scene_interactor, m_slicing_interactor, material_cbs);
     m_material_accessors.insert(accessors.begin(), accessors.end());
 }
 
@@ -2755,6 +2774,28 @@ void PresetInteractor::set_item_override(const Domain::ConfigItem& item, bool en
 
     m_backup_store.invalidate_backup(m_selected_project_id);
     invoke_on_preset_value_changed(item);
+    invoke_slicing_input_changed();
+}
+
+void PresetInteractor::set_macro_overrides(
+    const std::string& id,
+    std::optional<Domain::MacroOverridesLayerFDM> layer
+)
+{
+    Domain::Preset::SelectedPreset& selected_preset{mutable_selected_printer_preset()};
+    auto* fdm_overrides{std::get_if<Domain::MacroOverridesMapFDM>(&selected_preset.macro_overrides)};
+    ASSERT(fdm_overrides != nullptr);
+
+    if (layer.has_value()) {
+        *fdm_overrides ={std::pair{id, *layer}};
+    } else {
+        *fdm_overrides = {};
+    }
+
+    m_backup_store.invalidate_backup(m_selected_project_id);
+    invoke_listeners<IMacroOverridesChangedListener>(
+        [](auto* listener) { listener->on_macro_overrides_changed(); }
+    );
     invoke_slicing_input_changed();
 }
 

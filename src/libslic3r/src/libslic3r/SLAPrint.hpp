@@ -323,7 +323,7 @@ public:
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<Domain::ObjectID> print_object_ids() const override;
 
-    Biz::Slicing::ApplyStatus::Status update(
+    Biz::Slicing::UpdateResult update(
         Domain::Model& model,
         const Domain::ConfigPack& config,
         const Domain::BedInstance& bed,

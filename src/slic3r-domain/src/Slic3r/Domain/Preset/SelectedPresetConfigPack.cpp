@@ -16,6 +16,11 @@ const PrintSettings& SelectedPresetConfigPack::get_print() const
     return std::get<PrintSettings>(m_selected_preset.print.values);
 }
 
+const MacroOverridesMapFDM& SelectedPresetConfigPack::get_macro_overrides() const
+{
+    return std::get<MacroOverridesMapFDM>(m_selected_preset.macro_overrides);
+}
+
 const ToolPrintSettings& SelectedPresetConfigPack::get_tool(size_t index) const
 {
     return std::get<ToolPrintSettings>(m_selected_preset.tools.at(index).values);

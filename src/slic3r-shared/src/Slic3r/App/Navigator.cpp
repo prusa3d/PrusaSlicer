@@ -64,6 +64,10 @@ void Navigator::on_init(
     AppServices::instance().app_config_interactor().add_listener<IAppConfigChangedListener>(this);
 }
 
+void Navigator::shutdown() {
+    m_project_contexts = {};
+}
+
 bool Navigator::has_modules() const
 {
     return m_project_contexts != nullptr;
@@ -148,6 +152,15 @@ void Navigator::request_search()
     }
     set_render_module_type(Render::ModuleType::Plater);
     m_plater_module->open_search();
+}
+
+void Navigator::open_effective_values_dialog(std::optional<std::string> key)
+{
+    if (!has_modules()) {
+        return;
+    }
+    current_render_module()->set_effective_values_key(key);
+    set_modal_dialog(ModalDialog::EffectiveValues);
 }
 
 void Navigator::set_modal_dialog(ModalDialog modal_dialog)

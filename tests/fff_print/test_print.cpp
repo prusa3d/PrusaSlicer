@@ -371,13 +371,14 @@ TEST_CASE("Changing all config values works", "[PrintApply]")
     auto apply_status{print.apply(
         model,
         full_config,
+        Domain::PartialConfig{},
         preset_metadata,
         "bed1",
         Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, config),
         Domain::ModelWipeTower{},
         std::nullopt,
         {0}
-    )};
+    ).status};
     REQUIRE(std::holds_alternative<Biz::Slicing::ApplyStatus::Unchanged>(apply_status));
 
     std::vector<ConfigBox*> boxes{&config.print, &config.printer, &config.project};
@@ -410,13 +411,14 @@ TEST_CASE("Changing all config values works", "[PrintApply]")
     apply_status = print.apply(
         model,
         full_config,
+        Domain::PartialConfig{},
         preset_metadata,
         "bed1",
         Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, config),
         Domain::ModelWipeTower{},
         std::nullopt,
         {0}
-    );
+    ).status;
     REQUIRE(std::holds_alternative<Biz::Slicing::ApplyStatus::Changed>(apply_status));
 }
 
@@ -509,13 +511,14 @@ void apply_and_check(
     const auto apply_status{context.print.apply(
         context.model,
         full_config,
+        Domain::PartialConfig{},
         preset_metadata,
         "bed1",
         Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, context.config),
         Domain::ModelWipeTower{},
         std::nullopt,
         {0}
-    )};
+    ).status};
     REQUIRE(std::holds_alternative<Biz::Slicing::ApplyStatus::Changed>(apply_status));
     REQUIRE(is_exclusively_undone(context.print, expected_undone));
 }
@@ -632,15 +635,15 @@ TEST_CASE("Apply rejects invalid extruders", "[PrintApply]") {
     config.print.items.opt("support_material_extruder").set(4);
     model.objects.front()->object_settings.overrides.set("support_material_interface_extruder", 4);
 
-    Status status{print.update(
+    Biz::Slicing::UpdateResult result{print.update(
         model,
         config,
         bed_instance,
         preset_metadata,
         Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, config)
     )};
-    REQUIRE(std::holds_alternative<InvalidData>(status));
-    const auto errors{std::get<InvalidData>(status).errors};
+    REQUIRE(std::holds_alternative<InvalidData>(result.status));
+    const auto errors{std::get<InvalidData>(result.status).errors};
     REQUIRE(errors.size() == 1);
     const auto error{errors.front()};
     CHECK(error.code == ErrorCode::InvalidExtruders);
@@ -668,14 +671,14 @@ TEST_CASE("Apply rejects invalid extruders", "[PrintApply]") {
     config.print.items.opt("support_material_extruder").set(0);
     model.objects.front()->object_settings.overrides.set("support_material_interface_extruder", 2);
 
-    status = print.update(
+    result = print.update(
         model,
         config,
         bed_instance,
         preset_metadata,
         Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, config)
     );
-    REQUIRE(std::holds_alternative<Changed>(status));
+    REQUIRE(std::holds_alternative<Changed>(result.status));
 }
 
 SCENARIO("Print: Object containing a degenerate planar volume", "[PrintApply]")

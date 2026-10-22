@@ -24,6 +24,7 @@ ConfigPack SelectedPreset::config() const
         config.filament.resize(materials.size());
         for (size_t i = 0, n = materials.size(); i < n; i++)
             config.filament[i] = std::get<FilamentSettings>(materials[i].values);
+        config.macro_overrides = std::get<MacroOverridesMapFDM>(macro_overrides);
         return config;
     }
     if (printer.kind == PresetKind::SlaPrinter) {
@@ -32,6 +33,7 @@ ConfigPack SelectedPreset::config() const
         config.sla_print_settings   = std::get<SLAPrintSettings>(print.values);
         ASSERT(materials.size() == 1);
         config.sla_material_settings = std::get<SLAMaterialSettings>(materials.at(0).values);
+        config.macro_overrides = std::get<MacroOverridesMapSLA>(macro_overrides);
         return config;
     }
 
@@ -79,6 +81,7 @@ SelectedPreset SelectedPreset::make(const SelectedPresetMetadata& metadata, cons
                         metadata.print,
                         typed_config.print
                     ),
+                    .macro_overrides = typed_config.macro_overrides,
                 };
 
                 ASSERT(metadata.hw_config.tools.size() == metadata.tools.size());
@@ -126,7 +129,8 @@ SelectedPreset SelectedPreset::make(const SelectedPresetMetadata& metadata, cons
                         metadata.materials.at(0),
                         typed_config.sla_material_settings
                     )}},
-                    .material_matdb_uuids = metadata.material_matdb_uuids
+                    .material_matdb_uuids = metadata.material_matdb_uuids,
+                    .macro_overrides = typed_config.macro_overrides,
                 };
             },
         },

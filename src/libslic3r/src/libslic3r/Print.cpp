@@ -94,19 +94,16 @@ Domain::Point PrintInstance::shift() const
 Print::Print() :
     m_on_fdm_result([](Biz::libpgcode::ProcessorResult&&) {}),
     m_on_wipe_tower_geometry([](Biz::Slicing::OptWipeTowerGeometry&&) {}),
-    m_on_extruder_candidates([](std::vector<unsigned>) {}),
     m_on_generated_support_points([](GeneratedSupportPointsSnapshot&&) {})
 {}
 
 Print::Print(
     const OnFdmResult& on_fdm_result,
     const OnWipeTowerGeometry& on_wipe_tower_geometry,
-    const OnExtruderCandidates& on_extruder_candidates,
     const OnGeneratedSupportPoints& on_generated_support_points
 ) :
     m_on_fdm_result(on_fdm_result),
     m_on_wipe_tower_geometry(on_wipe_tower_geometry),
-    m_on_extruder_candidates(on_extruder_candidates),
     m_on_generated_support_points(on_generated_support_points)
 {}
 
@@ -294,6 +291,12 @@ static std::optional<Biz::Slicing::Error> check_extruders(
                 }
             }
         }
+        for (const Domain::MacroOverridesLayerFDM& macro : config.macro_overrides | std::views::values) {
+            const auto macro_extruder{macro.overrides.overrides.get(key)};
+            if (macro_extruder && !accepts_extruder(*macro_extruder, 1)) {
+                result.push_back(key);
+            }
+        }
     }
 
     check_virtual_extruder_roles(model, config, result);
@@ -309,6 +312,18 @@ static std::optional<Biz::Slicing::Error> check_extruders(
         for (const Domain::ModelObject* object : model.objects) {
             const auto object_extruder{object->object_settings.overrides.get(key)};
             if (object_extruder && !in_range(*object_extruder, 0, slot_count)) {
+                result.push_back(key);
+            }
+        }
+    }
+
+    for (const char* key : {"wipe_tower_extruder",
+                            "support_material_extruder",
+                            "support_material_interface_extruder"})
+    {
+        for (const Domain::MacroOverridesLayerFDM& macro : config.macro_overrides | std::views::values) {
+            const auto macro_extruder{macro.overrides.overrides.get(key)};
+            if (macro_extruder && !in_range(*macro_extruder, 0, slot_count)) {
                 result.push_back(key);
             }
         }
@@ -399,7 +414,7 @@ uses_virtual_extruder(const PrintObjectPtrs& objects, const unsigned int virtual
     return false;
 }
 
-Biz::Slicing::ApplyStatus::Status Print::update(
+Biz::Slicing::UpdateResult Print::update(
     Domain::Model& model,
     const ConfigPack& config,
     const Domain::BedInstance& bed,
@@ -409,7 +424,7 @@ Biz::Slicing::ApplyStatus::Status Print::update(
 {
     namespace ApplyStatus = Biz::Slicing::ApplyStatus;
 
-    ApplyStatus::Status result{ApplyStatus::Unchanged{}};
+    Biz::Slicing::UpdateResult result{ApplyStatus::Unchanged{}};
     Biz::Slicing::with_limited_instances(model, bed.model_instances, [&]() {
         const InstanceTransformations original_transformations{
             transform_instances(model, bed.transformation.get_matrix().inverse())
@@ -427,35 +442,37 @@ Biz::Slicing::ApplyStatus::Status Print::update(
         const std::vector<unsigned> extruder_candidates{
             metadata.hw_config.material_slot_count() == 1 ?
                 std::vector<unsigned>{0} :
-                Biz::Slicing::get_extruder_candidates(model, config_fdm, bed, config_fdm.virtual_extruders)
-        };
-        // Backend needs extruder_candidates for MMU, but in Biz/App extruder candidates
-        // has to correspond to tool count
-        m_on_extruder_candidates(
-            metadata.hw_config.tool_count == 1 ? std::vector<unsigned>{0} : extruder_candidates
-        );
+                Biz::Slicing::
+                    get_extruder_candidates(model, config_fdm, bed, config_fdm.virtual_extruders)};
 
         std::vector<Biz::Slicing::Error> errors{
             validate_input(model, config_fdm, metadata.hw_config)
         };
         if (!errors.empty()) {
             m_invalid = true;
-            result = ApplyStatus::InvalidData{std::move(errors)};
+            m_extruder_candidates.clear();
+            result = Biz::Slicing::UpdateResult{
+                ApplyStatus::InvalidData{std::move(errors)}};
             return;
         }
 
-        const auto slicing_input{
-            prepare_slicing_input(config_fdm, extruder_candidates, metadata.hw_config)
-        };
+        const auto slicing_input{prepare_slicing_input(
+            config_fdm,
+            extruder_candidates,
+            metadata.hw_config)};
+
         if (!slicing_input.has_value()) {
             m_invalid = true;
-            result = ApplyStatus::InvalidData{std::move(slicing_input.error())};
+            m_extruder_candidates.clear();
+            result = Biz::Slicing::UpdateResult{
+                ApplyStatus::InvalidData{std::move(slicing_input.error())}};
             return;
         }
 
         result = this->apply(
             model,
             slicing_input.value(),
+            Domain::PartialConfig{Domain::to_refs(config_fdm.macro_overrides), metadata.hw_config},
             metadata,
             bed.name(),
             serializer,
@@ -464,43 +481,44 @@ Biz::Slicing::ApplyStatus::Status Print::update(
             extruder_candidates
         );
         if (!is_any_printable(model.objects)) {
-            result = ApplyStatus::Empty{};
+            result.status = ApplyStatus::Empty{};
             return;
         }
         if (
-            std::holds_alternative<ApplyStatus::Changed>(result)
-            || (m_invalid && std::holds_alternative<ApplyStatus::Unchanged>(result))
+            std::holds_alternative<ApplyStatus::Changed>(result.status)
+            || (m_invalid && std::holds_alternative<ApplyStatus::Unchanged>(result.status))
         ) {
             Biz::Slicing::ValidationResult validation_result{validate()};
             if (!validation_result.errors.empty()) {
-                result = ApplyStatus::InvalidData{std::move(validation_result.errors)};
+                result = Biz::Slicing::UpdateResult{
+                    ApplyStatus::InvalidData{std::move(validation_result.errors)}};
                 return;
             }
 
-            if (std::holds_alternative<ApplyStatus::Unchanged>(result)) {
-                result = ApplyStatus::Changed{};
+            if (std::holds_alternative<ApplyStatus::Unchanged>(result.status)) {
+                result = Biz::Slicing::UpdateResult{ApplyStatus::Changed{}};
             }
 
             for (const Biz::Slicing::Warning& warning : validation_result.warnings) {
-                std::get<ApplyStatus::Changed>(result).warrnings.push_back(warning);
+                std::get<ApplyStatus::Changed>(result.status).warrnings.push_back(warning);
             }
         }
     });
 
-    if (std::holds_alternative<ApplyStatus::InvalidData>(result)) {
+    if (std::holds_alternative<ApplyStatus::InvalidData>(result.status)) {
         m_invalid = true;
     } else {
-        if (m_invalid && std::holds_alternative<ApplyStatus::Unchanged>(result)) {
-            result = ApplyStatus::Changed{};
+        if (m_invalid && std::holds_alternative<ApplyStatus::Unchanged>(result.status)) {
+            result.status = ApplyStatus::Changed{};
         }
         m_invalid = false;
     }
 
-    if (std::holds_alternative<ApplyStatus::Changed>(result) && m_pre_preview) {
+    if (std::holds_alternative<ApplyStatus::Changed>(result.status) && m_pre_preview) {
         if (m_pre_preview->invalidate(*this)) {
             m_on_fdm_result(m_pre_preview->generate_result());
         }
-    } else if (!std::holds_alternative<ApplyStatus::Unchanged>(result)) {
+    } else if (!std::holds_alternative<ApplyStatus::Unchanged>(result.status)) {
         m_on_fdm_result({});
     }
 
@@ -724,7 +742,7 @@ DONE:;
         if (total_copies_count > 1 && !m_config.get<bool>("complete_objects")) {
             errors.push_back(Error{ErrorCode::SpiralVaseMultipleObjects, {"spiral_vase"}});
         }
-        ASSERT(m_objects.size() == 1);
+        ASSERT(m_objects.size() > 0);
         if (m_objects.front()->all_regions().size() > 1) {
             errors.push_back(Error{ErrorCode::SpiralVaseMultipleMaterials, {"spiral_vase"}});
         }

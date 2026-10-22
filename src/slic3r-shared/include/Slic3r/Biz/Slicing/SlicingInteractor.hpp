@@ -65,9 +65,9 @@ struct IWipeTowerGeometryListener : ISlicingListener
     virtual void on_wipe_tower_geometry_changed(Slicing::OptWipeTowerGeometry, const Domain::SlicingId) = 0;
 };
 
-struct IExtruderCandidatesListener : ISlicingListener
+struct IBackgroundProcessStateListener : ISlicingListener
 {
-    virtual void on_extruder_candidates_changed(std::vector<unsigned>, const Domain::SlicingId) = 0;
+    virtual void on_background_process_state_changed(const Domain::SlicingId) = 0;
 };
 
 struct UpdateRequest
@@ -94,7 +94,7 @@ struct FatalSlicingError : public std::runtime_error {
 class SlicingInteractor :
     public ISelectedProjectChangedListener,
     public IProcessCallbacks,
-    public WithListeners<IStatusListener, IWipeTowerGeometryListener, IExtruderCandidatesListener>,
+    public WithListeners<IStatusListener, IWipeTowerGeometryListener, IBackgroundProcessStateListener>,
     public WithListener<
         IFDMResultListener,
         ISLAResultListener,
@@ -140,12 +140,14 @@ public:
     void on_sla_object(const Domain::SlicingId&, Sla::Object&&) override;
     void on_status(const StatusUpdate, Domain::SlicingId) override;
     void on_wipe_tower_geometry(Slicing::OptWipeTowerGeometry&& wipe_tower_geometry, const Domain::SlicingId id) override;
-    void on_extruder_candidates(std::vector<unsigned>&& extruder_candidates, const Domain::SlicingId id) override;
     void on_generated_support_points(
         GeneratedSupportPointsSnapshot&& generated_support_points,
         const Domain::SlicingId id
     ) override;
     StatusCode get_status(const Domain::SlicingId id) const override;
+
+    [[nodiscard]] const BackgroundProcessState*
+    find_process_state(const Domain::SlicingId id) const;
 
 private:
     Domain::SlicingId get_process_id(const Domain::SelectionId bed_instance_id) const;
@@ -154,6 +156,7 @@ private:
     void process_update_requests();
     // Tells the listeners that nothing the process of the bed produced is valid any more.
     void notify_bed_outputs_cleared(const Domain::SlicingId& id);
+    void invoke_background_process_state_changed(const Domain::SlicingId& id);
     int64_t get_active_processes_count() const;
     void update_status(const Domain::SlicingId id, const StatusCode status);
     void create_process(

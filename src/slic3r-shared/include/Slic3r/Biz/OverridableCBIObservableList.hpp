@@ -16,7 +16,10 @@ public:
     virtual size_t size() const;
 
     std::map<const OverridableConfigBoxInteractor*, OverridableConfigBoxInteractor::SetAccessor>
-    set_items(const std::vector<OverridableConfigBoxInteractor::ConfigBoxes>& config_boxes_list);
+    set_items(
+        Scene::SceneInteractor& scene_interactor,
+        Slicing::SlicingInteractor& slicing_interactor,
+        const std::vector<OverridableConfigBoxInteractor::ConfigBoxes>& config_boxes_list);
 
 private:
     std::vector<OverridableConfigBoxInteractor> m_items;

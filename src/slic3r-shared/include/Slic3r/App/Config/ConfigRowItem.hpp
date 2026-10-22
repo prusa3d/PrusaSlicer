@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Slic3r/Biz/EffectiveValueStatus.hpp"
 #include "Slic3r/Domain/Config.hpp"
 
 #include "Slic3r/Biz/DataObserver.hpp"
@@ -22,6 +23,7 @@ namespace Slic3r::App {
 
 class ConfigItemControl;
 class ConfigItemSpinBox;
+class ConfigRowItemLabel;
 
 class ConfigRowItem :
     public Biz::DataObserver<Domain::ConfigItem>,
@@ -46,6 +48,8 @@ public:
     void set_label_text_color(const ImColor& color);
     void set_enabled_control(bool enabled);
 
+    void set_effective_value_status(Biz::EffectiveValueStatus status);
+
 private:
     void on_data_update() override;
 
@@ -58,7 +62,7 @@ private:
     Domain::ConfigItemDef::GUIType m_created_gui_type{Domain::ConfigItemDef::GUIType::undefined};
     const std::type_info* m_created_value_type{nullptr};
     Yoga::Item* m_left_side{nullptr};
-    Yoga::Text* m_label{nullptr};
+    ConfigRowItemLabel* m_label{nullptr};
     Yoga::LayoutButton* m_revert_button{nullptr};
     Yoga::Item* m_input{nullptr};
     Yoga::ToggleButton* m_toggle_enable{nullptr};
@@ -69,6 +73,7 @@ private:
     }; ///< valid only if ConfigItem gui type is spinbox
 
     FnEnableRevert m_enable_revert{nullptr};
+    Biz::EffectiveValueStatus m_effective_value_status{Biz::EffectiveValueStatus::None};
 };
 
 } // namespace Slic3r::App

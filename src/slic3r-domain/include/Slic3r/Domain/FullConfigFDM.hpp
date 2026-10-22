@@ -2,6 +2,7 @@
 
 #include "Slic3r/Domain/ConfigBoxesFDM.hpp"
 #include "Slic3r/Domain/ConfigPack.hpp"
+#include "Slic3r/Domain/MacroOverrides.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
 #include "Slic3r/Uuid.hpp"
 
@@ -31,24 +32,6 @@ private:
     VirtualExtruders m_virtual_extruders;
 };
 
-class PartialObjectConfigFDM : public PartialConfig {
-public:
-    PartialObjectConfigFDM(
-        const ObjectSettings& object_settings,
-        const Preset::HwPrinterConfig& hw_config
-    );
-};
-
-class PartialVolumeConfigFDM : public PartialConfig {
-public:
-    PartialVolumeConfigFDM(
-        const VolumeSettings& volume_settings,
-        const Preset::HwPrinterConfig& hw_config
-    );
-};
-
 using FullConfigFDMPtr = std::shared_ptr<const FullConfigFDM>;
-using PartialObjectConfigFDMPtr = std::shared_ptr<const PartialObjectConfigFDM>;
-using PartialVolumeConfigFDMPtr = std::shared_ptr<const PartialVolumeConfigFDM>;
 
 } // namespace Slic3r::Domain

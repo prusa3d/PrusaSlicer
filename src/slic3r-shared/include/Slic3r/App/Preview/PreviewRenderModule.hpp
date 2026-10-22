@@ -7,6 +7,7 @@
 
 #include "Slic3r/App/Plater/ThumbnailImageGenerator.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
+#include "Slic3r/App/EffectiveValuesDialog.hpp"
 #include "Slic3r/App/RenderModuleBase.hpp"
 #include "Slic3r/App/Preview/PreviewScenePresenter.hpp"
 #include "Slic3r/App/Scene/GizmoManager.hpp"

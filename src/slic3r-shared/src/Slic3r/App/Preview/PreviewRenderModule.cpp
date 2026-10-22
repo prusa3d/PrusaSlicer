@@ -29,6 +29,7 @@
 #include "Slic3r/App/PrintSettingsDialog.hpp"
 #include "Slic3r/App/Material/MaterialSelectionDialog.hpp"
 #include "Slic3r/App/Material/MaterialSettingsDialog.hpp"
+#include "Slic3r/App/PrintModeDialog.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
 #include "Slic3r/App/UIItemCommand.hpp"
 #include "Slic3r/App/AppConfig.hpp"
@@ -442,6 +443,7 @@ void PreviewRenderModule::set_modal_dialog(ModalDialog modal_dialog)
     handle_dialog(m_crashed_projects_dialog.get(), ModalDialog::CrashedProjects);
     handle_dialog(m_preset_updater_dialog.get(), ModalDialog::PresetUpdater);
     handle_dialog(m_invalid_data_dialog.get(), ModalDialog::InvalidData);
+    handle_dialog(m_effective_values_dialog.get(), ModalDialog::EffectiveValues);
     if (modal_dialog == ModalDialog::MsgBox) {
         msg_box_handler()->open_modal();
     } else {
@@ -865,6 +867,10 @@ void PreviewRenderModule::init_scene_layout()
         m_project_interactor,
         *m_render_module_navigator
     );
+    m_effective_values_dialog = std::make_unique<EffectiveValuesDialog>(
+        m_project_interactor,
+        *m_render_module_navigator
+    );
     m_crashed_projects_dialog =
         std::make_unique<CrashedProjectsDialog>(m_project_interactor, *m_render_module_navigator);
 
@@ -916,6 +922,7 @@ void PreviewRenderModule::init_scene_layout()
         m_slider_gcode.release(),
         m_sidebar_auto_reslice.release(),
         m_invalid_data_dialog.release(),
+        m_effective_values_dialog.release(),
         m_crashed_projects_dialog.release(),
         m_preset_updater_dialog.release()
     ));
@@ -1093,7 +1100,9 @@ void PreviewRenderModule::init_dialog_navigation()
 
     m_dialog_navigation.insert_dialog(&m_sidebar_print->print_settings_dialog());
     m_dialog_navigation.insert_dialog(m_sidebar_print->tool_to_feature_dialog());
+    m_dialog_navigation.insert_dialog(&m_sidebar_print->print_mode_dialog());
     m_dialog_navigation.insert_dialog(m_invalid_data_dialog.get());
+    m_dialog_navigation.insert_dialog(m_effective_values_dialog.get());
     m_dialog_navigation.insert_dialog(m_preset_updater_dialog.get());
 
     m_dialog_navigation.insert_dialog(&m_sidebar_action_buttons->physical_printer_settings_dialog());

@@ -281,12 +281,47 @@ load_fdm(const ordered_json& json, const Domain::Preset::HwPrinterConfig& hw_con
     ProjectSettings project_settings;
     const auto project_issues = load_box(json[project_location_name], project_settings);
 
+    // Optional. An object keyed by the layer id, see Config::to_json() for the layer format.
+    const std::string macro_overrides_location_name{
+        get_location_name(FDMConfigLocation::MacroOverrides)};
+    Domain::MacroOverridesMapFDM macro_overrides;
+    BoxIssues macro_overrides_issues;
+    if (is_object(macro_overrides_location_name, json)) {
+        for (const auto& [id, layer_json] : json[macro_overrides_location_name].items()) {
+            if (!layer_json.is_object() || !is_object("overrides", layer_json)) {
+                macro_overrides_issues[id] = {
+                    ItemParsingIssueType::InvalidFormat, "Not a macro overrides layer!"};
+                continue;
+            }
+            Domain::MacroOverridesLayerFDM layer;
+            if (const auto name{layer_json.find("name")};
+                name != layer_json.end() && name->is_string()) {
+                layer.name = name->get<std::string>();
+            }
+            if (is_object("params", layer_json)) {
+                for (const auto& [name, value_json] : layer_json["params"].items()) {
+                    if (const auto value{print_mode_param_from_json(value_json)}) {
+                        layer.params.insert_or_assign(name, *value);
+                    } else {
+                        macro_overrides_issues[id + "." + name] = {
+                            ItemParsingIssueType::InvalidFormat,
+                            "Not a labeled bool, number or string!"};
+                    }
+                }
+            }
+            BoxIssues issues{load_box(layer_json["overrides"], layer.overrides)};
+            macro_overrides_issues.merge(issues);
+            macro_overrides.insert_or_assign(id, std::move(layer));
+        }
+    }
+
     ConfigPackFDM config;
     config.printer = printer_settings;
     config.tool = tool_load_result.settings;
     config.print = print_settings;
     config.filament = filament_load_result.settings;
     config.project = project_settings;
+    config.macro_overrides = std::move(macro_overrides);
 
     IssuesPerLocation issues;
     if (!printer_issues.empty()) {
@@ -303,6 +338,9 @@ load_fdm(const ordered_json& json, const Domain::Preset::HwPrinterConfig& hw_con
     }
     if (!project_issues.empty()) {
         issues.insert({FDMConfigLocation::Project, project_issues});
+    }
+    if (!macro_overrides_issues.empty()) {
+        issues.insert({FDMConfigLocation::MacroOverrides, macro_overrides_issues});
     }
 
     return LoadResult{.config = std::move(config), .issues = std::move(issues)};

@@ -270,3 +270,27 @@ TEST_CASE_METHOD(
         get_extruder_candidates(model, small_config, bed_instance, small_config.virtual_extruders);
     CHECK(extruders == std::vector<unsigned>{1});
 }
+
+TEST_CASE_METHOD(
+    ExtruderCandidatesTestFixture,
+    "Extruder candidates take macro overrides into account",
+    "[ExtruderCandidates]"
+)
+{
+    config.print.items.opt("support_material").set(SupportMode::None);
+    object->object_settings.overrides.set("support_material_extruder", 2);
+
+    std::vector<unsigned> extruders{
+        get_extruder_candidates(model, config, bed_instance, config.virtual_extruders)
+    };
+    CHECK(extruders == std::vector<unsigned>{0});
+
+    Slic3r::Domain::MacroOverridesFDM& soluble{
+        config.macro_overrides["some_layer"].overrides};
+    soluble.overrides.set("support_material", SupportMode::Everywhere);
+    soluble.overrides.set("support_material_extruder", 4);
+
+    // The macro override wins over the object override.
+    extruders = get_extruder_candidates(model, config, bed_instance, config.virtual_extruders);
+    CHECK(extruders == std::vector<unsigned>{0, 3});
+}

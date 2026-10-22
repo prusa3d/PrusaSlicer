@@ -16,6 +16,7 @@ public:
     const FilamentSettings& get_filament(size_t index) const override;
     const size_t tool_size() const override;
     const size_t filament_size() const override;
+    const MacroOverridesMapFDM& get_macro_overrides() const override;
 
 private:
     const SelectedPreset& m_selected_preset;

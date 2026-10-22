@@ -172,17 +172,15 @@ SlicingParameters SlicingParameters::create_from_config(
     const Vec3d shrinkage = Slicing::get_shrinkage_compensation(object_extruders, print_config_view)
                                 .value_or(Vec3d{1., 1., 1.});
 
-    const auto partial_object_config_fdm = prepare_slicing_object_input(
-        object_settings,
+    const Domain::PartialConfig partial_object_config_fdm{
+        {object_settings},
         hw_config,
-        hw_config.material_slot_count()
-    );
-    ASSERT(partial_object_config_fdm.has_value());
-
-    const PrintObjectConfigView config_view{
-        full_config_fdm.value(),
-        partial_object_config_fdm.value()
     };
+
+    const Domain::PartialConfig macro_overrides{Domain::to_refs(config.macro_overrides), hw_config};
+
+    const PrintObjectConfigView
+        config_view{full_config_fdm.value(), partial_object_config_fdm, macro_overrides};
     return create_from_config(config_view, object_height, object_extruders, shrinkage);
 }
 

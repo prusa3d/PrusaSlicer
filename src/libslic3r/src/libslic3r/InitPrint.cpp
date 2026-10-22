@@ -20,16 +20,12 @@ std::unique_ptr<IPrint> init_print(const Domain::PrinterTechnology& printer_tech
         Print::OnWipeTowerGeometry on_wipe_tower_geometry =
             [callbacks_ref, id](OptWipeTowerGeometry&& geometry)
         { callbacks_ref.get().on_wipe_tower_geometry(std::move(geometry), id); };
-        Print::OnExtruderCandidates on_extruder_candidates =
-            [callbacks_ref, id](std::vector<unsigned> extruder_candidates)
-        { callbacks_ref.get().on_extruder_candidates(std::move(extruder_candidates), id); };
         Print::OnGeneratedSupportPoints on_generated_support_points =
             [callbacks_ref, id](GeneratedSupportPointsSnapshot&& support_points)
         { callbacks_ref.get().on_generated_support_points(std::move(support_points), id); };
         print = std::make_unique<Print>(
             on_fdm_result,
             on_wipe_tower_geometry,
-            on_extruder_candidates,
             on_generated_support_points
         );
         break;

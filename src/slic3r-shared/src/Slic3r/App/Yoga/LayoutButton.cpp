@@ -101,6 +101,18 @@ void LayoutButton::set_text_wrap_mode(Text::WrapMode wrap_mode)
     m_text->set_wrap_mode(wrap_mode);
 }
 
+void LayoutButton::set_label_size(const Unit& width, const Unit& height)
+{
+    m_text->set_width(width);
+    m_text->set_height(height);
+    m_text->set_flex_shrink(0);
+}
+
+void LayoutButton::set_label_align(const Yoga::Align& align)
+{
+    m_text->set_align(align);
+}
+
 Text* LayoutButton::label_object() const
 {
     return m_text;

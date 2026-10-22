@@ -3,6 +3,7 @@
 #include "Slic3r/App/Yoga/Window.hpp"
 #include "Slic3r/App/Yoga/ButtonGroup.hpp"
 #include "Slic3r/App/Yoga/ComboBoxListViewSelection.hpp"
+#include "Slic3r/Biz/Preset/IMacroOverridesChangedListener.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 #include "Slic3r/App/SidebarToolHeadRow.hpp"
 #include "Slic3r/App/Yoga/ListView.hpp"
@@ -15,6 +16,7 @@ namespace Slic3r::App {
 
 class PrintSettingsDialog;
 class ToolToFeatureDialog;
+class PrintModeDialog;
 class PrintToolFavoritesItem;
 class Navigator;
 
@@ -25,13 +27,17 @@ class ComboBox;
 class ScrollArea;
 } // namespace Yoga
 
-class SidebarPrint : public Yoga::Window, public Biz::Preset::IPresetChangedListener
+class SidebarPrint :
+    public Yoga::Window,
+    public Biz::Preset::IPresetChangedListener,
+    public Biz::Preset::IMacroOverridesChangedListener
 {
 public:
     explicit SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator& navigator);
 
     PrintSettingsDialog& print_settings_dialog();
     ToolToFeatureDialog* tool_to_feature_dialog();
+    PrintModeDialog& print_mode_dialog();
 
     void on_preset_selection_changed(
         Domain::SelectionId project_id,
@@ -52,8 +58,11 @@ public:
         Domain::SelectionId config_container_id
     ) override;
 
+    void on_macro_overrides_changed() override;
+
 private:
     void add_separator();
+    void refresh_print_mode_button();
 
     void create_tool_to_feature_row();
     void create_favorite_params();
@@ -77,11 +86,17 @@ private:
         Biz::Preset::PresetInteractor,
         SidebarPrint>
         m_preset_changed_listener_scope;
+    Biz::ListenerScope<
+        Biz::Preset::IMacroOverridesChangedListener,
+        Biz::Preset::PresetInteractor,
+        SidebarPrint>
+        m_macro_overrides_listener_scope;
 
     Biz::ProjectInteractor& m_project_interactor;
     Navigator& m_navigator;
 
     Yoga::LayoutButton* m_settings_set_btn{nullptr};
+    Yoga::LayoutButton* m_print_mode_btn{nullptr};
     Yoga::ScrollArea* m_content_area{nullptr};
     ToolToFeatureDialog* m_tool_to_feature_dialog{nullptr};
     Yoga::Item* m_tool_to_feature_row{nullptr};
@@ -91,6 +106,7 @@ private:
     ToolHeadListView* m_tool_head_list_view{nullptr};
 
     PrintSettingsDialog* m_print_settings_dialog{nullptr};
+    PrintModeDialog* m_print_mode_dialog{nullptr};
 
     int m_last_selected_index{-1};
 };

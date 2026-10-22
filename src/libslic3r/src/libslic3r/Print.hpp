@@ -93,10 +93,22 @@ public:
     {}
     ~PrintRegion() = default;
 
-// Methods NOT modifying the PrintRegion's state:
 public:
-    const PrintRegionConfigView& config() const throw() { return m_config; }
-    void finalize_config() { m_config.finalize(); };
+    const PrintRegionConfigView& config() const throw()
+    {
+        return m_config;
+    }
+
+    void finalize_config()
+    {
+        m_config.finalize();
+    };
+
+    void add_config_override(const Domain::PartialConfig& config)
+    {
+        m_config.add_override(config);
+    };
+
     size_t                      config_hash() const throw() { return m_config_hash; }
     // Identifier of this PrintRegion in the list of Print::m_print_regions.
     int                         print_region_id() const throw() { return m_print_region_id; }
@@ -252,8 +264,7 @@ public:
     {
         Domain::LayerHeightRange            layer_height_range;
         // Config of the layer range, null if there is just a single range with no config override.
-        // Config is owned by the associated ModelObject.
-        Domain::PartialVolumeConfigFDMPtr   config;
+        Domain::PartialConfig config;
         // Volumes sorted by ModelVolume::id().
         std::vector<VolumeExtents>          volumes;
 
@@ -544,7 +555,6 @@ public:
     Print(
         const OnFdmResult& on_fdm_result,
         const OnWipeTowerGeometry& on_wipe_tower_geometry,
-        const OnExtruderCandidates& on_extruder_candidates,
         const OnGeneratedSupportPoints& on_generated_support_points
     );
     virtual ~Print();
@@ -561,7 +571,7 @@ public:
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<Domain::ObjectID> print_object_ids() const override;
 
-    virtual Biz::Slicing::ApplyStatus::Status update(
+    virtual Biz::Slicing::UpdateResult update(
         Domain::Model& model,
         const Domain::ConfigPack& config,
         const Domain::BedInstance& bed,
@@ -569,9 +579,10 @@ public:
         const MetadataSerializeFn& serializer
     ) override;
 
-    Biz::Slicing::ApplyStatus::Status apply(
+    Biz::Slicing::UpdateResult apply(
         const Domain::Model& model,
         const Domain::FullConfigFDMPtr& new_full_config_ptr,
+        const Domain::PartialConfig& macro_overrides,
         const Domain::Preset::SelectedPresetMetadata& metadata,
         const std::string& bed_name,
         const MetadataSerializeFn& serializer,
@@ -704,7 +715,6 @@ public:
 
     OnFdmResult m_on_fdm_result;
     OnWipeTowerGeometry m_on_wipe_tower_geometry;
-    OnExtruderCandidates m_on_extruder_candidates;
     OnGeneratedSupportPoints m_on_generated_support_points;
 
     PrintConfigView m_config;

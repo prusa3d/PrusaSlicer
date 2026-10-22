@@ -352,14 +352,14 @@ void init_print(
             bed_instance.model_instances.push_back(instance);
         }
     }
-    const auto status{print.update(
+    const auto result{print.update(
         model,
         config,
         bed_instance,
         preset_metadata,
         Slicing::build_metadata_serializer(gcode_metadata, preset_metadata, config_in)
     )};
-    ASSERT(!std::holds_alternative<Biz::Slicing::ApplyStatus::InvalidData>(status));
+    ASSERT(!std::holds_alternative<Biz::Slicing::ApplyStatus::InvalidData>(result.status));
     print.validate();
 }
 

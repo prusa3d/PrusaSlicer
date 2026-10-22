@@ -463,7 +463,7 @@ namespace {
 // Remembers the last notification of what a bed process produces besides the results.
 struct BedOutputsListener : public IWipeTowerGeometryListener,
                             public Slic3r::Biz::Slicing::IGeneratedSupportPointsListener,
-                            public Slic3r::Biz::Slicing::IExtruderCandidatesListener
+                            public Slic3r::Biz::Slicing::IBackgroundProcessStateListener
 {
     void on_wipe_tower_geometry_changed(OptWipeTowerGeometry geometry, const SlicingId) override
     {
@@ -480,20 +480,18 @@ struct BedOutputsListener : public IWipeTowerGeometryListener,
         support_points_notified = true;
     }
 
-    void on_extruder_candidates_changed(std::vector<unsigned> candidates, const SlicingId) override
+    void on_background_process_state_changed(const SlicingId) override
     {
-        extruder_candidates          = std::move(candidates);
-        extruder_candidates_notified = true;
+        process_state_notified = true;
     }
 
     void reset() { *this = BedOutputsListener{}; }
 
     OptWipeTowerGeometry wipe_tower;
     Slic3r::Biz::Slicing::GeneratedSupportPointsSnapshot support_points;
-    std::vector<unsigned> extruder_candidates;
     bool wipe_tower_notified{false};
     bool support_points_notified{false};
-    bool extruder_candidates_notified{false};
+    bool process_state_notified{false};
 };
 
 } // namespace
@@ -508,7 +506,7 @@ TEST_CASE_METHOD(SlicingFixture, "Switching the printer technology of a bed clea
     BedOutputsListener listener;
     slicing.add_listener<IWipeTowerGeometryListener>(&listener);
     slicing.set_listener<Slic3r::Biz::Slicing::IGeneratedSupportPointsListener>(&listener);
-    slicing.add_listener<Slic3r::Biz::Slicing::IExtruderCandidatesListener>(&listener);
+    slicing.add_listener<Slic3r::Biz::Slicing::IBackgroundProcessStateListener>(&listener);
 
     const auto slice_with = [&](const ModelOnBed& settings) {
         status_listener.status_events.clear();
@@ -523,9 +521,10 @@ TEST_CASE_METHOD(SlicingFixture, "Switching the printer technology of a bed clea
         REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
             return !events.empty() && events.back().status_code == StatusCode::Finished;
         }));
+        return status_listener.status_events.back().slicing_id;
     };
 
-    slice_with(fff_settings);
+    const SlicingId id{slice_with(fff_settings)};
 
     // An SLA process never reports these, so only the switch itself can clear what the FFF one did.
     listener.reset();
@@ -534,8 +533,9 @@ TEST_CASE_METHOD(SlicingFixture, "Switching the printer technology of a bed clea
     CHECK_FALSE(listener.wipe_tower.has_value());
     CHECK(listener.support_points_notified);
     CHECK(listener.support_points.empty());
-    CHECK(listener.extruder_candidates_notified);
-    CHECK(listener.extruder_candidates.empty());
+    CHECK(listener.process_state_notified);
+    REQUIRE(slicing.find_process_state(id));
+    CHECK(slicing.find_process_state(id)->extruder_candidates.empty());
 }
 
 TEST_CASE_METHOD(SlicingFixture, "SLA bed with a pad but no supports ends as invalid data", "[slicing][slicing-interactor][timeout]") {

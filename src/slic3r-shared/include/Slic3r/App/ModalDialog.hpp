@@ -9,6 +9,7 @@ enum class ModalDialog
     CrashedProjects,
     Welcome,
     PresetUpdater,
+    EffectiveValues,
     MsgBox, ///< One-of modal dialogs created by MsgBoxHandler
     InvalidData,
 };

@@ -7,9 +7,10 @@ namespace Slic3r::Biz {
 PrintToolConfigBoxInteractor::PrintToolConfigBoxInteractor(
     const Domain::Workbench& workbench,
     Scene::SceneInteractor& scene_interactor,
+    Biz::Slicing::SlicingInteractor& slicing_interactor,
     SetAccessor& set_accessor
 ) :
-    m_observable_list(std::make_shared<PrintToolConfigObservableList>(workbench, scene_interactor))
+    m_observable_list(std::make_shared<PrintToolConfigObservableList>(workbench, scene_interactor, slicing_interactor))
 {
     set_accessor.set_source(m_observable_list.get());
 }

@@ -19,6 +19,7 @@ enum class Icon : wchar_t
     WarningMarkerWhite,
     ErrorMarker,
     RevertButton,
+    EffectiveValueInfo,
 
     // Do not forget use following letters only in wstring
     ClippyMarker,

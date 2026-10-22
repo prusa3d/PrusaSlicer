@@ -38,10 +38,20 @@ ExportNameData parse_fdm_export_name(
     );
     ASSERT(bed_instance != nullptr);
 
+    const Biz::Slicing::BackgroundProcessState* background_process_state{
+        project_interactor.slicing_interactor().find_process_state(
+            {project_id, bed_instance->id().id})};
+
+    const static std::vector<unsigned> empty_extruder_candidates;
+    const std::vector<unsigned>& extruder_candidates{
+        background_process_state ?
+            background_process_state->extruder_candidates :
+            empty_extruder_candidates};
+
     ExportNameData result {Technology::Fdm, project_name, resolve_preferred_extension(output_filename_format)};
     auto full_config{std::make_shared<Domain::FullConfigFDM>(
         fdm_config,
-        bed_instance->extruder_candidates,
+        extruder_candidates,
         project_interactor.preset_interactor().current_printer_config()
     )};
     Domain::ConfigView view{full_config, {}};

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Slic3r/Domain/ConfigBoxesFDM.hpp"
+#include "Slic3r/Domain/MacroOverrides.hpp"
 
 namespace Slic3r::Domain {
 
@@ -15,6 +16,7 @@ public:
     virtual const size_t tool_size() const                                   = 0;
     virtual const Domain::FilamentSettings& get_filament(size_t index) const = 0;
     virtual const size_t filament_size() const                               = 0;
+    virtual const Domain::MacroOverridesMapFDM& get_macro_overrides() const  = 0;
 };
 
 } // namespace Slic3r::Domain

@@ -6,11 +6,11 @@
 
 namespace Slic3r {
 
-inline std::vector<Domain::PartialConfigPtr> join(
-    const Domain::PartialObjectConfigFDMPtr& object_settings,
-    const std::vector<Domain::PartialVolumeConfigFDMPtr>& volume_settings
+inline std::vector<Domain::PartialConfig> join(
+    const Domain::PartialConfig& object_settings,
+    const std::vector<Domain::PartialConfig>& volume_settings
 ) {
-    std::vector<Domain::PartialConfigPtr> result;
+    std::vector<Domain::PartialConfig> result;
     result.push_back(object_settings);
     result.insert(result.end(), volume_settings.begin(), volume_settings.end());
     return result;
@@ -21,8 +21,8 @@ class PrintRegionConfigView : public Domain::ConfigView
 public:
     PrintRegionConfigView(
         const Domain::FullConfigFDMPtr& full_config,
-        const Domain::PartialObjectConfigFDMPtr& object_settings,
-        const std::vector<Domain::PartialVolumeConfigFDMPtr>& volume_settings
+        const Domain::PartialConfig& object_settings,
+        const std::vector<Domain::PartialConfig>& volume_settings
     ) :
         ConfigView{full_config, join(object_settings, volume_settings)},
         m_virtual_extruders{full_config->virtual_extruders()}
@@ -32,7 +32,7 @@ public:
         ConfigView{std::make_shared<const Domain::FullConfigFDM>(Domain::FullConfigFDM::defaults()), {}}
     {}
 
-    void add_override(const Domain::PartialVolumeConfigFDMPtr& override) {
+    void add_override(const Domain::PartialConfig& override) {
         m_partial_configs.push_back(override);
     }
 
@@ -55,19 +55,20 @@ class PrintObjectConfigView : public Domain::ConfigView
 public:
     PrintObjectConfigView(
         const Domain::FullConfigFDMPtr& full_config,
-        const Domain::PartialObjectConfigFDMPtr& object_settings
+        const Domain::PartialConfig& object_settings,
+        const Domain::PartialConfig& macro_overrides
     ):
-        ConfigView{full_config, {object_settings}}, m_object_settings{object_settings}
+        ConfigView{full_config, {object_settings, macro_overrides}}, m_object_settings{object_settings}
     {
         finalize();
     }
 
-    const Domain::PartialObjectConfigFDMPtr& object_settings() const {
+    const Domain::PartialConfig& object_settings() const {
         return m_object_settings;
     }
 
 private:
-    Domain::PartialObjectConfigFDMPtr m_object_settings;
+    Domain::PartialConfig m_object_settings;
 };
 
 class PrintConfigView : public Domain::ConfigView
@@ -111,7 +112,7 @@ class SLAPrintObjectConfigView : public Domain::ConfigView
 public:
     SLAPrintObjectConfigView(
         const Domain::FullConfigSLAPtr& full_config,
-        const Domain::PartialObjectConfigSLAPtr& object_settings
+        const Domain::PartialConfig& object_settings
     ):
         ConfigView{full_config, {object_settings}}
     {

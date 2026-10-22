@@ -12,6 +12,7 @@
 
 #include "Slic3r/Domain/ConfigValue.hpp"
 #include "Slic3r/Domain/ConfigDef.hpp"
+#include "Slic3r/Domain/EffectiveValues.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
 
 namespace Slic3r::Domain {
@@ -182,11 +183,17 @@ protected:
 
 using BoxRef = std::reference_wrapper<const ConfigBox>;
 using BoxRefs = std::vector<BoxRef>;
-using BoxOrBoxesVector = std::vector<std::variant<BoxRef, BoxRefs>>;
+/// Boxes identified by a name (e.g. macro override layers). Squashed like individual boxes,
+/// serialized as an object keyed by the name.
+using NamedBoxRef = std::pair<std::string, BoxRef>;
+using NamedBoxRefs = std::vector<NamedBoxRef>;
+using BoxOrBoxesVector = std::vector<std::variant<BoxRef, BoxRefs, NamedBoxRefs>>;
 
 using MutBoxRef = std::reference_wrapper<ConfigBox>;
 using MutBoxRefs = std::vector<MutBoxRef>;
-using MutBoxOrBoxesVector = std::vector<std::variant<MutBoxRef, MutBoxRefs>>;
+using MutNamedBoxRef = std::pair<std::string, MutBoxRef>;
+using MutNamedBoxRefs = std::vector<MutNamedBoxRef>;
+using MutBoxOrBoxesVector = std::vector<std::variant<MutBoxRef, MutBoxRefs, MutNamedBoxRefs>>;
 
 /* @param default_value: Used if any of the items is nullptr. Might be nullptr,
  *     but then all the item values need to be specified.
@@ -212,13 +219,19 @@ std::pair<ConfigValue, bool> apply_compatibility_rule(
     const std::set<unsigned>& extruder_candidates
 );
 
+const ConfigItemDef* find_def(const std::string& key, PrinterTechnology printer_technology);
+
 class SquashedConfig {
 public:
+    SquashedConfig() = default;
+
     SquashedConfig(
         const BoxOrBoxesVector& boxes,
         const std::vector<unsigned>& extruder_candidates,
         const Preset::HwPrinterConfig& hw_config
     );
+
+    virtual ~SquashedConfig() = default;
 
     const Preset::HwPrinterConfig& hw_config() const;
 
@@ -239,12 +252,13 @@ public:
 
     std::size_t hash() const;
 
-    const std::map<std::string, ConfigValue>& original_values() const;
+    const EffectiveValueMap& effective_values() const;
     const std::vector<unsigned>& extruder_candidates() const;
 
 protected:
     std::map<std::string, ConfigValue> m_values;
-    std::map<std::string, ConfigValue> m_original_values;
+    EffectiveValueMap m_effective_values;
+
     Preset::HwPrinterConfig m_hw_config;
     std::vector<unsigned> m_extruder_candidates;
 };
@@ -282,28 +296,23 @@ public:
         return std::nullopt;
     }
 
-    virtual ~PartialConfig() = default;
+    PartialConfig() = default;
 
-
-protected:
     PartialConfig(
         const BoxOrBoxesVector& input,
         const Preset::HwPrinterConfig& hw_config
     );
 
-private:
-    friend class ConfigView;
     std::optional<ConfigValue> get_value(const std::string& key) const;
 };
 
 
 using FullConfigPtr = std::shared_ptr<const FullConfig>;
-using PartialConfigPtr = std::shared_ptr<const PartialConfig>;
 
 class ConfigView
 {
 public:
-    ConfigView(FullConfigPtr full_config, const std::vector<PartialConfigPtr>& partial_configs);
+    ConfigView(FullConfigPtr full_config, const std::vector<PartialConfig>& partial_configs);
 
     template<class T>
     T get(const std::string& key) const {
@@ -319,6 +328,8 @@ public:
 
     const std::map<std::string, ConfigValue>& values() const;
 
+    const EffectiveValueMap& effective_values() const;
+
     std::size_t hash() const;
 
     std::vector<std::string> diff_keys(const ConfigView& other) const;
@@ -328,9 +339,10 @@ public:
 protected:
     bool m_finalized{false};
     FullConfigPtr m_full_config;
-    std::vector<PartialConfigPtr> m_partial_configs;
+    std::vector<PartialConfig> m_partial_configs;
     std::vector<std::string> m_keys;
     std::map<std::string, ConfigValue> m_values;
+    EffectiveValueMap m_effective_values;
     Domain::Preset::HwPrinterConfig m_hw_config;
 
     ConfigValue resolve_value(const std::string& key) const;

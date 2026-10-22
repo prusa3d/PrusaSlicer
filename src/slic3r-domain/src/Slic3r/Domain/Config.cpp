@@ -1,5 +1,6 @@
 #include "Slic3r/Domain/Config.hpp"
 #include "Slic3r/Assert.hpp"
+#include "Slic3r/Domain/EffectiveValues.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Domain/ConfigDefsFDM.hpp"
@@ -333,26 +334,26 @@ spread_feeders(const BoxOrBoxesVector& boxes, const Preset::HwPrinterConfig& hw_
 {
     BoxOrBoxesVector result;
     for (const auto& box_or_boxes : boxes) {
-        if (std::holds_alternative<BoxRef>(box_or_boxes)) {
+        if (!std::holds_alternative<BoxRefs>(box_or_boxes)) {
             result.push_back(box_or_boxes);
-        } else {
-            ASSERT(std::holds_alternative<BoxRefs>(box_or_boxes));
-            const BoxRefs& boxes{std::get<BoxRefs>(box_or_boxes)};
-            if (boxes.size() == hw_config.material_slot_count()) {
-                result.push_back(box_or_boxes);
-                continue;
-            }
-
-            ASSERT(boxes.size() == hw_config.tools.size());
-
-            BoxRefs spread_boxes;
-            const std::vector<std::size_t> tool_slot_counts{get_tool_slot_counts(hw_config)};
-            for (std::size_t tool_index{}; tool_index < hw_config.tools.size(); ++tool_index) {
-                const BoxRef box_ref{boxes.at(tool_index)};
-                spread_boxes.resize(spread_boxes.size() + tool_slot_counts.at(tool_index), box_ref);
-            }
-            result.push_back(spread_boxes);
+            continue;
         }
+
+        const BoxRefs& boxes{std::get<BoxRefs>(box_or_boxes)};
+        if (boxes.size() == hw_config.material_slot_count()) {
+            result.push_back(box_or_boxes);
+            continue;
+        }
+
+        ASSERT(boxes.size() == hw_config.tools.size());
+
+        BoxRefs spread_boxes;
+        const std::vector<std::size_t> tool_slot_counts{get_tool_slot_counts(hw_config)};
+        for (std::size_t tool_index{}; tool_index < hw_config.tools.size(); ++tool_index) {
+            const BoxRef box_ref{boxes.at(tool_index)};
+            spread_boxes.resize(spread_boxes.size() + tool_slot_counts.at(tool_index), box_ref);
+        }
+        result.push_back(spread_boxes);
     }
     return result;
 }
@@ -360,7 +361,6 @@ spread_feeders(const BoxOrBoxesVector& boxes, const Preset::HwPrinterConfig& hw_
 struct ConfigValueAndDef
 {
     ConfigValue value;
-    std::optional<ConfigValue> original_value;
     const ConfigItemDef* def{nullptr};
 };
 
@@ -456,56 +456,102 @@ static void set_vector_value(ConfigValue& vector, std::size_t index, const Confi
         });
 }
 
-static std::map<std::string, ConfigValueAndDef>
-squash_boxes(const BoxOrBoxesVector& boxes, std::size_t material_slot_count)
+struct SquashResult {
+    std::map<std::string, ConfigValueAndDef> squashed_values;
+    EffectiveValueMap effective_values;
+};
+
+static SquashResult squash_boxes(const BoxOrBoxesVector& boxes, std::size_t material_slot_count)
 {
-    std::map<std::string, ConfigValueAndDef> result;
+    SquashResult result;
+
+    const auto squash_box = [&](const ConfigBox& box)
+    {
+        for (const auto& item : box.items.all_items()) {
+            const auto [it, inserted]{result.squashed_values.insert(
+                {item.def().name, normalize(item, material_slot_count)})};
+            ASSERT(inserted);
+            result.effective_values[item.def().name].modifications.push_back(
+                EffectiveValue::Modification{
+                    EffectiveValue::SetBy{box.location},
+                    item.value()});
+        }
+
+        for (const auto& item : box.overrides.overridden_items()) {
+            const std::string& name{item.get().name()};
+            auto it{result.squashed_values.find(name)};
+            const ConfigValueAndDef value{normalize(item.get(), material_slot_count)};
+            if (it == result.squashed_values.end()) {
+                result.squashed_values[name] = value;
+            } else {
+                it->second                = value;
+            }
+            result.effective_values[name].modifications.push_back(
+                EffectiveValue::Modification{
+                    EffectiveValue::OverriddenBy{box.location},
+                    item.get().value()});
+        }
+    };
+
     for (const auto& box_or_boxes : boxes) {
         std::visit(
             Domain::overloaded{
-                [&](const BoxRef& box)
+                [&](const BoxRef& box) { squash_box(box.get()); },
+                [&](const NamedBoxRefs& boxes)
                 {
-                    for (const auto& item : box.get().items.all_items()) {
-                        const auto [it, inserted]{
-                            result.insert({item.def().name, normalize(item, material_slot_count)})};
-                        it->second.original_value = item.value();
-                        ASSERT(inserted);
-                    }
-
-                    for (const auto& item : box.get().overrides.overridden_items()) {
-                        const std::string& name{item.get().name()};
-                        auto it{result.find(name)};
-                        const ConfigValueAndDef value{normalize(item.get(), material_slot_count)};
-                        if (it == result.end()) {
-                            result[name] = value;
-                        } else {
-                            it->second = value;
-                        }
+                    for (const auto& [_, box] : boxes) {
+                        squash_box(box.get());
                     }
                 },
                 [&](const BoxRefs& boxes)
                 {
                     ASSERT(!boxes.empty());
 
+                    std::set<std::string> set_by;
                     for (std::size_t box_index{}; box_index < boxes.size(); ++box_index) {
                         const ConfigBox& box{boxes[box_index].get()};
                         for (const auto& item : box.items.all_items()) {
-                            auto it{result.find(item.name())};
-                            if (it == result.end()) {
-                                result.insert({item.name(), normalize(item, material_slot_count)});
+                            auto it{result.squashed_values.find(item.name())};
+                            if (it == result.squashed_values.end()) {
+                                result.squashed_values.insert(
+                                    {item.name(), normalize(item, material_slot_count)});
+                                set_by.insert(item.name());
                             } else {
                                 set_vector_value(it->second.value, box_index, item.value());
                             }
                         }
+                    }
 
+                    for (const std::string& name : set_by) {
+                        const auto it{result.squashed_values.find(name)};
+                        ASSERT(it != result.squashed_values.end());
+                        result.effective_values[name].modifications.push_back(
+                            EffectiveValue::Modification{
+                                EffectiveValue::SetBy{boxes.front().get().location},
+                                it->second.value});
+                    }
+
+                    std::set<std::string> overriden_by;
+                    for (std::size_t box_index{}; box_index < boxes.size(); ++box_index) {
+                        const ConfigBox& box{boxes[box_index].get()};
                         for (const auto& item : box.overrides.overridden_items()) {
-                            auto it{result.find(item.get().name())};
-                            if (it == result.end()) {
-                                result.insert({item.get().name(), normalize(item.get(), material_slot_count)});
+                            auto it{result.squashed_values.find(item.get().name())};
+                            if (it == result.squashed_values.end()) {
+                                result.squashed_values.insert({item.get().name(), normalize(item.get(), material_slot_count)});
                             } else {
                                 set_vector_value(it->second.value, box_index, item.get().value());
                             }
+                            overriden_by.insert(item.get().name());
                         }
+                    }
+
+                    for (const std::string& name : overriden_by) {
+                        const auto it{result.squashed_values.find(name)};
+                        ASSERT(it != result.squashed_values.end());
+                        result.effective_values[name].modifications.push_back(
+                            EffectiveValue::Modification{
+                                EffectiveValue::OverriddenBy{boxes.front().get().location},
+                                it->second.value});
                     }
                 }},
             box_or_boxes);
@@ -513,22 +559,23 @@ squash_boxes(const BoxOrBoxesVector& boxes, std::size_t material_slot_count)
     return result;
 }
 
-static void
-ensure_slot_parity(std::map<std::string, ConfigValueAndDef>& squashed_boxes, const std::size_t size)
+static void ensure_slot_parity(SquashResult& squash_result, const std::size_t size)
 {
-    for (auto& [_, item] : squashed_boxes) {
+    for (auto& [_, item] : squash_result.squashed_values) {
         if (!item.def || !item.def->require_tool_parity) {
             continue;
         }
 
         item.value.visit(overloaded{
-            [size]<typename T>(std::vector<T>& vector)
+            [&]<typename T>(std::vector<T>& vector)
             {
                 if (vector.size() == size) {
                     return;
                 }
                 ASSERT(vector.size() == 1);
                 vector.resize(size, vector.front());
+                squash_result.effective_values[item.def->name].modifications.push_back(
+                    {EffectiveValue::SlotParityEnsured{}, ConfigValue{vector}});
             },
             []<typename T>(const T& v)
             { PANIC("Only types of std::vector<T> can have require_tool_parity set to true"); }});
@@ -793,6 +840,7 @@ static double resolve_float_or_percentage_for_tool(
 
 static void resolve_float_or_percentages(
     std::map<std::string, ConfigValue>& values,
+    EffectiveValueMap& effective_values,
     PrinterTechnology printer_technology)
 {
     for (auto& [key, value] : values) {
@@ -804,21 +852,37 @@ static void resolve_float_or_percentages(
         value.visit(Domain::overloaded{
             [&](FloatOrPercentage& value)
             {
-                value = resolve_float_or_percentage_scalar(
-                    key,
-                    ConfigValue{value},
-                    values,
-                    printer_technology);
+                if (value.is_percentage()) {
+                    value = resolve_float_or_percentage_scalar(
+                        key,
+                        ConfigValue{value},
+                        values,
+                        printer_technology);
+
+                    effective_values[key].modifications.push_back(
+                        {EffectiveValue::ResolvedFloatOrPercentage{def->ratio_over},
+                         ConfigValue{value}});
+                }
             },
             [&](std::vector<FloatOrPercentage>& value)
             {
-                for (std::size_t tool_index{}; tool_index < value.size(); ++tool_index) {
-                    value[tool_index] = resolve_float_or_percentage_for_tool(
-                        key,
-                        ConfigValue{value},
-                        tool_index,
-                        values,
-                        printer_technology);
+                const bool any_percentage{std::ranges::any_of(
+                    value,
+                    [](const FloatOrPercentage& float_or_percent)
+                    { return float_or_percent.is_percentage(); })};
+
+                if (any_percentage) {
+                    for (std::size_t tool_index{}; tool_index < value.size(); ++tool_index) {
+                        value[tool_index] = resolve_float_or_percentage_for_tool(
+                            key,
+                            ConfigValue{value},
+                            tool_index,
+                            values,
+                            printer_technology);
+                    }
+                    effective_values[key].modifications.push_back(
+                        {EffectiveValue::ResolvedFloatOrPercentage{def->ratio_over},
+                         ConfigValue{value}});
                 }
             },
             []<typename T>(const T&)
@@ -831,7 +895,7 @@ static void resolve_float_or_percentages(
 
 static void apply_compatibility_rules(
     std::map<std::string, ConfigValue>& values,
-    const std::map<std::string, ConfigValue>& original_values,
+    EffectiveValueMap& effective_values,
     const std::vector<unsigned>& extruder_candidates,
     PrinterTechnology printer_technology)
 {
@@ -881,13 +945,23 @@ static void apply_compatibility_rules(
             },
         })};
 
-        value =
-            apply_compatibility_rule(
-                def->name,
-                values,
-                original_values.at(def->name),
-                def->compatibility_rule)
-                .first;
+        EffectiveValue& effective_value{effective_values.at(def->name)};
+        ASSERT(
+            !effective_value.modifications.empty()
+            && std::holds_alternative<EffectiveValue::SetBy>(
+                effective_value.modifications.front().payload));
+
+        const ConfigValue& original_value{effective_value.modifications.front().value};
+
+        const auto [apply_value, applied]{apply_compatibility_rule(
+            def->name,
+            values,
+            original_value,
+            def->compatibility_rule)};
+
+        value = apply_value;
+        effective_value.modifications.push_back(
+            {EffectiveValue::CompatibilityRuleApplied{def->compatibility_rule, applied}, value});
     }
 }
 
@@ -934,25 +1008,62 @@ find_param(std::map<std::string, ConfigValueAndDef>& squashed_boxes, const std::
     return &it->second;
 }
 
-static void expand_parameters(std::map<std::string, ConfigValueAndDef>& squashed_boxes)
+static void clamp_extruders_to_single_slot(SquashResult& squashed_boxes)
 {
-    if (const ConfigValueAndDef* extruder{find_param(squashed_boxes, "extruder")}) {
+    for (const std::string& key :
+         {"perimeter_extruder",
+          "infill_extruder",
+          "solid_infill_extruder",
+          "support_material_extruder",
+          "support_material_interface_extruder"})
+    {
+        ConfigValueAndDef* extruder{find_param(squashed_boxes.squashed_values, key)};
+        if (!extruder || extruder->value == ConfigValue{1}) {
+            continue;
+        }
+        extruder->value = ConfigValue{1};
+        squashed_boxes.effective_values[key].modifications.push_back(
+            EffectiveValue::Modification{EffectiveValue::ClampedToSingleSlot{}, ConfigValue{1}});
+    }
+}
+
+static void expand_parameters(SquashResult& squashed_boxes, const std::size_t material_slot_count)
+{
+    if (const ConfigValueAndDef* extruder{find_param(squashed_boxes.squashed_values, "extruder")}) {
         if (extruder->value != ConfigValue{0}) {
             for (const std::string& key :
                  {"perimeter_extruder", "infill_extruder", "solid_infill_extruder"})
             {
-                ConfigValueAndDef* specific_extruder{find_param(squashed_boxes, key)};
+                ConfigValueAndDef* specific_extruder{
+                    find_param(squashed_boxes.squashed_values, key)};
+
+                bool expanded{false};
                 if (!specific_extruder) {
-                    squashed_boxes[key] = ConfigValueAndDef{extruder->value, std::nullopt, nullptr};
+                    squashed_boxes.squashed_values[key] =
+                        ConfigValueAndDef{extruder->value, nullptr};
+                    expanded = true;
                 } else if (specific_extruder->value == ConfigValue{0}) {
                     specific_extruder->value = extruder->value;
+                    expanded                 = true;
+                }
+                if (expanded) {
+                    squashed_boxes.effective_values[key].modifications.push_back(
+                        EffectiveValue::Modification{
+                            EffectiveValue::ExpandedFrom{"extruder"},
+                            ConfigValue{extruder->value}});
                 }
             }
         }
-        squashed_boxes.erase("extruder");
+        squashed_boxes.squashed_values.erase("extruder");
+        squashed_boxes.effective_values.erase("extruder");
     }
 
-    if (const ConfigValueAndDef* first_layer_speed{find_param(squashed_boxes, "first_layer_speed")})
+    if (material_slot_count == 1) {
+        clamp_extruders_to_single_slot(squashed_boxes);
+    }
+
+    if (const ConfigValueAndDef* first_layer_speed{
+            find_param(squashed_boxes.squashed_values, "first_layer_speed")})
     {
         for (
             const std::string& key :
@@ -966,29 +1077,42 @@ static void expand_parameters(std::map<std::string, ConfigValueAndDef>& squashed
                 "first_layer_gap_fill_speed",
             })
         {
-            ConfigValueAndDef* specific_speed{find_param(squashed_boxes, key)};
+            ConfigValueAndDef* specific_speed{find_param(squashed_boxes.squashed_values, key)};
 
+            bool expanded{false};
             if (!specific_speed) {
-                squashed_boxes[key] =
-                    ConfigValueAndDef{first_layer_speed->value, std::nullopt, nullptr};
+                squashed_boxes.squashed_values[key] =
+                    ConfigValueAndDef{first_layer_speed->value, nullptr};
+                expanded = true;
             } else {
-                const auto first_layer_speed_value{first_layer_speed->value.get<std::vector<FloatOrPercentage>>()};
+                const auto first_layer_speed_value{
+                    first_layer_speed->value.get<std::vector<FloatOrPercentage>>()};
                 specific_speed->value.visit(overloaded{
-                    [&](std::vector<FloatOrPercentage>& values){
+                    [&](std::vector<FloatOrPercentage>& values)
+                    {
                         for (std::size_t i{}; i < values.size(); ++i) {
                             FloatOrPercentage& value{values[i]};
                             if (value.is_zero()) {
-                                value = first_layer_speed_value.at(i);
+                                value    = first_layer_speed_value.at(i);
+                                expanded = true;
                             }
                         }
                     },
-                    [](auto&&){
-                        PANIC("Vector of values is expected!");
-                    },
+                    [](auto&&) { PANIC("Vector of values is expected!"); },
                 });
             }
+
+            if (expanded) {
+                ConfigValueAndDef* final_speed{find_param(squashed_boxes.squashed_values, key)};
+                ASSERT(final_speed);
+                squashed_boxes.effective_values[key].modifications.push_back(
+                    EffectiveValue::Modification{
+                        EffectiveValue::ExpandedFrom{"first_layer_speed"},
+                        final_speed->value});
+            }
         }
-        squashed_boxes.erase("first_layer_speed");
+        squashed_boxes.squashed_values.erase("first_layer_speed");
+        squashed_boxes.effective_values.erase("first_layer_speed");
     }
 }
 
@@ -1006,32 +1130,37 @@ SquashedConfig::SquashedConfig(
         std::visit(
             overloaded{
                 [](const BoxRef&) {},
+                [](const NamedBoxRefs&) {},
                 [&](const BoxRefs& box_refs) { ASSERT(box_refs.size() == material_slot_count); },
             },
             box_or_boxes);
     }
 
-    std::map<std::string, ConfigValueAndDef> squashed_boxes{
+    SquashResult squashed_boxes{
         squash_boxes(boxes, material_slot_count)};
 
     if (hw_config.technology == PrinterTechnology::FFF) {
-        squashed_boxes["nozzle_diameter"] =
-            ConfigValueAndDef{ConfigValue{get_nozzle_diameters(hw_config)}, std::nullopt, nullptr};
+        const ConfigValue nozzle_diameter{get_nozzle_diameters(hw_config)};
+        squashed_boxes.squashed_values["nozzle_diameter"] =
+            ConfigValueAndDef{nozzle_diameter, nullptr};
+        squashed_boxes.effective_values["nozzle_diameter"].modifications.push_back(
+            {EffectiveValue::SetBy{FDMConfigLocation::Printer}, nozzle_diameter});
 
-        squashed_boxes["nozzle_high_flow"] =
-            ConfigValueAndDef{ConfigValue{get_nozzle_high_flows(hw_config)}, std::nullopt, nullptr};
+        const ConfigValue nozzle_high_flow{get_nozzle_high_flows(hw_config)};
+        squashed_boxes.squashed_values["nozzle_high_flow"] =
+            ConfigValueAndDef{nozzle_high_flow, nullptr};
+        squashed_boxes.effective_values["nozzle_high_flow"].modifications.push_back(
+            {EffectiveValue::SetBy{FDMConfigLocation::Printer}, nozzle_high_flow});
     }
 
     ensure_slot_parity(squashed_boxes, hw_config.material_slot_count());
 
-    expand_parameters(squashed_boxes);
+    expand_parameters(squashed_boxes, material_slot_count);
 
-    for (const auto& [key, item] : squashed_boxes) {
+    for (const auto& [key, item] : squashed_boxes.squashed_values) {
         m_values[key] = item.value;
-        if (item.original_value) {
-            m_original_values[key] = *item.original_value;
-        }
     }
+    m_effective_values = squashed_boxes.effective_values;
 }
 
 const Preset::HwPrinterConfig& SquashedConfig::hw_config() const {
@@ -1202,8 +1331,8 @@ std::size_t SquashedConfig::hash() const
     return seed;
 }
 
-const std::map<std::string, ConfigValue>& SquashedConfig::original_values() const {
-    return m_original_values;
+const EffectiveValueMap& SquashedConfig::effective_values() const {
+    return m_effective_values;
 }
 
 const std::vector<unsigned>& SquashedConfig::extruder_candidates() const {
@@ -1212,7 +1341,7 @@ const std::vector<unsigned>& SquashedConfig::extruder_candidates() const {
 
 ConfigView::ConfigView(
     FullConfigPtr full_config,
-    const std::vector<PartialConfigPtr>& partial_configs
+    const std::vector<PartialConfig>& partial_configs
 ) :
     m_full_config{full_config},
     m_partial_configs{partial_configs},
@@ -1220,9 +1349,8 @@ ConfigView::ConfigView(
 {
     std::vector<std::string> partial_config_keys;
     ASSERT(m_full_config);
-    for (const PartialConfigPtr& ptr : m_partial_configs) {
-        ASSERT(ptr);
-        for (const auto& [key, _] : ptr->m_values) {
+    for (const PartialConfig& config : m_partial_configs) {
+        for (const auto& [key, _] : config.values()) {
             partial_config_keys.push_back(key);
         }
     }
@@ -1258,15 +1386,39 @@ bool ConfigView::operator==(const ConfigView& other) const
 void ConfigView::finalize() {
     for (const std::string& key : m_keys) {
         m_values[key] = resolve_value(key);
+
+        std::vector<EffectiveValue::Modification> modifications;
+        const auto append{
+            [&](const EffectiveValueMap& map)
+            {
+                if (const auto it{map.find(key)}; it != map.end()) {
+                    modifications.insert(
+                        modifications.end(),
+                        it->second.modifications.begin(),
+                        it->second.modifications.end());
+                }
+            }};
+
+        append(m_full_config->effective_values());
+        for (const PartialConfig& partial_config : m_partial_configs) {
+            append(partial_config.effective_values());
+        }
+
+        if (!modifications.empty()) {
+            m_effective_values[key].modifications = std::move(modifications);
+        }
     }
 
-    resolve_float_or_percentages(m_values, m_full_config->hw_config().technology);
+    resolve_float_or_percentages(
+        m_values,
+        m_effective_values,
+        m_full_config->hw_config().technology);
+
     apply_compatibility_rules(
         m_values,
-        m_full_config->original_values(),
+        m_effective_values,
         m_full_config->extruder_candidates(),
-        m_full_config->hw_config().technology
-    );
+        m_full_config->hw_config().technology);
 
     m_finalized = true;
 
@@ -1278,12 +1430,18 @@ const std::map<std::string, ConfigValue>& ConfigView::values() const {
     return m_values;
 }
 
+const EffectiveValueMap& ConfigView::effective_values() const
+{
+    ASSERT(m_finalized);
+    return m_effective_values;
+}
+
 std::size_t ConfigView::hash() const
 {
     ASSERT(!m_finalized);
     std::size_t seed{m_full_config->hash()};
-    for (const PartialConfigPtr& partial_config : m_partial_configs) {
-        boost::hash_combine(seed, partial_config->hash());
+    for (const PartialConfig& partial_config : m_partial_configs) {
+        boost::hash_combine(seed, partial_config.hash());
     }
     return seed;
 }
@@ -1308,8 +1466,8 @@ ConfigValue ConfigView::resolve_value(const std::string& key) const
 {
     ASSERT(!m_finalized);
     for (auto rev_it = m_partial_configs.rbegin(); rev_it != m_partial_configs.rend(); ++rev_it) {
-        const PartialConfigPtr& partial_config{*rev_it};
-        if (auto result{partial_config->get_value(key)}) {
+        const PartialConfig& partial_config{*rev_it};
+        if (auto result{partial_config.get_value(key)}) {
             return *result;
         }
     }

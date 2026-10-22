@@ -13,6 +13,7 @@
 #include "Slic3r/Biz/Preset/PresetInteractorProjectContext.hpp"
 #include "Slic3r/Biz/Preset/PresetDiffOperation.hpp"
 #include "Slic3r/Biz/Preset/IPresetDialogManager.hpp"
+#include "Slic3r/Biz/Preset/IMacroOverridesChangedListener.hpp"
 #include "Slic3r/Biz/Preset/IO/BundlePaths.hpp"
 #include "Slic3r/Biz/ConfigBoxInteractor.hpp"
 #include "Slic3r/Biz/PrintToolConfigBoxInteractor.hpp"
@@ -26,6 +27,10 @@
 namespace Slic3r::Biz {
 class BackupStore;
 } // namespace Slic3r::Biz
+
+namespace Slic3r::Biz::Slicing {
+class SlicingInteractor;
+} // namespace Slic3r::Biz::Slicing
 
 namespace Slic3r::Biz::Preset {
 
@@ -95,7 +100,8 @@ class PresetInteractor final :
     public ISelectedConfigContainerChangedListener,
     public WithListeners<
         IPresetChangedListener,
-        ISlicingInputChangedListener>,
+        ISlicingInputChangedListener,
+        IMacroOverridesChangedListener>,
     public IPresetNameProvider,
     public IConfigBoxSetter,
     public IPresetVisualGetter
@@ -104,7 +110,8 @@ public:
     PresetInteractor(
         Domain::Workbench& workbench,
         Scene::SceneInteractor& scene_interactor,
-        BackupStore& backup_store
+        BackupStore& backup_store,
+        Slicing::SlicingInteractor& slicing_interactor
     );
 
     PresetInteractor(PresetInteractor&&) = default;
@@ -299,6 +306,12 @@ public:
     ) override;
 
     void set_item_override(const Domain::ConfigItem& item, bool enable, size_t index = 0) override;
+
+    /// Replaces the macro overrides layer of the given id, or removes it when `layer` is empty.
+    void set_macro_overrides(
+        const std::string& id,
+        std::optional<Domain::MacroOverridesLayerFDM> layer
+    );
 
     template <typename T>
     using ConstRefBoolPair = std::pair<std::reference_wrapper<const T>, bool>;
@@ -997,6 +1010,8 @@ private:
     using SetAccessorMap = std::map<const OverridableConfigBoxInteractor*, OverridableConfigBoxInteractor::SetAccessor>;
 
     Domain::Workbench& m_workbench;
+    Scene::SceneInteractor& m_scene_interactor;
+    Slicing::SlicingInteractor& m_slicing_interactor;
     BackupStore& m_backup_store;
     IO::BundlePaths m_bundle_paths;
 

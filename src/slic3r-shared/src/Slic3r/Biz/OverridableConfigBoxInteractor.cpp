@@ -38,19 +38,16 @@ void OverridableConfigBoxInteractor::SetAccessor::set_from_original_value(const 
 }
 
 OverridableConfigBoxInteractor::OverridableConfigBoxInteractor(
+    Scene::SceneInteractor& scene_interctor,
+    Slicing::SlicingInteractor& slicing_interactor,
     SetAccessor& set_accessor,
-    const ConfigBoxes& config_boxes
-) :
-    OverridableConfigBoxInteractor()
+    const ConfigBoxes& config_boxes) :
+    m_config_box_list(
+        std::make_shared<OverridableConfigBoxObservableList>(scene_interctor, slicing_interactor))
 {
     set_accessor.set_source(m_config_box_list.get());
-
     m_config_box_list->set_config_box(config_boxes.editable, config_boxes.original);
 }
-
-OverridableConfigBoxInteractor::OverridableConfigBoxInteractor() :
-    m_config_box_list(std::make_shared<OverridableConfigBoxObservableList>())
-{}
 
 const Domain::ConfigValue* OverridableConfigBoxInteractor::find(const std::string& name) const
 {

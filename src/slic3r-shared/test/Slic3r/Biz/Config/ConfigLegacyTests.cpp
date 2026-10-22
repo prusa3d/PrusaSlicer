@@ -386,6 +386,37 @@ void compare_3mfs(const Zip& a, const Zip& b, const Domain::PrinterTechnology te
 
 constexpr bool debug_files{false};
 
+TEST_CASE("Legacy spiral_vase is converted to the vase mode layer", "[config]")
+{
+    boost::nowide::ifstream input((fs::path(TEST_DATA_DIR) / "test_fdm.ini").string());
+    REQUIRE(bool(input));
+    std::string ini;
+    bool spiral_vase_found{false};
+    for (std::string line; std::getline(input, line);) {
+        if (line.starts_with("spiral_vase")) {
+            line              = "spiral_vase = 1";
+            spiral_vase_found = true;
+        }
+        ini += line + "\n";
+    }
+    REQUIRE(spiral_vase_found);
+
+    TempFile tmp_file;
+    {
+        boost::nowide::ofstream output(tmp_file.get_path());
+        output << ini;
+    }
+
+    const Domain::ConfigPack cfg{Biz::load_config_from_legacy_file(tmp_file.get_path())};
+    const auto& fdm{std::get<Domain::ConfigPackFDM>(cfg)};
+    CHECK_FALSE(fdm.print.items.opt("spiral_vase").get<bool>());
+    REQUIRE(fdm.macro_overrides.contains(Domain::vase_mode_layer_id()));
+    const Domain::MacroOverridesLayerFDM& layer{
+        fdm.macro_overrides.at(Domain::vase_mode_layer_id())};
+    CHECK(layer.overrides.overrides.get("spiral_vase"));
+    CHECK(layer == Domain::make_vase_mode_layer());
+}
+
 TEST_CASE("Legacy FDM 3MF roundtrip", "[config]")
 {
     for (const std::string& filename : std::vector<std::string>{"fdm_roundtrip1.3mf", "fdm_roundtrip2.3mf"}) {

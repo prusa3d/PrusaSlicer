@@ -16,6 +16,8 @@ using Slic3r::Biz::Config::load;
 using Slic3r::Biz::Config::LoadResult;
 using Slic3r::Domain::Preset::HwPrinterConfig;
 using Slic3r::Domain::PrinterTechnology;
+using Slic3r::Domain::MacroOverridesLayerFDM;
+using Slic3r::Domain::vase_mode_layer_id;
 
 TEST_CASE("Default fdm config pack roundtrip", "[ConfigRoundtrip]")
 {
@@ -42,4 +44,61 @@ TEST_CASE("Default sla config pack roundtrip", "[ConfigRoundtrip]")
     const auto& result_config_pack{std::get<ConfigPackSLA>(load_result.config)};
     CHECK(load_result.issues.empty());
     CHECK(config == result_config_pack);
+}
+
+TEST_CASE("Fdm config pack with macro overrides roundtrip", "[ConfigRoundtrip]")
+{
+    const HwPrinterConfig hw_config{.technology = PrinterTechnology::FFF};
+    ConfigPackFDM config;
+    MacroOverridesLayerFDM vase_mode;
+    vase_mode.name = "Vase mode";
+    vase_mode.params = {
+        {"flag", {"Flag", true}},
+        {"count", {"Count", 2}},
+        {"ratio", {"Ratio", 0.5}},
+        {"text", {"Text", std::string{"abc"}}}};
+    vase_mode.overrides.overrides.set("perimeters", 1);
+    vase_mode.overrides.overrides.set("thin_walls", false);
+    config.macro_overrides.insert_or_assign(vase_mode_layer_id(), vase_mode);
+
+    const ordered_json json = Slic3r::Biz::Config::to_json(config);
+    REQUIRE(json.contains("macro_overrides"));
+    REQUIRE(json["macro_overrides"].contains(vase_mode_layer_id()));
+    const ordered_json& layer{json["macro_overrides"][vase_mode_layer_id()]};
+    CHECK(layer["name"] == "Vase mode");
+    CHECK(layer["params"]["flag"]["label"] == "Flag");
+    CHECK(layer["params"]["flag"]["value"] == true);
+    CHECK(layer["params"]["count"]["label"] == "Count");
+    CHECK(layer["params"]["count"]["value"] == 2);
+    CHECK(layer["params"]["ratio"]["value"] == 0.5);
+    CHECK(layer["params"]["text"]["value"] == "abc");
+    CHECK(layer["overrides"]["perimeters"] == 1);
+    CHECK(layer["overrides"]["thin_walls"] == false);
+    CHECK(layer["overrides"].size() == 2);
+
+    const auto result{load(json, hw_config)};
+    REQUIRE(result);
+    const LoadResult& load_result{result.value()};
+    const auto& result_config_pack{std::get<ConfigPackFDM>(load_result.config)};
+    CHECK(load_result.issues.empty());
+    CHECK(config == result_config_pack);
+}
+
+TEST_CASE("Any macro overrides layer is loaded", "[ConfigRoundtrip]")
+{
+    const HwPrinterConfig hw_config{.technology = PrinterTechnology::FFF};
+    const ConfigPackFDM config;
+    ordered_json json = as_boxes(config);
+    json["macro_overrides"]["some_plugin_layer"]["overrides"]["perimeters"] = 1;
+
+    const auto result{load(json, hw_config)};
+    REQUIRE(result);
+    const LoadResult& load_result{result.value()};
+    CHECK(load_result.issues.empty());
+    const auto& macro_overrides{std::get<ConfigPackFDM>(load_result.config).macro_overrides};
+    REQUIRE(macro_overrides.contains("some_plugin_layer"));
+    const MacroOverridesLayerFDM& layer{macro_overrides.at("some_plugin_layer")};
+    CHECK(layer.name.empty());
+    CHECK(layer.params.empty());
+    CHECK(layer.overrides.overrides.get("perimeters")->get<int>() == 1);
 }
