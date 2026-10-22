@@ -117,7 +117,7 @@ public:
 
 private:
     /// Reloads everything the modes depend on and re-evaluates when anything changed.
-    void reload_all();
+    void reload_all(bool modes_dropped = false);
     void reevaluate();
     void apply_evaluated();
     /// The provider's modes for the selected printer. A config container must be selected.
@@ -125,6 +125,8 @@ private:
     /// Removes the applied modes the provider knows but which are incompatible with the selected
     /// printer. Unknown ones are kept as orphans.
     bool remove_incompatible_modes();
+    /// Removes all applied modes. Orphans are kept.
+    bool drop_modes();
     bool reload_config_values();
     bool reload_mode_params();
     bool reload_orphaned_modes();
