@@ -13,6 +13,8 @@
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/ConfigViews.hpp"
 
+using namespace Slic3r::Biz;
+
 namespace Slic3r::ExtrusionProcessor {
 
 ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath                             &path,
@@ -171,7 +173,225 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const Extru
         }
     }
     return result;
-};
+}
+
+/**
+ * @brief Splits the path at the boundary of the region and adds the speed limit to the parts lying inside the region.
+ *
+ * Crossings with the region boundary are inserted into the path and each segment is classified by its middle point.
+ * Parts shorter than the extrusion width are merged into a neighboring part to avoid tiny extrusions.
+ */
+static ExtrusionPaths split_path_by_speed_limit_region(
+    const ExtrusionPath& path,
+    const AABBTreeLines::LinesDistancer<Line>& region_boundary,
+    const ExtrusionSpeedLimit speed_limit,
+    const std::function<bool(ExtrusionRole)>& should_limit_role
+)
+{
+    if (!should_limit_role(path.role())) {
+        return {path};
+    }
+
+    struct PathPart
+    {
+        Points points;
+        bool is_inside_region;
+    };
+
+    std::vector<PathPart> path_parts;
+    const Points& path_points = path.polyline.points;
+    for (size_t point_index = 1; point_index < path_points.size(); ++point_index) {
+        const Point& segment_start = path_points[point_index - 1];
+        const Point& segment_end   = path_points[point_index];
+
+        Points segment_points = {segment_start};
+        for (const auto& [crossing_point, boundary_line_index] :
+             region_boundary.intersections_with_line<true>(Line{segment_start, segment_end}))
+        {
+            if (crossing_point != segment_points.back() && crossing_point != segment_end) {
+                segment_points.emplace_back(crossing_point);
+            }
+        }
+
+        segment_points.push_back(segment_end);
+
+        for (size_t segment_point_index = 1; segment_point_index < segment_points.size();
+             ++segment_point_index)
+        {
+            const Point& part_start     = segment_points[segment_point_index - 1];
+            const Point& part_end       = segment_points[segment_point_index];
+            const Point middle_point    = (part_start + part_end) / 2;
+            const bool is_inside_region = region_boundary.outside(middle_point) < 0;
+            if (path_parts.empty() || path_parts.back().is_inside_region != is_inside_region) {
+                path_parts.push_back(
+                    PathPart{.points = Points{part_start}, .is_inside_region = is_inside_region}
+                );
+            }
+
+            path_parts.back().points.push_back(part_end);
+        }
+    }
+
+    if (path_parts.size() <= 1) {
+        if (path_parts.empty() || !path_parts.front().is_inside_region) {
+            return {path};
+        }
+
+        ExtrusionAttributes attributes = path.attributes();
+        attributes.speed_limits        = attributes.speed_limits | speed_limit;
+
+        return {ExtrusionPath{path.polyline, attributes}};
+    }
+
+    const double minimal_part_length = scaled<double>(path.width());
+    std::vector<PathPart> merged_parts;
+    for (PathPart& path_part : path_parts) {
+        if (!merged_parts.empty()
+            && (Algorithms::Polyline::length(path_part.points) < minimal_part_length
+                || merged_parts.back().is_inside_region == path_part.is_inside_region))
+        {
+            Points& previous_points = merged_parts.back().points;
+            previous_points.insert(
+                previous_points.end(),
+                std::next(path_part.points.begin()),
+                path_part.points.end()
+            );
+        } else {
+            merged_parts.push_back(std::move(path_part));
+        }
+    }
+
+    if (merged_parts.size() > 1
+        && Algorithms::Polyline::length(merged_parts.front().points) < minimal_part_length)
+    {
+        Points& next_points = merged_parts[1].points;
+        next_points.insert(
+            next_points.begin(),
+            merged_parts.front().points.begin(),
+            std::prev(merged_parts.front().points.end())
+        );
+        merged_parts.erase(merged_parts.begin());
+    }
+
+    ExtrusionPaths result;
+    result.reserve(merged_parts.size());
+    for (PathPart& path_part : merged_parts) {
+        ExtrusionAttributes attributes = path.attributes();
+        if (path_part.is_inside_region) {
+            attributes.speed_limits = attributes.speed_limits | speed_limit;
+        }
+
+        result.emplace_back(Polyline(std::move(path_part.points)), attributes);
+    }
+
+    return result;
+}
+
+static ExtrusionPaths split_paths_by_speed_limit_region(
+    const ExtrusionPaths                      &paths,
+    const AABBTreeLines::LinesDistancer<Line> &region_boundary,
+    const ExtrusionSpeedLimit                  speed_limit,
+    const std::function<bool(ExtrusionRole)>  &should_limit_role
+) {
+    ExtrusionPaths result;
+    for (const ExtrusionPath &path : paths) {
+        Slic3r::append(result, split_path_by_speed_limit_region(path, region_boundary, speed_limit, should_limit_role));
+    }
+
+    return result;
+}
+
+ExtrusionEntityCollection split_extrusions_by_speed_limit_region(
+    const ExtrusionEntityCollection& collection,
+    const AABBTreeLines::LinesDistancer<Line>& region_boundary,
+    const ExtrusionSpeedLimit speed_limit,
+    const std::function<bool(ExtrusionRole)>& should_limit_role
+)
+{
+    ExtrusionEntityCollection result;
+    result.no_sort = collection.no_sort;
+
+    for (const ExtrusionEntity* extrusion_entity : collection.entities) {
+        // Oriented types have to be tested before their reversible base types.
+        if (const ExtrusionEntityCollection* nested_collection =
+                dynamic_cast<const ExtrusionEntityCollection*>(extrusion_entity))
+        {
+            result.append(split_extrusions_by_speed_limit_region(
+                *nested_collection,
+                region_boundary,
+                speed_limit,
+                should_limit_role
+            ));
+        } else if (const ExtrusionLoop* loop = dynamic_cast<const ExtrusionLoop*>(extrusion_entity))
+        {
+            ExtrusionLoop split_loop{*loop};
+            split_loop.paths = split_paths_by_speed_limit_region(
+                loop->paths,
+                region_boundary,
+                speed_limit,
+                should_limit_role
+            );
+            result.append(std::move(split_loop));
+        } else if (const ExtrusionMultiPathOriented* oriented_multipath =
+                       dynamic_cast<const ExtrusionMultiPathOriented*>(extrusion_entity))
+        {
+            result.append(
+                ExtrusionMultiPathOriented{split_paths_by_speed_limit_region(
+                    oriented_multipath->paths,
+                    region_boundary,
+                    speed_limit,
+                    should_limit_role
+                )}
+            );
+        } else if (const ExtrusionMultiPath* multipath =
+                       dynamic_cast<const ExtrusionMultiPath*>(extrusion_entity))
+        {
+            result.append(
+                ExtrusionMultiPath{split_paths_by_speed_limit_region(
+                    multipath->paths,
+                    region_boundary,
+                    speed_limit,
+                    should_limit_role
+                )}
+            );
+        } else if (const ExtrusionPathOriented* oriented_path =
+                       dynamic_cast<const ExtrusionPathOriented*>(extrusion_entity))
+        {
+            ExtrusionPaths path_parts{split_path_by_speed_limit_region(
+                *oriented_path,
+                region_boundary,
+                speed_limit,
+                should_limit_role
+            )};
+            if (path_parts.size() == 1) {
+                result.append(
+                    ExtrusionPathOriented{
+                        std::move(path_parts.front().polyline),
+                        path_parts.front().attributes()
+                    }
+                );
+            } else {
+                result.append(ExtrusionMultiPathOriented{std::move(path_parts)});
+            }
+        } else if (const ExtrusionPath* path = dynamic_cast<const ExtrusionPath*>(extrusion_entity))
+        {
+            ExtrusionPaths path_parts{split_path_by_speed_limit_region(
+                *path,
+                region_boundary,
+                speed_limit,
+                should_limit_role
+            )};
+            if (path_parts.size() == 1) {
+                result.append(std::move(path_parts.front()));
+            } else {
+                result.append(ExtrusionMultiPath{path_parts});
+            }
+        } else {
+            throw Slic3r::InvalidArgument("Unknown extrusion entity type");
+        }
+    }
+    return result;
+}
 
 static std::map<float, float> calc_print_speed_sections(
     const ExtrusionAttributes& attributes,

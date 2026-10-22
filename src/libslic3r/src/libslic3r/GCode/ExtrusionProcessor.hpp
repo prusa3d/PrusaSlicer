@@ -275,6 +275,20 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(
     const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
     const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines);
 
+/**
+ * @brief Splits the extrusions at the boundary of a region and adds the speed limit to the parts lying inside the region.
+ *
+ * The parts of a single path are kept together in an ExtrusionMultiPath (ExtrusionMultiPathOriented for oriented paths),
+ * so that the path planning cannot separate or reorder them. The top level structure of the collection is preserved.
+ * @param should_limit_role Only paths with a role accepted by this predicate are split.
+ */
+ExtrusionEntityCollection split_extrusions_by_speed_limit_region(
+    const ExtrusionEntityCollection& collection,
+    const AABBTreeLines::LinesDistancer<Line>& region_boundary,
+    ExtrusionSpeedLimit speed_limit,
+    const std::function<bool(ExtrusionRole)>& should_limit_role
+);
+
 OverhangSpeeds calculate_overhang_speed(
     const ExtrusionAttributes& attributes,
     const Biz::Slicing::ExtrudeConfig& config,
