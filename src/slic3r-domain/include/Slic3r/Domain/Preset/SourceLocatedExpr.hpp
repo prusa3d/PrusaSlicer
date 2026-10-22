@@ -11,7 +11,7 @@ struct SourceLocation
 
     [[nodiscard]] std::string to_string() const
     {
-        return file + ": " + std::to_string(line) + ":" + std::to_string(column);
+        return file + ":" + std::to_string(line) + ":" + std::to_string(column);
     }
 };
 

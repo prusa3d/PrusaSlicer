@@ -86,7 +86,7 @@ void EnumWrapper::set_string(const std::string& value)
     }
 
     // Maybe should be an exception, as serialized value can be user input.
-    PANIC("Failed to set enum from string!");
+    PANIC("Failed to set enum from string!", value);
 }
 
 void EnumWrapper::set_index(size_t index)

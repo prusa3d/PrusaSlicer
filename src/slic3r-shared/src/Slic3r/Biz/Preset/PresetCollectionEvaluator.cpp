@@ -3,6 +3,7 @@
 #include <Slic3r/Biz/Preset/JsonUtils.hpp>
 #include <Slic3r/Log.hpp>
 
+#include <stack>
 #include <nlohmann/json.hpp>
 
 // Xcode 15 has not finished ranges support we need here
@@ -28,6 +29,16 @@ namespace Slic3r::Biz::Preset {
 namespace {
 using namespace Domain::Preset;
 
+thread_local std::stack<SourceLocation> last_location;
+
+[[noreturn]]
+void preset_eval_assert_handler(const libassert::assertion_info& info)
+{
+    std::string prefix = "[" + (last_location.empty() ? SourceLocation{} : last_location.top()).to_string() +  "]";
+    handle_assert(info, prefix);
+};
+
+
 template<typename DestMap, typename SrcMap>
 void override_preset_values(DestMap& dest, const SrcMap& overrides)
 {
@@ -51,7 +62,29 @@ void override_feature_values(FeatureValueMap& dest, const FeatureValueMap& overr
         dest[key] = value;
 }
 
+} // namespace
+
+ScopedSourceLocation::ScopedSourceLocation(const Domain::Preset::SourceLocation& source)
+{
+    last_location.push(source);
 }
+
+ScopedSourceLocation::~ScopedSourceLocation()
+{
+    last_location.pop();
+}
+
+std::optional<SourceLocation> ScopedSourceLocation::last_source_location()
+{
+    if (last_location.empty()) {
+        return std::nullopt;
+    }
+    return last_location.top();
+}
+
+ScopedPresetEvalAssertHandler::ScopedPresetEvalAssertHandler() :
+    m_assert_scope(preset_eval_assert_handler)
+{}
 
 PresetCollectionEvaluator::PresetCollectionEvaluator(
     const Domain::Preset::Presets& presets,
@@ -147,6 +180,8 @@ PresetEvaluator::EvalPresetContexts PresetCollectionEvaluator::eval_preset(
                     return included;
                 };
 
+                ScopedPresetEvalAssertHandler sah;
+
                 return eval_preset(
                            preset,
                            preset.id,
@@ -192,6 +227,8 @@ PresetEvaluator::EvalPresetContexts PresetCollectionEvaluator::eval_preset(
     bool skip_condition_eval
 ) const
 {
+    ScopedSourceLocation ssl{node.source_location};
+
     ASSERT(!parent_contexts.empty());
 
     if (!skip_condition_eval
@@ -315,6 +352,7 @@ PresetEvaluator::EvalPresetContexts PresetCollectionEvaluator::eval_preset(
     bool any_variant_visited = false;
 
     for (const auto& var : node.variants) {
+        ScopedSourceLocation var_scope{var.source_location};
         const bool conditional = var.condition.has_value();
         (conditional ? conditional_variants : unconditional_variants)++;
         if (conditional) {

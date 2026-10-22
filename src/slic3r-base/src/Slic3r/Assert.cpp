@@ -9,10 +9,26 @@ namespace {
 
 
 [[noreturn]]
-void assert_failure_handler(const assertion_info& info) {
+void assert_failure_handler(const assertion_info& info)
+{
+    handle_assert(info);
+}
 
+}
+
+
+void init_assert()
+{
+    set_failure_handler(assert_failure_handler);
+}
+
+void handle_assert(const assertion_info& info, std::string_view message_prefix)
+{
     enable_virtual_terminal_processing_if_needed(); // for terminal colors on windows
     std::string message = info.to_string();
+    if (!message_prefix.empty()) {
+        message = std::string{message_prefix} + message;
+    }
     SPDLOG_ERROR(message);
 
     switch(info.type) {
@@ -29,14 +45,7 @@ void assert_failure_handler(const assertion_info& info) {
     default:
         LIBASSERT_PRIMITIVE_PANIC("Unknown assertion type in assertion failure handler");
     }
-}
 
 }
 
-
-void init_assert()
-{
-    set_failure_handler(assert_failure_handler);
-}
-
-}
+} // namespace Slic3r

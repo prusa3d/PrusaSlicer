@@ -21,6 +21,21 @@ enum class EvalMode
     NodeOnly
 };
 
+struct ScopedSourceLocation final
+{
+    explicit ScopedSourceLocation(const Domain::Preset::SourceLocation& source);
+    ~ScopedSourceLocation();
+
+    static std::optional<Domain::Preset::SourceLocation> last_source_location();
+};
+
+struct ScopedPresetEvalAssertHandler final
+{
+    ScopedPresetEvalAssertHandler();
+private:
+    ScopedAssertHandler m_assert_scope;
+};
+
 
 class PresetCollectionEvaluator {
 public:

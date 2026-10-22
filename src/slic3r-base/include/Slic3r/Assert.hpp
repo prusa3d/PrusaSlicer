@@ -12,6 +12,27 @@
 
 namespace Slic3r {
 void init_assert();
+[[noreturn]]
+void handle_assert(const libassert::assertion_info& info, std::string_view message_prefix="");
+
+struct ScopedAssertHandler final
+{
+    explicit ScopedAssertHandler(libassert::handler_ptr handler) :
+        m_original_handler(libassert::get_failure_handler())
+    {
+        libassert::set_failure_handler(handler);
+    }
+
+    ~ScopedAssertHandler()
+    {
+        libassert::set_failure_handler(m_original_handler);
+    }
+
+private:
+    libassert::handler_ptr m_original_handler;
+};
+
+
 }
 
 #else // #ifndef __EMSCRIPTEN__

@@ -15,6 +15,13 @@
 namespace Slic3r::Biz::Preset {
 
 namespace {
+std::string fmt_last_location()
+{
+    auto val = ScopedSourceLocation::last_source_location();
+    return val.has_value() ? val->to_string() : "";
+}
+
+
 template <typename T, typename... Ts>
 struct AnyTypeOf
 {
@@ -128,7 +135,8 @@ struct CastingGetterVisitor
             }
         }
         SPDLOG_ERROR(
-            "Type mismatched for item {}: source type: {}  dest type: {}",
+            "[{}]: Type mismatched for item {}: source type: {}  dest type: {}",
+            fmt_last_location(),
             item.name(),
             type_name(value),
             type_name(dest)
@@ -177,7 +185,8 @@ struct ConfigValueSetterVisitor
                 return type_name(v);
             });
             SPDLOG_ERROR(
-                "Type mismatched for item {}: source type: {}  dest type: {}",
+                "[{}]: Type mismatched for item {}: source type: {}  dest type: {}",
+                fmt_last_location(),
                 item.name(),
                 type_name(v),
                 dest_type_name
@@ -201,7 +210,8 @@ struct ConfigValueSetterVisitor
                 return type_name(v);
             });
             SPDLOG_ERROR(
-                "Type mismatched for item {}: source type: {}  dest type: {}",
+                "[{}]: Type mismatched for item {}: source type: {}  dest type: {}",
+                fmt_last_location(),
                 item.name(),
                 type_name(v),
                 dest_type_name
@@ -229,7 +239,8 @@ struct ConfigValueSetterVisitor
                 return type_name(v);
             });
             SPDLOG_ERROR(
-                "Type mismatched for item {}: source type: {}  dest type: {}",
+                "[{}]: Type mismatched for item {}: source type: {}  dest type: {}",
+                fmt_last_location(),
                 item.name(),
                 type_name(v),
                 dest_type_name
@@ -287,7 +298,8 @@ struct ConfigValueSetterVisitor
             return type_name(v);
         });
         SPDLOG_ERROR(
-            "Type mismatched for item {}: source type: {}  dest type: {}",
+            "[{}]: Type mismatched for item {}: source type: {}  dest type: {}",
+            fmt_last_location(),
             item.name(),
             type_name(v),
             dest_type_name
@@ -312,7 +324,7 @@ ConfigType config_values(
     for (const auto& [k, v] : values) {
         const auto q = config.find(k);
         if (q.item == nullptr) {
-            SPDLOG_ERROR("Invalid key {} for {}", k, type_name(config));
+            SPDLOG_ERROR("[{}]: Invalid key {} for {}", fmt_last_location(), k, type_name(config));
             continue;
         }
 
@@ -403,6 +415,9 @@ Domain::Preset::EvaluatedPreset<FdmConfigType, SlaConfigType> PresetEvaluator::p
     const EvalPresetContext& context
 )
 {
+
+    ScopedPresetEvalAssertHandler assert_scope;
+    ScopedSourceLocation location_scope{context.last_node_location};
     std::vector<std::string> conditions;
     if (!context.conditions.empty() || !context.negative_conditions.empty()) {
         std::ranges::transform(context.conditions, std::back_inserter(conditions),
