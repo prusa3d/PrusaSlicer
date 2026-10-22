@@ -12,6 +12,7 @@ struct ExtrudeConfig
     std::vector<double> default_acceleration{};
     std::vector<double> first_layer_acceleration{};
     std::vector<double> first_layer_acceleration_over_raft{};
+    std::vector<double> over_support_interface_acceleration{};
     std::vector<double> bridge_acceleration{};
     std::vector<double> top_solid_infill_acceleration{};
     std::vector<double> solid_infill_acceleration{};
@@ -79,6 +80,7 @@ struct ExtrudeConfig
     std::vector<Domain::FloatOrPercentage> first_layer_top_solid_infill_speed{};
     std::vector<Domain::FloatOrPercentage> first_layer_gap_fill_speed{};
     std::vector<Domain::FloatOrPercentage> first_layer_speed_over_raft{};
+    std::vector<double> over_support_interface_speed{};
     double avoid_crossing_perimeters_max_detour{};
     bool gcode_comments{};
     Domain::ArcFittingType arc_fitting{};

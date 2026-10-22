@@ -1430,6 +1430,7 @@ void Print::process()
             obj.generate_support_material();
             obj.estimate_curled_extrusions();
             obj.calculate_overhanging_perimeters();
+            obj.calculate_extrusion_speed_limits();
         }
     }, tbb::simple_partitioner());
 

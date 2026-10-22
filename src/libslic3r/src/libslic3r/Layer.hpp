@@ -239,6 +239,10 @@ protected:
     virtual ~Layer();
     // Clear fill extrusions, remove them from layer islands.
     void clear_fills();
+    /**
+     * @brief Replaces the perimeters and fills split by PrintObject::calculate_extrusion_speed_limits() by their backups.
+     */
+    void restore_extrusions_without_speed_limits();
 
 private:
     void sort_perimeters_into_islands(

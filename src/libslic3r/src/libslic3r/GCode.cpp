@@ -3559,6 +3559,14 @@ std::string GCodeGenerator::_extrude(
         } else {
             acceleration = config.default_acceleration.at(extruder_id);
         }
+
+        if (path_attr.speed_limits.has(ExtrusionSpeedLimit::OverSupportInterface)
+            && config.over_support_interface_acceleration.at(extruder_id) > 0)
+        {
+            acceleration =
+                std::min(acceleration, config.over_support_interface_acceleration.at(extruder_id));
+        }
+
         gcode += m_writer.set_print_acceleration((unsigned int)floor(acceleration + 0.5));
     }
 
@@ -3649,6 +3657,12 @@ std::string GCodeGenerator::_extrude(
 
     if (dynamic_print_and_fan_speeds.print_speed > -1) {
         speed = dynamic_print_and_fan_speeds.print_speed;
+    }
+
+    if (path_attr.speed_limits.has(ExtrusionSpeedLimit::OverSupportInterface)
+        && config.over_support_interface_speed.at(extruder_id) > 0)
+    {
+        speed = std::min(speed, config.over_support_interface_speed.at(extruder_id));
     }
 
     // cap speed with max_volumetric_speed anyway (even if user is not using autospeed)

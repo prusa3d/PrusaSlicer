@@ -466,8 +466,11 @@ static void insert_fills_into_islands(Layer &layer, uint32_t fill_region_id, uin
 
 void Layer::clear_fills()
 {
-    for (LayerRegion *layerm : m_regions)
+    for (LayerRegion* layerm : m_regions) {
         layerm->m_fills.clear();
+        layerm->m_fills_without_speed_limits.clear();
+    }
+
     for (LayerSlice &lslice : lslices_ex)
 		for (LayerIsland &island : lslice.islands)
 			island.fills.clear();

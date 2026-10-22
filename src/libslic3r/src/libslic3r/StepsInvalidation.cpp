@@ -48,6 +48,7 @@ std::vector<Step> propagate(Step step)
                         posSupportMaterial,
                         posEstimateCurledExtrusions,
                         posCalculateOverhangingPerimeters,
+                        posCalculateExtrusionSpeedLimits,
                         psSkirtBrim,
                         psAlertWhenSupportsNeeded,
                         psWipeTower,
@@ -62,6 +63,7 @@ std::vector<Step> propagate(Step step)
                         posSupportSpotsSearch,
                         posEstimateCurledExtrusions,
                         posCalculateOverhangingPerimeters,
+                        posCalculateExtrusionSpeedLimits,
                         psSkirtBrim,
                         psAlertWhenSupportsNeeded,
                         psWipeTower,
@@ -73,6 +75,7 @@ std::vector<Step> propagate(Step step)
                         posInfill,
                         posIroning,
                         posSupportSpotsSearch,
+                        posCalculateExtrusionSpeedLimits,
                         psAlertWhenSupportsNeeded,
                         psWipeTower,
                         psGCodeExport
@@ -82,12 +85,19 @@ std::vector<Step> propagate(Step step)
                         posInfill,
                         posIroning,
                         posSupportSpotsSearch,
+                        posCalculateExtrusionSpeedLimits,
                         psAlertWhenSupportsNeeded,
                         psWipeTower,
                         psGCodeExport
                     };
                 case posIroning:
-                    return {posIroning, psAlertWhenSupportsNeeded, psWipeTower, psGCodeExport};
+                    return {
+                        posIroning,
+                        posCalculateExtrusionSpeedLimits,
+                        psAlertWhenSupportsNeeded,
+                        psWipeTower,
+                        psGCodeExport
+                    };
                 case posSupportSpotsSearch:
                     return {
                         posSupportSpotsSearch,
@@ -99,6 +109,7 @@ std::vector<Step> propagate(Step step)
                     return {
                         posSupportMaterial,
                         posEstimateCurledExtrusions,
+                        posCalculateExtrusionSpeedLimits,
                         psSkirtBrim,
                         psAlertWhenSupportsNeeded,
                         psWipeTower,
@@ -107,7 +118,20 @@ std::vector<Step> propagate(Step step)
                 case posEstimateCurledExtrusions:
                     return {posEstimateCurledExtrusions, psAlertWhenSupportsNeeded, psWipeTower, psGCodeExport};
                 case posCalculateOverhangingPerimeters:
-                    return {posCalculateOverhangingPerimeters, psAlertWhenSupportsNeeded, psWipeTower, psGCodeExport};
+                    return {
+                        posCalculateOverhangingPerimeters,
+                        posCalculateExtrusionSpeedLimits,
+                        psAlertWhenSupportsNeeded,
+                        psWipeTower,
+                        psGCodeExport
+                    };
+                case posCalculateExtrusionSpeedLimits:
+                    return {
+                        posCalculateExtrusionSpeedLimits,
+                        psAlertWhenSupportsNeeded,
+                        psWipeTower,
+                        psGCodeExport
+                    };
                 default:
                     PANIC("Unknown object step propagation!");
                 }
@@ -388,7 +412,9 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"only_retract_when_crossing_perimeters", steps({propagate(psGCodeExport)})},
     {"ooze_prevention", steps({propagate(psSkirtBrim)})},
     {"output_filename_format", steps({})},
-    {"over_bridge_speed", steps({propagate(psGCodeExport)})},
+    {"over_bridge_speed", steps({propagate(posCalculateExtrusionSpeedLimits)})},
+    {"over_support_interface_acceleration", steps({propagate(posCalculateExtrusionSpeedLimits)})},
+    {"over_support_interface_speed", steps({propagate(posCalculateExtrusionSpeedLimits)})},
     {"overhangs", steps({propagate(posPerimeters), propagate(posSupportMaterial)})},
     {"parking_pos_retraction", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"pause_print_gcode", steps({propagate(psGCodeExport)})},
@@ -568,16 +594,6 @@ std::set<Step> handle_special_cases(
                 // Reset everything.
                 // See GH #1482 for details.
                 result.insert(posSlice);
-            }
-        } else if (opt_key == "over_bridge_speed") {
-            const auto old_speed = old_config.get<std::vector<FloatOrPercentage>>(opt_key);
-            const auto new_speed = new_config.get<std::vector<FloatOrPercentage>>(opt_key);
-
-            const auto is_zero{[](auto v) { return v.is_zero(); }};
-
-            if (std::ranges::any_of(old_speed, is_zero) || std::ranges::any_of(new_speed, is_zero))
-            {
-                result.insert(posPrepareInfill);
             }
         } else if (opt_key == "fill_density") {
             // One likely wants to reslice only when switching between zero infill to simulate boolean difference (subtracting volumes),

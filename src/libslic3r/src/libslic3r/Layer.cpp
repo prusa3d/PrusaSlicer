@@ -605,6 +605,24 @@ void Layer::restore_untyped_slices_no_extra_perimeters()
     }
 }
 
+void Layer::restore_extrusions_without_speed_limits()
+{
+    const auto restore =
+        [](ExtrusionEntityCollection& extrusions,
+           ExtrusionEntityCollection& extrusions_without_speed_limits)
+    {
+        if (!extrusions_without_speed_limits.empty()) {
+            extrusions.swap(extrusions_without_speed_limits);
+            extrusions_without_speed_limits.clear();
+        }
+    };
+
+    for (LayerRegion* layer_region : m_regions) {
+        restore(layer_region->m_perimeters, layer_region->m_perimeters_without_speed_limits);
+        restore(layer_region->m_fills, layer_region->m_fills_without_speed_limits);
+    }
+}
+
 ExPolygons Layer::merged(float offset_scaled) const
 {
 	assert(offset_scaled >= 0.f);
@@ -729,6 +747,8 @@ void Layer::make_perimeters()
         layerm.m_fill_expolygons_bboxes.clear();
         layerm.m_fill_expolygons_composite.clear();
         layerm.m_fill_expolygons_composite_bboxes.clear();
+        layerm.m_perimeters_without_speed_limits.clear();
+        layerm.m_fills_without_speed_limits.clear();
     };
 
     // Remove layer islands, remove references to perimeters and fills from these layer islands to LayerRegion ExtrusionEntities.
