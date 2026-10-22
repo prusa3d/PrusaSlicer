@@ -19,6 +19,7 @@ public:
     {
         std::string name_search;
         std::vector<std::string> types;
+        std::optional<std::vector<std::string>> uuids;
     };
 
     bool open(const std::string& path);

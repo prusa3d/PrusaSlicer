@@ -9,10 +9,13 @@
 #include "Slic3r/App/Material/MaterialSelectionRow.hpp"
 #include "Slic3r/App/Material/MaterialSpoolSelectionRow.hpp"
 
+#include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
 #include "Slic3r/Biz/ObservableListSortFilter.hpp"
 #include "Slic3r/Biz/ObservableListSearcher.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
+#include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
+#include "Slic3r/Biz/Platform/ListenerScope.hpp"
 
 namespace Slic3r::Biz {
 class ProjectInteractor;
@@ -34,7 +37,9 @@ class MaterialSelectionDialog :
     public Yoga::Dialog,
     public Biz::IListSelectionChangedListener,
     public Biz::IListObserver<Biz::Preset::PresetItemObservableList>,
-    public IAppConfigChangedListener
+    public IAppConfigChangedListener,
+    public Biz::Preset::IPresetChangedListener,
+    public Biz::ISelectedConfigContainerChangedListener
 {
 public:
     struct Callbacks
@@ -58,8 +63,20 @@ public:
 
     void on_app_config_changed(const std::string& key) override;
 
+    void on_preset_selection_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        Biz::Preset::PresetItemType type
+    ) override;
+
+    void on_selected_config_container_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id
+    ) override;
+
 protected:
     void close_action() override;
+    void on_about_to_show() override;
 
     void on_tab_selected(int current_index) override;
 
@@ -74,6 +91,7 @@ private:
     const ProjectContext& context() const;
     void update_current_context();
     void update_material_filter();
+    void update_materials_tab_enabled();
 
 private:
     using SelectionRowListViewFactory = Yoga::ViewFactory<
@@ -106,6 +124,18 @@ private:
 
     Callbacks m_callbacks;
 
+    Biz::ListenerScope<
+        Biz::Preset::IPresetChangedListener,
+        Biz::Preset::PresetInteractor,
+        MaterialSelectionDialog>
+        m_preset_changed_listener_scope;
+
+    Biz::ListenerScope<
+        Biz::ISelectedConfigContainerChangedListener,
+        Biz::ProjectInteractor,
+        MaterialSelectionDialog>
+        m_selected_config_container_changed_listener_scope;
+
     Biz::ProjectInteractor& m_project_interactor;
     Navigator& m_navigator;
 
@@ -130,8 +160,10 @@ private:
     // ----------- Page materials ----------
     Yoga::Item* m_page_materials                               = nullptr;
     Yoga::InputText* m_input_text_search_materials             = nullptr;
+    Yoga::LayoutButton* m_only_favorite_materials_button       = nullptr;
     SpoolSelectionRowListView* m_spool_selection_row_list_view = nullptr;
     Yoga::ComboBox* m_combobox_material_type                   = nullptr;
+    bool m_materials_tab_enabled                               = true;
 
     struct ProjectContext
     {

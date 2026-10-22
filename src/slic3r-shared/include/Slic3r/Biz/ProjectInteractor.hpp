@@ -155,6 +155,7 @@ public:
         m_slicing_interactor.add_listener<Slicing::IWipeTowerGeometryListener>(&m_scene_interactor);
         m_user_account_interactor.add_listener<UserAccount::IUserAccountListener>(this);
         m_user_account_interactor.add_listener<UserAccount::IUserAccountListener>(&m_physical_printer_interactor.connect_printer_service());
+        connect_favorite_material_service().add_listener<ConnectPrinter::IConnectFavoriteMaterialsListener>(&m_matdb_interactor);
         Platform::PlatformServices::instance()
             .app_instance_message_handler()
             .add_listener<Platform::IAppInstanceMessageContentListener>(this);

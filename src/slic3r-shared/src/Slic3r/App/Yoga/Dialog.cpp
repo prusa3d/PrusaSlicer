@@ -153,6 +153,11 @@ void Dialog::set_current_tab(size_t current_index)
     }
 }
 
+void Dialog::set_tab_enabled(size_t index, bool enabled)
+{
+    m_tab_buttons.at(index)->set_enabled(enabled);
+}
+
 void Dialog::on_tab_selected(int current_index) {}
 
 void Dialog::close_action()

@@ -63,13 +63,18 @@ const std::set<std::string>& MatDbInteractor::types() const
     return m_client.types();
 }
 
-void MatDbInteractor::query(size_t material_index, const std::string& q, const std::optional<std::string>& type)
+void MatDbInteractor::query(
+    size_t material_index,
+    const std::string& q,
+    const std::optional<std::string>& type,
+    bool only_favorites
+)
 {
     MatDbClient::Query query = {q};
     if (type.has_value()) {
         query.types.push_back(type.value());
     }
-    m_query = {query, material_index};
+    m_query = {query, material_index, only_favorites};
     run_query();
 }
 
@@ -134,7 +139,9 @@ void MatDbInteractor::on_preset_selection_changed(
     Preset::PresetItemType type
 )
 {
-    if (type == Preset::PresetItemType::PrintPreset) {
+    if (type == Preset::PresetItemType::PrintPreset
+        || type == Preset::PresetItemType::MaterialPreset)
+    {
         run_query_if_active(project_id, config_container_id);
     }
 }
@@ -153,6 +160,27 @@ void MatDbInteractor::on_preset_bundles_loaded()
     run_query();
 }
 
+void MatDbInteractor::on_connect_favorite_materials_changed()
+{
+    if (m_query.has_value() && m_query->only_favorites) {
+        run_query();
+        return;
+    }
+    for (size_t i = 0; i < m_result.size(); ++i) {
+        const bool favorite = is_favorite(m_result.at(i).material);
+        if (m_result.at(i).is_favorite != favorite) {
+            MatDbItem item   = m_result.at(i);
+            item.is_favorite = favorite;
+            m_result.set(std::move(item), i);
+        }
+    }
+}
+
+bool MatDbInteractor::is_favorite(const Domain::MatDb::Material& mat) const
+{
+    return m_project_interactor.connect_favorite_material_service().is_favorite(mat.uuid);
+}
+
 void MatDbInteractor::run_query()
 {
     if (!m_query.has_value()) {
@@ -167,9 +195,25 @@ void MatDbInteractor::run_query()
     }
     m_query->slot_index = std::min(m_query->slot_index, slot_count - 1);
 
-    const auto& query = m_query->query;
+    auto& query = m_query->query;
     const auto material_index = m_query->slot_index;
+    if (m_query->only_favorites) {
+        query.uuids = m_project_interactor.connect_favorite_material_service()
+                          .favorite_material_uuids();
+    } else {
+        query.uuids.reset();
+    }
     auto result = m_client.query(query, 64, 0);
+    bool has_selected = false;
+    if (const std::string selected_uuid{selected_preset().material_matdb_uuid(material_index)};
+        !selected_uuid.empty())
+    {
+        std::erase_if(result, [&selected_uuid](const auto& mat) { return mat.uuid == selected_uuid; });
+        if (auto selected = m_client.get_by_uuid(selected_uuid)) {
+            result.insert(result.begin(), std::move(*selected));
+            has_selected = true;
+        }
+    }
     std::vector<MatDbItem> items;
     auto resolve_preset = [this, material_index](const Domain::MatDb::Material& mat) -> PresetMatches
     {
@@ -195,11 +239,16 @@ void MatDbInteractor::run_query()
                     preset.last_node_location.column
                 );
                 MATDB_PRESET_MATCH_LOG("Rule: {}", to_string(mr));
-                ret.emplace_back(preset.id, std::string{preset.short_name()}, rank);
+                ret.emplace_back(
+                    preset.id,
+                    std::string{preset.short_name()},
+                    rank,
+                    Domain::Preset::get_feature<bool>(preset.features, "generic").value_or(false)
+                );
             }
         }
         MATDB_PRESET_MATCH_LOG("----Sorted results-------------------------------");
-        std::ranges::sort(ret, std::ranges::greater(), [](const auto& v) { return v.rank; });
+        std::ranges::stable_sort(ret, std::ranges::greater(), [](const auto& v) { return v.rank; });
 #if MATDB_PRESET_MATCH_DEBUG
         for (const auto& r : ret) {
             MATDB_PRESET_MATCH_LOG("{}: {}", r.rank, r.preset_name);
@@ -211,11 +260,14 @@ void MatDbInteractor::run_query()
     std::ranges::copy(
         result
             | std::views::transform(
-                [&resolve_preset](const Domain::MatDb::Material& mat)
-                { return MatDbItem{mat, resolve_preset(mat)}; }
+                [this, &resolve_preset](const Domain::MatDb::Material& mat)
+                { return MatDbItem{mat, resolve_preset(mat), is_favorite(mat)}; }
             ),
         std::back_inserter(items)
     );
+    if (has_selected) {
+        items.front().is_selected = true;
+    }
     m_result.reset(std::move(items));
 
 }

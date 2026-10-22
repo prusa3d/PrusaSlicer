@@ -37,6 +37,9 @@ protected:
     void action_internal() override;
 
 private:
+    void update_generic_warning();
+
+private:
     Biz::MatDb::MatDbInteractor& m_matdb_interactor;
     const size_t& m_material_index;
     CheckedFn m_checked_fn{nullptr};
@@ -44,9 +47,11 @@ private:
 
     Yoga::Text* m_spool_name{nullptr};
     Yoga::Icon* m_spool_icon{nullptr};
+    Yoga::Icon* m_favorite_icon{nullptr};
     Yoga::ComboBox* m_preset_combobox{nullptr};
     Yoga::Item* m_bottom_row{nullptr};
     Yoga::LayoutButton* m_confirm_button{nullptr};
+    Yoga::Text* m_generic_warning{nullptr};
 };
 
 } // namespace Slic3r::App

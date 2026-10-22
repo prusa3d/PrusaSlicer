@@ -575,6 +575,11 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn  = []() { return Domain::ConfigValue(false); };
 
+    def           = defs.add("matdb_materials_only_favorites", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue(false); };
+
     def           = defs.add("auto_reslice", typeid(bool));
     def->location = Domain::AppConfigLocation{};
     def->category = Domain::ConfigItemDef::Category::Hidden;

@@ -4,6 +4,7 @@
 #include "Slic3r/Domain/SelectionId.hpp"
 #include "Slic3r/Biz/ObservableList.hpp"
 
+#include "Slic3r/Biz/ConnectPrinter/ConnectFavoriteMaterialService.hpp"
 #include "Slic3r/Biz/MatDb/MatDbClient.hpp"
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/Domain/Workbench.hpp"
@@ -22,6 +23,7 @@ struct PresetMatch
     std::string preset_id;
     std::string preset_name;
     size_t rank{0};
+    bool is_generic{false};
 };
 
 using PresetMatches = std::vector<PresetMatch>;
@@ -30,12 +32,15 @@ struct MatDbItem
 {
     Domain::MatDb::Material material;
     PresetMatches preset_matches;
+    bool is_favorite{false};
+    bool is_selected{false};
 };
 
 struct MatDbInteractorProjectContexts;
 
 class MatDbInteractor final :
     public Preset::IPresetChangedListener,
+    public ConnectPrinter::IConnectFavoriteMaterialsListener,
     public IMdb
 {
 public:
@@ -45,7 +50,12 @@ public:
     void init_client();
 
     const std::set<std::string>& types() const;
-    void query(size_t material_index, const std::string& q, const std::optional<std::string>& type);
+    void query(
+        size_t material_index,
+        const std::string& q,
+        const std::optional<std::string>& type,
+        bool only_favorites
+    );
 
     void select_material_preset(
         size_t material_index,
@@ -82,15 +92,19 @@ public:
     ) override;
     void on_preset_bundles_loaded() override;
 
+    void on_connect_favorite_materials_changed() override;
+
 private:
     const Domain::Preset::SelectedPreset& selected_preset() const;
     void run_query();
+    bool is_favorite(const Domain::MatDb::Material& mat) const;
 
 private:
     struct QueryState
     {
         MatDbClient::Query query;
         size_t slot_index;
+        bool only_favorites;
     };
 
     Domain::Workbench& m_workbench;

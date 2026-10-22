@@ -222,6 +222,9 @@ auto match_query(const MatDbClient::Query& q, const Domain::MatDb::Index& index)
                       [&](const auto& t) { return mat_idx.type.has_value() && mat_idx.type == t; }
                 );
         }
+        if (q.uuids.has_value()) {
+            ret = ret && std::ranges::find(*q.uuids, mat_idx.uuid) != q.uuids->end();
+        }
         return ret && tokens.size() == hit.size();
     };
 }

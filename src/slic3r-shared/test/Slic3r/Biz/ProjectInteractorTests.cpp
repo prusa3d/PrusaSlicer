@@ -857,6 +857,6 @@ TEST_CASE_METHOD(
 
     REQUIRE(project_interactor->preset_interactor().selected_printer_preset().materials.size() == 1);
 
-    CHECK_NOTHROW(project_interactor->matdb_interactor().query(2, "", std::nullopt));
+    CHECK_NOTHROW(project_interactor->matdb_interactor().query(2, "", std::nullopt, false));
     CHECK(project_interactor->matdb_interactor().result().size() > 0);
 }

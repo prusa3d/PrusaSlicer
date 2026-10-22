@@ -28,6 +28,7 @@ public:
 
     size_t current_tab_index() const;
     void set_current_tab(size_t current_index);
+    void set_tab_enabled(size_t index, bool enabled);
 
 protected:
     Item* content() const;

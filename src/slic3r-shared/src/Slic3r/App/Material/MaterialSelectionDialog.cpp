@@ -24,6 +24,9 @@ using namespace Slic3r::Biz;
 
 namespace Slic3r::App {
 
+constexpr size_t presets_tab_index   = 0;
+constexpr size_t materials_tab_index = 1;
+
 static bool is_favorite(const Biz::Preset::PresetItem& preset_item)
 {
     return AppServices::instance()
@@ -61,12 +64,20 @@ void MaterialSelectionDialog::update_current_context()
 
 void MaterialSelectionDialog::update_material_filter()
 {
+    if (m_material_index == Domain::INVALID_ID) {
+        return;
+    }
     const std::optional<std::string> material = m_combobox_material_type->current_index() == 0 ?
         std::nullopt :
         std::optional<std::string>{m_combobox_material_type->current_label()};
 
     m_project_interactor.matdb_interactor()
-        .query(m_material_index, m_input_text_search_materials->text(), material);
+        .query(
+            m_material_index,
+            m_input_text_search_materials->text(),
+            material,
+            m_only_favorite_materials_button->checked()
+        );
 }
 
 MaterialSelectionDialog::MaterialSelectionDialog(
@@ -74,6 +85,8 @@ MaterialSelectionDialog::MaterialSelectionDialog(
     Navigator& navigator
 ) :
     Yoga::Dialog({Biz::_u8L("Profiles"), Biz::_u8L("Materials")}, "MaterialSelectionDialog"),
+    m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
+    m_selected_config_container_changed_listener_scope(project_interactor, *this),
     m_project_interactor(project_interactor),
     m_navigator(navigator),
     m_material_presets(m_project_interactor.preset_interactor().material_presets()),
@@ -114,9 +127,11 @@ MaterialSelectionDialog::MaterialSelectionDialog(
 
     set_material_index(0);
 
-    set_current_tab(
-        AppServices::instance().app_config().get<int>("last_material_selection_dialog_tab")
-    );
+    if (m_materials_tab_enabled) {
+        set_current_tab(
+            AppServices::instance().app_config().get<int>("last_material_selection_dialog_tab")
+        );
+    }
 }
 
 MaterialSelectionDialog::~MaterialSelectionDialog()
@@ -142,7 +157,12 @@ void MaterialSelectionDialog::set_material_index(size_t material_index)
     update_preset_list();
 
     m_project_interactor.matdb_interactor()
-        .query(m_material_index, m_input_text_search_materials->text(), std::nullopt);
+        .query(
+            m_material_index,
+            m_input_text_search_materials->text(),
+            std::nullopt,
+            m_only_favorite_materials_button->checked()
+        );
 }
 
 void MaterialSelectionDialog::on_list_selection_changed(Domain::SelectionId new_selection)
@@ -187,10 +207,18 @@ void MaterialSelectionDialog::close_action()
     m_navigator.set_opened_dialog(nullptr);
 }
 
+void MaterialSelectionDialog::on_about_to_show()
+{
+    m_project_interactor.connect_favorite_material_service().request_refresh();
+}
+
 void MaterialSelectionDialog::on_tab_selected(int current_index)
 {
     m_stack_layout->set_current_index(current_index);
 
+    if (!m_materials_tab_enabled) {
+        return;
+    }
     AppServices::instance().app_config_interactor().set_item_value(
         "last_material_selection_dialog_tab",
         Domain::ConfigValue{current_index}
@@ -204,9 +232,30 @@ static bool has_filament_types(const Biz::ProjectInteractor& project_interactor)
         == Domain::PrinterTechnology::FFF;
 }
 
+void MaterialSelectionDialog::update_materials_tab_enabled()
+{
+    const bool enabled = has_filament_types(m_project_interactor);
+    if (m_materials_tab_enabled == enabled) {
+        return;
+    }
+    m_materials_tab_enabled = enabled;
+    set_tab_enabled(materials_tab_index, enabled);
+
+    if (!enabled) {
+        if (current_tab_index() == materials_tab_index) {
+            set_current_tab(presets_tab_index);
+        }
+    } else {
+        set_current_tab(
+            AppServices::instance().app_config().get<int>("last_material_selection_dialog_tab")
+        );
+    }
+}
+
 void MaterialSelectionDialog::update_preset_list()
 {
     m_type_filters->set_visible(has_filament_types(m_project_interactor));
+    update_materials_tab_enabled();
 
     if (m_preset_list) {
         m_preset_list->remove_listener<Biz::IListSelectionChangedListener>(this);
@@ -400,6 +449,32 @@ void MaterialSelectionDialog::create_page_materials()
     m_input_text_search_materials->callbacks().text_changed = [this]()
     { update_material_filter(); };
 
+    m_only_favorite_materials_button = search_row->emplace_back<LayoutButton>(
+        std::string(),
+        Render::Icon::Star,
+        Biz::_u8L("Filter only favorited items")
+    );
+    m_only_favorite_materials_button->set_width(24_fpx);
+    m_only_favorite_materials_button->set_height(24_fpx);
+    m_only_favorite_materials_button->set_checkable(true);
+    m_only_favorite_materials_button->set_self_align(YGAlignCenter);
+    m_only_favorite_materials_button->callbacks().checked_changed = [this](bool checked)
+    {
+        m_only_favorite_materials_button->set_icon(
+            checked ? Render::Icon::StarSolid : Render::Icon::Star
+        );
+        m_only_favorite_materials_button->set_tooltip(
+            checked ? Biz::_u8L("Show all items") : Biz::_u8L("Filter only favorited items")
+        );
+        update_material_filter();
+        AppServices::instance().app_config_interactor().set_item_value(
+            "matdb_materials_only_favorites",
+            Domain::ConfigValue{checked}
+        );
+    };
+
+    on_app_config_changed("matdb_materials_only_favorites");
+
     m_page_materials->emplace_back<Separator>(Orientation::Horizontal);
 
     Item* scroll_area = m_page_materials->emplace_back<Item>();
@@ -447,7 +522,38 @@ void MaterialSelectionDialog::on_app_config_changed(const std::string& key)
                 ->value()
                 .get<bool>()
         );
+    } else if (key == "matdb_materials_only_favorites") {
+        m_only_favorite_materials_button->set_checked(
+            AppServices::instance()
+                .app_config()
+                .get_config_box()
+                .items.find("matdb_materials_only_favorites")
+                ->value()
+                .get<bool>()
+        );
     }
+}
+
+void MaterialSelectionDialog::on_preset_selection_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    Biz::Preset::PresetItemType type
+)
+{
+    if (type == Biz::Preset::PresetItemType::PrinterPreset
+        && project_id == m_project_interactor.selected_project_id()
+        && config_container_id == m_project_interactor.selected_config_container_id())
+    {
+        update_materials_tab_enabled();
+    }
+}
+
+void MaterialSelectionDialog::on_selected_config_container_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id
+)
+{
+    update_materials_tab_enabled();
 }
 
 } // namespace Slic3r::App

@@ -32,7 +32,6 @@ MaterialSpoolSelectionRow::MaterialSpoolSelectionRow(
     set_flex_shrink(0);
     set_content_padding({7_fpx, 4_fpx});
     set_checkable(true);
-    set_background_color_checked(m_theme->color_imgui(Platform::Color::Button));
     set_background_color_border(m_theme->color_imgui(Platform::Color::AccentSecondary));
     set_allow_overlap(true);
 
@@ -44,10 +43,18 @@ MaterialSpoolSelectionRow::MaterialSpoolSelectionRow(
     m_spool_name->set_align({AlignH::Left, AlignV::Center});
     m_spool_name->set_wrap_mode(Text::WrapMode::WrapElide);
 
+    m_favorite_icon = top_row->emplace_back<Icon>(Render::Icon::StarSolid);
+    m_favorite_icon->set_width(16_fpx);
+    m_favorite_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
+
     m_spool_icon = top_row->emplace_back<Icon>(Render::Icon::SpoolBig);
     m_spool_icon->set_width(64_fpx);
     m_spool_icon->set_height(32_fpx);
     m_spool_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
+
+    m_generic_warning = emplace_back<Text>(Biz::_u8L("Generic profile is used"));
+    m_generic_warning->set_text_color(m_theme->color_imgui(Platform::Color::Warning));
+    m_generic_warning->set_visible(false);
 
     m_bottom_row = emplace_back<Item>();
     m_bottom_row->set_gap(5_fpx);
@@ -59,6 +66,7 @@ MaterialSpoolSelectionRow::MaterialSpoolSelectionRow(
 
     m_preset_combobox = m_bottom_row->emplace_back<ComboBox>("MaterialPresetCombobox");
     m_preset_combobox->set_flex_grow(1);
+    m_preset_combobox->callbacks().selection_changed = [this](int) { update_generic_warning(); };
 
     m_confirm_button = m_bottom_row->emplace_back<LayoutButton>(
         std::string{},
@@ -99,7 +107,18 @@ void MaterialSpoolSelectionRow::on_data_update()
     }
 
     m_spool_icon->set_tint(color);
+
+    if (m_state->is_selected) {
+        const ImColor selected_color =
+            m_theme->color_imgui(Platform::Color::Button, Platform::ColorGroup::Active);
+        set_background_color(selected_color);
+        set_background_color_checked(selected_color);
+    } else {
+        set_background_color(Platform::Color::Button);
+        set_background_color_checked(m_theme->color_imgui(Platform::Color::Button));
+    }
     m_spool_name->set_text(m_state->material.brand.name + " " + m_state->material.name);
+    m_favorite_icon->set_visible(m_state->is_favorite);
 
     std::vector<std::string> presets;
     std::ranges::transform(
@@ -108,6 +127,8 @@ void MaterialSpoolSelectionRow::on_data_update()
         [](const Biz::MatDb::PresetMatch& preset) { return preset.preset_name; }
     );
     m_preset_combobox->set_items(presets);
+    m_preset_combobox->set_current_index(0);
+    update_generic_warning();
 }
 
 void MaterialSpoolSelectionRow::checked_updated_internal()
@@ -115,6 +136,16 @@ void MaterialSpoolSelectionRow::checked_updated_internal()
     RectangleButton::checked_updated_internal();
     m_bottom_row->set_visible(checked());
     set_background_border_width(checked() ? 2 : 0);
+    update_generic_warning();
+}
+
+void MaterialSpoolSelectionRow::update_generic_warning()
+{
+    const int index = m_preset_combobox->current_index();
+    const bool is_generic = index >= 0
+        && static_cast<size_t>(index) < m_state->preset_matches.size()
+        && m_state->preset_matches.at(index).is_generic;
+    m_generic_warning->set_visible(checked() && is_generic);
 }
 
 void MaterialSpoolSelectionRow::action_internal()
