@@ -15,17 +15,31 @@ else ()
     set(_exclude_from_all OFF)
 endif ()
 
+set(_openssl_depends "")
+
 if (WIN32)
     # OpenSSL is not needed by PrusaSlicer itself on Windows, but Paho MQTT links it on every
     # platform, so the Windows build (Perl Configure + nmake) has to be available here.
-    find_package(Perl REQUIRED)
-    set(_conf_cmd ${PERL_EXECUTABLE} Configure)
+    #
+    # OpenSSL's Configure needs a native Windows Perl. It is fetched as a pinned portable
+    # Strawberry Perl by StrawberryPerl.cmake. It lives in a separate file on purpose: the
+    # flatpak manifest generator in PrusaSlicer-Actions takes the first URL it finds in
+    # OpenSSL.cmake as the OpenSSL source archive, so this file must contain only that one.
+    include(${CMAKE_CURRENT_LIST_DIR}/StrawberryPerl.cmake)
+    set(_openssl_depends dep_Perl)
+
+    set(_conf_cmd ${_perl_exe} Configure)
     if (CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(_cross_arch "VC-WIN64A")
     else ()
         set(_cross_arch "VC-WIN32")
     endif ()
-    set(_extra_conf_flags no-asm)
+    # Explicitly set the tools, so they match the other deps.
+    set(_extra_conf_flags no-asm no-module no-apps no-tests
+        "CC=${CMAKE_C_COMPILER}"
+        "LD=${CMAKE_LINKER}"
+        "AR=${CMAKE_AR}"
+    )
     set(_bld_cmd nmake)
     set(_ins_cmd nmake install_sw)
 elseif (APPLE)
@@ -83,4 +97,5 @@ ExternalProject_Add(dep_OpenSSL
         ${_apple_target_flags}
     BUILD_COMMAND ${_bld_cmd}
     INSTALL_COMMAND ${_ins_cmd}
+    DEPENDS ${_openssl_depends}
 )
