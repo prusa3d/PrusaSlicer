@@ -151,6 +151,7 @@ inline bool operator==(const OverhangAttributes &lhs, const OverhangAttributes &
 enum class ExtrusionSpeedLimit : uint8_t
 {
     OverSupportInterface,
+    OverBridge,
 };
 
 using ExtrusionSpeedLimits = Domain::enum_bitmask<ExtrusionSpeedLimit>;

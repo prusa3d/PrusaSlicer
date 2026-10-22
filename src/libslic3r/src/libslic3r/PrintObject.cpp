@@ -58,7 +58,6 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/MultiMaterialSegmentation.hpp"
 #include "libslic3r/Point.hpp"
-#include "libslic3r/InfillAboveBridges.hpp"
 #include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 #include "libslic3r/HwConfigUtils.hpp"
 
@@ -449,27 +448,6 @@ void PrintObject::prepare_infill()
     } // for each layer
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
-
-    PrepareInfill::SurfaceRefs surfaces;
-    for (const Layer *layer : m_layers) {
-        surfaces.emplace_back();
-        for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
-            LayerRegion *layerm = layer->m_regions[region_id];
-            if (!layerm->fill_surfaces().empty()
-                && !layerm->region()
-                        .extruder_config_value<Domain::FloatOrPercentage>(
-                            "over_bridge_speed",
-                            FlowRole::frSolidInfill
-                        )
-                        .is_zero())
-            {
-                surfaces.back().push_back(std::ref(layerm->m_fill_surfaces));
-            }
-        }
-    }
-    constexpr double infill_over_bridges_expand{1.0};
-    PrepareInfill::separate_infill_above_bridges(surfaces, infill_over_bridges_expand);
-
     this->set_done(posPrepareInfill);
 }
 
@@ -744,6 +722,29 @@ may_support_overlap_object_layer(const SupportLayer& support_layer, const Layer&
 }
 
 /**
+ * @brief Returns the bridges of the layer below the object layer, expanded to cover the infill anchored over them.
+ */
+static ExPolygons bridges_directly_below(const Layer& object_layer)
+{
+    constexpr double bridges_expansion{1.0};
+
+    if (object_layer.lower_layer == nullptr) {
+        return {};
+    }
+
+    ExPolygons bridges;
+    for (const LayerRegion* lower_layer_region : object_layer.lower_layer->regions()) {
+        for (const Surface* bridge :
+             lower_layer_region->fill_surfaces().filter_by_type(stBottomBridge))
+        {
+            bridges.push_back(bridge->expolygon);
+        }
+    }
+
+    return offset_ex(bridges, scaled<float>(bridges_expansion));
+}
+
+/**
  * @brief Splits the extrusions at the boundary of the region, the extrusions are backed up before their first split.
  */
 static void split_and_back_up_extrusions(
@@ -817,6 +818,45 @@ void PrintObject::calculate_extrusion_speed_limits()
                                 support_boundary,
                                 ExtrusionSpeedLimit::OverSupportInterface,
                                 is_any_role
+                            );
+                        }
+                    }
+
+                    std::vector<LayerRegion*> regions_limited_over_bridges;
+                    std::ranges::copy_if(
+                        layer.regions(),
+                        std::back_inserter(regions_limited_over_bridges),
+                        [](const LayerRegion* layer_region)
+                        {
+                            return !layer_region->region()
+                                        .extruder_config_value<Domain::FloatOrPercentage>(
+                                            "over_bridge_speed",
+                                            FlowRole::frSolidInfill
+                                        )
+                                        .is_zero();
+                        }
+                    );
+
+                    if (regions_limited_over_bridges.empty()) {
+                        continue;
+                    }
+
+                    if (const ExPolygons bridges = bridges_directly_below(layer);
+                        !bridges.empty()) {
+                        const auto is_solid_infill = [](const ExtrusionRole role)
+                        { return role == ExtrusionRole::SolidInfill; };
+
+                        const AABBTreeLines::LinesDistancer<Line> bridges_boundary{
+                            Algorithms::ExPolygon::to_lines(bridges)
+                        };
+
+                        for (LayerRegion* layer_region : regions_limited_over_bridges) {
+                            split_and_back_up_extrusions(
+                                layer_region->m_fills,
+                                layer_region->m_fills_without_speed_limits,
+                                bridges_boundary,
+                                ExtrusionSpeedLimit::OverBridge,
+                                is_solid_infill
                             );
                         }
                     }

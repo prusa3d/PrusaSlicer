@@ -406,20 +406,23 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->min = 0;
     def->init_fn = init_with(60.);
 
-    def = defs.add("over_bridge_speed", typeid(FloatOrPercentage));
-    def->location = Print;
-    def->overrides_in = Locations{ Tool, Object, Volume, MacroSlotOverrides };
+    def               = defs.add("over_bridge_speed", typeid(FloatOrPercentage));
+    def->location     = Print;
+    def->overrides_in = Locations{Tool, Object, Volume, MacroSlotOverrides};
     // TRN: Label for speed used to print infill above bridges.
-    def->label = L("Over bridges");
+    def->label        = L("Over bridges");
     def->option_group = ConfigItemDef::OptionGroup::Print_Speed_SupportAndBridges;
-    def->category = ConfigItemDef::Category::Print_Speed;
-    def->order = 1;
-    def->gui_type = ConfigItemDef::GUIType::unit_or_percentage;
-    def->tooltip = L("Speed for printing solid infill above bridges. Set to 0 to use solid infill speed. "
-                    "If set as percentage, the speed is calculated over solid infill speed. ");
-    def->units = {L("mm/s"), L("%")};;
-    def->min = 0;
-    def->init_fn = init_with(FloatOrPercentage{0.});
+    def->category     = ConfigItemDef::Category::Print_Speed;
+    def->order        = 1;
+    def->gui_type     = ConfigItemDef::GUIType::unit_or_percentage;
+    def->tooltip      = L(
+        "Maximum speed for the parts of solid infill printed above bridges. It only limits the speed, "
+             "it never increases it. Set to 0 to use solid infill speed. "
+             "If set as percentage, the speed is calculated over solid infill speed. "
+    );
+    def->units      = {L("mm/s"), L("%")};
+    def->min        = 0;
+    def->init_fn    = init_with(FloatOrPercentage{0.});
     def->ratio_over = "solid_infill_speed";
 
     def               = defs.add("over_support_interface_speed", typeid(double));

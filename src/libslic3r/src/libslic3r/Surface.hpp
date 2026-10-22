@@ -34,8 +34,6 @@ enum SurfaceType {
     stInternalVoid,
     // Inner/outer perimeters.
     stPerimeter,
-    // InternalSolid that is directly above stBottomBridge.
-    stSolidOverBridge,
     // Number of SurfaceType enums.
     stCount,
 };
@@ -106,7 +104,6 @@ public:
 	bool   is_solid()    const {
         return this->is_external()
             || this->surface_type == stInternalSolid
-            || this->surface_type == stSolidOverBridge
             || this->surface_type == stInternalBridge;
     }
 };

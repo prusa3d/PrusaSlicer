@@ -3595,13 +3595,6 @@ std::string GCodeGenerator::_extrude(
             speed = infill_speed;
         } else if (path_attr.role == ExtrusionRole::SolidInfill) {
             speed = solid_infill_speed;
-        } else if (path_attr.role == ExtrusionRole::InfillOverBridge) {
-            const double over_bridge_speed{config.over_bridge_speed.at(extruder_id).get_abs_value(solid_infill_speed)};
-            if (over_bridge_speed > 0) {
-                speed = over_bridge_speed;
-            } else {
-                speed = solid_infill_speed;
-            }
         } else if (path_attr.role == ExtrusionRole::TopSolidInfill) {
             speed = config.top_solid_infill_speed.at(extruder_id).get_abs_value(solid_infill_speed);
         } else if (path_attr.role == ExtrusionRole::Ironing) {
@@ -3663,6 +3656,14 @@ std::string GCodeGenerator::_extrude(
         && config.over_support_interface_speed.at(extruder_id) > 0)
     {
         speed = std::min(speed, config.over_support_interface_speed.at(extruder_id));
+    }
+
+    if (path_attr.speed_limits.has(ExtrusionSpeedLimit::OverBridge)) {
+        const double over_bridge_speed =
+            config.over_bridge_speed.at(extruder_id).get_abs_value(solid_infill_speed);
+        if (over_bridge_speed > 0) {
+            speed = std::min(speed, over_bridge_speed);
+        }
     }
 
     // cap speed with max_volumetric_speed anyway (even if user is not using autospeed)
