@@ -61,6 +61,7 @@ ExternalProject_Add(dep_OpenSSL
     BUILD_IN_SOURCE ON
     CONFIGURE_COMMAND ${_conf_cmd} ${_cross_arch}
         "--prefix=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}"
+        --libdir=lib
         ${_cross_comp_prefix_line}
         no-shared
         -Wa,--noexecstack
