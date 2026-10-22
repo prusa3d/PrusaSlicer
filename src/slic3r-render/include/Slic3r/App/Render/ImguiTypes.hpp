@@ -224,6 +224,8 @@ enum class Icon : wchar_t
     CheckMark,
     Robot,
     Primary,
+    PrintGoals,
+    ExtruderAssignment,
 
     // PNGs
     SpoolBig,

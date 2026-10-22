@@ -253,6 +253,8 @@ static const std::unordered_map<Icon, const char*> ICON_FILENAMES = {
     {Icon::Robot, "robot"},
     {Icon::SpoolBig, "spool_big"},
     {Icon::Primary, "primary"},
+    {Icon::PrintGoals, "print_goals"},
+    {Icon::ExtruderAssignment, "extruder_assignment"},
 };
 
 static const std::unordered_set<Icon> ICON_PNG = {Icon::SpoolBig};

@@ -72,10 +72,7 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
     m_combo_print =
         layer_height_row->emplace_back<ComboBoxListViewSelection<Biz::Preset::PresetItem>>();
     m_combo_print->set_get_name_fn(
-        [](const Biz::Preset::PresetItem* item) -> std::string
-        {
-            return item->ui_preset_name();
-        }
+        [](const Biz::Preset::PresetItem* item) -> std::string { return item->ui_preset_name(); }
     );
     m_combo_print->set_source_list(&m_project_interactor.preset_interactor().print_presets());
     m_combo_print->set_flex_grow(1);
@@ -85,10 +82,8 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
             auto& preset_interactor = m_project_interactor.preset_interactor();
             const std::string& preset_id =
                 preset_interactor.print_presets().items().at(print_index).id;
-            if (Biz::Preset::PresetSelectionCheck::can_select_print_preset(
-                    preset_interactor,
-                    preset_id
-                ))
+            if (Biz::Preset::PresetSelectionCheck::
+                    can_select_print_preset(preset_interactor, preset_id))
             {
                 preset_interactor.select_print_preset(preset_id, true);
                 m_last_selected_index = print_index;
@@ -129,25 +124,15 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
     refresh_tools_comboboxes_label_colors();
 
     m_tool_to_feature_dialog->attach_to_item(this, Position::Left, 20_fpx);
-    m_print_mode_btn = m_content_area->emplace_back<LayoutButton>(Biz::_u8L("Print mode"));
-    m_print_mode_btn->set_self_align(YGAlignCenter);
-    m_print_mode_btn->set_flex_shrink(0);
-    m_print_mode_btn->set_content_padding({1.25_rem, 0.25_rem});
-    m_print_mode_btn->set_checkable(true);
-    m_print_mode_btn->callbacks().action = [this]
-    {
-        m_navigator.set_opened_dialog(m_print_mode_dialog->opened() ? nullptr : m_print_mode_dialog);
-    };
 
     m_print_mode_dialog->attach_to_item(this, Position::Left, 20);
     m_print_mode_dialog->callbacks().opened = [this] { m_print_mode_btn->set_checked(true); };
     m_print_mode_dialog->callbacks().closed = [this] { m_print_mode_btn->set_checked(false); };
+
+    create_print_extras();
+
     refresh_print_mode_button();
-
-    add_separator();
-
-    create_tool_to_feature_row();
-    update_tool_to_feature_row_visibility();
+    update_extruder_assignment_visibility();
 
     create_favorite_params();
 }
@@ -158,32 +143,39 @@ void SidebarPrint::add_separator()
     separator->set_margin(Margins(-padding().left, gap(), -padding().right, gap()));
 }
 
-void SidebarPrint::create_tool_to_feature_row()
+void SidebarPrint::create_print_extras()
 {
-    m_tool_to_feature_row = m_content_area->emplace_back<Item>();
-    m_tool_to_feature_row->set_orientation(Orientation::Horizontal);
-    m_tool_to_feature_row->set_padding({0, 5_fpx});
-    m_tool_to_feature_row->set_gap(5_fpx);
-    m_tool_to_feature_row->set_height(40_fpx);
-    m_tool_to_feature_row->set_flex_shrink(0);
+    add_separator();
 
-    Text* tool_to_feature_label =
-        m_tool_to_feature_row->emplace_back<Text>(Biz::_u8L("Tool to feature"));
-    tool_to_feature_label->set_wrap_mode(Text::WrapMode::WrapElide);
-    tool_to_feature_label->set_align({AlignH::Left, AlignV::Center});
-    tool_to_feature_label->set_flex_grow(1);
-    tool_to_feature_label->set_width(90);
-    tool_to_feature_label->set_max_width(175);
+    auto add_extras_button = [this](const std::string& label, Render::Icon icon) -> LayoutButton*
+    {
+        Item* wrap = m_content_area->emplace_back<Item>();
+        wrap->set_orientation(Orientation::Horizontal);
+        wrap->set_flex_shrink(0);
 
-    LayoutButton* configure_button =
-        m_tool_to_feature_row->emplace_back<LayoutButton>(Biz::_u8L("Configure"));
-    configure_button->set_flex_grow(1);
-    configure_button->set_self_align(YGAlignCenter);
-    configure_button->set_max_width(200_fpx);
-    configure_button->set_width(90_fpx);
-    configure_button->set_height(25_fpx);
+        LayoutButton* button = wrap->emplace_back<LayoutButton>(label, icon);
+        button->set_content_padding(6_fpx);
+        button->set_content_gap(6_fpx);
+        button->set_content_justify_content(YGJustifyFlexStart);
+        button->set_flex_grow(1);
+        button->set_self_align(YGAlignCenter);
+        return button;
+    };
 
-    configure_button->callbacks().action = [this]() { m_tool_to_feature_dialog->open(); };
+    m_print_mode_btn = add_extras_button(Biz::_u8L("Print Goals"), Render::Icon::PrintGoals);
+    m_print_mode_btn->callbacks().action = [this]
+    {
+        m_navigator.set_opened_dialog(
+            m_print_mode_dialog->opened() ? nullptr : m_print_mode_dialog
+        );
+    };
+
+    LayoutButton* extruder_assignment_btn =
+        add_extras_button(Biz::_u8L("Extruder Assignment"), Render::Icon::ExtruderAssignment);
+    extruder_assignment_btn->callbacks().action = [this]() { m_tool_to_feature_dialog->open(); };
+    m_extruder_assignment_item                  = extruder_assignment_btn->parent_item();
+
+    add_separator();
 }
 
 void SidebarPrint::create_favorite_params()
@@ -203,20 +195,21 @@ void SidebarPrint::update_tools_visibility()
     m_tool_head_list_view->set_visible(is_multi_extruder);
 }
 
-void SidebarPrint::update_tool_to_feature_row_visibility()
+void SidebarPrint::update_extruder_assignment_visibility()
 {
-    m_tool_to_feature_row->set_visible(
+    m_extruder_assignment_item->set_visible(
         m_project_interactor.preset_interactor().selected_printer_preset().materials.size() > 1
     );
 }
 
 void SidebarPrint::refresh_print_combobox_label_color()
 {
-    bool is_modified_preset = m_project_interactor.preset_interactor()
-                                  .print_tool_cbi()
-                                  .observable_list()
-                                  .lock()
-                                  ->is_dirty_print();
+    bool is_modified_preset =
+        m_project_interactor.preset_interactor()
+            .print_tool_cbi()
+            .observable_list()
+            .lock()
+            ->is_dirty_print();
     m_combo_print->set_label_color(m_theme->color_imgui(
         is_modified_preset ? Platform::Color::AccentTertiary : Platform::Color::Text
     ));
@@ -225,22 +218,24 @@ void SidebarPrint::refresh_print_combobox_label_color()
 void SidebarPrint::refresh_print_mode_button()
 {
     const auto* overrides{std::get_if<Domain::MacroOverridesMapFDM>(
-        &m_project_interactor.preset_interactor().selected_printer_preset().macro_overrides)};
+        &m_project_interactor.preset_interactor().selected_printer_preset().macro_overrides
+    )};
     const bool active{overrides && !overrides->empty()};
-    m_print_mode_btn->set_label_color(m_theme->color_imgui(
-        active ? Platform::Color::AccentTertiary : Platform::Color::Text
-    ));
+    m_print_mode_btn->set_label_color(
+        m_theme->color_imgui(active ? Platform::Color::AccentTertiary : Platform::Color::Text)
+    );
 }
 
 void SidebarPrint::refresh_tools_comboboxes_label_colors()
 {
     const size_t tool_cnt = m_project_interactor.preset_interactor().tool_presets().size();
     for (size_t tool_index{}; tool_index < tool_cnt; tool_index++) {
-        bool is_modified_preset = m_project_interactor.preset_interactor()
-                                      .print_tool_cbi()
-                                      .observable_list()
-                                      .lock()
-                                      ->is_dirty_tool(tool_index);
+        bool is_modified_preset =
+            m_project_interactor.preset_interactor()
+                .print_tool_cbi()
+                .observable_list()
+                .lock()
+                ->is_dirty_tool(tool_index);
         m_tool_head_list_view->item_at(tool_index)
             ->combo_box()
             ->set_label_color(m_theme->color_imgui(
@@ -276,7 +271,7 @@ void SidebarPrint::on_preset_selection_changed(
         switch (type) {
         case Biz::Preset::PresetItemType::PrinterPreset:
             update_tools_visibility();
-            update_tool_to_feature_row_visibility();
+            update_extruder_assignment_visibility();
             break;
         case Biz::Preset::PresetItemType::PrintPreset:
             refresh_print_combobox_label_color();
@@ -285,7 +280,7 @@ void SidebarPrint::on_preset_selection_changed(
             refresh_tools_comboboxes_label_colors();
             break;
         case Biz::Preset::PresetItemType::MaterialPreset:
-            update_tool_to_feature_row_visibility();
+            update_extruder_assignment_visibility();
             break;
         default:
             break;
@@ -329,7 +324,7 @@ void SidebarPrint::on_config_container_selection_changed(
         && m_project_interactor.selected_config_container_id() == config_container_id)
     {
         update_tools_visibility();
-        update_tool_to_feature_row_visibility();
+        update_extruder_assignment_visibility();
         refresh_print_mode_button();
     }
 }

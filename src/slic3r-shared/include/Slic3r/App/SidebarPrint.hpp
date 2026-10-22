@@ -64,11 +64,11 @@ private:
     void add_separator();
     void refresh_print_mode_button();
 
-    void create_tool_to_feature_row();
+    void create_print_extras();
     void create_favorite_params();
 
     void update_tools_visibility();
-    void update_tool_to_feature_row_visibility();
+    void update_extruder_assignment_visibility();
     void refresh_print_combobox_label_color();
     void refresh_tools_comboboxes_label_colors();
 
@@ -99,7 +99,7 @@ private:
     Yoga::LayoutButton* m_print_mode_btn{nullptr};
     Yoga::ScrollArea* m_content_area{nullptr};
     ToolToFeatureDialog* m_tool_to_feature_dialog{nullptr};
-    Yoga::Item* m_tool_to_feature_row{nullptr};
+    Yoga::Item* m_extruder_assignment_item{nullptr};
     PrintToolFavoritesItem* m_favorite_params{nullptr};
 
     Yoga::ComboBoxListViewSelection<Biz::Preset::PresetItem>* m_combo_print{nullptr};

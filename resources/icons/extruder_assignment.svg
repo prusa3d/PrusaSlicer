@@ -1,0 +1,16 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!--
+  Extruder Assignment — návrh D „Tryska a seznam“, v2 (20. 10. 2026).
+  Srovnáno se standardem ikon z Figmy (Toolbar 10882:54167, Tool icon v2):
+  jedna barva #F7F7F7 (token color-usage-icon), žádná průhlednost, obrys 1 px
+  na půlpixelech. v1 měla plnou trysku a šedé řádky #808080.
+-->
+<g id="Icon 16x16">
+<path id="Nozzle" d="M2.5 1.5H4.5C5.05 1.5 5.5 1.95 5.5 2.5V10L3.5 14L1.5 10V2.5C1.5 1.95 1.95 1.5 2.5 1.5Z" stroke="#F7F7F7" stroke-linejoin="round"/>
+<path id="Heater block" d="M1.5 10H5.5" stroke="#F7F7F7"/>
+<circle id="Row dot 1" cx="8.5" cy="3.5" r="1" fill="#F7F7F7"/>
+<circle id="Row dot 2" cx="8.5" cy="8" r="1" fill="#F7F7F7"/>
+<circle id="Row dot 3" cx="8.5" cy="12.5" r="1" fill="#F7F7F7"/>
+<path id="Rows" d="M11 3.5H14.5M11 8H14.5M11 12.5H14.5" stroke="#F7F7F7" stroke-linecap="round"/>
+</g>
+</svg>
