@@ -45,7 +45,7 @@ cmake --build build
 
 - **Windows `cmd.exe`**: use `%CD%` for the current directory
 ```cmd
-cmake -S . -B build -DCMAKE_PREFIX_PATH="%CD%/deps/build/destdir/usr/local"
+cmake -S . -B build -DCMAKE_PREFIX_PATH="%CD%/deps/build/destdir/usr/local" -DSLIC3R_PCH=OFF
 cmake --build build
 ```
 
