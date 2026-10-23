@@ -116,6 +116,11 @@ void ConfigItemComboBox::on_data_update()
         m_last_item = m_state;
     }
 
+    if (!m_init) {
+        initialize();
+        m_init = true;
+    }
+
     // TODO: the validators gets constantly recreated, clean this up
     if (mixed()) {
         set_override_label(Biz::_u8L("Mixed"));
@@ -134,11 +139,6 @@ void ConfigItemComboBox::on_data_update()
 
 void ConfigItemComboBox::update_value(const Domain::ConfigValue& value)
 {
-    if (!m_init) {
-        initialize();
-        m_init = true;
-    }
-
     std::vector<std::string> items;
     const Domain::ConfigItemDef::GUIType gui_type = m_state->def().gui_type;
     if (gui_type == Domain::ConfigItemDef::GUIType::f_enum_open) {

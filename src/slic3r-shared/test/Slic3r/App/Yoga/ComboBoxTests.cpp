@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <Slic3r/App/Yoga/ComboBox.hpp>
+#include <Slic3r/App/Yoga/Validator.hpp>
 
 #include "YogaComponentFixture.hpp"
 
@@ -179,4 +180,100 @@ TEST_CASE_METHOD(
 
     REQUIRE(text_edited);
     REQUIRE(combo->current_label() == "custom");
+}
+
+// ── Override label (mixed) tests ──────────────────────────────────────────────
+
+// Helper: open the popup of an editable combo by clicking its arrow button (the body is a text field).
+static void open_editable_combo(YogaComponentFixture& f, ComboBox* combo)
+{
+    const Vec2f pos = combo->get_global_pos();
+    f.simulate_click(
+        pos.x() + combo->width() - combo->height() * 0.5f,
+        pos.y() + combo->height() * 0.5f
+    );
+}
+
+TEST_CASE_METHOD(
+    YogaComponentFixture,
+    "ComboBox: override label - selecting current item fires selection_changed"
+)
+{
+    ComboBox* combo = make_combo(*this, {"alpha", "beta", "gamma"});
+    combo->set_current_index(1);
+    combo->set_override_label("Mixed");
+
+    int changed_index                    = -1;
+    combo->callbacks().selection_changed = [&](int idx) { changed_index = idx; };
+
+    render();
+    open_combo(*this, combo);
+    click_popup_item(*this, combo, 1);
+
+    REQUIRE(changed_index == 1);
+    REQUIRE(combo->current_index() == 1);
+}
+
+TEST_CASE_METHOD(
+    YogaComponentFixture,
+    "ComboBox: override label - editable keeps current label"
+)
+{
+    ComboBox* combo = make_combo(*this, {"alpha", "beta"});
+    combo->set_editable(true);
+    combo->set_current_index(1);
+    combo->set_override_label("Mixed");
+
+    render();
+    render();
+
+    REQUIRE(combo->current_label() == "beta");
+}
+
+TEST_CASE_METHOD(
+    YogaComponentFixture,
+    "ComboBox: override label - editable selection_changed fires when user selects item"
+)
+{
+    ComboBox* combo = make_combo(*this, {"alpha", "beta", "gamma"});
+    combo->set_editable(true);
+    combo->set_override_label("Mixed");
+
+    int changed_index                    = -1;
+    combo->callbacks().selection_changed = [&](int idx) { changed_index = idx; };
+
+    render();
+    open_editable_combo(*this, combo);
+    click_popup_item(*this, combo, 2);
+
+    REQUIRE(changed_index == 2);
+    REQUIRE(combo->current_label() == "gamma");
+}
+
+TEST_CASE_METHOD(
+    YogaComponentFixture,
+    "ComboBox: override label - editable text_edited fires with validated value"
+)
+{
+    ComboBox* combo = make_combo(*this, {"10", "20"});
+    combo->set_validator(std::make_unique<IntValidator>());
+    combo->set_editable(true);
+    combo->set_override_label("Mixed");
+
+    bool text_edited               = false;
+    combo->callbacks().text_edited = [&] { text_edited = true; };
+
+    render();
+    const Vec2f pos = combo->get_global_pos();
+    simulate_click(pos.x() + combo->width() * 0.25f, pos.y() + combo->height() * 0.5f);
+    key_down(ImGuiKey_LeftCtrl);
+    key_tap(ImGuiKey_A);
+    key_up(ImGuiKey_LeftCtrl);
+    type_text("42");
+    key_tap(ImGuiKey_Enter);
+
+    REQUIRE(text_edited);
+    auto* validator = dynamic_cast<IntValidator*>(combo->validator());
+    REQUIRE(validator != nullptr);
+    REQUIRE(validator->value() == 42);
 }

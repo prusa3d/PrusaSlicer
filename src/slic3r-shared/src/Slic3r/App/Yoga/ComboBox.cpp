@@ -135,16 +135,27 @@ bool ComboBox::YGBeginCombo(
 
     if (editable) {
         ImGui::SetCursorScreenPos(cursor_pos);
-        const std::string lab = std::string(label) + "##inputtext";
+        const std::string lab    = std::string(label) + "##inputtext";
+        const bool show_override = !m_override_label.empty()
+            && ImGui::GetActiveID() != window->GetID(lab.c_str());
+        char empty[1]            = {0};
+        if (show_override) {
+            ImGui::PushFont(label_font, GImGui->FontSizeBase);
+            ImGui::PushStyleColor(ImGuiCol_TextDisabled, label_color.Value);
+        }
         edited |= ImGui::InputTextEx(
             lab.c_str(),
-            "",
-            buffer,
-            buf_size,
+            show_override ? m_override_label.c_str() : "",
+            show_override ? empty : buffer,
+            show_override ? 1 : buf_size,
             ImVec2(value_x2 - bb.Min.x, bb.Max.y - bb.Min.y),
             ImGuiInputTextFlags_AutoSelectAll,
             nullptr
         );
+        if (show_override) {
+            ImGui::PopStyleColor();
+            ImGui::PopFont();
+        }
         if (ImGui::IsItemActivated() && m_validator) {
             std::string without_unit = m_validator->string_without_unit();
             strncpy(
