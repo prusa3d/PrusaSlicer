@@ -78,6 +78,14 @@ private:
     uint32_t m_g1_line_id{ 0 };
     uint32_t m_layer_id{ 0 };
     uint32_t m_last_default_color_id{ 0 };
+    // Text of the custom G-code collected between the Custom_Code_Start and Custom_Code_End tags.
+    // It is assigned to the item only when the end tag is found.
+    struct CustomGCodeCapture
+    {
+        size_t item_id;
+        std::string text;
+    };
+    std::optional<CustomGCodeCapture> m_custom_gcode_capture;
     float m_feedrate{ 0.0f }; // mm/s
     float m_fan_speed{ 0.0f }; // percentage
     float m_width{ 0.0f }; // mm

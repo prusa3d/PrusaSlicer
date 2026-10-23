@@ -2144,6 +2144,8 @@ static std::string emit_custom_gcode_per_print_z(
     using Domain::CustomGCode::Type;
     using Biz::libpgcode::reserved_tag;
     using Biz::libpgcode::Tags;
+    using Biz::libpgcode::custom_tag;
+    using Biz::libpgcode::CustomTags;
     std::string gcode;
 
     // Extruder switches are processed by LayerTools, they should be filtered out.
@@ -2167,9 +2169,13 @@ static std::string emit_custom_gcode_per_print_z(
 
             // add tag for processor
             gcode += ";" + std::string(reserved_tag(Tags::Pause_Print)) + "\n";
-            //! FIXME_in_fw show message during print pause
-            if (!pause_print_msg.empty())
+            if (!pause_print_msg.empty()) {
+                // add tag for processor, it restores the message from it
+                gcode += ";" + std::string(custom_tag(CustomTags::Pause_Print_Message))
+                    + pause_print_msg + "\n";
+                //! FIXME_in_fw show message during print pause
                 gcode += "M117 " + pause_print_msg + "\n";
+            }
 
             ParserConfig cfg;
             cfg.set("color_change_extruder", int(current_extruder_id));
@@ -2180,15 +2186,20 @@ static std::string emit_custom_gcode_per_print_z(
         } else {
             // add tag for processor
             gcode += ";" + std::string(reserved_tag(Tags::Custom_Code)) + "\n";
-            if (gcode_type == CustomGCode::Type::Template)
-                // Template Custom Gcode
+            if (gcode_type == CustomGCode::Type::Template) {
+                // Template Custom Gcode, the processor recognizes the template by these tags
+                gcode += ";" + std::string(custom_tag(CustomTags::Custom_Template_Start)) + "\n";
                 gcode += gcodegen.placeholder_parser_process(
                     "template_custom_gcode", config.get<std::string>("template_custom_gcode"),
                     current_extruder_id
                 );
-            else
-                // custom Gcode
+                gcode += "\n;" + std::string(custom_tag(CustomTags::Custom_Template_End));
+            } else {
+                // custom Gcode, the processor restores its text from the lines between these tags
+                gcode += ";" + std::string(custom_tag(CustomTags::Custom_Code_Start)) + "\n";
                 gcode += custom_gcode.extra;
+                gcode += "\n;" + std::string(custom_tag(CustomTags::Custom_Code_End));
+            }
         }
         gcode += "\n";
     }

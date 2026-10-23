@@ -21,11 +21,8 @@
 #include <Slic3r/Biz/libpgcode/Utils.hpp>
 #include <Slic3r/App/libvgcode/Types.hpp>
 
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/replace.hpp>
-
 #include <algorithm>
+#include <string_view>
 
 #include "Slic3r/LegacyFormat.hpp"
 #include "libslic3r/CustomGCode.hpp"
@@ -704,6 +701,25 @@ std::string DoubleSliderForLayers::label(int pos, LabelType label_type, unsigned
     return "";
 }
 
+static std::string limit_gcode_lines(std::string_view gcode)
+{
+    // when the tooltip is too long, it starts to flicker,
+    // see: https://github.com/prusa3d/PrusaSlicer/issues/7368
+    // so we limit the number of lines shown
+    static constexpr size_t MAX_LINES = 10;
+    size_t end = 0;
+    for (size_t i = 0; i < MAX_LINES; ++i) {
+        end = gcode.find('\n', end);
+        if (end == std::string_view::npos)
+            return fmt::format("\n{}\n", gcode);
+        ++end;
+    }
+    // nothing is hidden behind the last shown line break
+    if (end == gcode.size())
+        return fmt::format("\n{}\n", gcode);
+    return fmt::format("\n{}[{}]\n\n", gcode.substr(0, end), _u8L("continue"));
+}
+
 std::string DoubleSliderForLayers::tooltip(int tick /*=-1*/) const
 {
     if (m_focus == FocusedItem::None)
@@ -771,25 +787,7 @@ std::string DoubleSliderForLayers::tooltip(int tick /*=-1*/) const
             );
 
         // Show custom Gcode as a first string of tooltop
-        std::string space = "   ";
-        tooltip.clear(); // = space;
-        auto format_gcode = [space](std::string gcode) -> std::string
-        {
-            // when the tooltip is too long, it starts to flicker, see: https://github.com/prusa3d/PrusaSlicer/issues/7368
-            // so we limit the number of lines shown
-            std::vector<std::string> lines;
-            boost::split(lines, gcode, boost::is_any_of("\n"), boost::token_compress_off);
-            static const size_t MAX_LINES = 10;
-            if (lines.size() > MAX_LINES) {
-                gcode = lines.front() + '\n';
-                for (size_t i = 1; i < MAX_LINES; ++i) {
-                    gcode += lines[i] + '\n';
-                }
-                gcode += "[" + _u8L("continue") + "]\n";
-            }
-            boost::replace_all(gcode, "\n", "\n" + space);
-            return gcode;
-        };
+        tooltip.clear();
         tooltip += tick_code_it->type == CustomGCode::Type::ColorChange ?
             (m_mode == CustomGCode::Mode::SingleExtruder && tick_code_it->extruder == 1 ?
                  format(_u8L("Color change (\"%1%\")"), gcode(CustomGCode::Type::ColorChange)) :
@@ -799,12 +797,27 @@ std::string DoubleSliderForLayers::tooltip(int tick /*=-1*/) const
                      tick_code_it->extruder
                  )) :
             tick_code_it->type == CustomGCode::Type::PausePrint ?
-            format(_u8L("Pause print (\"%1%\")"), gcode(CustomGCode::Type::PausePrint)) :
+            format(
+                _u8L("Pause print (\"%1%\")"),
+                tick_code_it->extra.empty() ?
+                    gcode(CustomGCode::Type::PausePrint) :
+                    fmt::format(
+                        "\nM117 {}\n{}\n",
+                        tick_code_it->extra,
+                        gcode(CustomGCode::Type::PausePrint)
+                    )
+            ) :
             tick_code_it->type == CustomGCode::Type::Template ?
-            format(_u8L("Custom template (\"%1%\")"), gcode(CustomGCode::Type::Template)) :
+            format(
+                _u8L("Custom template (\"%1%\")"),
+                limit_gcode_lines(gcode(CustomGCode::Type::Template))
+            ) :
             tick_code_it->type == CustomGCode::Type::ToolChange ?
             format(_u8L("Extruder (tool) is changed to extruder \"%1%\""), tick_code_it->extruder) :
-            format_gcode(tick_code_it->extra); // tick_code_it->type == Custom
+            format(
+                _u8L("Custom G-code (\"%1%\")"),
+                limit_gcode_lines(tick_code_it->extra)
+            ); // tick_code_it->type == Custom
 
         // If tick is marked as a conflict (exclamation icon),
         // we should to explain why
@@ -1865,6 +1878,12 @@ void DoubleSliderForLayers::open_custom_gcode_dialog(int tick, int extruder, boo
 
     auto it = m_ticks.ticks.find(TickCode{tick});
 
+    std::string input_string = editing ?
+        (it->type == Domain::CustomGCode::Type::Template ?
+             gcode(CustomGCode::Type::Template) :
+             it->extra) :
+        std::string{};
+
     m_navigator.input_text(
         _u8L("Custom G-code on current layer")
             + " ("
@@ -1876,7 +1895,7 @@ void DoubleSliderForLayers::open_custom_gcode_dialog(int tick, int extruder, boo
             )
             + ")",
         _u8L("Enter custom G-code used on current layer") + ":",
-        editing ? it->extra : std::string{},
+        input_string,
         [this, tick, extruder, editing, z](const std::string& text)
         {
             if (editing) {

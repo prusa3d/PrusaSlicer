@@ -288,6 +288,10 @@ void ProcessorImpl::process_gcode_line(const GCodeReader::GCodeLine& line)
 {
     ++m_line_id;
 
+    // Checked before and after processing the line,
+    // so that the custom G-code tag lines are not collected.
+    const bool capturing_custom_gcode = m_custom_gcode_capture.has_value();
+
     // update start position
     m_start_position = m_end_position;
 
@@ -477,6 +481,11 @@ void ProcessorImpl::process_gcode_line(const GCodeReader::GCodeLine& line)
             // Process tags embedded into comments. Tag comments always start at the start of a line
             // with a comment and continue with a tag without any whitespace separator.
             process_tags(skip_whitespaces(comment.substr(1)));
+    }
+
+    if (capturing_custom_gcode && m_custom_gcode_capture.has_value()) {
+        m_custom_gcode_capture->text += line.raw();
+        m_custom_gcode_capture->text += '\n';
     }
 }
 
@@ -1939,6 +1948,57 @@ void ProcessorImpl::process_tags(const std::string_view comment)
         return;
     }
 
+    // The following tags have to be checked before the Pause_Print and Custom_Code tags,
+    // because those are their prefixes.
+
+    // custom code start tag
+    if (comment.starts_with(custom_tag(CustomTags::Custom_Code_Start))) {
+        // The text belongs to the item created by the preceding Custom_Code tag.
+        if (!m_result.custom_gcode_per_print_z.empty() &&
+            m_result.custom_gcode_per_print_z.back().type == CustomGCode::Type::Custom)
+            m_custom_gcode_capture =
+                CustomGCodeCapture{ m_result.custom_gcode_per_print_z.size() - 1, {} };
+        return;
+    }
+
+    // custom code end tag
+    if (comment.starts_with(custom_tag(CustomTags::Custom_Code_End))) {
+        if (m_custom_gcode_capture.has_value()) {
+            std::string& text = m_custom_gcode_capture->text;
+            if (!text.empty()) {
+                // Remove the line break appended after the last line of the custom G-code.
+                text.pop_back();
+            }
+            m_result.custom_gcode_per_print_z[m_custom_gcode_capture->item_id].extra =
+                std::move(text);
+            m_custom_gcode_capture.reset();
+        }
+        return;
+    }
+
+    // custom template start tag
+    if (comment.starts_with(custom_tag(CustomTags::Custom_Template_Start))) {
+        // The template is emitted with the Custom_Code tag,
+        // which created the item as a custom G-code.
+        if (!m_result.custom_gcode_per_print_z.empty() &&
+            m_result.custom_gcode_per_print_z.back().type == CustomGCode::Type::Custom)
+            m_result.custom_gcode_per_print_z.back().type = CustomGCode::Type::Template;
+        return;
+    }
+
+    // custom template end tag
+    if (comment.starts_with(custom_tag(CustomTags::Custom_Template_End)))
+        return;
+
+    // pause print message tag
+    if (comment.starts_with(custom_tag(CustomTags::Pause_Print_Message))) {
+        if (!m_result.custom_gcode_per_print_z.empty() &&
+            m_result.custom_gcode_per_print_z.back().type == CustomGCode::Type::PausePrint)
+            m_result.custom_gcode_per_print_z.back().extra =
+                std::string(comment.substr(custom_tag(CustomTags::Pause_Print_Message).length()));
+        return;
+    }
+
     // moving unretract start tag
     if (comment.starts_with(reserved_tag(Tags::Moving_Unretract_Start))) {
         m_moving_unretract = true;
@@ -2660,6 +2720,7 @@ void ProcessorImpl::reset()
     m_g1_line_id = 0;
     m_layer_id = 0;
     m_last_default_color_id = 0;
+    m_custom_gcode_capture.reset();
     m_feedrate = 0.0f;
     m_fan_speed = 0.0f;
     m_width = 0.0f;

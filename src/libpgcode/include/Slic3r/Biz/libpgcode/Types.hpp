@@ -330,6 +330,11 @@ enum class CustomTags : uint8_t
     Flush_End,
     Exclude_E_Start,
     Exclude_E_End,
+    Custom_Code_Start,
+    Custom_Code_End,
+    Custom_Template_Start,
+    Custom_Template_End,
+    Pause_Print_Message,
     COUNT
 };
 
@@ -337,7 +342,12 @@ static const std::vector<std::string_view> CUSTOM_TAGS = {
     "FLUSH_START"sv,
     "FLUSH_END"sv,
     "EXCLUDE_E_START"sv,
-    "EXCLUDE_E_END"sv
+    "EXCLUDE_E_END"sv,
+    "CUSTOM_GCODE_START"sv,
+    "CUSTOM_GCODE_END"sv,
+    "CUSTOM_TEMPLATE_START"sv,
+    "CUSTOM_TEMPLATE_END"sv,
+    "PAUSE_PRINT_MESSAGE:"sv
 };
 
 } // namespace Slic3r::Biz::libpgcode
