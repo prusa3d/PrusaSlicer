@@ -77,6 +77,8 @@ void ColorMenuItem::set_entry(
 
     if (index) {
         m_swatch->set_extruder_index(*index);
+    }else {
+        m_swatch->set_extruder_index_visible(false);
     }
 }
 
