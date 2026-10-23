@@ -37,10 +37,13 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
     const Platform::MouseEvent::Type type{evt.type()};
 
     if (evt.button() != Platform::MouseButton::Right) {
-        return Scene::GizmoActivationState::Inactive;
+        return m_probing ?
+            Scene::GizmoActivationState::Probing :
+            Scene::GizmoActivationState::Inactive;
     }
 
     if (type == Platform::MouseEvent::Type::ButtonDown) {
+        m_probing = true;
         return Scene::GizmoActivationState::Probing;
     }
     auto& timer_queue = Biz::Platform::PlatformServices::instance().timer_queue();
@@ -63,7 +66,7 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
 
         if (ctx.pick_results().empty()) {
             request_context_menu(ContextMenuType::Scene, pos);
-            return Scene::GizmoActivationState::Inactive;
+            return Scene::GizmoActivationState::Done;
         }
 
         Scene::Node* node = ctx.pick_results().front().node;
@@ -72,6 +75,7 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
 
             if (m_project_interactor.scene_interactor().bed_selection().is_selected(instance)) {
                 request_context_menu(ContextMenuType::Bed, pos);
+                return Scene::GizmoActivationState::Done;
             }
         } else if (const Scene::SceneNodeTag* tag{node->tag_of_type<Scene::SceneNodeTag>()};
                    tag && !tag->is_wipe_tower())
@@ -96,6 +100,11 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
     }
 
     return Scene::GizmoActivationState::Inactive;
+}
+
+void ContextMenuGizmo::on_cycle_prepare()
+{
+    m_probing = false;
 }
 
 } // namespace Slic3r::App::Plater

@@ -8,6 +8,7 @@
 // DEBUG ONLY: for MEASURE_GIZMO_DEBUG
 #include "Slic3r/App/Plater/MeasureGizmo.hpp"
 
+#include <magic_enum/magic_enum.hpp>
 #include <tracy/Tracy.hpp>
 
 #if DEBUG_GIZMO_MANAGER
@@ -143,7 +144,7 @@ void GizmoManager::on_scene_mouse_event(const Platform::MouseEvent& e, const Sli
     auto [pick_results, pick_ray] = pick(e, screen_info);
 
 #if DEBUG_GIZMO_MANAGER
-    update_gizmo_activation_debug_frame_begin();
+    update_gizmo_activation_debug_frame_begin(e);
 #endif
 
     GizmoEventContext ctx{m_scene_provider, e, pick_ray, pick_results, screen_info};
@@ -196,7 +197,7 @@ void GizmoManager::on_scene_mouse_event(const Platform::MouseEvent& e, const Sli
 
             auto ret = g->on_mouse(ctx, single_active);
 #if DEBUG_GIZMO_MANAGER
-        update_gizmo_activation_debug_data(g, ret);
+            update_gizmo_activation_debug_data(g, ret);
 #endif
 
             if (ret == GizmoActivationState::Inactive) {
@@ -477,12 +478,16 @@ void GizmoManager::update_gizmo_activation_debug_data(const IGizmo* g, GizmoActi
     }
 }
 
-void GizmoManager::update_gizmo_activation_debug_frame_begin()
+void GizmoManager::update_gizmo_activation_debug_frame_begin(Platform::MouseEvent event)
 {
     for (auto& [g, gad] : m_activation_debug) {
         gad.push_back(GizmoActivationState::Inactive);
         if (gad.size() > NUM_DEBUG_ACTIVATION_LAST_STEPS)
             gad.pop_front();
+    }
+    m_events_debug.emplace_back(std::move(event));
+    if (m_events_debug.size() > NUM_DEBUG_ACTIVATION_LAST_STEPS) {
+        m_events_debug.pop_front();
     }
 }
 
@@ -491,16 +496,48 @@ void GizmoManager::render_gizmo_activation_debug()
     if (!m_activation_debug_shown)
         return;
 
-    ImGui::SetNextWindowSize(ImVec2(0,240), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(0, ImGui::GetIO().DisplaySize.y), ImGuiCond_Appearing, ImVec2(0, 1));
+    const auto& io = ImGui::GetIO();
+    ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, 240), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(0, io.DisplaySize.y), ImGuiCond_Appearing, ImVec2(0, 1));
 
     if (ImGui::Begin("Gizmo Activation", &m_activation_debug_shown, ImGuiWindowFlags_NoSavedSettings)) {
         // Begin a table with 2 + maxCellsPerRow columns
         if (ImGui::BeginTable("MapDataTable", 1 + NUM_DEBUG_ACTIVATION_LAST_STEPS, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
             // Set fixed width for the first column
-            ImGui::TableSetupColumn("Gizmo", ImGuiTableColumnFlags_WidthFixed, 250.0f); // Adjust 150.0f as needed
+            ImGui::TableSetupColumn("Gizmo", ImGuiTableColumnFlags_WidthFixed, 230.0f); // Adjust 150.0f as needed
+            size_t n = m_events_debug.size();
+            int header_start_idx = NUM_DEBUG_ACTIVATION_LAST_STEPS - n;
+            auto header_it = m_events_debug.begin();
             for (int i = 0; i < NUM_DEBUG_ACTIVATION_LAST_STEPS; ++i) {
-                ImGui::TableSetupColumn("");
+                std::string label;
+                if (i >= header_start_idx) {
+                    auto e = *header_it;
+                    ++header_it;
+                    switch (e.type()) {
+                    case Platform::MouseEvent::Type::Move:
+                        label += "M";
+                        break;
+                    case Platform::MouseEvent::Type::ButtonDown:
+                        label += "D";
+                        break;
+                    case Platform::MouseEvent::Type::ButtonUp:
+                        label += "U";
+                        break;
+                    case Platform::MouseEvent::Type::DoubleClick:
+                        label += "2";
+                        break;
+                    case Platform::MouseEvent::Type::Wheel:
+                        label += "W";
+                        break;
+                    case Platform::MouseEvent::Type::Enter:
+                        label += "E";
+                        break;
+                    case Platform::MouseEvent::Type::Leave:
+                        label += "L";
+                        break;
+                    }
+                }
+                ImGui::TableSetupColumn(label.c_str(), ImGuiTableColumnFlags_WidthStretch);
             }
             ImGui::TableHeadersRow();
 

@@ -23,6 +23,7 @@ public:
     );
 
     Scene::GizmoActivationState on_mouse(Scene::GizmoEventContext& ctx, bool only_active) override;
+    void on_cycle_prepare() override;
 
 private:
     Biz::ProjectInteractor& m_project_interactor;
@@ -30,6 +31,7 @@ private:
 
     Biz::Platform::TimerQueue::TimerID m_timer_id;
     bool m_double_click_detected{false};
+    bool m_probing{false};
 };
 
 } // namespace Slic3r::App::Plater

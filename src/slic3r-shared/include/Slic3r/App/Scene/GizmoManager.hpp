@@ -167,7 +167,7 @@ private:
     const ProjectContext& current_context() const { return m_projects.selected(); }
 #if DEBUG_GIZMO_MANAGER
     void update_gizmo_activation_debug_data(const IGizmo* g, GizmoActivationState state);
-    void update_gizmo_activation_debug_frame_begin();
+    void update_gizmo_activation_debug_frame_begin(Platform::MouseEvent event);
     void render_gizmo_activation_debug();
 #endif
 
@@ -223,9 +223,11 @@ private:
 #if DEBUG_GIZMO_MANAGER
     constexpr static size_t NUM_DEBUG_ACTIVATION_LAST_STEPS = 63;
     using GizmoActivationDebugData = std::list<GizmoActivationState>;
+    using GizmoActivationDebugEvents = std::list<Platform::MouseEvent>;
     using GizmosActivationDebugData = std::unordered_map<const IGizmo*, GizmoActivationDebugData>;
     bool m_activation_debug_shown {true};
     GizmosActivationDebugData m_activation_debug;
+    GizmoActivationDebugEvents m_events_debug;
 #endif
 };
 

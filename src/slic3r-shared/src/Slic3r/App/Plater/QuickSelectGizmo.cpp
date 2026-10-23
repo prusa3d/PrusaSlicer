@@ -590,7 +590,9 @@ Scene::GizmoActivationState QuickSelectGizmo::on_mouse(Scene::GizmoEventContext&
                     m_scene_provider.scene()
                 );
             invoke_hover_changed(hover_data);
-            return Scene::GizmoActivationState::Inactive;
+            return m_processing ?
+                Scene::GizmoActivationState::Probing :
+                Scene::GizmoActivationState::Inactive;
         }
     } else if (type == Platform::MouseEvent::Type::ButtonUp) {
         // First, deactivate rectangle selection if it is active
