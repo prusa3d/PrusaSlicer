@@ -111,16 +111,17 @@ public:
      *
      * The account service rotates the token every few minutes and stops honouring the previous
      * one, so a job that outlives a rotation has to ask again instead of carrying a copy. The
-     * provider is called on the job thread, once per request.
+     * provider is called on the job thread, once per request, and may block while a rotation
+     * is in flight, so it receives the job's stop token.
      */
-    void set_access_token_provider(std::function<std::string()> provider)
+    void set_access_token_provider(std::function<std::string(JThread::StopToken)> provider)
     {
         m_access_token_provider = std::move(provider);
     }
 
     std::string access_token() const
     {
-        return m_access_token_provider ? m_access_token_provider() : std::string{};
+        return m_access_token_provider ? m_access_token_provider(m_stop_token) : std::string{};
     }
 
     bool on_attempt(int attempt, unsigned delay);
@@ -172,7 +173,7 @@ private:
     std::string m_warning_target_vendor;
     PresetUpdaterProgress m_progress;
     Network::HttpRetryOpt m_retry_policy;
-    std::function<std::string()> m_access_token_provider;
+    std::function<std::string(JThread::StopToken)> m_access_token_provider;
     StatusChangedFn m_dispatch_status_fn;
 
     JThread::StopToken m_stop_token;

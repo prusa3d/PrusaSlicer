@@ -39,7 +39,6 @@ void UserAccountInteractor::init(bool app_config_enabled)
                     [](auto* listener) { listener->on_user_account_logged_out(); }
                 );
             }
-            
         }
     }
     
@@ -54,11 +53,10 @@ void UserAccountInteractor::replace_communication(
     std::unique_ptr<IUserAccountCommunication> communication
 )
 {
-    std::unique_ptr<IUserAccountCommunication> released_after_unlock;
-    {
-        std::lock_guard<std::mutex> lock(m_communication_mutex);
-        released_after_unlock = std::exchange(m_communication, std::move(communication));
-    }
+    std::lock_guard<std::mutex> lock(m_communication_mutex);
+    m_retired_communications.emplace_back(
+        std::exchange(m_communication, std::move(communication))
+    );
 }
 
 bool UserAccountInteractor::is_enabled() const
@@ -130,6 +128,19 @@ std::string UserAccountInteractor::access_token() const
 {
     std::lock_guard<std::mutex> lock(m_communication_mutex);
     return m_communication->access_token();
+}
+
+std::string UserAccountInteractor::wait_for_access_token(
+    std::chrono::milliseconds timeout,
+    JThread::StopToken stop_token
+)
+{
+    IUserAccountCommunication* communication = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(m_communication_mutex);
+        communication = m_communication.get();
+    }
+    return communication->wait_for_access_token(timeout, stop_token);
 }
 
 void UserAccountInteractor::request_printables_secret_token()

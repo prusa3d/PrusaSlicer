@@ -55,6 +55,24 @@ size_t unacknowledged_count(const std::vector<VendorReconfiguration>& new_vendor
     ));
 }
 
+/// Names every offer a check would announce, so a later check can tell whether it brings news.
+std::set<std::string> announced_offer_names(const PresetUpdaterReconfigurationList& list)
+{
+    std::set<std::string> names;
+    for (const VendorReconfiguration& update : list.regular_updates()) {
+        names.insert(
+            update.vendor_repo_id + "/" + update.vendor_id + "@"
+            + update.recommended_version.to_string()
+        );
+    }
+    for (const VendorReconfiguration& added : list.new_vendors()) {
+        if (!added.acknowledged) {
+            names.insert(added.vendor_repo_id + "/" + added.vendor_id);
+        }
+    }
+    return names;
+}
+
 void log_reconfigurations(const PresetUpdaterReconfigurationList& list)
 {
     const std::pair<const char*, const std::vector<VendorReconfiguration>*> buckets[]{
@@ -1526,6 +1544,28 @@ void PresetUpdaterController::on_online_allowed_changed()
     }
 }
 
+void PresetUpdaterController::on_logged_in()
+{
+    recheck_sources_silently(CheckAnnouncement::OnChange);
+}
+
+void PresetUpdaterController::on_logged_out()
+{
+    recheck_sources_silently(CheckAnnouncement::Nothing);
+}
+
+void PresetUpdaterController::recheck_sources_silently(CheckAnnouncement announcement)
+{
+    if (m_shut_down || !online_allowed() || dialog_open() || forced_mode()
+        || activity() == ControllerActivity::Installing || sources_changing())
+    {
+        return;
+    }
+
+    Transaction transaction(*this);
+    start_check(Biz::PresetUpdater::SourceListSync::Fetch, CheckReporting::Silent, announcement);
+}
+
 void PresetUpdaterController::check_offline_once_sources_settle()
 {
     if (!m_offline_check_pending || m_shut_down || sources_changing()) {
@@ -1649,11 +1689,14 @@ void PresetUpdaterController::start_listing()
 }
 
 void PresetUpdaterController::start_check(
-    Biz::PresetUpdater::SourceListSync source_list, CheckReporting reporting
+    Biz::PresetUpdater::SourceListSync source_list,
+    CheckReporting reporting,
+    CheckAnnouncement announcement
 )
 {
     cancel_check();
-    m_operation_failed = false;
+    m_operation_failed   = false;
+    m_check_announcement = announcement;
 
     const std::set<std::string> required = m_forced.required_repo_ids();
     m_store.set_required_repos(required);
@@ -2125,6 +2168,19 @@ void PresetUpdaterController::on_preset_updater_reconfigurations_list(
         show_dialog();
         return;
     }
+
+    if (m_check_announcement == CheckAnnouncement::Nothing) {
+        return;
+    }
+    const std::set<std::string> offers = announced_offer_names(reconfigurations);
+    if (m_check_announcement == CheckAnnouncement::OnChange
+        && std::includes(
+            m_announced_offers.begin(), m_announced_offers.end(), offers.begin(), offers.end()
+        ))
+    {
+        return;
+    }
+    m_announced_offers = offers;
 
     // Only what is on offer: presets of a version the source does not list cannot be installed.
     m_activity_reporter.report_check_finished(

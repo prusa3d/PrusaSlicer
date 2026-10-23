@@ -208,9 +208,9 @@ PresetUpdaterVendorRow::PresetUpdaterVendorRow(
 
     m_name = header->emplace_back<Text>(std::string(), Render::ImguiFontType::Bold);
     m_name->set_wrap_mode(Text::WrapMode::WrapElide);
-    m_name->set_min_width(name_width);
+    m_name->set_min_width(name_min_width);
     m_name->set_flex_grow(1);
-    m_name->set_flex_shrink(0);
+    m_name->set_flex_shrink(1);
 
     m_change = header->emplace_back<Text>(std::string());
     m_change->set_width(change_width);

@@ -87,6 +87,8 @@ public:
     void switch_left_tab(LeftBarTabs id, const std::string& data);
 
     void on_user_account_enabled_state_changed(bool is_enabled) override;
+    void on_user_account_id_success(bool is_refresh, const std::string& username) override;
+    void on_user_account_logged_out() override;
     void on_project_loaded(Domain::SelectionId project_id) override;
     void on_project_saved(Domain::SelectionId project_id) override;
 

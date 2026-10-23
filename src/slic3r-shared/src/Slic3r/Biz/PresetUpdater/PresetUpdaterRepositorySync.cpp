@@ -24,6 +24,8 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 
+#include <algorithm>
+
 namespace fs = boost::filesystem;
 
 namespace Slic3r::Biz::PresetUpdater {
@@ -117,6 +119,46 @@ void remove_directory(
 
     if (failed) {
         process_status->set_warning(fmt::format("{}: Failed to remove directory {}: {}", func_name, path.string(), ec.message()), PresetUpdaterReason::LocalStorageFailed);
+    }
+}
+
+/**
+ * @brief Removes staged indices of vendors the source no longer offers.
+ *
+ * Runs only over a freshly parsed answer, so a failed fetch keeps what an earlier one staged.
+ * Indices the installation carries in resources are kept: they are re-staged every sync and
+ * stay installable without the network. A failed removal is only logged, because it merely
+ * keeps yesterday's offer one more round.
+ */
+void remove_indices_the_source_dropped(
+    const std::string& repo_id, const std::vector<PresetUpdaterIndex>& offered
+)
+{
+    std::set<std::string> keep;
+    for (const PresetUpdaterIndex& index : offered) {
+        keep.insert(index.vendor() + ".idx");
+    }
+
+    boost::system::error_code ec;
+    for (const auto& entry : fs::directory_iterator(update_sync_repo_path(repo_id), ec)) {
+        const std::string name = entry.path().filename().string();
+        if (entry.path().extension() != ".idx" || keep.contains(name)) {
+            continue;
+        }
+        boost::system::error_code file_ec;
+        if (fs::is_regular_file(resources_repo_path(repo_id) / name, file_ec)) {
+            continue;
+        }
+        SPDLOG_INFO(
+            "Source {} no longer offers {}. Dropping its staged index.",
+            repo_id,
+            entry.path().stem().string()
+        );
+        if (!fs::remove(entry.path(), file_ec) || file_ec) {
+            SPDLOG_WARN(
+                "Failed to remove staged index {}: {}", entry.path().string(), file_ec.message()
+            );
+        }
     }
 }
 
@@ -603,12 +645,19 @@ void PresetUpdaterRepositorySync::sync_indices(
         return;
     }
 
+    const auto is_private = [](const AbstractPresetUpdaterRepository* repo)
+    { return repo->is_online() && !repo->descriptor().visibility.empty(); };
+    const bool logged_out = online_allowed
+        && std::any_of(repositories.begin(), repositories.end(), is_private)
+        && process_status->access_token().empty();
+    const auto offers_nothing = [&](const AbstractPresetUpdaterRepository* repo)
+    { return repo->is_online() && (!online_allowed || (logged_out && is_private(repo))); };
+
     for (const AbstractPresetUpdaterRepository* repo : repositories) {
         if (process_status->get_canceled()) {
             break;
         }
-        const bool resources_only = repo->is_online() && !online_allowed;
-        if (!repo->is_selected() || resources_only) {
+        if (!repo->is_selected() || offers_nothing(repo)) {
             process_status->set_warning_target(repo->descriptor().id);
             remove_directory(update_sync_repo_path(repo->descriptor().id), process_status, __FUNCTION__);
             process_status->clear_warning_target();
@@ -634,11 +683,38 @@ void PresetUpdaterRepositorySync::sync_indices(
             );
             continue;
         }
+        if (offers_nothing(repo)) {
+            SPDLOG_INFO(
+                "Nobody is logged in, so the private source {} offers nothing.",
+                repo->descriptor().id
+            );
+            continue;
+        }
         this->stage_indices_from_repository(temp_dir / repo->descriptor().id, repo, process_status);
         remove_empty_parents(update_sync_repo_path(repo->descriptor().id), update_sync_root());
     }
 
     remove_directory(temp_dir, process_status, __FUNCTION__);
+}
+
+void PresetUpdaterRepositorySync::remove_unknown_sources(
+    const std::set<std::string>& known_repo_ids,
+    PresetUpdaterProcessStatus* process_status
+) const
+{
+    boost::system::error_code ec;
+    for (const auto& entry : fs::directory_iterator(update_sync_root(), ec)) {
+        boost::system::error_code type_ec;
+        if (!fs::is_directory(entry.path(), type_ec) || type_ec) {
+            continue;
+        }
+        const std::string repo_id = entry.path().filename().string();
+        if (known_repo_ids.contains(repo_id)) {
+            continue;
+        }
+        SPDLOG_INFO("No source has id {}. Dropping its staged files.", repo_id);
+        remove_directory(entry.path(), process_status, __FUNCTION__);
+    }
 }
 
 void PresetUpdaterRepositorySync::stage_indices_from_resources(
@@ -767,6 +843,7 @@ void PresetUpdaterRepositorySync::stage_indices_from_repository(
         process_status->set_warning_target(repo->descriptor().id, index.vendor());
         stage_index(index.path(), repo->descriptor().id, index.vendor(), process_status, __FUNCTION__);
     }
+    remove_indices_the_source_dropped(repo->descriptor().id, index_db);
     process_status->clear_warning_target();
 }
 

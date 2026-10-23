@@ -14,8 +14,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/trompeloeil.hpp>
 
+#include <chrono>
 #include <ctime>
 #include <functional>
+#include <future>
 #include <map>
 #include <memory>
 #include <string>
@@ -299,4 +301,86 @@ TEST_CASE_METHOD(SessionFixture, "Logout reports whether a session was signed in
     CHECK(listener.logged_out[1].was_logged_in);
 
     session.remove_listener<IUserAccountSessionListener>(&listener);
+}
+
+TEST_CASE_METHOD(SessionFixture, "Token wait returns a usable token right away", "[user_account]")
+{
+    session.set_tokens("access-token", "refresh-token", "session-key", std::time(nullptr) + 3600);
+
+    CHECK(session.wait_for_access_token(std::chrono::milliseconds(0)) == "access-token");
+}
+
+TEST_CASE_METHOD(SessionFixture, "Token wait returns right away when logged out", "[user_account]")
+{
+    const auto before = std::chrono::steady_clock::now();
+
+    CHECK(session.wait_for_access_token(std::chrono::seconds(5)).empty());
+    CHECK(std::chrono::steady_clock::now() - before < std::chrono::seconds(1));
+}
+
+TEST_CASE_METHOD(SessionFixture, "Token wait hands out the token a refresh delivers", "[user_account]")
+{
+    session.set_tokens("stale-token", "refresh-token", "session-key", std::time(nullptr) - 10);
+
+    auto waiter = std::async(
+        std::launch::async,
+        [this] { return session.wait_for_access_token(std::chrono::seconds(5)); }
+    );
+    session.set_tokens("fresh-token", "refresh-token", "session-key", std::time(nullptr) + 3600);
+
+    CHECK(waiter.get() == "fresh-token");
+}
+
+TEST_CASE_METHOD(SessionFixture, "Token wait settles empty on logout", "[user_account]")
+{
+    session.set_tokens("stale-token", "refresh-token", "session-key", std::time(nullptr) - 10);
+
+    auto waiter = std::async(
+        std::launch::async,
+        [this] { return session.wait_for_access_token(std::chrono::seconds(5)); }
+    );
+    session.do_clear(false);
+
+    CHECK(waiter.get().empty());
+}
+
+TEST_CASE_METHOD(SessionFixture, "Token wait returns the stale token after the timeout", "[user_account]")
+{
+    session.set_tokens("stale-token", "refresh-token", "session-key", std::time(nullptr) - 10);
+
+    const auto before       = std::chrono::steady_clock::now();
+    const std::string token = session.wait_for_access_token(std::chrono::milliseconds(50));
+
+    CHECK(token == "stale-token");
+    CHECK(std::chrono::steady_clock::now() - before >= std::chrono::milliseconds(50));
+}
+
+TEST_CASE_METHOD(SessionFixture, "Token wait leaves early when its job is stopped", "[user_account]")
+{
+    session.set_tokens("stale-token", "refresh-token", "session-key", std::time(nullptr) - 10);
+
+    JThread::StopSource stop_source = std::make_unique<std::atomic<bool>>(false);
+    JThread::StopToken stop_token{stop_source};
+    auto waiter = std::async(
+        std::launch::async,
+        [this, stop_token]
+        { return session.wait_for_access_token(std::chrono::seconds(60), stop_token); }
+    );
+    stop_source->store(true);
+
+    REQUIRE(waiter.wait_for(std::chrono::seconds(5)) == std::future_status::ready);
+    CHECK(waiter.get() == "stale-token");
+}
+
+TEST_CASE_METHOD(SessionFixture, "Stop wakes token waiters and outlasts them", "[user_account]")
+{
+    session.set_tokens("stale-token", "refresh-token", "session-key", std::time(nullptr) - 10);
+
+    auto waiter = std::async(
+        std::launch::async,
+        [this] { return session.wait_for_access_token(std::chrono::seconds(60)); }
+    );
+    session.stop();
+
+    CHECK(waiter.wait_for(std::chrono::seconds(5)) == std::future_status::ready);
 }
