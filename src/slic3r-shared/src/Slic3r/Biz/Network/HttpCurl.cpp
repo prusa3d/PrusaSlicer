@@ -509,6 +509,17 @@ IHttp& HttpCurl::set_range(const std::string& range)
     return *this;
 }
 
+IHttp& HttpCurl::restrict_redirects(long max_redirects)
+{
+    ::curl_easy_setopt(m_curl.get(), CURLOPT_MAXREDIRS, max_redirects);
+#if LIBCURL_VERSION_NUM >= 0x075500 // CURLOPT_REDIR_PROTOCOLS_STR is available since v7.85, CURLOPT_REDIR_PROTOCOLS deprecated.
+    ::curl_easy_setopt(m_curl.get(), CURLOPT_REDIR_PROTOCOLS_STR, "https");
+#else
+    ::curl_easy_setopt(m_curl.get(), CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTPS);
+#endif
+    return *this;
+}
+
 IHttp& HttpCurl::header(std::string name, const std::string& value)
 {
     if (name.size() > 0) {

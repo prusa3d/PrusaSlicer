@@ -145,6 +145,7 @@ FileDownloaderJobData perform_job(
     bool success                = false;
     Network::IHttp::create(Network::IHttp::RequestMethod::Get, job_data.input_data.file_url, retry_fn)
         ->size_limit(DOWNLOAD_SIZE_LIMIT) // more?
+        .restrict_redirects(10)
         .set_range(range_string)
         .on_progress(
             [&](Network::IHttp::Progress progress, bool& cancel)

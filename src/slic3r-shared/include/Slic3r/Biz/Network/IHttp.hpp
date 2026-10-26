@@ -127,6 +127,11 @@ public:
 	 * Example: curl_easy_setopt(curl, CURLOPT_RANGE, "0-199");
 	 */
 	virtual IHttp& set_range(const std::string& range) = 0;
+
+	/**
+	 * @brief Follow at most max_redirects redirects and only to https:// URLs.
+	 */
+	virtual IHttp& restrict_redirects(long max_redirects) = 0;
 	
 	/**
 	 * @brief Sets an HTTP header field.

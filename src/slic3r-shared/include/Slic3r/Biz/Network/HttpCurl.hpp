@@ -43,6 +43,11 @@ public:
 	IHttp& set_range(const std::string& range) override;
 
 	/**
+	 * @brief Follow at most max_redirects redirects and only to https:// URLs.
+	 */
+	IHttp& restrict_redirects(long max_redirects) override;
+
+	/**
 	 * @brief Sets an HTTP header field.
 	 */
 	IHttp& header(std::string name, const std::string& value) override;

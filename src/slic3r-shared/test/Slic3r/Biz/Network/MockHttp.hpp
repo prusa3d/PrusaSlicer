@@ -98,6 +98,14 @@ public:
         return *this;
     }
 
+    MAKE_MOCK1(restrict_redirects_mock, void(long));
+
+    IHttp& restrict_redirects(long m) override
+    {
+        restrict_redirects_mock(m);
+        return *this;
+    }
+
     MAKE_MOCK2(header_mock, void(std::string, const std::string&));
 
     IHttp& header(std::string k, const std::string& v) override
