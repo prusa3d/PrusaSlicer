@@ -5,6 +5,7 @@
 #include "Slic3r/Domain/ObjectID.hpp"
 
 #include <map>
+#include <set>
 #include <string>
 #include <variant>
 #include <vector>
@@ -22,6 +23,7 @@ struct EffectiveValue
     struct OverriddenBy
     {
         ConfigLocation location;
+        std::set<std::size_t> slots;
         bool operator==(const OverriddenBy&) const = default;
     };
 

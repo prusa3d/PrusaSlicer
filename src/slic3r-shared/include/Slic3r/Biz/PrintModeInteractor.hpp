@@ -46,7 +46,8 @@ public:
     virtual PrintMode evaluate(
         const std::string& id,
         const std::map<std::string, Domain::ConfigValue>& inputs,
-        const Domain::PrintModeParams& params
+        const Domain::PrintModeParams& params,
+        const Domain::Preset::HwPrinterConfig& hw_config
     ) const = 0;
 };
 
@@ -61,7 +62,8 @@ public:
     PrintMode evaluate(
         const std::string& id,
         const std::map<std::string, Domain::ConfigValue>& inputs,
-        const Domain::PrintModeParams& params) const override
+        const Domain::PrintModeParams& params,
+        const Domain::Preset::HwPrinterConfig&) const override
     {
         return {{}, "No print modes provider"};
     }

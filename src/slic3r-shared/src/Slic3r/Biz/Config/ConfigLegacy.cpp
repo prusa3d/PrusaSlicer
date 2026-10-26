@@ -691,7 +691,7 @@ ConfigPack convert_dynamic_print_config_to_new(Slic3rLegacy::DynamicPrintConfig&
                 spiral_vase.set(false);
                 out.macro_overrides.insert_or_assign(
                     Domain::vase_mode_layer_id(),
-                    Domain::make_vase_mode_layer()
+                    Domain::make_vase_mode_layer(out.filament.size())
                 );
             }
             return out;

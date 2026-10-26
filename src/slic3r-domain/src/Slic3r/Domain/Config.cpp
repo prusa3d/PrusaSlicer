@@ -5,6 +5,7 @@
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Domain/ConfigDefsFDM.hpp"
 #include "Slic3r/Domain/ConfigDefsSLA.hpp"
+#include "Slic3r/Domain/MacroOverrides.hpp"
 
 #include <algorithm>
 #include <numeric>
@@ -329,6 +330,14 @@ static std::vector<size_t> get_tool_slot_counts(const Preset::HwPrinterConfig& h
     return counts;
 }
 
+static BoxRefs fit_slot_boxes(const BoxRefs& boxes, const std::size_t material_slot_count)
+{
+    static const MacroSlotOverridesFDM empty_box;
+    BoxRefs result{boxes.begin(), boxes.begin() + std::min(boxes.size(), material_slot_count)};
+    result.resize(material_slot_count, std::cref(empty_box));
+    return result;
+}
+
 static BoxOrBoxesVector
 spread_feeders(const BoxOrBoxesVector& boxes, const Preset::HwPrinterConfig& hw_config)
 {
@@ -342,6 +351,14 @@ spread_feeders(const BoxOrBoxesVector& boxes, const Preset::HwPrinterConfig& hw_
         const BoxRefs& boxes{std::get<BoxRefs>(box_or_boxes)};
         if (boxes.size() == hw_config.material_slot_count()) {
             result.push_back(box_or_boxes);
+            continue;
+        }
+
+        ASSERT(!boxes.empty());
+        if (boxes.front().get().location
+            == ConfigLocation{FDMConfigLocation::MacroSlotOverrides})
+        {
+            result.push_back(fit_slot_boxes(boxes, hw_config.material_slot_count()));
             continue;
         }
 
@@ -410,21 +427,6 @@ static ConfigValue spread_values(const ConfigItem& item, const std::size_t size)
     return extract_values(items);
 }
 
-static bool is_defined_per_material_slot(const ConfigItemDef& def)
-{
-    if (def.location == ConfigLocation{FDMConfigLocation::Tool}
-        || def.location == ConfigLocation{FDMConfigLocation::Filament})
-    {
-        return true;
-    }
-    if (def.overrides_in.contains(FDMConfigLocation::Tool)
-        || def.overrides_in.contains(FDMConfigLocation::Filament))
-    {
-        return true;
-    }
-    return false;
-}
-
 static ConfigValueAndDef
 normalize(const ConfigItem& item, std::size_t material_slot_count)
 {
@@ -456,9 +458,28 @@ static void set_vector_value(ConfigValue& vector, std::size_t index, const Confi
         });
 }
 
+static ConfigValue get_vector_element(const ConfigValue& vector, std::size_t index)
+{
+    return vector.visit(
+        [&](auto&& vector) -> ConfigValue
+        {
+            using VectorType = std::remove_cvref_t<decltype(vector)>;
+            if constexpr (Domain::is_std_vector_v<VectorType>) {
+                using ValueType = VectorType::value_type;
+                return ConfigValue{ValueType{vector.at(index)}};
+            } else if constexpr (std::is_same_v<VectorType, EnumVectorWrapper>) {
+                return ConfigValue{
+                    EnumWrapper{vector.values().at(index), vector.type(), vector.def()}};
+            } else {
+                PANIC("Vector is expected!");
+            }
+        });
+}
+
 struct SquashResult {
     std::map<std::string, ConfigValueAndDef> squashed_values;
     EffectiveValueMap effective_values;
+    std::map<std::string, std::set<std::size_t>> partially_defined_slots;
 };
 
 static SquashResult squash_boxes(const BoxOrBoxesVector& boxes, std::size_t material_slot_count)
@@ -486,6 +507,7 @@ static SquashResult squash_boxes(const BoxOrBoxesVector& boxes, std::size_t mate
             } else {
                 it->second                = value;
             }
+            result.partially_defined_slots.erase(name);
             result.effective_values[name].modifications.push_back(
                 EffectiveValue::Modification{
                     EffectiveValue::OverriddenBy{box.location},
@@ -519,6 +541,7 @@ static SquashResult squash_boxes(const BoxOrBoxesVector& boxes, std::size_t mate
                             } else {
                                 set_vector_value(it->second.value, box_index, item.value());
                             }
+                            result.partially_defined_slots.erase(item.name());
                         }
                     }
 
@@ -531,26 +554,42 @@ static SquashResult squash_boxes(const BoxOrBoxesVector& boxes, std::size_t mate
                                 it->second.value});
                     }
 
-                    std::set<std::string> overriden_by;
+                    std::map<std::string, std::set<std::size_t>> overriden_by;
                     for (std::size_t box_index{}; box_index < boxes.size(); ++box_index) {
                         const ConfigBox& box{boxes[box_index].get()};
                         for (const auto& item : box.overrides.overridden_items()) {
-                            auto it{result.squashed_values.find(item.get().name())};
+                            const std::string& name{item.get().name()};
+                            auto it{result.squashed_values.find(name)};
                             if (it == result.squashed_values.end()) {
-                                result.squashed_values.insert({item.get().name(), normalize(item.get(), material_slot_count)});
+                                result.squashed_values.insert(
+                                    {name, normalize(item.get(), material_slot_count)});
+                                result.partially_defined_slots[name].insert(box_index);
                             } else {
                                 set_vector_value(it->second.value, box_index, item.get().value());
+                                const auto slots{result.partially_defined_slots.find(name)};
+                                if (slots != result.partially_defined_slots.end()) {
+                                    slots->second.insert(box_index);
+                                }
                             }
-                            overriden_by.insert(item.get().name());
+                            overriden_by[name].insert(box_index);
                         }
                     }
 
-                    for (const std::string& name : overriden_by) {
+                    for (const auto& [name, _] : overriden_by) {
+                        const auto slots{result.partially_defined_slots.find(name)};
+                        if (slots != result.partially_defined_slots.end()
+                            && slots->second.size() == boxes.size())
+                        {
+                            result.partially_defined_slots.erase(slots);
+                        }
+                    }
+
+                    for (const auto& [name, slots] : overriden_by) {
                         const auto it{result.squashed_values.find(name)};
                         ASSERT(it != result.squashed_values.end());
                         result.effective_values[name].modifications.push_back(
                             EffectiveValue::Modification{
-                                EffectiveValue::OverriddenBy{boxes.front().get().location},
+                                EffectiveValue::OverriddenBy{boxes.front().get().location, slots},
                                 it->second.value});
                     }
                 }},
@@ -1161,6 +1200,7 @@ SquashedConfig::SquashedConfig(
         m_values[key] = item.value;
     }
     m_effective_values = squashed_boxes.effective_values;
+    m_partially_defined_slots = std::move(squashed_boxes.partially_defined_slots);
 }
 
 const Preset::HwPrinterConfig& SquashedConfig::hw_config() const {
@@ -1169,11 +1209,30 @@ const Preset::HwPrinterConfig& SquashedConfig::hw_config() const {
 
 std::vector<std::string> SquashedConfig::diff_keys(const SquashedConfig& other) const
 {
-    return ::Slic3r::Domain::diff_keys<std::string, ConfigValue>(
+    std::vector<std::string> result{::Slic3r::Domain::diff_keys<std::string, ConfigValue>(
         m_values,
         other.m_values,
         [](const ConfigValue& a, const ConfigValue& b) { return a == b; }
-    );
+    )};
+    const auto differs_in_slots{[&](const std::string& key)
+    {
+        const auto mine{m_partially_defined_slots.find(key)};
+        const auto theirs{other.m_partially_defined_slots.find(key)};
+        const bool mine_found{mine != m_partially_defined_slots.end()};
+        const bool theirs_found{theirs != other.m_partially_defined_slots.end()};
+        if (mine_found != theirs_found) {
+            return true;
+        }
+        return mine_found && mine->second != theirs->second;
+    }};
+    for (const auto* slots : {&m_partially_defined_slots, &other.m_partially_defined_slots}) {
+        for (const auto& [key, _] : *slots) {
+            if (differs_in_slots(key) && std::ranges::find(result, key) == result.end()) {
+                result.push_back(key);
+            }
+        }
+    }
+    return result;
 }
 
 bool SquashedConfig::operator==(const SquashedConfig& other) const
@@ -1184,6 +1243,11 @@ bool SquashedConfig::operator==(const SquashedConfig& other) const
 const std::map<std::string, ConfigValue>& SquashedConfig::values() const
 {
     return m_values;
+}
+
+const std::map<std::string, std::set<std::size_t>>& SquashedConfig::partially_defined_slots() const
+{
+    return m_partially_defined_slots;
 }
 
 std::pair<ConfigValue, bool> apply_compatibility_rule(
@@ -1248,6 +1312,7 @@ FullConfig::FullConfig(
     const Preset::HwPrinterConfig& hw_config) :
     SquashedConfig{input, extruder_candidates, hw_config}
 {
+    ASSERT(m_partially_defined_slots.empty());
     std::ranges::transform(
         m_values,
         std::back_inserter(m_keys),
@@ -1327,6 +1392,12 @@ std::size_t SquashedConfig::hash() const
     for (const auto& [key, value] : m_values) {
         boost::hash_combine(seed, Domain::hash(key));
         boost::hash_combine(seed, Domain::hash(value));
+    }
+    for (const auto& [key, slots] : m_partially_defined_slots) {
+        boost::hash_combine(seed, Domain::hash(key));
+        for (const std::size_t slot : slots) {
+            boost::hash_combine(seed, slot);
+        }
     }
     return seed;
 }
@@ -1465,13 +1536,28 @@ const Domain::Preset::HwPrinterConfig& ConfigView::hw_config() const {
 ConfigValue ConfigView::resolve_value(const std::string& key) const
 {
     ASSERT(!m_finalized);
-    for (auto rev_it = m_partial_configs.rbegin(); rev_it != m_partial_configs.rend(); ++rev_it) {
-        const PartialConfig& partial_config{*rev_it};
-        if (auto result{partial_config.get_value(key)}) {
-            return *result;
+    std::optional<ConfigValue> result;
+    for (const PartialConfig& partial_config : m_partial_configs) {
+        const std::optional<ConfigValue> partial_value{partial_config.get_value(key)};
+        if (!partial_value) {
+            continue;
+        }
+        const auto slots{partial_config.partially_defined_slots().find(key)};
+        if (slots == partial_config.partially_defined_slots().end()) {
+            result = *partial_value;
+            continue;
+        }
+        if (!result) {
+            result = m_full_config->get_value(key);
+        }
+        for (const std::size_t slot : slots->second) {
+            set_vector_value(*result, slot, get_vector_element(*partial_value, slot));
         }
     }
-    return m_full_config->get_value(key);
+    if (!result) {
+        return m_full_config->get_value(key);
+    }
+    return *result;
 }
 
 } // namespace Slic3r::Domain

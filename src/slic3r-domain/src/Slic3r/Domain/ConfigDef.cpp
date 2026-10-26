@@ -353,6 +353,8 @@ std::string get_location_name(const ConfigLocation& location)
                     return "volume_settings";
                 case FDMConfigLocation::MacroOverrides:
                     return "macro_overrides";
+                case FDMConfigLocation::MacroSlotOverrides:
+                    return "macro_slot_overrides";
                 default:
                     PANIC("Unknown location");
                 }
@@ -381,6 +383,21 @@ std::string get_location_name(const ConfigLocation& location)
         },
         location
     );
+}
+
+bool is_defined_per_material_slot(const ConfigItemDef& def)
+{
+    if (def.location == ConfigLocation{FDMConfigLocation::Tool}
+        || def.location == ConfigLocation{FDMConfigLocation::Filament})
+    {
+        return true;
+    }
+    if (def.overrides_in.contains(FDMConfigLocation::Tool)
+        || def.overrides_in.contains(FDMConfigLocation::Filament))
+    {
+        return true;
+    }
+    return false;
 }
 
 ConfigDefinitions::ConfigDefinitions(
@@ -424,6 +441,19 @@ void ConfigDefinitions::check_valid() const
         }, def.location);
 
         ASSERT(!def.overrides_in.contains(def.location));
+
+        const bool macro_overridable{def.overrides_in.contains(FDMConfigLocation::MacroOverrides)};
+        const bool macro_slot_overridable{
+            def.overrides_in.contains(FDMConfigLocation::MacroSlotOverrides)};
+        ASSERT(
+            !(macro_overridable && macro_slot_overridable),
+            "'" + def.name + "' is both macro and macro slot overridable");
+        ASSERT(
+            !macro_overridable || !is_defined_per_material_slot(def),
+            "'" + def.name + "' is defined per slot, it must be macro slot overridable");
+        ASSERT(
+            !macro_slot_overridable || is_defined_per_material_slot(def),
+            "'" + def.name + "' is not defined per slot, it must be macro overridable");
 
         // Check that all items are assigned to valid boxes.
         ASSERT(m_acceptable_boxes.contains(def.location));

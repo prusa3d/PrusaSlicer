@@ -25,6 +25,7 @@ function execute(opts)
         support_material_xy_spacing = config:value("support_material_xy_spacing") * 0.5,
         support_material_extruder = opts.extruder,
         support_material_interface_extruder = opts.extruder,
+        filament_soluble = {[opts.extruder] = true},
         wipe_tower_bridging = config:value("wipe_tower_bridging") * 0.75,
         support_material_extrusion_width = config:value("support_material_extrusion_width") * 0.875
     }

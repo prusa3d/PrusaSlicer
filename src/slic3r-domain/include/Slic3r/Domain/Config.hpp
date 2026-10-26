@@ -241,6 +241,8 @@ public:
 
     const std::map<std::string, ConfigValue>& values() const;
 
+    const std::map<std::string, std::set<std::size_t>>& partially_defined_slots() const;
+
     /* This is an extremelly dangerous operation, possibly modifying the slicing input.
      * Use with caution, and not that it is up to you to ensure the type of the
      * value is correct. */
@@ -258,6 +260,7 @@ public:
 protected:
     std::map<std::string, ConfigValue> m_values;
     EffectiveValueMap m_effective_values;
+    std::map<std::string, std::set<std::size_t>> m_partially_defined_slots;
 
     Preset::HwPrinterConfig m_hw_config;
     std::vector<unsigned> m_extruder_candidates;

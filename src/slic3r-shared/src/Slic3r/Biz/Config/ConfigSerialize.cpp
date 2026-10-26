@@ -138,6 +138,7 @@ nlohmann::ordered_json to_json(const Domain::ConfigPackFDM& config_pack)
     const std::string location{
         Domain::get_location_name(Domain::FDMConfigLocation::MacroOverrides)};
     json.erase(location);
+    json.erase(Domain::get_location_name(Domain::FDMConfigLocation::MacroSlotOverrides));
     if (config_pack.macro_overrides.empty()) {
         return json;
     }
@@ -152,6 +153,13 @@ nlohmann::ordered_json to_json(const Domain::ConfigPackFDM& config_pack)
         layer_json["name"] = layer.name;
         layer_json["params"] = std::move(params);
         layer_json["overrides"] = layer.overrides;
+        Domain::BoxRefs slot_boxes;
+        slot_boxes.insert(
+            slot_boxes.end(), layer.slot_overrides.cbegin(), layer.slot_overrides.cend());
+        layer_json["slot_overrides"] = nlohmann::ordered_json::object();
+        if (!slot_boxes.empty()) {
+            layer_json["slot_overrides"] = slot_boxes;
+        }
     }
     json[location] = std::move(layers);
     return json;

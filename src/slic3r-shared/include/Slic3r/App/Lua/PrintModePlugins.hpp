@@ -20,7 +20,8 @@ public:
     Biz::PrintMode evaluate(
         const std::string& id,
         const std::map<std::string, Domain::ConfigValue>& inputs,
-        const Domain::PrintModeParams& params) const override;
+        const Domain::PrintModeParams& params,
+        const Domain::Preset::HwPrinterConfig& hw_config) const override;
 
     void on_plugins_scanned(const PluginRegistry& registry) override;
 

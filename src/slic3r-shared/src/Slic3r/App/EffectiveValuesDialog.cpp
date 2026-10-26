@@ -112,10 +112,17 @@ bool is_print_location(const Domain::ConfigLocation& location)
     return fdm && *fdm == Domain::FDMConfigLocation::Print;
 }
 
+bool is_macro_slot_override(const Domain::ConfigLocation& location)
+{
+    const auto* fdm{std::get_if<Domain::FDMConfigLocation>(&location)};
+    return fdm && *fdm == Domain::FDMConfigLocation::MacroSlotOverrides;
+}
+
 bool is_macro_override(const Domain::ConfigLocation& location)
 {
     if (const auto* fdm{std::get_if<Domain::FDMConfigLocation>(&location)}) {
-        return *fdm == Domain::FDMConfigLocation::MacroOverrides;
+        return *fdm == Domain::FDMConfigLocation::MacroOverrides
+            || *fdm == Domain::FDMConfigLocation::MacroSlotOverrides;
     }
     if (const auto* sla{std::get_if<Domain::SLAConfigLocation>(&location)}) {
         return *sla == Domain::SLAConfigLocation::MacroOverrides;
@@ -138,6 +145,7 @@ std::string location_label(const Domain::ConfigLocation& location)
                 case Domain::FDMConfigLocation::Object: return Biz::_u8L("Object settings");
                 case Domain::FDMConfigLocation::Volume: return Biz::_u8L("Part settings");
                 case Domain::FDMConfigLocation::MacroOverrides: return Biz::_u8L("Mode override");
+                case Domain::FDMConfigLocation::MacroSlotOverrides: return Biz::_u8L("Mode override");
                 case Domain::FDMConfigLocation::None: return {};
                 }
                 PANIC("Unknown location");
@@ -160,6 +168,17 @@ std::string location_label(const Domain::ConfigLocation& location)
             { return Biz::_u8L("Application settings"); },
         },
         location);
+}
+
+bool overrides_key(const Domain::MacroOverridesLayerFDM& layer, const std::string& key)
+{
+    if (layer.overrides.overrides.find(key)) {
+        return layer.overrides.overrides.get(key).has_value();
+    }
+    return std::ranges::any_of(
+        layer.slot_overrides,
+        [&](const Domain::MacroSlotOverridesFDM& slot_box)
+        { return slot_box.overrides.find(key) && slot_box.overrides.get(key).has_value(); });
 }
 
 std::string def_label(const std::string& key, Domain::PrinterTechnology technology)
@@ -264,6 +283,7 @@ public:
         std::string label;
         std::vector<std::string> values;
         bool per_tool{false}; // values has one entry per tool.
+        std::set<size_t> slots; // Non-empty: only these tool columns show a value.
     };
 
     ValueTable()
@@ -360,8 +380,10 @@ private:
         label->set_text_color(text_color);
 
         if (row.per_tool) {
-            for (const std::string& value : row.values) {
-                auto cell{row_item->emplace_back<Yoga::Text>(value, font)};
+            for (size_t slot{}; slot < row.values.size(); ++slot) {
+                const bool shown{row.slots.empty() || row.slots.contains(slot)};
+                auto cell{row_item->emplace_back<Yoga::Text>(
+                    shown ? row.values[slot] : std::string{}, font)};
                 cell->set_width(fpx(ColumnWidth));
                 cell->set_align({Yoga::AlignH::Center, Yoga::AlignV::Center});
                 cell->set_text_color(text_color);
@@ -508,7 +530,7 @@ std::string EffectiveValuesDialog::macro_override_label(const std::string& key) 
 
     if (const auto* fdm{std::get_if<Domain::MacroOverridesMapFDM>(&macro_overrides)}) {
         for (const auto& [id, layer] : *fdm) {
-            if (!layer.overrides.overrides.get(key).has_value() || layer.name.empty()) {
+            if (layer.name.empty() || !overrides_key(layer, key)) {
                 continue;
             }
             return layer.name;
@@ -594,7 +616,8 @@ void EffectiveValuesDialog::update_effective_value_table(const std::string& key)
 
     const auto make_row{[&](ValueTable::Row::Kind kind,
                             const std::string& label,
-                            const Domain::ConfigValue& value)
+                            const Domain::ConfigValue& value,
+                            const std::set<size_t>& slots = {})
     {
         std::vector<std::string> values{to_display_strings(item, value)};
         bool per_tool{false};
@@ -604,7 +627,8 @@ void EffectiveValuesDialog::update_effective_value_table(const std::string& key)
         } else if (per_slot_item && values.size() == slot_count) {
             per_tool = true;
         }
-        return ValueTable::Row{kind, label, std::move(values), per_tool};
+        return ValueTable::Row{
+            kind, label, std::move(values), per_tool, per_tool ? slots : std::set<size_t>{}};
     }};
 
     const auto is_set_in_print{[](const Domain::EffectiveValue::Modification& modification)
@@ -652,10 +676,14 @@ void EffectiveValuesDialog::update_effective_value_table(const std::string& key)
         make_row(ValueTable::Row::Kind::Effective, Biz::_u8L("Effective value"), effective));
     rows.push_back({ValueTable::Row::Kind::Section, Biz::_u8L("How this value was determined")});
     for (const Domain::EffectiveValue::Modification& modification : to_display) {
+        const auto* overridden_by{
+            std::get_if<Domain::EffectiveValue::OverriddenBy>(&modification.payload)};
+        const bool slot_override{overridden_by && is_macro_slot_override(overridden_by->location)};
         rows.push_back(make_row(
             ValueTable::Row::Kind::Step,
             step_label(modification, printer_technology, macro_label),
-            modification.value));
+            modification.value,
+            slot_override ? overridden_by->slots : std::set<size_t>{}));
     }
 
     m_table->set_rows(tools, rows);
