@@ -67,11 +67,11 @@ void open_folder(const std::string& path)
 
 std::string filename_from_url(const std::string& url)
 {
-	std::string url_plain = std::string(url.begin(), std::find(url.begin(), url.end(), '?'));
+	std::string url_plain = std::string(url.begin(), std::find_if(url.begin(), url.end(), [](char c) { return c == '?' || c == '#'; }));
 	size_t slash = url_plain.find_last_of("/");
 	if (slash == std::string::npos)
 		return std::string();
-	return std::string(url_plain.begin() + slash + 1, url_plain.end());
+	return FileGet::sanitize_filename(std::string(url_plain.begin() + slash + 1, url_plain.end()));
 }
 std::string unescape_url(const std::string& unescaped)
 {

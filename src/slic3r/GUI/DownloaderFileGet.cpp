@@ -60,6 +60,27 @@ bool FileGet::is_subdomain(const std::string& url, const std::string& domain)
 	return false;
 }
 
+std::string FileGet::sanitize_filename(const std::string& filename)
+{
+	// Keep only the last path component. Both separators are handled on all platforms,
+	// so a name prepared for Windows cannot traverse there, and the behavior is the same everywhere.
+	size_t      separator = filename.find_last_of("/\\");
+	std::string name      = separator == std::string::npos ? filename : filename.substr(separator + 1);
+	// Prevent ':' (drive letters and alternate data streams on Windows) and control characters.
+	name.erase(std::remove_if(name.begin(), name.end(), [](unsigned char c) { return c == ':' || c < 32 || c == 127; }), name.end());
+	// Reject ".", ".." and names made of dots and spaces only (Windows strips trailing dots and spaces, so "... " is "..").
+	if (name.find_first_not_of(". ") == std::string::npos)
+		return {};
+	// Prevent Windows reserved device names. Windows 10 and older treat "COM3.gcode" (or the temporary
+	// "COM3.gcode.<pid>.download") as the COM3 device, so the download would be written to a serial port.
+	std::string stem = boost::algorithm::to_upper_copy(name.substr(0, name.find('.')));
+	boost::algorithm::trim_right(stem);
+	static const std::regex reserved_regex("CON|PRN|AUX|NUL|CONIN\\$|CONOUT\\$|(COM|LPT)([0-9]|\xC2\xB9|\xC2\xB2|\xC2\xB3)");
+	if (std::regex_match(stem, reserved_regex))
+		name = "_" + name;
+	return name;
+}
+
 namespace {
 unsigned get_current_pid()
 {
@@ -127,13 +148,13 @@ struct FileGet::priv
 FileGet::priv::priv(int ID, std::string&& url, const std::string& filename, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder, bool load_after)
 	: m_id(ID)
 	, m_url(std::move(url))
-	, m_filename(filename)
+	, m_filename(FileGet::sanitize_filename(filename))
 	, m_evt_handler(evt_handler)
 	, m_dest_folder(dest_folder)
     , m_load_after(load_after)
 {
-    // Prevent ':' in filename
-    m_filename.erase(std::remove(m_filename.begin(), m_filename.end(), ':'), m_filename.end());
+    if (m_filename.empty())
+        m_filename = "download";
 }
 
 void FileGet::priv::get_perform()
@@ -212,6 +233,7 @@ void FileGet::priv::get_perform()
 	size_t written_this_session = 0;
 	Http::get(m_url)
 		.size_limit(DOWNLOAD_SIZE_LIMIT) //more?
+		.restrict_redirects(10)
 		.set_range(range_string)
 		.on_progress([&](Http::Progress progress, bool& cancel) {
 			// to prevent multiple calls into following ifs (m_cancel / m_pause)
@@ -278,7 +300,7 @@ void FileGet::priv::get_perform()
 		})
         .on_headers([&](const std::string& headers) {
             // we are looking for content-disposition header in response, to use it as correct filename
-            std::string new_filename = extract_filename_from_header(headers);
+            std::string new_filename = FileGet::sanitize_filename(extract_filename_from_header(headers));
             if (new_filename.empty()) {
                 return;
             }
