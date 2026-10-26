@@ -14,6 +14,7 @@
 #include "Slic3r/Assert.hpp"
 
 
+#include <algorithm>
 #include <nlohmann/json.hpp>
 #include <regex>
 
@@ -309,6 +310,8 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_sli
     return {{BrowserLogicCommandType::SwitchToSlicing, {}}};
 }
 
+static constexpr int MAX_SLICE_FILES_COUNT = 100;
+
 std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_slice_files(const std::string& message_data)
 {
 
@@ -326,7 +329,8 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_sli
                     info.file_name = obj["name"].get<std::string>();
                 }
                 if (obj.contains("count") && obj["count"].is_number_integer()) {
-                    info.load_count = obj["count"].get<int>();
+                    // Each copy loads the file again, do not let the message ask for a negative (huge as size_t) or absurd count.
+                    info.load_count = std::clamp(obj["count"].get<int>(), 0, MAX_SLICE_FILES_COUNT);
                 }
                 if (obj.contains("source")) {
                     const auto& source = obj["source"];
