@@ -3,6 +3,7 @@
 #include "Slic3r/Biz/AppInstance/AppInstanceUtils.hpp"
 #include "Slic3r/Biz/Network/IHttp.hpp"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/nowide/fstream.hpp>
@@ -50,6 +51,14 @@ std::string sanitize_filename(const std::string& filename)
     // Reject ".", ".." and names made of dots and spaces only (Windows strips trailing dots and spaces, so "... " is "..").
     if (name.find_first_not_of(". ") == std::string::npos) {
         return {};
+    }
+    // Prevent Windows reserved device names. Windows 10 and older treat "COM3.gcode" (or the temporary
+    // "COM3.gcode.<pid>.download") as the COM3 device, so the download would be written to a serial port.
+    std::string stem = boost::algorithm::to_upper_copy(name.substr(0, name.find('.')));
+    boost::algorithm::trim_right(stem);
+    static const std::regex reserved_regex("CON|PRN|AUX|NUL|CONIN\\$|CONOUT\\$|(COM|LPT)([0-9]|\xC2\xB9|\xC2\xB2|\xC2\xB3)");
+    if (std::regex_match(stem, reserved_regex)) {
+        name = "_" + name;
     }
     return name;
 }

@@ -37,3 +37,17 @@ TEST_CASE("sanitize_filename rejects names without a usable file name")
     CHECK(sanitize_filename("dir/").empty());
     CHECK(sanitize_filename("dir/..").empty());
 }
+
+TEST_CASE("sanitize_filename prefixes Windows reserved device names")
+{
+    CHECK(sanitize_filename("COM3.gcode") == "_COM3.gcode");
+    CHECK(sanitize_filename("com3.gcode") == "_com3.gcode");
+    CHECK(sanitize_filename("nul") == "_nul");
+    CHECK(sanitize_filename("NUL .txt") == "_NUL .txt");
+    CHECK(sanitize_filename("Nul.tar.gz") == "_Nul.tar.gz");
+    CHECK(sanitize_filename("conin$.3mf") == "_conin$.3mf");
+    CHECK(sanitize_filename("LPT\xC2\xB9.stl") == "_LPT\xC2\xB9.stl");
+    CHECK(sanitize_filename("COM10.gcode") == "COM10.gcode");
+    CHECK(sanitize_filename("CONSOLE.stl") == "CONSOLE.stl");
+    CHECK(sanitize_filename(".NUL") == ".NUL");
+}
