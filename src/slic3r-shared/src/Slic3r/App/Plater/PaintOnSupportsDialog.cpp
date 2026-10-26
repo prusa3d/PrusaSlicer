@@ -20,6 +20,7 @@ PaintOnSupportsDialog::Callbacks& PaintOnSupportsDialog::callbacks()
 
 PaintOnSupportsDialog::PaintOnSupportsDialog() : GizmoWindow()
 {
+    set_object_name("PaintOnSupportsDialog");
     content()->set_padding(20.f);
     content()->set_gap(2.f * gap_size());
 

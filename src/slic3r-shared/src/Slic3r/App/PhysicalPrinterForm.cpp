@@ -496,6 +496,7 @@ void PhysicalPrinterForm::build_form()
 
     // TRN Button that verifies the connection to the configured print host.
     m_test_button = footer->emplace_back<LayoutButton>(_u8L("Test"));
+    m_test_button->set_object_name("TestConnectionButton");
     m_test_button->set_content_padding({10_fpx, 4_fpx});
     m_test_button->callbacks().action = [this]
     {
@@ -513,6 +514,7 @@ void PhysicalPrinterForm::build_form()
         Render::Icon::TobBarSave,
         Biz::_u8L("Save this printer configuration")
     );
+    m_save_button->set_object_name("SavePrinterButton");
     m_save_button->set_content_padding({10_fpx, 4_fpx});
     m_save_button->set_content_align_items(YGAlignCenter);
     // Icon has no intrinsic size, without it the icon collapses next to the label

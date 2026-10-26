@@ -201,6 +201,7 @@ PluginDialog::PluginDialog(
     const Domain::FontList& fonts,
     const std::string& default_font_name
 ) :
+    Dialog("PluginDialog"),
     m_process_function(std::move(process_function)),
     m_fonts(fonts),
     m_default_font_name(default_font_name)

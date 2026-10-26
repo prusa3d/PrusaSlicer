@@ -41,7 +41,7 @@ PrinterSettingsDialog::PrinterSettingsDialog(
     PrinterAddDialog* printer_add_dialog,
     Navigator& navigator
 ) :
-    Dialog({"Printers"}, "LogicalPrinterSettingsDialog"),
+    Dialog({"Printers"}, "PrinterSettingsDialog"),
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
     m_selected_project_changed_listener_scope(project_interactor, *this),
     m_project_interactor(project_interactor),

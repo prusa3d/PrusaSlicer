@@ -9,6 +9,8 @@
 #include "Slic3r/App/Yoga/ScrollArea.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 
+#include <magic_enum/magic_enum.hpp>
+
 namespace Slic3r::App::PopNotification {
 
 using namespace Yoga;
@@ -16,6 +18,15 @@ using namespace Yoga;
 const Unit TotalWidth = 400_fpx;
 const Unit MinHeight  =  40_fpx;
 const Unit MaxHeight  = 160_fpx;
+
+namespace {
+
+std::string object_name_of(PopNotificationType type)
+{
+    return std::string(magic_enum::enum_name(type)) + "Notification";
+}
+
+} // namespace
 
 PopNotificationView::PopNotificationView(
     size_t index,
@@ -27,6 +38,7 @@ PopNotificationView::PopNotificationView(
     m_notification_list(notification_list),
     m_current_level(m_state->level)
 {
+    set_object_name(object_name_of(m_state->type));
     layout();
 }
 
@@ -83,6 +95,8 @@ void PopNotificationView::layout()
 void PopNotificationView::on_data_update()
 {
     ASSERT(m_state);
+
+    set_object_name(object_name_of(m_state->type));
 
     if (m_current_layout.index() != m_state->layout.index() || m_current_level != m_state->level) {
         m_current_level = m_state->level;

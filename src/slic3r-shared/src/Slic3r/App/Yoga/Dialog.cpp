@@ -8,9 +8,24 @@
 namespace Slic3r::App::Yoga {
 constexpr Unit dialog_padding = 10_fpx;
 
+namespace {
+
+std::string popup_name(const std::string& dialog_name)
+{
+    constexpr std::string_view suffix{"Dialog"};
+    if (dialog_name.ends_with(suffix)) {
+        return dialog_name.substr(0, dialog_name.size() - suffix.size()) + "Popup";
+    }
+    return dialog_name + "Popup";
+}
+
+} // namespace
+
 Dialog::Dialog(const std::string& name)
 {
-    WindowPtr window = std::make_unique<Window>(name.empty() ? "Dialog" : name);
+    const std::string dialog_name = name.empty() ? "Dialog" : name;
+    set_object_name(popup_name(dialog_name));
+    WindowPtr window = std::make_unique<Window>(dialog_name);
 
     window->set_orientation(Orientation::Vertical);
     window->set_gap(0);
@@ -53,6 +68,7 @@ Dialog::Dialog(const std::string& name)
     buttons_rect->set_rounding(0);
 
     m_close_button = buttons_rect->emplace_back<LayoutButton>(std::string{}, Render::Icon::PrintIdle);
+    m_close_button->set_object_name("DialogCloseButton");
     m_close_button->set_min_width(20_fpx);
     m_close_button->set_min_height(20_fpx);
     m_close_button->callbacks().action = [this] {
@@ -115,6 +131,7 @@ Separator* Dialog::add_separator()
 LayoutButton* Dialog::append_tab(const std::string& tab)
 {
     LayoutButton* tab_button = m_tab_container->emplace_back<LayoutButton>(tab);
+    tab_button->set_object_name("DialogTabButton");
     tab_button->set_checkable(true);
     tab_button->set_content_padding({10_fpx, 3_fpx});
     tab_button->set_background_color(Platform::Color::WindowBgAlternate);

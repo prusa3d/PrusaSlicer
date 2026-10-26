@@ -41,6 +41,7 @@ class AbstractRenderCanvas;
 
 namespace Yoga {
 class Dialog;
+class RootItem;
 } // namespace Yoga
 
 namespace Render {
@@ -75,6 +76,8 @@ public:
 
     /// False between set_canvas and on_init, while the app runs without the plater and preview.
     bool has_modules() const;
+
+    Yoga::RootItem* current_root_item();
 
     void on_init(
         Plater::PlaterRenderModule& plater_module,

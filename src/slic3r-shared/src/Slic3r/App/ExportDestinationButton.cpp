@@ -43,6 +43,7 @@ ExportDestinationButton::ExportDestinationButton(Biz::ExportDestination::ExportD
     m_listener_scope(interactor, *this),
     m_interactor(interactor)
 {
+    set_object_name("ExportDestinationButton");
     m_menu = emplace_back<Yoga::Menu>("export_destination_menu", Yoga::Position::Left);
     for (ExportDestination destination : Biz::ExportDestination::ALL_EXPORT_DESTINATIONS) {
         Yoga::MenuItem* item = m_menu->append_item(destination_label(destination), destination_icon(destination));

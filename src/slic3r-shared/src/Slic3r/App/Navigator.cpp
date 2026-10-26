@@ -74,6 +74,15 @@ bool Navigator::has_modules() const
     return m_project_contexts != nullptr;
 }
 
+Yoga::RootItem* Navigator::current_root_item()
+{
+    if (!has_modules()) {
+        return nullptr;
+    }
+    RenderModuleBase* module = current_render_module();
+    return module != nullptr ? &module->root_item() : nullptr;
+}
+
 void Navigator::navigate_to_module_type(Render::ModuleType type)
 {
     if (!has_modules()) {

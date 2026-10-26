@@ -700,6 +700,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Yoga/ItemEvents.cpp
         include/Slic3r/App/Yoga/RootItem.hpp
         src/Slic3r/App/Yoga/RootItem.cpp
+        include/Slic3r/App/Yoga/TreeDump.hpp
+        src/Slic3r/App/Yoga/TreeDump.cpp
         include/Slic3r/App/Yoga/StackLayout.hpp
         src/Slic3r/App/Yoga/StackLayout.cpp
         include/Slic3r/App/Yoga/Popup.hpp
@@ -1711,6 +1713,8 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/App/Yoga/ComboBoxTests.cpp
             test/Slic3r/App/Yoga/ComboBoxListViewTests.cpp
             test/Slic3r/App/Yoga/ComboBoxListViewSelectionTests.cpp
+            test/Slic3r/App/Yoga/RenderInfoTests.cpp
+            test/Slic3r/App/Yoga/TreeDumpTests.cpp
 
             test/Slic3r/Biz/ProjectInteractorTests.cpp
             test/Slic3r/Biz/ExportGcodeTests.cpp

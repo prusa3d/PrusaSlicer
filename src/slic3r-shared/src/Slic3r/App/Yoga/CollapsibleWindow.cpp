@@ -26,6 +26,7 @@ CollapsibleWindow::CollapsibleWindow(const std::string& label, const std::string
 
     m_collapse_button =
         m_header_row->emplace_back<LayoutButton>(std::string{}, Render::Icon::CaretUp);
+    m_collapse_button->set_object_name("CollapseButton");
     m_collapse_button->callbacks().action = [this] { set_collapsed(!m_collapsed); };
     m_collapse_button->set_width(22_fpx);
     m_collapse_button->set_height(22_fpx);

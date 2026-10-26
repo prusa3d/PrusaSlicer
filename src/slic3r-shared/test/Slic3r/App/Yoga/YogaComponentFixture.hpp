@@ -10,7 +10,7 @@ struct YogaComponentFixture : public ImGuiFixture
 {
     YogaComponentFixture()
     {
-        window = root.emplace_back<Slic3r::App::Yoga::Window>("test");
+        window = root.emplace_back<Slic3r::App::Yoga::Window>("Test");
         window->set_padding(0.f);
         window->set_flex_grow(1.f);
         window->set_rounding(0.f);

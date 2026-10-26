@@ -45,6 +45,7 @@ public:
     void open(Vec2f pos);
     void close();
     bool opened() const;
+    bool last_frame_opened() const;
 
     ImGuiWindowFlags flags() const;
     void set_flags(ImGuiWindowFlags flags);

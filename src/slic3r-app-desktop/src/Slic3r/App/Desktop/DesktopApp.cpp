@@ -1,6 +1,8 @@
 #include "DesktopApp.hpp"
 
 #include "MainFrame.hpp"
+#include "Testing/TestDialogs.hpp"
+#include "Testing/TestMode.hpp"
 #include "Slic3r/App/Undo/Store.hpp"
 #include "SplashScreen.hpp"
 #include <wx/weakref.h>
@@ -34,6 +36,7 @@
 
 #include <Slic3r/Directories.hpp>
 #include <Slic3r/App/Render/TextureManager.hpp>
+#include <Slic3r/App/Yoga/Item.hpp>
 
 #include <Slic3r/Biz/Platform/PlatformServices.hpp>
 #include <Slic3r/Biz/Platform/JobManager/JobManager.hpp>
@@ -271,6 +274,13 @@ static void select_favorite_preset(
 
 bool DesktopApp::OnInit()
 {
+    // First, so that no wx dialog is shown in test mode, not even during startup.
+    if (m_init_params.misc.test_mode) {
+        m_test_dialogs = std::make_shared<Testing::TestDialogs>();
+        m_modal_hook   = std::make_unique<Testing::ModalHook>(m_test_dialogs);
+        m_modal_hook->Register();
+    }
+
     auto& app_services{AppServices::instance()};
     Theme::Style style = app_services.app_config().get<Theme::Style>("theme");
 
@@ -339,6 +349,19 @@ bool DesktopApp::OnInit()
 
     platform_services.set_main_thread_dispatcher(std::make_unique<WXMainThreadDispatcher>());
 
+    // Before any window exists, so that a slicer whose server can't start exits cleanly.
+    if (m_init_params.misc.test_mode) {
+        m_test_mode = std::make_unique<Testing::TestMode>(
+            m_init_params.misc.test_mode->port,
+            m_init_params.misc.test_mode->password,
+            m_test_dialogs
+        );
+        if (!m_test_mode->start()) {
+            SetErrorExitCode(EXIT_FAILURE);
+            return false;
+        }
+    }
+
     platform_services.set_secret_store(SecretStoreFactory::create_secret_store());
     // Reset Token store if Account not allowed in app_config
     if (!app_services.app_config().is_prusa_account_enabled()) {
@@ -376,7 +399,11 @@ bool DesktopApp::OnInit()
     m_thumbnail_store_updater =
         std::make_shared<App::ThumbnailStoreUpdater>(*m_thumbnail_image_generator, m_thumbnail_store);
 
-    app_services.set_dialog_manager(std::make_unique<WX::DialogManager>());
+    if (m_test_dialogs) {
+        app_services.set_dialog_manager(std::make_unique<Testing::TestDialogManager>(m_test_dialogs));
+    } else {
+        app_services.set_dialog_manager(std::make_unique<WX::DialogManager>());
+    }
 
     app_services.set_navigator(std::make_unique<Navigator>());
     Navigator& navigator{app_services.navigator()};
@@ -485,6 +512,10 @@ bool DesktopApp::OnInit()
     m_project_saver = std::make_shared<ProjectSaver>(*m_project_interactor, *m_thumbnail_store);
 
     m_main_frame = new MainFrame(m_workbench, *m_project_interactor, navigator, m_project_saver);
+    if (m_init_params.misc.test_mode) {
+        m_main_frame->show_testing_title(m_init_params.misc.test_mode->port);
+        Yoga::Item::set_test_mode(true);
+    }
     platform_services.app_instance_message_handler().init(m_main_frame->GetHandle());
     Platform::WX::WXRenderCanvas& canvas = m_main_frame->get_render_canvas();
     m_gl_context                         = canvas.release_context();
@@ -503,6 +534,10 @@ bool DesktopApp::OnInit()
     // The main thread dispatcher is drained from the canvas only once the window is up, so the
     // answer of the check started above cannot arrive before this point.
     m_main_frame->Show();
+
+    if (m_test_mode) {
+        m_test_mode->attach(canvas, navigator);
+    }
 
     return true;
 }
@@ -716,6 +751,7 @@ void DesktopApp::finish_init()
 
 DesktopApp::~DesktopApp()
 {
+    m_test_mode.reset();
     m_mouse_3d_backend.reset();
 
     // Before m_project_interactor, which owns the interactor the model listens to and calls into.

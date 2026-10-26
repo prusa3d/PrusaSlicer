@@ -24,6 +24,7 @@ SimplifyDialog::Callbacks& SimplifyDialog::callbacks()
 
 SimplifyDialog::SimplifyDialog() : GizmoWindow()
 {
+    set_object_name("SimplifyDialog");
     content()->set_orientation(Orientation::Vertical);
     content()->set_gap(gap_size());
 
@@ -36,7 +37,7 @@ SimplifyDialog::SimplifyDialog() : GizmoWindow()
     add_separator(content());
 
     m_detail_level_btn = Passthrough{std::make_unique<RadioButton>(_u8L("Level of detail"))};
-    m_detail_level     = Passthrough{std::make_unique<ComboBox>("Detail level")};
+    m_detail_level     = Passthrough{std::make_unique<ComboBox>("DetailLevelComboBox")};
     m_detail_level->set_max_width(preffered_max_width());
     m_detail_level->set_items( // Order must match enum class Detail
         {_ctx_u8L("Extra high", "Simplify: Detail level"),

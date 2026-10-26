@@ -457,6 +457,11 @@ MsgBoxHandler* PreviewRenderModule::msg_box_handler()
     return &m_layout->msg_box_handler();
 }
 
+Yoga::RootItem& PreviewRenderModule::root_item()
+{
+    return m_layout->root_item();
+}
+
 void PreviewRenderModule::on_init(
     Render::Device& device,
     Render::ImguiRender& imgui_render,

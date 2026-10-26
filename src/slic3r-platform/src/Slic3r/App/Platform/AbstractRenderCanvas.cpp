@@ -116,6 +116,10 @@ void AbstractRenderCanvas::render()
         end_frame(*cmd_buffer);
     }
 
+    invoke_listeners<IFrameRenderedListener>(
+        [frame = ImGui::GetFrameCount()](auto* L) { L->on_frame_rendered(frame); }
+    );
+
     if (m_next_render_module) {
         set_render_module(m_next_render_module);
         m_next_render_module = nullptr;

@@ -60,7 +60,7 @@ ObjectButton::ObjectButton(CollapsibleArea* collapsible_item, bool is_printable)
     m_name->set_wrap_mode(Text::WrapMode::WrapElide);
     m_name->set_flex_grow(1.f);
 
-    m_name_editing = emplace_back<InputTextField>("Object name");
+    m_name_editing = emplace_back<InputTextField>("ObjectName");
     m_name_editing->set_flex_grow(1.f);
     m_name_editing->set_color(Platform::Color::Transparent);
     m_name_editing->set_visible(false);

@@ -31,6 +31,7 @@ TranslationDialog::TranslationDialog(
     m_project_interactor{project_interactor},
     m_projects{project_interactor}
 {
+    set_object_name("TranslationDialog");
     m_scene_provider.add_listener<App::Plater::ISelectionExtentsChangedListener>(this);
     m_project_interactor.scene_interactor().add_listener<Biz::ISelectedBedInstancesChangedListener>(
         this

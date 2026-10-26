@@ -29,6 +29,7 @@ ProjectButton::ProjectButton(
     m_project_interactor(project_interactor),
     m_project_saver(project_saver)
 {
+    set_object_name("ProjectButton");
     m_project_interactor.add_listener<Biz::ISelectedProjectChangedListener>(this);
 
     set_allow_overlap(true);
@@ -48,6 +49,7 @@ ProjectButton::ProjectButton(
     m_label->set_self_align(YGAlignCenter);
 
     m_cross = m_background->emplace_back<LayoutButton>("", Render::Icon::TopBarCross);
+    m_cross->set_object_name("CloseProjectButton");
     m_cross->set_width(22_fpx);
     m_cross->set_height(22_fpx);
     m_cross->set_self_align(YGAlignCenter);

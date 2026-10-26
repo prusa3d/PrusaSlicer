@@ -17,6 +17,8 @@ public:
 
     void root_render(const SizeInfo& size_info);
 
+    int last_rendered_frame() const;
+
     void set_style_dirty() override;
 
     void style_node() override;
@@ -54,6 +56,9 @@ protected:
     Popups m_popups;
     Popups m_popups_to_be_added;
     Popups m_popups_to_be_deleted;
+
+private:
+    int m_last_rendered_frame = -1;
 };
 
 } // namespace Slic3r::App::Yoga

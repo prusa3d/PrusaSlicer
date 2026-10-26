@@ -75,6 +75,8 @@ public:
     void sys_color_changed();
     bool select_language();
 
+    void show_testing_title(uint16_t port);
+
     // set language, font and all other ui settings for canvas
     void update_graphics_settings();
 

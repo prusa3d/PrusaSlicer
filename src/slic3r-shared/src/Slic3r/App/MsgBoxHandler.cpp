@@ -156,7 +156,7 @@ public:
         MsgBoxHandler::DialogButtons dialog_buttons,
         Navigator& navigator
     ) :
-        Dialog({title}, "YesNoCancel"),
+        Dialog({title}, "YesNoCancelDialog"),
         m_fn_cancelled(fn_cancelled),
         m_navigator(navigator)
     {

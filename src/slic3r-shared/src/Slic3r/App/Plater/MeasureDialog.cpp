@@ -23,6 +23,7 @@ using namespace Biz;
 
 MeasureDialog::MeasureDialog() : GizmoWindow()
 {
+    set_object_name("MeasureDialog");
     const Vec2f shortcut_button_size{30.f, 30.f};
 
     content()->set_orientation(Orientation::Vertical);

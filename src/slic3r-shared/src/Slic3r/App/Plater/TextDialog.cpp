@@ -29,6 +29,7 @@ TextDialog::Callbacks& TextDialog::callbacks()
 
 TextDialog::TextDialog() : GizmoWindow()
 {
+    set_object_name("TextDialog");
     content()->set_gap(2.f * gap_size());
 
     m_editor = content()->emplace_back<InputTextField>();

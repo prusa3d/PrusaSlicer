@@ -27,6 +27,7 @@ RotationDialog::RotationDialog(
     m_project_interactor{project_interactor},
     m_projects{project_interactor}
 {
+    set_object_name("RotationDialog");
     m_scene_provider.add_listener<App::Plater::ISelectionExtentsChangedListener>(this);
     m_project_interactor.add_listener<Biz::ISelectedProjectChangedListener>(this);
     m_project_interactor.scene_interactor()

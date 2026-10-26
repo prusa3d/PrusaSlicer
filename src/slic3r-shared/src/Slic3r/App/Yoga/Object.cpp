@@ -3,6 +3,8 @@
 #include "Slic3r/App/Yoga/ItemEvents.hpp"
 #include "Slic3r/Log.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <stack>
 
 namespace Slic3r::App::Yoga {
@@ -47,9 +49,15 @@ const std::string& Object::object_name() const
 
 void Object::set_object_name(const std::string& object_name)
 {
-    ASSERT(
-        object_name.find('_') == std::string::npos,
-        "Yoga::Object name cannot contain underscore '_'"
+    DEBUG_ASSERT(
+        !object_name.empty()
+            && std::isupper(static_cast<unsigned char>(object_name.front()))
+            && std::ranges::all_of(
+                object_name,
+                [](char c) { return std::isalnum(static_cast<unsigned char>(c)); }
+            ),
+        "Yoga::Object name must be CamelCase: letters and digits only, starting with an uppercase "
+        "letter (no '_', no ' ')"
     );
 
     // Get item name without increment

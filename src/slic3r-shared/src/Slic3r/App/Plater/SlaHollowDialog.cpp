@@ -41,6 +41,7 @@ SlaHollowDialog::Callbacks& SlaHollowDialog::callbacks()
 
 SlaHollowDialog::SlaHollowDialog() : GizmoWindow()
 {
+    set_object_name("SlaHollowDialog");
     content()->set_padding(20.f);
     content()->set_gap(2.f * gap_size());
 

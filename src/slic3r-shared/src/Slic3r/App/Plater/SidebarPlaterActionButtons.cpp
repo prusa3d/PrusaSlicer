@@ -49,6 +49,7 @@ void SidebarPlaterActionButtons::on_init(Biz::ProjectInteractor* project_interac
     layout_bottom->set_orientation(Orientation::Horizontal);
 
     m_button_slice = layout_bottom->emplace_back<LayoutButton>("Slice");
+    m_button_slice->set_object_name("SliceButton");
     m_button_slice->set_flex_grow(1);
     m_button_slice->set_background_color(Platform::Color::AccentPrimary);
     m_button_slice->set_min_height(button_height);

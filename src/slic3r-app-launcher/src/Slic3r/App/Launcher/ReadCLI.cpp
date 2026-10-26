@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cassert>
+#include <charconv>
 #include <optional>
 #include <thread>
 #include <iostream>
@@ -569,6 +570,29 @@ void add_action_options(CLI::App& app, App::InitParams& params)
            "--generate-preset-cache",
            params.action.generate_preset_cache,
            "Generate preset bundle cache for faster debug build startup."
+    )
+        ->group("");
+
+    app.add_option_function<std::string>(
+           "--test",
+           [&params](const std::string& value)
+           {
+               const size_t separator = value.find(':');
+               if (separator == std::string::npos) {
+                   throw CLI::ValidationError("--test", "Expected <port>:<password>, got '" + value + "'");
+               }
+               const std::string port_str = value.substr(0, separator);
+               std::string password = value.substr(separator + 1);
+               unsigned port = 0;
+               const auto [end, ec] = std::from_chars(port_str.data(), port_str.data() + port_str.size(), port);
+               if (ec != std::errc{} || end != port_str.data() + port_str.size() || port < 1 || port > 65535) {
+                   throw CLI::ValidationError("--test", "Port must be an integer in 1..65535, got '" + port_str + "'");
+               }
+               if (password.empty()) {
+                   throw CLI::ValidationError("--test", "Password must not be empty");
+               }
+               params.misc.test_mode = App::TestModeParams{static_cast<uint16_t>(port), std::move(password)};
+           }
     )
         ->group("");
 }

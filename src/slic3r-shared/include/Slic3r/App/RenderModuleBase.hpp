@@ -24,6 +24,10 @@ class GizmoManager;
 class Scene;
 } // namespace Scene
 
+namespace Yoga {
+class RootItem;
+} // namespace Yoga
+
 /**
  * @brief Base class shared by the project-backed render modules (PlaterRenderModule,
  *        PreviewRenderModule). Holds the gizmo/menu/dialog/navigation infrastructure that is
@@ -52,6 +56,8 @@ public:
     virtual void set_modal_dialog(ModalDialog dialog);
 
     virtual MsgBoxHandler* msg_box_handler();
+
+    virtual Yoga::RootItem& root_item() = 0;
 
 protected:
     void apply_mouse_3d_input(Scene::Scene& scene);

@@ -14,6 +14,7 @@ ToolBarSwitchButton::ToolBarSwitchButton(
     m_switch_position(switch_position),
     m_label(label)
 {
+    set_object_name("ToolBarSwitchButton");
     set_label(label);
 
     set_background_color(Platform::Color::Button);

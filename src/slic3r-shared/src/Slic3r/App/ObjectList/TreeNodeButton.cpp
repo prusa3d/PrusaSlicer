@@ -28,6 +28,7 @@ const Unit default_height = 28_fpx;
 ActionButton::ActionButton(Render::Icon icon, const std::string& tooltip) :
     LayoutButton(std::string{}, icon, tooltip)
 {
+    set_object_name("ActionButton");
     set_min_width(18_fpx);
     set_min_height(18_fpx);
     set_content_padding(0);

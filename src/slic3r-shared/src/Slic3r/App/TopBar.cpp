@@ -124,6 +124,7 @@ TopBar::TopBar(
         Render::Icon::Plus,
         Biz::_u8L("Add new project")
     );
+    add_new_project_btn->set_object_name("AddProjectButton");
     add_new_project_btn->callbacks().action = [this] { m_project_interactor.new_project(); };
 
     Item* right_wrapper = emplace_back<Item>();
@@ -297,6 +298,7 @@ void TopBar::focus_search()
 void TopBar::add_save_project_btn(Item* parent)
 {
     m_save_btn = parent->emplace_back<LayoutButton>("", Render::Icon::TobBarSave, _u8L("Save"));
+    m_save_btn->set_object_name("SaveProjectButton");
     m_render_module->command_binding_manager().bind_tb_item(CommandName::SaveProject, m_save_btn);
 }
 
@@ -312,11 +314,13 @@ void TopBar::add_undo_btn(Item* parent)
     auto item{parent->emplace_back<Item>()};
     m_undo_btn =
         item->emplace_back<LayoutButton>(std::string{}, Render::Icon::TopBarUndo, _u8L("Undo"));
+    m_undo_btn->set_object_name("UndoButton");
     m_undo_stack_btn = item->emplace_back<LayoutButton>(
         std::string{},
         Render::Icon::CaretDown,
         _u8L("Undo stack")
     );
+    m_undo_stack_btn->set_object_name("UndoStackButton");
     m_undo_stack_btn->set_enabled(false);
 
     m_undo_menu = m_undo_stack_btn->emplace_back<Yoga::Menu>("undo_menu", Yoga::Position::Bottom);
@@ -332,11 +336,13 @@ void TopBar::add_redo_btn(Item* parent)
     auto item{parent->emplace_back<Item>()};
     m_redo_btn =
         item->emplace_back<LayoutButton>(std::string{}, Render::Icon::TopBarRedo, _u8L("Redo"));
+    m_redo_btn->set_object_name("RedoButton");
     m_redo_stack_btn = item->emplace_back<LayoutButton>(
         std::string{},
         Render::Icon::CaretDown,
         _u8L("Redo stack")
     );
+    m_redo_stack_btn->set_object_name("RedoStackButton");
     m_redo_stack_btn->set_enabled(false);
 
     m_redo_menu = m_redo_stack_btn->emplace_back<Yoga::Menu>("redo_menu", Yoga::Position::Bottom);
@@ -351,6 +357,7 @@ void TopBar::add_show_ui_btn(Item* parent)
 {
     m_show_ui_btn =
         parent->emplace_back<LayoutButton>("", Render::Icon::TobBarShowUI, _u8L("Hide sidebars"));
+    m_show_ui_btn->set_object_name("HideSidebarsButton");
     m_show_ui_btn->set_checkable(true);
     m_show_ui_btn->set_checked(AppServices::instance().app_config().get<bool>("hide_sidebars"));
 
@@ -372,6 +379,7 @@ void TopBar::add_menu_btns(Item* parent)
             MenuBuilder::item_name_translated(main_menu_item->name()),
             MenuBuilder::item_icon(main_menu_item->name())
         );
+        m_main_menu_btn->set_object_name("MainMenuButton");
         m_main_menu_btn->icon_object()->set_preserve_colors(true);
         m_main_menu_btn->set_background_color(Platform::Color::ButtonTransparent);
         m_main_menu_btn->callbacks().action = [this]() { toggle_menu_visibility(m_main_menu); };
@@ -393,6 +401,7 @@ void TopBar::add_menu_btns(Item* parent)
             MenuBuilder::item_name_translated(file_menu_item->name()),
             MenuBuilder::item_icon(file_menu_item->name())
         );
+        m_file_menu_btn->set_object_name("FileMenuButton");
         m_file_menu_btn->set_background_color(Platform::Color::ButtonTransparent);
         m_file_menu_btn->callbacks().action = [this]() { toggle_menu_visibility(m_file_menu); };
         m_file_menu_btn->callbacks().hovered_changed = [this](bool hovered)

@@ -14,6 +14,7 @@
 namespace Slic3r::App::Yoga {
 
 Render::ImguiRender* Item::m_imgui_render = nullptr;
+bool Item::m_test_mode                    = false;
 
 Item::Item()
 {
@@ -511,6 +512,20 @@ void Item::set_imgui_render(Render::ImguiRender* imgui_render)
     m_imgui_render = imgui_render;
 }
 
+void Item::set_test_mode(bool test_mode)
+{
+    m_test_mode = test_mode;
+}
+
+bool Item::debug_enabled()
+{
+#ifdef DEBUG
+    return true;
+#else
+    return m_test_mode;
+#endif
+}
+
 void Object::set_theme(Theme* theme)
 {
     m_theme = theme;
@@ -816,10 +831,14 @@ void Item::style_node()
     }
 }
 
-void Item::render_item_begin(const Vec2f& pos, const Vec2f& size) {}
+void Item::render_item_begin(const Vec2f& pos, const Vec2f& size)
+{
+    record_render(pos, size);
+}
 
 void Item::render_item_end(const Vec2f& pos, const Vec2f& size)
 {
+    record_render(pos, size);
     render_debug(pos, size);
 
     for (size_t render_index = 0; render_index < m_children_render_order.size(); ++render_index) {
@@ -841,13 +860,35 @@ void Item::render_node(const Vec2f& pos, Item* child)
         return;
     }
 
+    child->record_render(cell_pos, cell_size);
     child->render(cell_pos, cell_size);
+}
+
+void Item::record_render(const Vec2f& pos, const Vec2f& size)
+{
+    m_last_render_pos   = pos;
+    m_last_render_size  = size;
+    m_last_render_frame = ImGui::GetFrameCount();
+}
+
+Vec2f Item::last_render_pos() const
+{
+    return m_last_render_pos;
+}
+
+Vec2f Item::last_render_size() const
+{
+    return m_last_render_size;
+}
+
+int Item::last_render_frame() const
+{
+    return m_last_render_frame;
 }
 
 void Item::render_debug(const Vec2f& pos, const Vec2f& size)
 {
-#ifdef DEBUG
-    {
+    if (debug_enabled()) {
         ImRect rect(to_im(pos), to_im(pos + size));
 
         if (ImGui::IsMouseHoveringRect(rect.Min, rect.Max, false)) {
@@ -859,7 +900,6 @@ void Item::render_debug(const Vec2f& pos, const Vec2f& size)
             }
         }
     }
-#endif
 
     if (m_debug_border) {
         ImDrawList* draw_list = ImGui::GetForegroundDrawList();

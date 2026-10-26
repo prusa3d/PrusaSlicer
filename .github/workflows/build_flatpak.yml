@@ -23,10 +23,19 @@ on:
 
 jobs:
   build_flatpak:
-    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_flatpak.yml@master
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_flatpak.yml@nc_yoga_test_framework
     secrets: inherit
     with:
-      actions_branch: master
+      actions_branch: nc_yoga_test_framework
       enable_sentry: ${{ inputs.enable_sentry || false }}
       release_build: ${{ inputs.release_build || startsWith(github.ref, 'refs/tags/version_') }}
       debug_symbols: ${{ inputs.debug_symbols || false }}
+
+  ui_tests:
+    needs: build_flatpak
+    uses: Prusa-Development/PrusaSlicer-Testing/.github/workflows/run_ui_tests.yml@nc_yoga_test_framework
+    secrets: inherit
+    with:
+      flatpak_branch: ${{ needs.build_flatpak.outputs.flatpak_branch }}
+      flatpak_commit: ${{ needs.build_flatpak.outputs.flatpak_commit }}
+      testing_branch: nc_yoga_test_framework

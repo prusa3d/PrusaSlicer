@@ -22,6 +22,7 @@ ConfigContainerButton::ConfigContainerButton(
     std::function<void()>&& add_bed_fn
 )
 {
+    set_object_name("ConfigContainerButton");
     set_flex_shrink(0);
     set_allow_overlap(true);
     set_content_justify_content(YGJustifyFlexStart);
@@ -91,9 +92,6 @@ PrinterGroupItem::PrinterGroupItem(
         [this]() { duplicate_config_container(); },
         [this]() { add_bed(); }
     );
-    m_cc_button->set_object_name(
-        fmt::format("ConfigContainer {} Button", state.config_container_id)
-    );
 
     m_beds_list_view = emplace_back<BedListView>(BedListViewFactory(
         project_interactor,
@@ -117,9 +115,6 @@ PrinterGroupItem::~PrinterGroupItem()
 void PrinterGroupItem::on_data_update()
 {
     m_cc_button->set_name(state()->name);
-    m_cc_button->set_object_name(
-        fmt::format("ConfigContainer {} Button", state()->config_container_id)
-    );
 
     // Don't allow to delete last config container
     const size_t containers_cnt =

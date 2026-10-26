@@ -132,6 +132,8 @@ public:
 
     MsgBoxHandler* msg_box_handler() override;
 
+    Yoga::RootItem& root_item() override;
+
     Scene::IToolGizmo* tool_gizmo(Scene::ToolType type, Domain::PrinterTechnology pt) override;
 
     Scene::IGizmoController& gizmo_controller();

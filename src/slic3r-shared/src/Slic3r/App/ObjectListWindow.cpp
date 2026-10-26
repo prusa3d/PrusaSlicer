@@ -40,6 +40,7 @@ ObjectListWindow::ObjectListWindow(Biz::ProjectInteractor& project_interactor, b
             _u8L("Add printer group"),
             Render::Icon::ConfigContainer
         );
+        m_add_container_button->set_object_name("AddPrinterGroupButton");
         m_add_container_button->set_flex_shrink(0.f);
         m_add_container_button->set_padding({20.f, 5.f});
         m_add_container_button->callbacks().action = [this]()

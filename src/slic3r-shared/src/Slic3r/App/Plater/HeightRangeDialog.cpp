@@ -63,6 +63,7 @@ HeightRangeDialog::HeightRangeDialog(IConfigBoxSetter* config_box_setter) :
     GizmoWindowWithLeftSidePanel(),
     m_config_box_setter(config_box_setter)
 {
+    set_object_name("HeightRangeDialog");
     this->content()->set_orientation(Orientation::Vertical);
     this->content()->set_flex_grow(1);
 

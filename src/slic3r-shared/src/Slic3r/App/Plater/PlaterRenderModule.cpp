@@ -188,6 +188,11 @@ MsgBoxHandler* PlaterRenderModule::msg_box_handler()
     return &m_layout->msg_box_handler();
 }
 
+Yoga::RootItem& PlaterRenderModule::root_item()
+{
+    return m_layout->root_item();
+}
+
 Scene::IToolGizmo* PlaterRenderModule::tool_gizmo(Scene::ToolType type, Domain::PrinterTechnology pt)
 {
     return m_gizmo_manager->find_tool(type, pt);

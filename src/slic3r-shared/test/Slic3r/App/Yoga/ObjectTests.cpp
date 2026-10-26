@@ -17,22 +17,22 @@ TEST_CASE_METHOD(ImGuiFixture, "[Yoga::Object] set_object_name")
     RootItem item;
 
     Object* object1 = item.emplace_back<Object>();
-    object1->set_object_name("foo");
+    object1->set_object_name("Foo");
 
     Object* object2 = item.emplace_back<Object>();
-    object2->set_object_name("foo");
+    object2->set_object_name("Foo");
 
     Object* object3 = item.emplace_back<Object>();
-    object3->set_object_name("foo");
+    object3->set_object_name("Foo");
 
     item.remove(object3);
 
     Object* object4 = item.emplace_back<Object>();
-    object4->set_object_name("foo");
+    object4->set_object_name("Foo");
 
-    REQUIRE(object1->object_name() == "foo_1");
-    REQUIRE(object2->object_name() == "foo_2");
-    REQUIRE(object4->object_name() == "foo_4");
+    REQUIRE(object1->object_name() == "Foo_1");
+    REQUIRE(object2->object_name() == "Foo_2");
+    REQUIRE(object4->object_name() == "Foo_4");
 }
 
 TEST_CASE_METHOD(ImGuiFixture, "[Yoga::Object] heartbeat")

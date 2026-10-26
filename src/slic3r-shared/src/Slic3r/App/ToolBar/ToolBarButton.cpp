@@ -13,6 +13,7 @@ namespace Slic3r::App {
 ToolBarButton::ToolBarButton(Render::Icon icon, const std::string& tooltip) :
     LayoutButton(std::string{}, icon, tooltip)
 {
+    set_object_name("ToolBarButton");
     set_background_color(Platform::Color::ButtonTransparent);
 
     set_content_padding(10);

@@ -2,6 +2,7 @@
 
 #include "Slic3r/App/Yoga/Object.hpp"
 
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <variant>
@@ -169,6 +170,12 @@ public:
 
     static void set_imgui_render(Render::ImguiRender* imgui_render);
 
+    /**
+     * Enables the debug tools (Alt + hover overlay) outside DEBUG builds, used by --test mode.
+     */
+    static void set_test_mode(bool test_mode);
+    static bool debug_enabled();
+
     void set_debug_border(bool show_debug_border);
 
     Vec2f get_global_pos() const;
@@ -180,9 +187,11 @@ public:
      */
     Item* parent_item() const;
 
-#ifdef DEBUG
+    Vec2f last_render_pos() const;
+    Vec2f last_render_size() const;
+    int last_render_frame() const;
+
     void render_debug_overlay(ImDrawList* draw_list) const;
-#endif
 
 protected:
     static ImVec2 to_im(const Vec2f& val);
@@ -233,15 +242,16 @@ protected:
     float m_last_width  = 0;
     float m_last_height = 0;
 
-#ifdef DEBUG
     static Item* m_debug_item;
-#endif
+    static bool m_test_mode;
 
 private:
     void update_enabled();
     void update_visible();
 
     virtual void size_info_changed(const SizeInfo& info_size);
+
+    void record_render(const Vec2f& pos, const Vec2f& size);
 
 private:
     using YogaSize = std::variant<EvaluatedUnit, float>;
@@ -292,6 +302,10 @@ private:
     bool m_has_items    = false;
     bool m_enabled      = true;
     bool m_visible      = true;
+
+    Vec2f m_last_render_pos{NAN, NAN};
+    Vec2f m_last_render_size{NAN, NAN};
+    int m_last_render_frame = -1;
 };
 
 /**

@@ -99,6 +99,7 @@ AddPrinterPanel::AddPrinterPanel(
         title->set_flex_shrink(0);
 
         auto close_button{top_bar->emplace_back<LayoutButton>("", Render::Icon::TopBarCross)};
+        close_button->set_object_name("ClosePanelButton");
         close_button->set_width(22_fpx);
         close_button->set_height(22_fpx);
         close_button->callbacks().action = close;
@@ -137,6 +138,7 @@ ItemPtr AddPrinterPanel::create_printer_family(
 
     for (const PrinterEntry* entry : printers) {
         auto printer{printer_section->emplace_back<RectangleButton>()};
+        printer->set_object_name("PrinterTile");
         printer->set_flex_shrink(0);
         printer->set_content_padding(0);
         printer->callbacks().action = [this, entry]()
@@ -179,6 +181,7 @@ ItemPtr AddPrinterPanel::create_printer_family(
 void AddPrinterPanel::emplace_vendor_button(const std::string& name, const std::string& id)
 {
     auto button{m_left_bar->emplace_back<LayoutButton>(name)};
+    button->set_object_name("VendorButton");
     button->set_content_padding({20_fpx, 10_fpx, 20_fpx, 10_fpx});
     button->set_rounding(0);
     button->set_checkable(true);

@@ -29,6 +29,11 @@
 namespace Slic3r::App::Desktop {
 class MainFrame;
 class IMouse3DBackend;
+namespace Testing {
+class TestMode;
+class TestDialogs;
+class ModalHook;
+}
 
 class DesktopApp : public wxApp
 {
@@ -84,6 +89,9 @@ private:
     InitParams m_init_params;
     std::unique_ptr<PrintHost::PrusaLinkStorageListener> m_prusalink_storage_listener;
     std::unique_ptr<IMouse3DBackend> m_mouse_3d_backend;
+    std::unique_ptr<Testing::TestMode> m_test_mode;
+    std::shared_ptr<Testing::TestDialogs> m_test_dialogs;
+    std::unique_ptr<Testing::ModalHook> m_modal_hook;
 
     std::shared_ptr<Plater::ThumbnailImageGenerator> m_thumbnail_image_generator;
     std::shared_ptr<App::ThumbnailStore> m_thumbnail_store;

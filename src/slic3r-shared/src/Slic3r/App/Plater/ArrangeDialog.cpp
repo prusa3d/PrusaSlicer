@@ -182,6 +182,7 @@ ArrangeDialog::ArrangeDialog(
     m_on_arrange{on_arrange},
     m_on_cancel{on_cancel}
 {
+    set_object_name("ArrangeDialog");
     content()->set_orientation(Orientation::Vertical);
     content()->set_gap(0);
     content()->set_padding(0);

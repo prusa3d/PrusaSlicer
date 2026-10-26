@@ -100,6 +100,7 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
         Render::Icon::Cog,
         Biz::_u8L("Preset settings")
     );
+    button_advanced_setting->set_object_name("PrinterPresetSettingsButton");
     button_advanced_setting->set_background_color(Platform::Color::ButtonTransparent);
     button_advanced_setting->set_content_padding(5_fpx);
     button_advanced_setting->callbacks().action = [this]
@@ -121,6 +122,7 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
         Render::Icon::Palette,
         Biz::_u8L("Color mix settings")
     );
+    m_color_mix_button->set_object_name("ColorMixButton");
     m_color_mix_button->set_background_color(Platform::Color::ButtonTransparent);
     m_color_mix_button->set_content_padding(5_fpx);
     m_color_mix_button->callbacks().action = [this]
@@ -226,6 +228,7 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
     };
 
     m_purging_volumes_button = emplace_back<LayoutButton>(Biz::_u8L("Purging volumes"));
+    m_purging_volumes_button->set_object_name("PurgingVolumesButton");
     m_purging_volumes_button->callbacks().action = [this]()
     {
         Biz::ProjectSettingsInteractor& psi  = m_project_interactor.project_settings_interactor();

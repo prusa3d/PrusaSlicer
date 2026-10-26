@@ -193,6 +193,11 @@ MsgBoxHandler& AbstractRenderLayout::msg_box_handler()
     return m_msg_box_handler;
 }
 
+Yoga::RootItem& AbstractRenderLayout::root_item()
+{
+    return m_layout_main;
+}
+
 ToolBar* AbstractRenderLayout::tool_right_toolbar() const
 {
     return m_tool_right_toolbar;
@@ -363,7 +368,7 @@ void AbstractRenderLayout::init_toolbar_row()
     m_layout_middle_toolbar_row->set_orientation(Orientation::Horizontal);
     m_layout_middle_toolbar_row->set_z(1); // Increaze Z so toolbars can be on top of double sliders
 
-    m_mode_toolbar = m_layout_middle_toolbar_row->emplace_back<ToolBar>("BottomToolbar");
+    m_mode_toolbar = m_layout_middle_toolbar_row->emplace_back<ToolBar>("ModeToolbar");
     m_mode_toolbar->set_button_width(button_size);
     m_mode_toolbar->set_button_height(button_size);
     m_mode_toolbar->set_orientation(Orientation::Horizontal);
@@ -375,14 +380,14 @@ void AbstractRenderLayout::init_toolbar_row()
     tool_container->set_flex_grow(1);
     tool_container->set_justify_content(YGJustifyCenter);
 
-    m_tool_left_toolbar = tool_container->emplace_back<ToolBar>("TopToolbar");
+    m_tool_left_toolbar = tool_container->emplace_back<ToolBar>("ToolLeftToolbar");
     m_tool_left_toolbar->set_button_width(button_size);
     m_tool_left_toolbar->set_button_height(button_size);
     m_tool_left_toolbar->set_orientation(Orientation::Horizontal);
     m_tool_left_toolbar->set_flex_shrink(0);
     m_tool_left_toolbar->set_visible(false);
 
-    m_tool_right_toolbar = tool_container->emplace_back<ToolBar>("MiddleToolbar");
+    m_tool_right_toolbar = tool_container->emplace_back<ToolBar>("ToolRightToolbar");
     m_tool_right_toolbar->set_button_width(button_size);
     m_tool_right_toolbar->set_button_height(button_size);
     m_tool_right_toolbar->set_orientation(Orientation::Horizontal);

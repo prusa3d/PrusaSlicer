@@ -16,7 +16,7 @@ struct TestPopup : public Popup
 {
     explicit TestPopup(float w = 80.f, float h = 60.f)
     {
-        auto win = std::make_unique<Window>("test-popup");
+        auto win = std::make_unique<Window>("TestPopup");
         win->set_width(w);
         win->set_height(h);
         win->set_flags(

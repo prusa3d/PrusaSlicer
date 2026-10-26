@@ -20,6 +20,7 @@ static const Margins BUTTON_TEXT_MARGIN = {10.f, 2.f, 10.f, 2.f};
 
 VariableLayerHeightDialog::VariableLayerHeightDialog() : GizmoWindowWithLeftSidePanel()
 {
+    set_object_name("VariableLayerHeightDialog");
     side_panel()->set_min_width(80);
     this->content()->set_orientation(Orientation::Vertical);
     this->content()->set_gap(gap_size());

@@ -7,6 +7,7 @@
 #include "Slic3r/Log.hpp"
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -145,6 +146,12 @@ struct TransformParams
     std::optional<bool> split;
 };
 
+struct TestModeParams
+{
+    uint16_t port;
+    std::string password;
+};
+
 struct MiscParams
 {
     std::optional<std::string> datadir;
@@ -163,6 +170,7 @@ struct MiscParams
     std::optional<bool> opengl_debug;
     std::optional<std::pair<int, int>> opengl_version;
     std::optional<bool> sw_renderer;
+    std::optional<TestModeParams> test_mode;
 };
 
 class InitParams final

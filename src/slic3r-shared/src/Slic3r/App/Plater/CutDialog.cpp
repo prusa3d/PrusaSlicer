@@ -155,6 +155,7 @@ static constexpr ImColor build_volume_color{192, 154, 247};
 
 CutDialog::CutDialog() : GizmoWindow()
 {
+    set_object_name("CutDialog");
     LayoutButton* reset_cut_btn = revert_button();
     reset_cut_btn->set_tooltip(_u8L("Reset cutting plane and remove connectors"));
     reset_cut_btn->set_visible(true);
@@ -268,7 +269,7 @@ void CutDialog::init_cut_plane_input_panel()
     Item* cut_into_row = add_row(_u8L("Cut into") + ":", cut_plane_settings_panel);
     m_cut_into_row     = cut_into_row->parent_item();
 
-    m_cut_into_combo = cut_into_row->emplace_back<ComboBox>("Cut into");
+    m_cut_into_combo = cut_into_row->emplace_back<ComboBox>("CutIntoComboBox");
     m_cut_into_combo->set_flex_grow(1);
     // TRN CutGizmo: ComboBox "Cut into" ...
     m_cut_into_combo->set_items({_u8L("Objects"), _u8L("Parts")});

@@ -35,7 +35,7 @@ SearchBar::SearchBar(Biz::ProjectInteractor& project_interactor, Navigator& navi
     icon->set_width(18_fpx);
     icon->set_height(18_fpx);
 
-    m_input_text = emplace_back<InputText>();
+    m_input_text = emplace_back<InputText>("SearchTextField");
     m_input_text->set_hint(_u8L("Search..."));
     m_input_text->set_width(150_fpx);
     m_input_text->set_flags(ImGuiInputTextFlags_EscapeClearsAll);

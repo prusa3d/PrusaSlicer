@@ -52,11 +52,13 @@ void SidebarPreviewActionButtons::on_init(Biz::ProjectInteractor* project_intera
 
     auto navigation_button = get_navigation_button();
     m_navigation_button = navigation_button.get();
+    m_navigation_button->set_object_name("BackToPlaterButton");
     m_navigation_button->set_visible(false);
     layout_bottom->append(std::move(navigation_button));
 
     auto primary_button = get_primary_button();
     m_primary_button = primary_button.get();
+    m_primary_button->set_object_name("PrimaryActionButton");
     layout_bottom->append(std::move(primary_button));
 
     update_buttons();

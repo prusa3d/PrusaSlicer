@@ -101,6 +101,8 @@ void RootItem::root_render(const SizeInfo& size_info)
 
     render_debug_overlay();
 
+    m_last_rendered_frame = ImGui::GetFrameCount();
+
     if (m_loop_events.process_events() || m_style_dirty) {
         // There were a number of processed events,
         // therefore we need to schedule another render pass
@@ -108,6 +110,11 @@ void RootItem::root_render(const SizeInfo& size_info)
         // Some item called set_style_dirty in render()
         Biz::Platform::PlatformServices::instance().render_request_handler().request_render();
     }
+}
+
+int RootItem::last_rendered_frame() const
+{
+    return m_last_rendered_frame;
 }
 
 void RootItem::set_style_dirty()
@@ -122,12 +129,10 @@ void RootItem::push_event(EventPtr event)
 
 void RootItem::render_debug_overlay()
 {
-#ifdef DEBUG
-    if (m_debug_item) {
+    if (debug_enabled() && m_debug_item) {
         m_debug_item->render_debug_overlay(ImGui::GetForegroundDrawList());
         m_debug_item = nullptr;
     }
-#endif
 }
 
 void RootItem::calculate_size()

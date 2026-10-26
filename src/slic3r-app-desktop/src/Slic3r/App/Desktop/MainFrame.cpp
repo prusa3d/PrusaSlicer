@@ -433,6 +433,7 @@ void MainFrame::on_close(wxCloseEvent& event)
         from_u8(Biz::_u8L("Close application")),
         wxYES_NO | wxCANCEL | wxICON_EXCLAMATION
     };
+    dialog.SetName(from_u8("close_application"));
 
     dialog.SetYesNoCancelLabels(
         from_u8(Biz::_u8L("Save")),
@@ -831,6 +832,11 @@ void MainFrame::on_project_saved(Domain::SelectionId project_id)
     AppServices::instance().app_config().app_settings_advanced().push_recent_project(
         project->loaded_file_path().string()
     );
+}
+
+void MainFrame::show_testing_title(uint16_t port)
+{
+    SetTitle(GetTitle() + wxString::Format(from_u8(" - TESTING MODE, PORT %u"), unsigned(port)));
 }
 
 void MainFrame::sys_color_changed()

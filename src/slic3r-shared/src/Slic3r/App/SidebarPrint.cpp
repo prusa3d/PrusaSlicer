@@ -86,6 +86,7 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
 
     m_combo_print =
         layer_height_row->emplace_back<ComboBoxListViewSelection<Biz::Preset::PresetItem>>();
+    m_combo_print->set_object_name("PrintPresetComboBox");
     m_combo_print->set_get_name_fn(
         [](const Biz::Preset::PresetItem* item) -> std::string { return item->ui_preset_name(); }
     );
@@ -111,6 +112,7 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
 
     m_settings_set_btn =
         layer_height_row->emplace_back<LayoutButton>(std::string{}, Render::Icon::Cog);
+    m_settings_set_btn->set_object_name("PrintSettingsButton");
     m_settings_set_btn->set_checkable(true);
     m_settings_set_btn->set_height(24_fpx);
     m_settings_set_btn->set_self_align(YGAlignCenter);
@@ -187,11 +189,13 @@ void SidebarPrint::create_print_extras()
         Render::Icon::PrintGoals,
         m_print_mode_dialog
     );
+    m_print_mode_btn->set_object_name("PrintModeButton");
     m_extruder_assignment_btn = add_extras_button(
         Biz::_u8L("Extruder Assignment"),
         Render::Icon::ExtruderAssignment,
         m_tool_to_feature_dialog
     );
+    m_extruder_assignment_btn->set_object_name("ToolToFeatureButton");
 
     add_separator();
 }

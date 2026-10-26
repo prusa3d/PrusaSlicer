@@ -28,6 +28,7 @@ SlaSupportPointsDialog::Callbacks& SlaSupportPointsDialog::callbacks()
 
 SlaSupportPointsDialog::SlaSupportPointsDialog() : GizmoWindow()
 {
+    set_object_name("SlaSupportPointsDialog");
     content()->set_padding(20.f);
     content()->set_gap(2.f * gap_size());
 

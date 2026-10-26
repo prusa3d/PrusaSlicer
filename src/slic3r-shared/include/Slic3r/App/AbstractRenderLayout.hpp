@@ -89,6 +89,8 @@ public:
 
     MsgBoxHandler& msg_box_handler();
 
+    Yoga::RootItem& root_item();
+
     SidebarStackLayout* sidebar_stack_layout() const;
 
     void set_sidebars_visible(bool visible);

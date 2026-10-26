@@ -26,6 +26,12 @@ set(SLIC3R_APP_DESKTOP_FILES
     src/Slic3r/App/Desktop/AppInstanceCheck.cpp
     src/Slic3r/App/Desktop/SecretStoreFactory.hpp
     src/Slic3r/App/Desktop/Mouse3D/Mouse3DBackend.hpp
+    src/Slic3r/App/Desktop/Testing/TestDialogs.cpp
+    src/Slic3r/App/Desktop/Testing/TestDialogs.hpp
+    src/Slic3r/App/Desktop/Testing/TestMode.cpp
+    src/Slic3r/App/Desktop/Testing/TestMode.hpp
+    src/Slic3r/App/Desktop/Testing/TestServer.cpp
+    src/Slic3r/App/Desktop/Testing/TestServer.hpp
 )
 
 if(WIN32)
@@ -106,5 +112,24 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     if (SLIC3R_FHS)
         install(FILES ${CMAKE_SOURCE_DIR}/src/platform/unix/90-3dconnexion.rules DESTINATION lib/udev/rules.d)
+    endif ()
+endif ()
+
+if (SLIC3R_BUILD_TESTS)
+    add_executable(slic3r-app-desktop-tests
+            test/main.cpp
+            test/Slic3r/App/Desktop/Testing/TestServerTests.cpp
+    )
+
+    target_include_directories(slic3r-app-desktop-tests PRIVATE test src)
+    target_link_libraries(slic3r-app-desktop-tests PRIVATE slic3r-app-desktop Catch2::Catch2)
+
+    add_test(NAME slic3r-app-desktop-tests
+            COMMAND slic3r-app-desktop-tests ${CATCH_ALL_ARGS}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    if (WIN32)
+        prusaslicer_copy_dlls(slic3r-app-desktop-tests)
     endif ()
 endif ()

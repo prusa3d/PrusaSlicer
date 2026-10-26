@@ -299,6 +299,7 @@ MultiMaterialPaintingDialog::MultiMaterialPaintingDialog(
 ) :
     GizmoWindow()
 {
+    set_object_name("MultiMaterialPaintingDialog");
     const Paddings padding{4 * spacing};
 
     content()->set_orientation(Orientation::Vertical);

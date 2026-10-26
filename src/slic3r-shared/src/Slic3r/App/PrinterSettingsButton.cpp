@@ -11,6 +11,7 @@ namespace Slic3r::App {
 
 PrinterSettingsButton::PrinterSettingsButton(const std::string& tooltip) : RectangleButton(tooltip)
 {
+    set_object_name("PrinterSettingsButton");
     set_flex_shrink(0);
     set_allow_overlap(true);
     set_content_justify_content(YGJustifyFlexStart);

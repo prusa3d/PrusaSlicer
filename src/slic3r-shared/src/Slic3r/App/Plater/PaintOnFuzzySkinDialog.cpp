@@ -21,6 +21,7 @@ PaintOnFuzzySkinDialog::Callbacks& PaintOnFuzzySkinDialog::callbacks()
 
 PaintOnFuzzySkinDialog::PaintOnFuzzySkinDialog() : GizmoWindow()
 {
+    set_object_name("PaintOnFuzzySkinDialog");
     content()->set_padding(20.f);
     content()->set_gap(2.f * gap_size());
 

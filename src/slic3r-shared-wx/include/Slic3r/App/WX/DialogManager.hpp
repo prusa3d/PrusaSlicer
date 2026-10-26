@@ -6,6 +6,12 @@
 
 namespace Slic3r::App::WX {
 
+/**
+ * @brief The wxWindow name of the file dialogs, so tests can tell them apart without depending
+ * on their translated titles.
+ */
+const char* file_dialog_name(FileDialogType dialog_type);
+
 class DialogManager : public IDialogManager
 {
 public:

@@ -35,6 +35,7 @@ constexpr float ButtonSize = 20;
 
 SvgDialog::SvgDialog() : GizmoWindow()
 {
+    set_object_name("SvgDialog");
     Paddings padding = content()->padding().source;
 
     top_bar()->set_gap(gap_size());

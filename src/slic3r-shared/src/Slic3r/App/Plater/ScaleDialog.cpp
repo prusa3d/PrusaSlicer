@@ -10,6 +10,7 @@ using Biz::_u8L;
 
 ScaleDialog::ScaleDialog(Biz::ProjectInteractor& project_interactor) : GizmoWindow()
 {
+    set_object_name("ScaleDialog");
     content()->set_padding({20_fpx, 20_fpx});
     content()->set_orientation(Yoga::Orientation::Vertical);
     content()->set_gap(20_fpx);

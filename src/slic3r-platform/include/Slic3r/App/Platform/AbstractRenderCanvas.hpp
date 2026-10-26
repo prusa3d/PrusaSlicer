@@ -31,6 +31,12 @@ public:
     virtual void on_input_text_focus_changed(bool focused) = 0;
 };
 
+class IFrameRenderedListener
+{
+public:
+    virtual void on_frame_rendered(int frame) = 0;
+};
+
 /**
  * Abstract class for platform-specific render canvas.
  *
@@ -41,7 +47,7 @@ public:
 class AbstractRenderCanvas :
     public Biz::Platform::IRenderRequestHandler,
     Biz::Platform::IMainWindowHandler,
-    public WithListeners<IInputTextFocusChangedListener>
+    public WithListeners<IInputTextFocusChangedListener, IFrameRenderedListener>
 {
 public:
     AbstractRenderCanvas();

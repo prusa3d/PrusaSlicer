@@ -149,6 +149,8 @@ public:
 
     MsgBoxHandler* msg_box_handler() override;
 
+    Yoga::RootItem& root_item() override;
+
 protected:
     /**
      * @name Implementation of Platform::AbstractRenderModule protected interface

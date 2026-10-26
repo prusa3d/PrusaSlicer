@@ -272,6 +272,11 @@ bool ContextPopup::opened() const
     return ImGui::IsPopupOpen(object_name().c_str());
 }
 
+bool ContextPopup::last_frame_opened() const
+{
+    return m_opened;
+}
+
 ImGuiWindowFlags ContextPopup::flags() const
 {
     return m_flags;

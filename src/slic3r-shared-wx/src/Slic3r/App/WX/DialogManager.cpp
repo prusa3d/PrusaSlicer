@@ -99,6 +99,19 @@ protected:
 
 } // namespace
 
+const char* file_dialog_name(FileDialogType dialog_type)
+{
+    switch (dialog_type) {
+    case FileDialogType::Open:
+        return "open_file";
+    case FileDialogType::OpenMultiple:
+        return "open_files";
+    case FileDialogType::Save:
+        return "save_file";
+    }
+    return "file";
+}
+
 void
 DialogManager::show_file_dialog(FileDialogType dialog_type, const std::string& dialog_title, const boost::filesystem::path& override_dir, const std::string& default_file_name, const std::string& wildcards, const FileCallback& callback)
 {
@@ -126,7 +139,7 @@ DialogManager::show_file_dialog(FileDialogType dialog_type, const std::string& d
         dir = m_last_dir;
     }
     wxFileDialog dlg(nullptr, from_u8(dialog_title), from_u8(dir.string()), from_u8(default_file_name), from_u8(wildcards), flags);
-
+    dlg.SetName(from_u8(file_dialog_name(dialog_type)));
     if (dlg.ShowModal() != wxID_OK) {
         callback(false, {});
         return;
@@ -220,6 +233,7 @@ void DialogManager::show_yesnocancel_dialog(
 {
     MessageDialog
         dialog{nullptr, from_u8(text), from_u8(title), wxYES_NO | wxCANCEL | wxICON_EXCLAMATION};
+    dialog.SetName(from_u8("yes_no_cancel"));
 
     dialog.SetYesNoCancelLabels(from_u8(yes.first), from_u8(no.first), from_u8(cancel.first));
 
