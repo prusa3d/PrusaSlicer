@@ -31,7 +31,7 @@ bool is_any_subdomain(const std::string& url, const std::vector<std::string>& su
 
 std::string filename_from_url(const std::string& url)
 {
-    std::string url_plain = std::string(url.begin(), std::find(url.begin(), url.end(), '?'));
+    std::string url_plain = std::string(url.begin(), std::find_if(url.begin(), url.end(), [](char c) { return c == '?' || c == '#'; }));
     size_t slash          = url_plain.find_last_of("/");
     if (slash == std::string::npos)
         return std::string();

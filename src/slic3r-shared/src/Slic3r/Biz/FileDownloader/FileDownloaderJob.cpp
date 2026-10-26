@@ -39,6 +39,21 @@ std::string extract_filename_from_header(const std::string& headers) {
 }
 }
 
+std::string sanitize_filename(const std::string& filename)
+{
+    // Keep only the last path component. Both separators are handled on all platforms,
+    // so a name prepared for Windows cannot traverse there, and the behavior is the same everywhere.
+    const size_t separator = filename.find_last_of("/\\");
+    std::string name       = separator == std::string::npos ? filename : filename.substr(separator + 1);
+    // Prevent ':' (drive letters and alternate data streams on Windows) and control characters.
+    std::erase_if(name, [](unsigned char c) { return c == ':' || c < 32 || c == 127; });
+    // Reject ".", ".." and names made of dots and spaces only (Windows strips trailing dots and spaces, so "... " is "..").
+    if (name.find_first_not_of(". ") == std::string::npos) {
+        return {};
+    }
+    return name;
+}
+
 FileDownloaderJobData perform_job(
     Biz::JThread::StopToken stop_token,
     Biz::Platform::IMainThreadDispatcher& dis,
@@ -48,6 +63,11 @@ FileDownloaderJobData perform_job(
 {
     boost::system::error_code ec;
     ASSERT(fs::is_directory(job_data.dest_folder, ec) && !ec);
+    // The name comes from the URL or from Printables, it must not point outside of dest_folder.
+    job_data.input_data.file_name = sanitize_filename(job_data.input_data.file_name);
+    if (job_data.input_data.file_name.empty()) {
+        job_data.input_data.file_name = "download";
+    }
     fs::path dest_path    = job_data.dest_folder / job_data.input_data.file_name;
     std::string extension = dest_path.extension().string();
     std::string just_filename =
@@ -182,7 +202,11 @@ FileDownloaderJobData perform_job(
                  if (new_filename.empty()) {
                      return;
                  }
-                 new_filename = Network::IHttp::unescape_string(new_filename);
+                 // Sanitize after unescaping, so that encoded separators (%2F, %5C) are caught as well.
+                 new_filename = sanitize_filename(Network::IHttp::unescape_string(new_filename));
+                 if (new_filename.empty()) {
+                     return;
+                 }
                  // Find unused filename
                  boost::filesystem::path temp_dest_path = job_data.dest_folder / new_filename;
                  std::string extension                  = temp_dest_path.extension().string();
