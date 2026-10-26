@@ -3927,7 +3927,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->label = L("Prime all printing extruders");
     def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
     def->category = ConfigItemDef::Category::Print_MultiMaterial;
-    def->order = 8;
+    def->order        = 10;
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     def->tooltip = L("If enabled, all printing extruders will be primed at the front edge of the print bed at the start of the print.");
     def->init_fn = init_with(true);
@@ -3938,7 +3938,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->label = L("No sparse layers (EXPERIMENTAL)");
     def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
     def->category = ConfigItemDef::Category::Print_MultiMaterial;
-    def->order = 7;
+    def->order        = 9;
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     def->tooltip = L("If enabled, the wipe tower will not be printed on layers with no toolchanges. "
                      "On layers with a toolchange, extruder will travel downward to print the wipe tower. "
@@ -4867,6 +4867,38 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->min = 100.;
     def->max = 300.;
     def->init_fn = init_with(Percentage{100.});
+
+    def               = defs.add("wipe_tower_max_purge_speed", typeid(double));
+    def->location     = Print;
+    def->label        = L("Maximal print speed");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category     = ConfigItemDef::Category::Print_MultiMaterial;
+    def->order        = 7;
+    def->gui_type     = ConfigItemDef::GUIType::textfield;
+    def->tooltip      = L(
+        "Maximal speed for printing the wipe tower, including the purging lines, sparse infill "
+             "and perimeters. Purging starts at about a third of this speed and speeds up, ramming is not limited. "
+             "The filament maximal volumetric speed is still respected. Set zero to disable the limit."
+    );
+    def->units   = {L("mm/s")};
+    def->min     = 0;
+    def->init_fn = init_with(0.);
+
+    def               = defs.add("wipe_tower_deretraction_spread_ratio", typeid(double));
+    def->location     = Print;
+    def->label        = L("De-retraction spread ratio");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category     = ConfigItemDef::Category::Print_MultiMaterial;
+    def->order        = 8;
+    def->gui_type     = ConfigItemDef::GUIType::textfield;
+    def->tooltip      = L(
+        "On printers with multiple tools, the de-retraction after a tool change is done while moving back over "
+             "the start of the purge line instead of standing still, so the material does not form a blob. "
+             "The length of the move is the ramming volume of the new filament converted to purge line length multiplied by this ratio. "
+             "Set zero to de-retract without moving."
+    );
+    def->min     = 0;
+    def->init_fn = init_with(0.125);
 
     def = defs.add("wipe_into_infill", typeid(bool));
     def->location = Volume;

@@ -9,6 +9,7 @@
 #include <limits>
 #include <vector>
 #include <cstddef>
+#include <optional>
 
 #include "Slic3r/Domain/FullConfigFDM.hpp"
 #include "Slic3r/Domain/GCodeFlavor.hpp"
@@ -25,6 +26,10 @@ class WipeTower
 {
 public:
     static const std::string never_skip_tag() { return "_GCODE_WIPE_TOWER_NEVER_SKIP_TAG"; }
+    // Marks a travel that the G-code generator replaces by a travel with the print retraction and Z-hop.
+    static const std::string print_travel_tag() { return "_GCODE_WIPE_TOWER_PRINT_TRAVEL_TAG"; }
+    // Marks the travel back to the purge start after the tool change. The G-code generator removes it when it travels to the start of the de-retraction spread instead.
+    static const std::string toolchange_travel_tag() { return "_GCODE_WIPE_TOWER_TOOLCHANGE_TRAVEL_TAG"; }
 	static std::vector<std::vector<float>> extract_wipe_volumes(const PrintConfigView& config);
 
     struct Extrusion
@@ -88,6 +93,16 @@ public:
 		}
 
 		bool force_travel = false;
+
+        // De-retraction after the tool change done while moving back to the start of the purge line.
+        struct DeretractionSpread
+        {
+            Domain::Vec2f start; // Where the de-retraction starts, in the same frame as end_pos.
+            Domain::Vec2f end; // Start of the purge line, in the same frame as end_pos.
+            float max_feedrate;
+        };
+
+        std::optional<DeretractionSpread> deretraction_spread;
 	};
 
     struct box_coordinates
@@ -172,6 +187,7 @@ public:
 		m_layer_height			= layer_height;
 		m_depth_traversed  = 0.f;
         m_current_layer_finished = false;
+        m_purge_end.reset();
 
 		
         // Advance m_layer_info iterator, making sure we got it right
@@ -247,6 +263,7 @@ public:
         float               filament_area;
 		bool			    multitool_ramming;
 		float               multitool_ramming_time = 0.f;
+		float               multitool_ramming_volume = 0.f;
 		float               filament_minimal_purge_on_wipe_tower = 0.f;
         int                 ramming_temperature_delta = 0;
         float               ramming_initial_delay = 0.0;
@@ -299,6 +316,7 @@ private:
     float           m_parking_pos_retraction    = 0.f;
     float           m_extra_loading_move        = 0.f;
     float           m_bridging                  = 0.f;
+    float           m_deretraction_spread_ratio = 0.f;
     bool            m_no_sparse_layers          = false;
     bool            m_set_extruder_trimpot      = false;
     bool            m_adhesion                  = true;
@@ -334,6 +352,9 @@ private:
 	float			m_extra_flow      = 1.f;
 	float			m_extra_spacing_wipe    = 1.f;
 	float			m_extra_spacing_ramming = 1.f;
+
+    // Nozzle position after the last purge on the current layer.
+    std::optional<Domain::Vec2f> m_purge_end;
 
     bool is_first_layer() const { return size_t(m_layer_info - m_plan.begin()) == m_first_layer_idx; }
 
@@ -413,6 +434,12 @@ private:
 		WipeTowerWriter &writer,
 		const box_coordinates  &cleaning_box,
 		float wipe_volume);
+
+    float deretraction_spread_length(
+        const box_coordinates& cleaning_box,
+        float purge_start_x,
+        size_t new_tool
+    ) const;
 
     bool has_semm_loading_move() const;
 };

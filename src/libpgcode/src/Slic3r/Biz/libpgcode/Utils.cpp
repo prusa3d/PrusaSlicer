@@ -41,18 +41,40 @@ std::string_view to_string(TimeMode mode)
 // mapping from MoveType to OptionType
 OptionType move_type_to_option(MoveType type)
 {
-    switch (type)
-    {
-    case MoveType::Travel:      { return OptionType::Travels; }
-    case MoveType::Wipe:        { return OptionType::Wipes; }
-    case MoveType::Retract:     { return OptionType::Retractions; }
-    case MoveType::Unretract:   { return OptionType::Unretractions; }
-    case MoveType::Seam:        { return OptionType::Seams; }
-    case MoveType::ToolChange:  { return OptionType::ToolChanges; }
-    case MoveType::ColorChange: { return OptionType::ColorChanges; }
-    case MoveType::PausePrint:  { return OptionType::PausePrints; }
-    case MoveType::CustomGCode: { return OptionType::CustomGCodes; }
-    default:                    { return OptionType::COUNT; }
+    switch (type) {
+    case MoveType::Travel: {
+        return OptionType::Travels;
+    }
+    case MoveType::Wipe: {
+        return OptionType::Wipes;
+    }
+    case MoveType::Retract: {
+        return OptionType::Retractions;
+    }
+    case MoveType::Unretract: {
+        return OptionType::Unretractions;
+    }
+    case MoveType::MovingUnretract: {
+        return OptionType::Unretractions;
+    }
+    case MoveType::Seam: {
+        return OptionType::Seams;
+    }
+    case MoveType::ToolChange: {
+        return OptionType::ToolChanges;
+    }
+    case MoveType::ColorChange: {
+        return OptionType::ColorChanges;
+    }
+    case MoveType::PausePrint: {
+        return OptionType::PausePrints;
+    }
+    case MoveType::CustomGCode: {
+        return OptionType::CustomGCodes;
+    }
+    default: {
+        return OptionType::COUNT;
+    }
     }
 }
 

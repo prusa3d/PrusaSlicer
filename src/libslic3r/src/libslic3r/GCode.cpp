@@ -4049,7 +4049,12 @@ std::string GCodeGenerator::retract_and_wipe(
     return gcode;
 }
 
-std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_z, const Domain::ConfigView& config)
+std::string GCodeGenerator::set_extruder(
+    unsigned int extruder_id,
+    double print_z,
+    const Domain::ConfigView& config,
+    const std::optional<Vec2d>& toolchange_return_position
+)
 {
     if (!m_writer.need_toolchange(extruder_id))
         return "";
@@ -4148,7 +4153,7 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
     }
 
     // We inform the writer about what is happening, but we may not use the resulting gcode.
-    std::string toolchange_command = m_writer.toolchange(extruder_id);
+    std::string toolchange_command = m_writer.toolchange(extruder_id, toolchange_return_position);
     if (! custom_gcode_changes_tool(toolchange_gcode_parsed, m_writer.toolchange_prefix(), extruder_id))
         gcode += toolchange_command;
     else {

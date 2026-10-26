@@ -12,22 +12,50 @@ namespace Slic3r::App::Preview {
 
 std::string to_string(MoveType type)
 {
-    switch (type)
-    {
+    switch (type) {
     // TRN: Following strings are labels in the vertex properties dialog.
-    case MoveType::Noop:        { return _u8L("Noop"); }
-    case MoveType::Retract:     { return _u8L("Retract"); }
-    case MoveType::Unretract:   { return _u8L("Unretract"); }
-    case MoveType::Seam:        { return _u8L("Seam"); }
-    case MoveType::ToolChange:  { return _u8L("Tool Change"); }
-    case MoveType::ColorChange: { return _u8L("Color Change"); }
-    case MoveType::PausePrint:  { return _u8L("Pause Print"); }
-    case MoveType::CustomGCode: { return _u8L("Custom G-code"); }
-    case MoveType::Travel:      { return _u8L("Travel"); }
-    case MoveType::Wipe:        { return _u8L("Wipe"); }
-    case MoveType::Extrude:     { return _u8L("Extrude"); }
-    case MoveType::Flush:       { return _u8L("Flush"); }
-    default:                    { return _u8L("Unknown"); }
+    case MoveType::Noop: {
+        return _u8L("Noop");
+    }
+    case MoveType::Retract: {
+        return _u8L("Retract");
+    }
+    case MoveType::Unretract: {
+        return _u8L("Unretract");
+    }
+    case MoveType::Seam: {
+        return _u8L("Seam");
+    }
+    case MoveType::ToolChange: {
+        return _u8L("Tool Change");
+    }
+    case MoveType::ColorChange: {
+        return _u8L("Color Change");
+    }
+    case MoveType::PausePrint: {
+        return _u8L("Pause Print");
+    }
+    case MoveType::CustomGCode: {
+        return _u8L("Custom G-code");
+    }
+    case MoveType::Travel: {
+        return _u8L("Travel");
+    }
+    case MoveType::Wipe: {
+        return _u8L("Wipe");
+    }
+    case MoveType::Extrude: {
+        return _u8L("Extrude");
+    }
+    case MoveType::Flush: {
+        return _u8L("Flush");
+    }
+    case MoveType::MovingUnretract: {
+        return _u8L("Moving unretract");
+    }
+    default: {
+        return _u8L("Unknown");
+    }
     }
 }
 

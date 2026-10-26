@@ -111,7 +111,11 @@ ProcessorResult ProcessorImpl::finalize()
             const MoveVertex& prev = moves[i - 1];
             curr.mass = m_result.filament_densities[m_extruder_id] * curr.mm3_per_mm * (curr.position - prev.position).norm();
             OptionType option_type = move_type_to_option(curr.type);
-            if (option_type == OptionType::COUNT || option_type == OptionType::Travels || option_type == OptionType::Wipes) {
+            if (option_type == OptionType::COUNT
+                || option_type == OptionType::Travels
+                || option_type == OptionType::Wipes
+                || curr.type == MoveType::MovingUnretract)
+            {
                 if (mod_moves.empty() || prev.type != curr.type || prev.extrusion_role != curr.extrusion_role) {
                     // This move shall be preceded by its (almost) copy.
                     mod_moves.emplace_back(i);
@@ -597,6 +601,10 @@ void ProcessorImpl::process_G1(const std::array<std::optional<float>, 4>& axes, 
     this->update_used_filaments(volume_extruded_filament, filament_geo.area_cross_section);
 
     MoveType type = detect_move_type(delta_pos, m_wiping);
+    if (m_moving_unretract && type == MoveType::Extrude) {
+        type = MoveType::MovingUnretract;
+    }
+
     if (type == MoveType::Extrude) {
         float delta_xyz = std::sqrt(sqr(delta_pos[X]) + sqr(delta_pos[Y]) + sqr(delta_pos[Z]));
         float area_toolpath_cross_section = volume_extruded_filament / delta_xyz;
@@ -1696,7 +1704,31 @@ void ProcessorImpl::process_M702(const GCodeReader::GCodeLine& line)
 
 void ProcessorImpl::process_T(const GCodeReader::GCodeLine& line)
 {
-    process_T(line.cmd());
+    // The Prusa firmware returns the head to X and Y of the tool command after the tool change.
+    std::optional<Vec2f> return_position;
+    if ((m_config.flavor == GCodeFlavor::gcfMarlinFirmware
+         || m_config.flavor == GCodeFlavor::gcfPrusaFirmwareBuddy)
+        && (line.has_x() || line.has_y()))
+    {
+        const auto absolute_position = [this, &line](const Axis axis)
+        {
+            return extract_absolute_position_on_axis(
+                axis,
+                line.has(axis) ? std::optional<float>{line.value(axis)} : std::nullopt,
+                0.f,
+                m_global_positioning_type,
+                m_e_local_positioning_type,
+                m_units,
+                m_config.use_volumetric_e,
+                m_start_position,
+                m_origin
+            );
+        };
+
+        return_position = Vec2f{absolute_position(X), absolute_position(Y)};
+    }
+
+    process_T(line.cmd(), return_position);
 }
 
 #if __has_include(<charconv>)
@@ -1746,7 +1778,8 @@ template<typename T>
     }
 }
 
-void ProcessorImpl::process_T(const std::string_view command)
+void ProcessorImpl::
+    process_T(const std::string_view command, const std::optional<Vec2f>& return_position)
 {
     if (command.length() > 1) {
         int eid = 0;
@@ -1794,6 +1827,11 @@ void ProcessorImpl::process_T(const std::string_view command)
                         m_extruder_temps[m_extruder_id] = m_extruder_temps[old_extruder_id];
 
                     m_result.extruders_count = std::max<uint8_t>(m_result.extruders_count, m_extruder_id + 1);
+
+                    if (return_position.has_value()) {
+                        m_end_position[X] = return_position->x();
+                        m_end_position[Y] = return_position->y();
+                    }
                 }
 
                 // store tool change move
@@ -1898,6 +1936,18 @@ void ProcessorImpl::process_tags(const std::string_view comment)
     // exclude E end tag
     if (comment.starts_with(custom_tag(CustomTags::Exclude_E_End))) {
         m_exclude_e = false;
+        return;
+    }
+
+    // moving unretract start tag
+    if (comment.starts_with(reserved_tag(Tags::Moving_Unretract_Start))) {
+        m_moving_unretract = true;
+        return;
+    }
+
+    // moving unretract end tag
+    if (comment.starts_with(reserved_tag(Tags::Moving_Unretract_End))) {
+        m_moving_unretract = false;
         return;
     }
 
@@ -2597,6 +2647,7 @@ void ProcessorImpl::reset()
 {
     m_extruder_id = 0;
     m_wiping = false;
+    m_moving_unretract = false;
     m_flushing = false;
     m_exclude_e = false;
     m_seams_detection_enabled = false;

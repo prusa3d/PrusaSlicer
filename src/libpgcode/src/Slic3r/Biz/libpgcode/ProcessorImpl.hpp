@@ -69,6 +69,7 @@ private:
     UnitsType m_units{ UnitsType::Millimeters };
     uint8_t m_extruder_id{ 0 };
     bool m_wiping{ false };
+    bool m_moving_unretract{ false };
     bool m_flushing{ false };
     bool m_exclude_e{ false };
     bool m_seams_detection_enabled{ false };
@@ -198,7 +199,10 @@ private:
 
     // Processes T line (Select Tool)
     void process_T(const GCodeReader::GCodeReader::GCodeLine& line);
-    void process_T(const std::string_view command);
+    void process_T(
+        const std::string_view command,
+        const std::optional<Domain::Vec2f>& return_position = std::nullopt
+    );
 
     //
     // Process tags embedded into comments

@@ -15,6 +15,10 @@ namespace Slic3r {
 
 class GCodeGenerator;
 
+namespace Biz::Slicing {
+struct ExtrudeConfig;
+} // namespace Biz::Slicing
+
 namespace GCode {
 
 class WipeTowerIntegration {
@@ -82,6 +86,19 @@ private:
 
     // Postprocesses gcode: rotates and moves G1 extrusions and returns result
     std::string post_process_wipe_tower_moves(const WipeTower::ToolChangeResult& tcr, const Vec2f& translation, float angle) const;
+
+    /**
+     * @brief Replaces the travels tagged by WipeTower::print_travel_tag() by travels with the print retraction and Z-hop.
+     * @note The position is updated from the processed G-code.
+     */
+    std::string expand_print_travels(
+        GCodeGenerator& gcodegen,
+        const Biz::Slicing::ExtrudeConfig& config,
+        const std::string& tower_gcode,
+        unsigned int tower_print_acceleration,
+        Vec2f& position,
+        double z
+    ) const;
 
     // Left / right edges of the wipe tower, for the planning of wipe moves.
     const float                                                  m_left;
