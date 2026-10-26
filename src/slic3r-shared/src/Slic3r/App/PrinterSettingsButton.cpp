@@ -20,6 +20,15 @@ PrinterSettingsButton::PrinterSettingsButton(const std::string& tooltip) : Recta
     m_icon->set_height(58_fpx);
     m_icon->set_aspect_ratio(1);
 
+    m_connect_icon = m_icon->emplace_back<Icon>(Render::Icon::ConnectUpload);
+    m_connect_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
+    m_connect_icon->set_aspect_ratio(1);
+    m_connect_icon->set_position_type(YGPositionTypeAbsolute);
+    m_connect_icon->set_width(16_fpx);
+    m_connect_icon->set_right(0_fpx);
+    m_connect_icon->set_bottom(0_fpx);
+    m_connect_icon->set_visible(false);
+
     m_texts_wrapper = emplace_back<Item>();
     m_texts_wrapper->set_orientation(Orientation::Vertical);
     m_texts_wrapper->set_flex_grow(1.f);
@@ -29,8 +38,22 @@ PrinterSettingsButton::PrinterSettingsButton(const std::string& tooltip) : Recta
     m_printer_name->set_font_type(Render::ImguiFontType::Bold);
     m_printer_name->set_wrap_mode(Text::WrapMode::WrapElide);
 
-    m_preset_name = m_texts_wrapper->emplace_back<Text>(std::string{});
+    Item* preset_row = m_texts_wrapper->emplace_back<Item>();
+    preset_row->set_align_items(YGAlignCenter);
+    preset_row->set_gap(4_fpx);
+
+    m_state_btn = preset_row->emplace_back<LayoutButton>(std::string{}, Render::Icon::CircleFull);
+    m_state_btn->set_background_color(Platform::Color::ButtonTransparent);
+    m_state_btn->set_content_padding(1_fpx);
+    m_state_btn->set_width(12_fpx);
+    m_state_btn->set_height(12_fpx);
+    m_state_btn->set_flex_shrink(0);
+    m_state_btn->set_visible(false);
+
+    m_preset_name = preset_row->emplace_back<Text>(std::string{});
     m_preset_name->set_wrap_mode(Text::WrapMode::WrapElide);
+    m_preset_name->set_flex_grow(1);
+    m_preset_name->set_flex_shrink(1);
 
     m_btn_wrapper = emplace_back<Item>();
     m_btn_wrapper->set_flex_shrink(0);
@@ -61,6 +84,39 @@ void PrinterSettingsButton::set_preset_name(const std::string& preset_name)
 void PrinterSettingsButton::set_printing_state(int state)
 {
     // ToDo render colored circle as a printing state with Tooltip
+}
+
+void PrinterSettingsButton::set_connect_indicator(
+    std::optional<Biz::ConnectPrinter::ConnectPrinterState> state
+)
+{
+    m_connect_icon->set_visible(state.has_value());
+    m_state_btn->set_visible(state.has_value());
+    if (!state.has_value()) {
+        return;
+    }
+
+    using State = Biz::ConnectPrinter::ConnectPrinterState;
+
+    ImColor color = m_theme->color_imgui(Platform::Color::Text);
+    switch (*state) {
+    case State::Finished:
+    case State::Ready: color = m_theme->color_imgui(Platform::Color::Success); break;
+    case State::Stopped:
+    case State::Error: color = m_theme->color_imgui(Platform::Color::Error); break;
+    case State::Unknown:
+    case State::Busy:
+    case State::Attention: color = m_theme->color_imgui(Platform::Color::Warning); break;
+    case State::Printing: color = m_theme->color_imgui(Platform::Color::AccentSecondary); break;
+    case State::Paused: color = m_theme->color_imgui(Platform::Color::AccentTertiary); break;
+    case State::Offline:
+        color = m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled);
+        break;
+    default: break;
+    }
+
+    m_state_btn->set_icon_tint(color);
+    m_state_btn->set_tooltip(Biz::ConnectPrinter::connect_printer_state_to_string(*state));
 }
 
 void PrinterSettingsButton::set_visible_printer(bool is_visible)

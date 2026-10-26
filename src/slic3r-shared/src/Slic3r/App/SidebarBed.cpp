@@ -363,8 +363,13 @@ void SidebarBed::update_printer_button()
     m_logical_printer_button->set_printer_name(m_selected_printer_preset_name, is_modified_preset);
     m_logical_printer_button->set_visible_cog(
         !physical_printer
-        || (!physical_printer->is_runtime
-            && !std::holds_alternative<Biz::PhysicalPrinter::ConnectUpload>(physical_printer->payload))
+        || (!physical_printer->is_runtime && !Biz::PhysicalPrinter::is_connect_printer(*physical_printer))
+    );
+    const auto* connect_upload = physical_printer
+        ? std::get_if<Biz::PhysicalPrinter::ConnectUpload>(&physical_printer->payload)
+        : nullptr;
+    m_logical_printer_button->set_connect_indicator(
+        connect_upload ? std::optional{connect_upload->state} : std::nullopt
     );
     m_logical_printer_button->set_preset_name(preset_item.ui_hw_config_name());
     m_logical_printer_button->set_tooltip(
@@ -445,6 +450,11 @@ void SidebarBed::on_preset_selection_changed(
 }
 
 void SidebarBed::on_selected_physical_printer_changed()
+{
+    update_printer_button();
+}
+
+void SidebarBed::on_selected_physical_printer_updated()
 {
     update_printer_button();
 }

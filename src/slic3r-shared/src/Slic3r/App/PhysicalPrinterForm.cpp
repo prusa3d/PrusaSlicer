@@ -172,22 +172,15 @@ void PhysicalPrinterForm::set_printer_config(
     m_name->set_text(config.name);
     m_host->set_text(config.host);
 
-    const PrinterUpload* up = std::get_if<PrinterUpload>(&config.payload);
-    if (up) {
-        m_host_type->set_current_index(host_type_to_index(up->type));
-        rebuild_auth_type_options(up->auth_type);
-        m_api_key->set_text(up->api_key);
-        m_user->set_text(up->username);
-        m_password->set_text(up->password);
-        m_port->set_text(up->port);
-        m_ca_file->set_text(up->ca_file);
-        m_ssl_ignore_revoke->set_checked(up->ssl_revoke_best_effort);
+    if (const PrinterUpload* up = std::get_if<PrinterUpload>(&config.payload)) {
+        load_connection_fields(*up);
     }
 
     m_loading = false;
 
     update_field_visibility();
     update_test_button_state();
+    update_save_button_state();
 }
 
 PhysicalPrinterForm::Callbacks& PhysicalPrinterForm::callbacks()
@@ -205,6 +198,7 @@ void PhysicalPrinterForm::build_form()
     {
         if (!m_loading) {
             test_edits();
+            update_test_button_state();
         }
     };
 
@@ -250,6 +244,7 @@ void PhysicalPrinterForm::build_form()
         _u8L("User given name to distinguish configurations.")
     );
     m_name->set_flex_shrink(0);
+    m_name->callbacks().text_changed = [this] { update_save_button_state(); };
 
     emplace_back<Text>(_u8L("Sheet"), Render::ImguiFontType::Bold);
     m_combo_sheets =
@@ -288,7 +283,9 @@ void PhysicalPrinterForm::build_form()
     m_add_connection_button->callbacks().action = [this]
     {
         m_config.payload = PrinterUpload{};
+        load_connection_fields(std::get<PrinterUpload>(m_config.payload));
         update_field_visibility();
+        update_test_button_state();
     };
     m_add_connection_button->set_flex_shrink(0);
 
@@ -318,8 +315,11 @@ void PhysicalPrinterForm::build_form()
     );
     m_remove_connection_button->callbacks().action = [this]
     {
+        m_physical_printer_interactor.cancel_edited_printer_connection_test();
         m_config.payload = FileSystemExport{};
+        clear_test_status();
         update_field_visibility();
+        update_test_button_state();
     };
     m_remove_connection_button->set_flex_shrink(0);
 
@@ -484,7 +484,7 @@ void PhysicalPrinterForm::build_form()
         // TRN Status shown in the printer dialog while the connection test is running.
         set_test_status(_u8L("Testing connection..."), {}, Platform::Color::Text);
         m_physical_printer_interactor.test_printer_connection(
-            m_config,
+            edited_config(),
             [this](PrintHostTestResult result) { on_connection_test_finished(std::move(result)); }
         );
     };
@@ -502,13 +502,14 @@ void PhysicalPrinterForm::build_form()
     m_save_button->set_background_color(Platform::Color::AccentPrimary);
     m_save_button->set_label_font_type(Render::ImguiFontType::Bold);
     m_save_button->callbacks().action = [this] { commit_edits(); };
+    update_save_button_state();
 }
 
 void PhysicalPrinterForm::test_edits()
 {
-    if (m_name->text().empty()) {
+    if (!has_valid_name()) {
         set_test_status(
-            _u8L("Printer host cannot be empty"),
+            _u8L("Printer name cannot be empty"),
             std::string{},
             Platform::Color::Error
         );
@@ -519,11 +520,27 @@ void PhysicalPrinterForm::test_edits()
 
 void PhysicalPrinterForm::commit_edits()
 {
+    if (!has_valid_name()) {
+        update_save_button_state();
+        return;
+    }
+
     m_physical_printer_interactor.cancel_edited_printer_connection_test();
     clear_test_status();
     update_test_button_state();
 
-    PrinterUpload* up = std::get_if<PrinterUpload>(&m_config.payload);
+    m_config = edited_config();
+
+    if (m_callbacks.printer_saved) {
+        m_callbacks.printer_saved(m_config);
+    }
+}
+
+Biz::PhysicalPrinter::PhysicalPrinterConfig PhysicalPrinterForm::edited_config() const
+{
+    Biz::PhysicalPrinter::PhysicalPrinterConfig config = m_config;
+
+    PrinterUpload* up = std::get_if<PrinterUpload>(&config.payload);
     if (up) {
         up->type                   = host_type_from_index(m_host_type->current_index());
         up->auth_type              = current_auth_type();
@@ -535,12 +552,10 @@ void PhysicalPrinterForm::commit_edits()
         up->ssl_revoke_best_effort = m_ssl_ignore_revoke->checked();
     }
 
-    m_config.name = m_name->text();
-    m_config.host = m_host->text();
+    config.name = m_name->text();
+    config.host = m_host->text();
 
-    if (m_callbacks.printer_saved) {
-        m_callbacks.printer_saved(m_config);
-    }
+    return config;
 }
 
 void PhysicalPrinterForm::update_field_visibility()
@@ -556,7 +571,23 @@ void PhysicalPrinterForm::update_field_visibility()
     m_user_group->set_visible(show_digest);
     m_password_group->set_visible(show_digest);
     m_add_connection_button->set_visible(is_local);
+    m_test_button->set_visible(!is_local);
     m_port_group->set_visible(m_host_type->current_index() == Domain::Repetier - 1);
+}
+
+void PhysicalPrinterForm::load_connection_fields(const PrinterUpload& upload)
+{
+    const bool prev_loading = m_loading;
+    m_loading               = true;
+    m_host_type->set_current_index(host_type_to_index(upload.type));
+    rebuild_auth_type_options(upload.auth_type);
+    m_api_key->set_text(upload.api_key);
+    m_user->set_text(upload.username);
+    m_password->set_text(upload.password);
+    m_port->set_text(upload.port);
+    m_ca_file->set_text(upload.ca_file);
+    m_ssl_ignore_revoke->set_checked(upload.ssl_revoke_best_effort);
+    m_loading = prev_loading;
 }
 
 void PhysicalPrinterForm::rebuild_auth_type_options(Domain::PrintHostAuthType desired)
@@ -600,9 +631,19 @@ Domain::PrintHostAuthType PhysicalPrinterForm::current_auth_type() const
 void PhysicalPrinterForm::update_test_button_state()
 {
     m_test_button->set_enabled(
-        m_physical_printer_interactor.is_connection_testable(m_config)
+        m_physical_printer_interactor.is_connection_testable(edited_config())
         && !m_physical_printer_interactor.is_connection_test_in_flight()
     );
+}
+
+bool PhysicalPrinterForm::has_valid_name() const
+{
+    return m_name->text().find_first_not_of(" \t\r\n") != std::string::npos;
+}
+
+void PhysicalPrinterForm::update_save_button_state()
+{
+    m_save_button->set_enabled(has_valid_name());
 }
 
 void PhysicalPrinterForm::on_connection_test_finished(PrintHostTestResult result)

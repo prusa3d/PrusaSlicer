@@ -36,7 +36,6 @@ class PhysicalPrinterForm;
 class PrinterSettingsDialog :
     public Yoga::Dialog,
     public Biz::Preset::IPresetChangedListener,
-    public Biz::IListSelectionChangedListener,
     public Biz::ISelectedProjectChangedListener
 {
 public:
@@ -45,14 +44,6 @@ public:
         PrinterAddDialog* printer_add_dialog,
         Navigator& navigator
     );
-
-    void on_preset_selection_changed(
-        Domain::SelectionId project_id,
-        Domain::SelectionId config_container_id,
-        Biz::Preset::PresetItemType type
-    ) override;
-
-    void on_list_selection_changed(Domain::SelectionId new_selection) override;
 
     void on_selected_project_changed_final(size_t index) override;
 
@@ -63,7 +54,7 @@ private:
     void create_page_settings();
 
     void on_about_to_show() override;
-    void update_settings_data();
+    void update_settings_data(const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer);
 
     void on_config_container_selection_changed(
         Domain::SelectionId project_id,
@@ -100,12 +91,6 @@ private:
         Biz::Preset::PresetInteractor,
         PrinterSettingsDialog>
         m_preset_changed_listener_scope;
-
-    Biz::ListenerScope<
-        Biz::IListSelectionChangedListener,
-        Biz::Preset::PresetItemObservableList,
-        PrinterSettingsDialog>
-        m_preset_list_selection_changed_listener_scope;
 
     Biz::ListenerScope<
         Biz::ISelectedProjectChangedListener,

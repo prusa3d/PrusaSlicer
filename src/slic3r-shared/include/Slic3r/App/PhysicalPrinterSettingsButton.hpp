@@ -6,6 +6,8 @@
 #include "Slic3r/App/PrinterSettingsButton.hpp"
 #include "Slic3r/Biz/DataObserver.hpp"
 
+#include <optional>
+
 namespace Slic3r::App::Yoga {
 class Icon;
 class LayoutButton;
@@ -49,6 +51,8 @@ public:
 
     void on_selected_physical_printer_changed() override;
 
+    void on_view_will_be_removed() override;
+
 protected:
     void on_data_update() override;
 
@@ -57,14 +61,13 @@ protected:
 private:
     void set_visible_bin(bool is_visible);
     void set_printer_image();
-    void set_connect_state(Biz::ConnectPrinter::ConnectPrinterState state);
     void update_tooltip();
     void update_selected();
 
-    Biz::ListenerScope<
+    std::optional<Biz::ListenerScope<
         Biz::PhysicalPrinter::IPhysicalPrinterChangedListener,
         Biz::PhysicalPrinter::PhysicalPrinterInteractor,
-        PhysicalPrinterSettingsButton>
+        PhysicalPrinterSettingsButton>>
         m_physical_printer_changed_listener_scope;
 
     FnIndexClicked m_on_clicked;
@@ -79,8 +82,6 @@ private:
     bool m_is_bin_supported{true};
 
     Yoga::Icon* m_unresolved_model_icon{nullptr};
-    Yoga::Icon* m_connect_icon{nullptr};
-    Yoga::LayoutButton* m_state_btn{nullptr};
 };
 
 } // namespace Slic3r::App

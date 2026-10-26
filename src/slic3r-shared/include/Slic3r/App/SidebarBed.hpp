@@ -75,6 +75,7 @@ public:
     void on_preset_bundles_loaded() override;
 
     void on_selected_physical_printer_changed() override;
+    void on_selected_physical_printer_updated() override;
 
     PrinterSettingsDialog& logical_printer_settings_dialog();
     PrinterAddDialog& printer_add_dialog();

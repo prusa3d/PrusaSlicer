@@ -136,16 +136,41 @@ void PhysicalPrinterInteractor::remember_used_printer(const std::string& uuid)
 bool PhysicalPrinterInteractor::can_be_selected_at(size_t index) const
 {
     const auto& printer = m_observable_list.at(index);
-    if (std::holds_alternative<ConnectUpload>(printer.payload)) {
+    if (is_connect_printer(printer)) {
         return m_user_account_interactor.is_logged_in();
     }
     return true;
 }
 
-void PhysicalPrinterInteractor::apply_selection(const std::string& uuid, bool apply_hw_config)
+bool PhysicalPrinterInteractor::apply_selection(const std::string& uuid, bool apply_hw_config)
 {
-    m_selected_uuid                              = uuid;
     const PhysicalPrinterConfig physical_printer = printer_config_at(index_of(uuid));
+
+    // Hw config can be missing for Connect printers with incomplete data
+    if (apply_hw_config && physical_printer.hw_config.has_value()) {
+        if (physical_printer.is_runtime) {
+            m_preset_interactor.select_printer_config(physical_printer.hw_config->id);
+        } else if (auto result = m_preset_interactor.select_external_printer_config(
+                       physical_printer.hw_config.value()
+                   );
+                   !result.has_value())
+        {
+            SPDLOG_WARN(
+                "Cannot select printer config of physical printer '{}': {}",
+                physical_printer.name,
+                result.error()
+            );
+            // TRN Warning shown when a picked printer has no matching printer profile.
+            m_printer_preset_selector.warn(_u8L("No local printer profile matches the selected printer."));
+            return false;
+        }
+
+        if (const auto* upload = std::get_if<ConnectUpload>(&physical_printer.payload)) {
+            select_connect_materials(upload->printer_uuid);
+        }
+    }
+
+    m_selected_uuid = uuid;
     if (Domain::ConfigContainer* config_container = current_config_container()) {
         config_container->physical_printer_selection() = {
             physical_printer.uuid,
@@ -153,18 +178,26 @@ void PhysicalPrinterInteractor::apply_selection(const std::string& uuid, bool ap
         };
     }
 
-    // Hw config can be missing for Connect printers with incomplete data
-    if (apply_hw_config && physical_printer.hw_config.has_value()) {
-        if (physical_printer.is_runtime) {
-            m_preset_interactor.select_printer_config(physical_printer.hw_config->id);
-        } else {
-            m_preset_interactor.select_external_printer_config(physical_printer.hw_config.value());
-        }
-    }
-
     this->invoke_listeners<IPhysicalPrinterChangedListener>(
         [](auto* listener) { listener->on_selected_physical_printer_changed(); }
     );
+    return true;
+}
+
+void PhysicalPrinterInteractor::select_connect_materials(const std::string& printer_uuid)
+{
+    const ConnectPrinter::ConnectPrinter* connect_printer =
+        m_connect_printer_service.find(printer_uuid);
+    if (connect_printer == nullptr) {
+        return;
+    }
+    try {
+        m_printer_preset_selector.select_connect_materials(
+            nlohmann::json::parse(connect_printer->json)
+        );
+    } catch (const nlohmann::json::exception& e) {
+        SPDLOG_ERROR("Failed to parse Connect printer json: {}", e.what());
+    }
 }
 
 void PhysicalPrinterInteractor::clear_selection()
@@ -178,43 +211,17 @@ void PhysicalPrinterInteractor::clear_selection()
     );
 }
 
-void PhysicalPrinterInteractor::select_uuid(const std::string& uuid)
+bool PhysicalPrinterInteractor::select_uuid(const std::string& uuid)
 {
-    apply_selection(uuid, true);
+    if (!apply_selection(uuid, true)) {
+        return false;
+    }
     m_explicit_selection = true;
 
     this->invoke_listeners<IPhysicalPrinterChangedListener>(
         [](auto* listener) { listener->on_physical_printer_picked(); }
     );
-}
-
-void PhysicalPrinterInteractor::select_uuid_with_presets(const std::string& uuid)
-{
-    select_uuid(uuid);
-
-    const PhysicalPrinterConfig& printer = *ASSERT_VAL(selected_physical_printer_data());
-    if (const auto* upload = std::get_if<ConnectUpload>(&printer.payload)) {
-        if (upload->printer_uuid.empty()) {
-            return;
-        }
-        const ConnectPrinter::ConnectPrinter* connect_printer =
-            m_connect_printer_service.find(upload->printer_uuid);
-        if (!connect_printer) {
-            return;
-        }
-        try {
-            m_printer_preset_selector.select_for_connect_printer(
-                nlohmann::json::parse(connect_printer->json)
-            );
-        } catch (const nlohmann::json::exception& e) {
-            SPDLOG_ERROR("Failed to parse Connect printer json: {}", e.what());
-        }
-    } else if (
-        std::holds_alternative<PrinterUpload>(printer.payload) && printer.hw_config.has_value()
-    )
-    {
-        m_printer_preset_selector.select_for_hw_config(printer.hw_config.value());
-    }
+    return true;
 }
 
 void PhysicalPrinterInteractor::select_default()
@@ -272,7 +279,7 @@ bool PhysicalPrinterInteractor::is_printer_upload_selected() const
 bool PhysicalPrinterInteractor::is_connect_printer_selected() const
 {
     const PhysicalPrinterConfig* printer = selected_physical_printer_data();
-    return printer != nullptr && std::holds_alternative<ConnectUpload>(printer->payload);
+    return printer != nullptr && is_connect_printer(*printer);
 }
 
 void PhysicalPrinterInteractor::create_or_save_physical_printer(
@@ -478,6 +485,7 @@ PhysicalPrinterConfig PhysicalPrinterInteractor::create_connect_printer_config(
     hw_config.visual     = full_hw_config->visual;
     hw_config.sheet      = full_hw_config->sheet;
     for (size_t i = 0; i < std::min(hw_config.tools.size(), full_hw_config->tools.size()); ++i) {
+        hw_config.tools[i].id   = full_hw_config->tools[i].id;
         hw_config.tools[i].name = full_hw_config->tools[i].name;
     }
     return config;
@@ -528,7 +536,13 @@ void PhysicalPrinterInteractor::on_updated(const IndexRange& index_range)
             || (config.hw_config.has_value()
                 && config.hw_config->printer_id != current.hw_config->printer_id))
         {
+            const bool is_selected = config.uuid == m_selected_uuid;
             m_observable_list.set(std::move(config), CONNECT_PRINTERS_OFFSET + i);
+            if (is_selected) {
+                this->invoke_listeners<IPhysicalPrinterChangedListener>(
+                    [](auto* listener) { listener->on_selected_physical_printer_updated(); }
+                );
+            }
         }
     }
 }
@@ -571,7 +585,7 @@ bool PhysicalPrinterInteractor::is_printer_compatible(
 {
     const PhysicalPrinterConfig& printer = m_observable_list.at(index);
     // Connect printer with incomplete data has no hw config to compare
-    if (std::holds_alternative<ConnectUpload>(printer.payload) && !printer.hw_config.has_value()) {
+    if (is_connect_printer(printer) && !printer.hw_config.has_value()) {
         return true;
     }
     return is_physical_printer_compatible(printer, config);

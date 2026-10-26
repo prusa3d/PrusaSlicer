@@ -14,6 +14,9 @@ public:
 
     /// Fired after on_selected_physical_printer_changed when the user explicitly picked the printer.
     virtual void on_physical_printer_picked() {}
+
+    /// Fired when data of the selected printer changed, e.g. state of a Connect printer.
+    virtual void on_selected_physical_printer_updated() {}
 };
 
 } // namespace Slic3r::Biz::PhysicalPrinter

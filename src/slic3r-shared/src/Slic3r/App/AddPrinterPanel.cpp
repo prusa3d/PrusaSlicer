@@ -282,10 +282,22 @@ void AddPrinterPanel::create_page_details()
     left_column->set_orientation(Orientation::Vertical);
     left_column->set_gap(5_fpx);
 
-    m_printer_name = left_column->emplace_back<Text>(std::string{});
+    Item* title_row = left_column->emplace_back<Item>();
+    title_row->set_align_items(YGAlignCenter);
+    title_row->set_gap(5_fpx);
+    title_row->set_flex_shrink(0);
+
+    LayoutButton* back_button =
+        title_row->emplace_back<LayoutButton>(std::string{}, Render::Icon::CaretLeft);
+    back_button->set_width(24_fpx);
+    back_button->set_height(24_fpx);
+    back_button->set_content_padding(3_fpx);
+    back_button->set_flex_shrink(0);
+    back_button->callbacks().action = [this] { m_stack_layout->set_current_index(0); };
+
+    m_printer_name = title_row->emplace_back<Text>(std::string{});
     m_printer_name->set_wrap_mode(Text::WrapMode::WrapElide);
-    m_printer_name->set_width_percent(100);
-    m_printer_name->set_align({AlignH::Center, AlignV::Center});
+    m_printer_name->set_flex_grow(1);
 
     m_printer_image = left_column->emplace_back<Icon>(Render::Icon::None);
     m_printer_image->set_width(200_fpx);

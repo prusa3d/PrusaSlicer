@@ -45,6 +45,8 @@ struct PhysicalPrinterConfig
 /// Name for the UI, marks runtime printers.
 std::string ui_name(const PhysicalPrinterConfig& printer);
 
+bool is_connect_printer(const PhysicalPrinterConfig& printer);
+
 /**
  * @brief Load external hw config from Connect JSON
  * @param json Connect JSON describing the printer

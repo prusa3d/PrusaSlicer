@@ -76,11 +76,8 @@ public:
 
     Preset::PrinterPresetSelector& printer_preset_selector();
 
-    /// Explicit user selection for this session.
-    void select_uuid(const std::string& uuid);
-
-    /// Explicit user selection that also selects the presets matching the printer.
-    void select_uuid_with_presets(const std::string& uuid);
+    /// Explicit user selection for this session, fails when no printer config matches.
+    bool select_uuid(const std::string& uuid);
 
     /**
      * @brief Automatic selection which keeps the presets untouched.
@@ -158,7 +155,8 @@ private:
     bool can_be_selected_at(size_t index) const;
     bool is_printer_compatible(size_t index, const Domain::Preset::HwPrinterConfig& config) const;
     /// Selects the printer and remembers it in the current config container.
-    void apply_selection(const std::string& uuid, bool apply_hw_config);
+    bool apply_selection(const std::string& uuid, bool apply_hw_config);
+    void select_connect_materials(const std::string& printer_uuid);
     void clear_selection();
     void set_last_used(const std::string& uuid);
 

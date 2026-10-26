@@ -112,7 +112,7 @@ bool get_bool(const nlohmann::ordered_json& j, const char* key, bool def)
 
 nlohmann::ordered_json printer_to_json(const PhysicalPrinterConfig& printer)
 {
-    if (std::holds_alternative<ConnectUpload>(printer.payload)) {
+    if (is_connect_printer(printer)) {
         PANIC("Cannot save connect printer");
     }
 

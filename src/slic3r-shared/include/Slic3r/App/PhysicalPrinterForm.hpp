@@ -54,8 +54,11 @@ private:
     void build_form();
     void test_edits();
     void commit_edits();
+    Biz::PhysicalPrinter::PhysicalPrinterConfig edited_config() const;
     void update_field_visibility();
     void update_test_button_state();
+    void update_save_button_state();
+    bool has_valid_name() const;
 
     void on_connection_test_finished(Biz::PhysicalPrinter::PrintHostTestResult result);
     void set_test_status(const std::string& text, const std::string& detail, Platform::Color color);
@@ -63,6 +66,7 @@ private:
 
     void browse_ca_file();
 
+    void load_connection_fields(const Biz::PhysicalPrinter::PrinterUpload& upload);
     void rebuild_auth_type_options(Domain::PrintHostAuthType desired);
     Domain::PrintHostAuthType current_auth_type() const;
 

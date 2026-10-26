@@ -43,10 +43,6 @@ PrinterSettingsDialog::PrinterSettingsDialog(
 ) :
     Dialog({"Printers"}, "LogicalPrinterSettingsDialog"),
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
-    m_preset_list_selection_changed_listener_scope(
-        project_interactor.preset_interactor().printer_presets(),
-        *this
-    ),
     m_selected_project_changed_listener_scope(project_interactor, *this),
     m_project_interactor(project_interactor),
     m_navigator(navigator),
@@ -74,25 +70,6 @@ PrinterSettingsDialog::PrinterSettingsDialog(
     create_page_settings();
 
     m_stack_layout->set_current_index(0);
-
-    // Default project is already loaded, update default printer selection
-    on_list_selection_changed(
-        m_project_interactor.preset_interactor().printer_presets().selected_index()
-    );
-}
-
-void PrinterSettingsDialog::on_preset_selection_changed(
-    Domain::SelectionId project_id,
-    Domain::SelectionId config_container_id,
-    Biz::Preset::PresetItemType type
-)
-{
-    if (m_project_interactor.selected_project_id() == project_id
-        && m_project_interactor.selected_config_container_id() == config_container_id
-        && type == Biz::Preset::PresetItemType::PrinterPreset)
-    {
-        update_settings_data();
-    }
 }
 
 void PrinterSettingsDialog::on_config_container_selection_changed(
@@ -111,15 +88,6 @@ void PrinterSettingsDialog::on_preset_bundles_loaded()
 void PrinterSettingsDialog::update_warning()
 {
     m_warning->set_visible(m_project_interactor.preset_interactor().has_invalid_hw_config());
-}
-
-void PrinterSettingsDialog::on_list_selection_changed(Domain::SelectionId new_selection)
-{
-    if (new_selection == Domain::INVALID_ID) {
-        return;
-    }
-
-    update_settings_data();
 }
 
 void PrinterSettingsDialog::on_selected_project_changed_final(size_t index)
@@ -142,6 +110,7 @@ void PrinterSettingsDialog::select_page_settings(
         return;
     }
     m_physical_printer_form->set_printer_config(printer);
+    update_settings_data(printer);
     update_warning();
     m_stack_layout->set_current_index(1);
 }
@@ -190,8 +159,7 @@ void PrinterSettingsDialog::create_page_list()
     m_printer_filter->set_filter_fn(
         [this](const PhysicalPrinter::PhysicalPrinterConfig& printer) -> bool
         {
-            const bool is_connect =
-                std::holds_alternative<PhysicalPrinter::ConnectUpload>(printer.payload);
+            const bool is_connect = PhysicalPrinter::is_connect_printer(printer);
             switch (m_printer_filter_type) {
             case PrinterFilter::Local:
                 return !is_connect;
@@ -240,12 +208,10 @@ void PrinterSettingsDialog::create_page_list()
             dlg_manager.show_yesno_dialog(
                 _u8L("Remove printer?"),
                 _u8L("Do you wish to remove the printer?"),
-                [this, index](bool checked)
+                [this, uuid = m_preset_searcher->at(index).uuid](bool checked)
                 {
                     if (checked) {
-                        m_project_interactor.physical_printer_interactor().remove_uuid(
-                            m_preset_searcher->at(index).uuid
-                        );
+                        m_project_interactor.physical_printer_interactor().remove_uuid(uuid);
                     }
                 }
             );
@@ -300,6 +266,7 @@ void PrinterSettingsDialog::create_page_settings()
     Item* title_row = m_page_settings->emplace_back<Item>();
     title_row->set_align_items(YGAlignCenter);
     title_row->set_gap(5_fpx);
+    title_row->set_flex_shrink(0);
     LayoutButton* back_button =
         title_row->emplace_back<LayoutButton>(std::string{}, Render::Icon::CaretLeft);
     back_button->set_width(24_fpx);
@@ -312,6 +279,7 @@ void PrinterSettingsDialog::create_page_settings()
 
     Separator* sep = m_page_settings->emplace_back<Separator>(Orientation::Horizontal);
     sep->set_margin(Margins{-20_fpx, 0});
+    sep->set_flex_shrink(0);
 
     m_printer_icon = m_page_settings->emplace_back<Icon>(Render::Icon::None);
     m_printer_icon->set_height(225_fpx);
@@ -332,6 +300,7 @@ void PrinterSettingsDialog::create_page_settings()
     };
 
     m_warning = m_page_settings->emplace_back<WarningPanel>();
+    m_warning->set_flex_shrink(0);
     m_warning->set_warning(
         Biz::_u8L("Invalid combination"),
         Biz::_u8L("Selected nozzles cannot be used together on any layer height.")
@@ -344,18 +313,19 @@ void PrinterSettingsDialog::on_about_to_show()
     update_warning();
 }
 
-void PrinterSettingsDialog::update_settings_data()
+void PrinterSettingsDialog::update_settings_data(
+    const PhysicalPrinter::PhysicalPrinterConfig& printer
+)
 {
-    const Domain::Preset::HwPrinterConfig& printer_config =
-        m_project_interactor.preset_interactor().current_printer_config();
+    const std::optional<Domain::Preset::HwPrinterConfig>& printer_config = printer.hw_config;
+    m_text_printer_name->set_text(printer_config ? printer_config->name : printer.name);
 
-    m_text_printer_name->set_text(printer_config.name);
-
-    if (printer_config.visual.thumbnail.has_value()) {
-        const std::string image_path =
-            printer_config.relative_path_to_assets() + printer_config.visual.thumbnail.value();
-
-        m_printer_icon->set_image(image_path);
+    if (printer_config && printer_config->visual.thumbnail.has_value()) {
+        m_printer_icon->set_image(
+            printer_config->relative_path_to_assets() + printer_config->visual.thumbnail.value()
+        );
+    } else {
+        m_printer_icon->set_icon(Render::Icon::None);
     }
 }
 

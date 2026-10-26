@@ -284,10 +284,6 @@ public:
         const std::optional<std::string>& vendor_id = std::nullopt
     ) const override;
 
-    [[nodiscard]] const Domain::Preset::FeatureDefs* get_vendor_tool_feature_defs(
-        const std::optional<std::string>& vendor_id = std::nullopt
-    ) const;
-
     virtual boost::filesystem::path selected_user_preset_path(
         Domain::Preset::PresetKind kind,
         const std::string& preset_name

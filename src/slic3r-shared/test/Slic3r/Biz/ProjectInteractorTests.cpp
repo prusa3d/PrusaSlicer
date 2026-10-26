@@ -8,6 +8,11 @@
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/SecretStoreDummy.hpp"
 #include "Slic3r/Biz/AppInstance/AppInstanceMessageHandlerFactory.hpp"
+#include "Slic3r/Biz/Connect/ConnectMessageHandler.hpp"
+#include "Slic3r/Biz/Preset/PrinterPresetSelector.hpp"
+#include "Slic3r/Biz/JsonValueJson.hpp"
+#include "Slic3r/Biz/Network/MockHttp.hpp"
+#include "Slic3r/Biz/Network/MockHttpFactory.hpp"
 
 #include "Slic3r/App/Plater/ThumbnailImageGenerator.hpp"
 #include "Slic3r/App/Platform/StdMainThreadDispatcher.hpp"
@@ -22,6 +27,8 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/nowide/filesystem.hpp>
+
+#include <nlohmann/json.hpp>
 
 using Slic3r::Biz::IProjectsChangedListener;
 using Slic3r::Biz::Platform::PlatformServices;
@@ -350,8 +357,8 @@ struct PhysicalPrinterFromProjectFixture : public ProjectInteractorFixture
         printer.payload   = FileSystemExport{false};
         printer.name      = name;
         printer.hw_config = hw_config;
-        physical_printers().create_or_save_physical_printer(printer);
-        stored_uuids.push_back(physical_printers().selected_uuid());
+        stored_uuids.push_back(physical_printers().save_physical_printer(printer));
+        physical_printers().select_uuid(stored_uuids.back());
         return stored_uuids.back();
     }
 
@@ -454,6 +461,7 @@ TEST_CASE_METHOD(
     Slic3r::Domain::Preset::HwPrinterConfig incompatible_hw_config = current_hw_config();
     incompatible_hw_config.model.model += "_incompatible";
     const std::string uuid = create_stored_printer("Office printer", incompatible_hw_config);
+    selected_config_container().physical_printer_selection() = {uuid, "Office printer"};
 
     const std::string hw_config_name = current_hw_config().name;
     const fs::path path              = store_selected_project();
@@ -570,4 +578,267 @@ TEST_CASE_METHOD(
     physical_printers().select_default();
     CHECK(physical_printers().selected_uuid() == stored_uuids.back());
     CHECK(current_hw_config().name == hw_config_name);
+}
+
+namespace {
+
+struct ConnectSelectPrinterFixture : public PhysicalPrinterFromProjectFixture,
+                                     public Slic3r::Biz::Connect::IConnectHandlerListener,
+                                     public Slic3r::Biz::Preset::IPrinterPresetSelectorListener
+{
+    ConnectSelectPrinterFixture()
+    {
+        using namespace Slic3r::Biz::Network;
+        configure_http_factory_with_mock();
+        MockHttpProvider::get().set_create_fn(
+            [this](IHttp::RequestMethod, const std::string& url, IHttp::RetryFn retry_fn)
+            {
+                auto http = std::make_unique<MockHttp>(url, std::move(retry_fn));
+                http->set_perform_override_fn(
+                    [body = printer_list.dump()](MockHttp* performed, const HttpRetryOpt&)
+                    { performed->invoke_complete(body, 200); }
+                );
+                return http;
+            }
+        );
+        connect_message_handler().add_listener<IConnectHandlerListener>(this);
+        physical_printers()
+            .printer_preset_selector()
+            .add_listener<Slic3r::Biz::Preset::IPrinterPresetSelectorListener>(this);
+    }
+
+    ~ConnectSelectPrinterFixture()
+    {
+        physical_printers()
+            .printer_preset_selector()
+            .remove_listener<Slic3r::Biz::Preset::IPrinterPresetSelectorListener>(this);
+        connect_message_handler().remove_listener<IConnectHandlerListener>(this);
+    }
+
+    void on_connect_handler_error(const std::string& msg) override
+    {
+        errors.push_back(msg);
+    }
+
+    void on_printer_preset_selection_warning(const std::string& msg) override
+    {
+        warnings.push_back(msg);
+    }
+
+    Slic3r::Biz::Connect::ConnectMessageHandler& connect_message_handler()
+    {
+        return project_interactor->connect_message_handler();
+    }
+
+    void add_connect_printer(
+        const std::string& uuid,
+        const Slic3r::Domain::Preset::HwPrinterConfig& hw_config,
+        const std::vector<std::string>& material_types = {}
+    )
+    {
+        nlohmann::json tools = nlohmann::json::object();
+        for (size_t i = 0; i < hw_config.tool_count; ++i) {
+            tools[std::to_string(i)] = {{"class", "FFF"}, {"features", hw_config.tools.at(i).features}};
+            if (i < material_types.size()) {
+                tools[std::to_string(i)]["material_package_instance"] = {
+                    {"package", {{"material", {{"type", material_types[i]}}}}}
+                };
+            }
+        }
+        printer_list["printers"].push_back({
+            {"uuid", uuid},
+            {"name", "Connect printer"},
+            {"model", hw_config.model.model},
+            {"base_model", hw_config.model.base_model},
+            {"tool_count", hw_config.tool_count},
+            {"tools", tools},
+        });
+    }
+
+    template <typename Predicate>
+    void select_from_connect(const std::string& uuid, Predicate&& finished)
+    {
+        connect_message_handler().handle_select_printer_message(
+            nlohmann::json{{"uuid", uuid}}.dump()
+        );
+
+        const std::chrono::steady_clock::time_point deadline =
+            std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        while (!finished() && std::chrono::steady_clock::now() < deadline) {
+            dispatcher.dispatch_enqueued();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+
+    const Slic3r::Domain::Preset::HwPrinterConfig* find_other_tool_config()
+    {
+        const auto& items = project_interactor->preset_interactor().printer_configs().items();
+        for (size_t i = 0, n = items.size(); i < n; ++i) {
+            const auto& hw_config =
+                workbench.preset_bundle().printer_configs.at(items.at(i).hw_printer_config_id);
+            if (hw_config.model == current_hw_config().model
+                && hw_config.tool_count == 1
+                && hw_config.feeders.empty()
+                && hw_config.tools.at(0).id != current_hw_config().tools.at(0).id)
+            {
+                return &hw_config;
+            }
+        }
+        return nullptr;
+    }
+
+    const Slic3r::Domain::Preset::HwPrinterConfig* find_config_without_printer_presets()
+    {
+        auto& preset_interactor = project_interactor->preset_interactor();
+        const auto& items       = preset_interactor.printer_configs().items();
+        for (size_t i = 0, n = items.size(); i < n; ++i) {
+            const auto& hw_config =
+                workbench.preset_bundle().printer_configs.at(items.at(i).hw_printer_config_id);
+            if (hw_config.feeders.empty()
+                && std::ranges::empty(preset_interactor.get_printer_presets(hw_config.id)))
+            {
+                return &hw_config;
+            }
+        }
+        return nullptr;
+    }
+
+    std::string selected_filament_type(size_t slot)
+    {
+        const Slic3r::Domain::ConfigValue* value =
+            project_interactor->preset_interactor().material_cbi_list().at(slot).find("filament_type");
+        if (value == nullptr) {
+            return {};
+        }
+        if (value->holds_alternative<std::vector<std::string>>()) {
+            const auto values = value->get<std::vector<std::string>>();
+            return values.empty() ? std::string{} : values.front();
+        }
+        return value->holds_alternative<std::string>() ? value->get<std::string>() : std::string{};
+    }
+
+    nlohmann::json printer_list{{"printers", nlohmann::json::array()}};
+    std::vector<std::string> errors;
+    std::vector<std::string> warnings;
+};
+
+} // namespace
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect selects the Connect physical printer",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    const Slic3r::Domain::Preset::HwPrinterConfig* target = find_other_tool_config();
+    REQUIRE(target != nullptr);
+    const std::string target_tool_id = target->tools.at(0).id;
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, *target);
+
+    select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+    CHECK(errors.empty());
+    CHECK(physical_printers().selected_uuid() == uuid);
+    CHECK(physical_printers().is_connect_printer_selected());
+    CHECK(selected_config_container().physical_printer_selection().uuid == uuid);
+    REQUIRE(current_hw_config().tools.size() == 1);
+    CHECK(current_hw_config().tools.at(0).id == target_tool_id);
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect with unknown printer keeps the selection",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    add_connect_printer("c0ffee00-0000-0000-0000-000000000001", current_hw_config());
+    const std::string uuid           = create_stored_printer("Local printer", current_hw_config());
+    const std::string hw_config_name = current_hw_config().name;
+
+    select_from_connect("c0ffee00-0000-0000-0000-00000000dead", [&] { return !errors.empty(); });
+
+    CHECK(errors.size() == 1);
+    CHECK(physical_printers().selected_uuid() == uuid);
+    CHECK(current_hw_config().name == hw_config_name);
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Connect physical printer is compatible with the printer config it selected",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    const Slic3r::Domain::Preset::HwPrinterConfig* target = find_other_tool_config();
+    REQUIRE(target != nullptr);
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, *target);
+    select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+    REQUIRE(physical_printers().selected_physical_printer_data() != nullptr);
+    CHECK(Slic3r::Biz::PhysicalPrinter::is_physical_printer_compatible(
+        *physical_printers().selected_physical_printer_data(),
+        current_hw_config()
+    ));
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect without matching printer profile keeps the selection",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    const Slic3r::Domain::Preset::HwPrinterConfig* target = find_config_without_printer_presets();
+    REQUIRE(target != nullptr);
+
+    const std::string stored_uuid    = create_stored_printer("Local printer", current_hw_config());
+    const std::string hw_config_name = current_hw_config().name;
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, *target);
+    select_from_connect(uuid, [&] { return !warnings.empty(); });
+
+    CHECK(warnings.size() == 1);
+    CHECK(physical_printers().selected_uuid() == stored_uuid);
+    CHECK(selected_config_container().physical_printer_selection().uuid == stored_uuid);
+    CHECK(current_hw_config().name == hw_config_name);
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect selects the loaded filament",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    const std::string filament_type = selected_filament_type(0);
+    REQUIRE(!filament_type.empty());
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, current_hw_config(), {filament_type});
+    select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+    CHECK(errors.empty());
+    CHECK(warnings.empty());
+    CHECK(physical_printers().selected_uuid() == uuid);
+    CHECK(selected_filament_type(0) == filament_type);
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect warns about loaded filament without profile",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    const std::string filament_type = selected_filament_type(0);
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, current_hw_config(), {"UNKNOWN_FILAMENT"});
+    select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+    CHECK(errors.empty());
+    CHECK(warnings.size() == 1);
+    CHECK(physical_printers().selected_uuid() == uuid);
+    CHECK(selected_filament_type(0) == filament_type);
 }

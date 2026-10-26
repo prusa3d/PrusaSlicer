@@ -25,11 +25,79 @@
 #include <wx/tokenzr.h>
 #include <wx/app.h>
 #include <wx/utils.h>
+#include <wx/choicdlg.h>
+#include <wx/listbox.h>
+#ifdef __WXMSW__
+#include <wx/ownerdrw.h>
+#endif
 
 #include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
 
 namespace Slic3r::App::WX {
+
+namespace {
+
+#ifdef __WXMSW__
+class ThemedListBoxItem : public wxOwnerDrawn
+{
+public:
+    explicit ThemedListBoxItem(wxListBox* parent) : m_parent(parent) {}
+
+    wxString GetName() const override
+    {
+        return m_parent->GetString(m_parent->GetItemIndex(const_cast<ThemedListBoxItem*>(this)));
+    }
+
+protected:
+    void GetColourToUse(wxODStatus stat, wxColour& colText, wxColour& colBack) const override
+    {
+        wxOwnerDrawn::GetColourToUse(stat, colText, colBack);
+        if (stat & wxODSelected) {
+            colBack = w_config()->get_color_selected_btn_bg();
+            colText = w_config()->get_label_clr_default();
+        } else if (!GetBackgroundColour().IsOk()) {
+            colBack = wxSystemSettings::GetColour(wxSYS_COLOUR_LISTBOX);
+        }
+    }
+
+private:
+    wxListBox* m_parent;
+};
+
+class ThemedListBox : public wxListBox
+{
+public:
+    ThemedListBox(wxWindow* parent, wxWindowID id, int n, const wxString* choices, long style)
+    {
+        Create(parent, id, wxDefaultPosition, wxDefaultSize, n, choices, style | wxLB_OWNERDRAW);
+    }
+
+protected:
+    wxOwnerDrawn* CreateLboxItem(size_t) override { return new ThemedListBoxItem(this); }
+};
+#endif // __WXMSW__
+
+class ComboDialog : public wxSingleChoiceDialog
+{
+public:
+    ComboDialog(const wxString& message, const wxString& caption, const wxArrayString& choices)
+    {
+        Create(nullptr, message, caption, choices);
+    }
+
+protected:
+#ifdef __WXMSW__
+    wxListBoxBase* CreateList(int n, const wxString* choices, long styleLbox) override
+    {
+        auto* list_box = new ThemedListBox(this, wxID_ANY, n, choices, styleLbox);
+        list_box->Bind(wxEVT_LISTBOX_DCLICK, &wxSingleChoiceDialog::OnListBoxDClick, this);
+        return list_box;
+    }
+#endif // __WXMSW__
+};
+
+} // namespace
 
 void
 DialogManager::show_file_dialog(FileDialogType dialog_type, const std::string& dialog_title, const boost::filesystem::path& override_dir, const std::string& default_file_name, const std::string& wildcards, const FileCallback& callback)
@@ -277,13 +345,8 @@ std::string DialogManager::show_combo_dialog(
         choices.Add(from_u8(val));
     }
 
-    wxSingleChoiceDialog dialog(
-        nullptr, 
-        from_u8(text), 
-        from_u8(title), 
-        choices
-    );
-    
+    ComboDialog dialog(from_u8(text), from_u8(title), choices);
+
     if (dialog.ShowModal() == wxID_OK) {
         return into_u8(dialog.GetStringSelection());
     }

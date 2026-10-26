@@ -2,6 +2,9 @@
 
 #include "Slic3r/App/Yoga/RectangleButton.hpp"
 #include "Slic3r/App/Render/ImguiTypes.hpp"
+#include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
+
+#include <optional>
 
 namespace Slic3r::App::Yoga {
 class Icon;
@@ -20,6 +23,7 @@ public:
     void set_printer_name(const std::string& printer_name, bool is_modified = false);
     void set_preset_name(const std::string& preset_name);
     void set_printing_state(int state);
+    void set_connect_indicator(std::optional<Biz::ConnectPrinter::ConnectPrinterState> state);
 
     void set_visible_printer(bool is_visible);
     std::function<void()>& on_printer();
@@ -48,6 +52,8 @@ protected:
 
 private:
     Yoga::LayoutButton* m_printers_btn{nullptr};
+    Yoga::LayoutButton* m_state_btn{nullptr};
+    Yoga::Icon* m_connect_icon{nullptr};
 
     bool m_is_visible_printers{false};
 };

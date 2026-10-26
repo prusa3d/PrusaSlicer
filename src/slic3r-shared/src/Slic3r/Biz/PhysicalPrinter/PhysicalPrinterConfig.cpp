@@ -6,6 +6,8 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
+
 namespace Slic3r::Biz::PhysicalPrinter {
 
 std::string physical_printer_type_to_string(const PhysicalPrinterConfig& data)
@@ -35,6 +37,11 @@ std::string ui_name(const PhysicalPrinterConfig& printer)
     return printer.name;
 }
 
+bool is_connect_printer(const PhysicalPrinterConfig& printer)
+{
+    return std::holds_alternative<ConnectUpload>(printer.payload);
+}
+
 std::optional<Domain::Preset::HwPrinterConfig> hw_config_from_connect_json(std::string_view json)
 {
     auto result = Preset::IO::load_external_hw_config(json);
@@ -48,7 +55,7 @@ std::optional<Domain::Preset::HwPrinterConfig> hw_config_from_connect_json(std::
 bool has_unresolved_model(const PhysicalPrinterConfig& printer)
 {
     // printer_id is filled only when the external hw config was matched against the bundle
-    return std::holds_alternative<ConnectUpload>(printer.payload)
+    return is_connect_printer(printer)
         && (!printer.hw_config.has_value() || printer.hw_config->printer_id.empty());
 }
 
@@ -62,12 +69,16 @@ bool is_physical_printer_compatible(
     }
 
     const auto& phy_hw_config = physical_config.hw_config.value();
-    bool compatible = phy_hw_config.technology == hw_config.technology
+    return phy_hw_config.technology == hw_config.technology
         && phy_hw_config.model == hw_config.model
         && phy_hw_config.tool_count == hw_config.tool_count
-        && phy_hw_config.tools == hw_config.tools
-        ;
-    return compatible;
+        && std::ranges::equal(
+               phy_hw_config.tools,
+               hw_config.tools,
+               {},
+               &Domain::Preset::HwToolConfig::id,
+               &Domain::Preset::HwToolConfig::id
+        );
 }
 
 } // namespace Slic3r::Biz::PhysicalPrinter

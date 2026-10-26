@@ -24,7 +24,7 @@ PhysicalPrinterSettingsButton::PhysicalPrinterSettingsButton(
     Biz::PhysicalPrinter::PhysicalPrinterInteractor& physical_printer_interactor
 ) :
     Biz::DataObserver<Biz::PhysicalPrinter::PhysicalPrinterConfig>(index, physical_printer),
-    m_physical_printer_changed_listener_scope(physical_printer_interactor, *this),
+    m_physical_printer_changed_listener_scope(std::in_place, physical_printer_interactor, *this),
     m_on_clicked(on_clicked),
     m_on_cog_clicked(on_cog_clicked),
     m_on_bin_clicked(on_bin_clicked),
@@ -51,33 +51,6 @@ PhysicalPrinterSettingsButton::PhysicalPrinterSettingsButton(
     // WrapElide text has no min width, without flex grow it collapses to zero in a row
     m_printer_name->set_flex_grow(1);
     m_printer_name->set_flex_shrink(1);
-
-    // Connect state circle in front of the preset name
-    Item* preset_row = m_texts_wrapper->emplace_back<Item>();
-    preset_row->set_align_items(YGAlignCenter);
-    preset_row->set_gap(4_fpx);
-
-    m_state_btn = preset_row->emplace_back<LayoutButton>(std::string{}, Render::Icon::CircleFull);
-    m_state_btn->set_background_color(Platform::Color::ButtonTransparent);
-    m_state_btn->set_content_padding(1_fpx);
-    m_state_btn->set_width(12_fpx);
-    m_state_btn->set_height(12_fpx);
-    m_state_btn->set_flex_shrink(0);
-    m_state_btn->set_visible(false);
-
-    preset_row->append(m_texts_wrapper->remove(m_preset_name));
-    // WrapElide text has no min width, without flex grow it collapses to zero in a row
-    m_preset_name->set_flex_grow(1);
-    m_preset_name->set_flex_shrink(1);
-
-    m_connect_icon = m_icon->emplace_back<Icon>(Render::Icon::ConnectUpload);
-    m_connect_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
-    m_connect_icon->set_aspect_ratio(1);
-    m_connect_icon->set_position_type(YGPositionTypeAbsolute);
-    m_connect_icon->set_width(16_fpx);
-    m_connect_icon->set_right(0_fpx);
-    m_connect_icon->set_bottom(0_fpx);
-    m_connect_icon->set_visible(false);
 
     m_bin_btn = add_button(Render::Icon::DeleteBtnIcon, Biz::_u8L("Delete physical printer"));
 
@@ -119,17 +92,15 @@ void PhysicalPrinterSettingsButton::update()
     set_preset_name(preset_name);
     set_printer_name(Biz::PhysicalPrinter::ui_name(*m_state));
     m_preset_name->set_visible(!preset_name.empty());
-    m_state_btn->set_visible(false);
     set_printer_image();
     m_unresolved_model_icon->set_visible(Biz::PhysicalPrinter::has_unresolved_model(*m_state));
 
     if (const auto* upload = std::get_if<Biz::PhysicalPrinter::ConnectUpload>(&m_state->payload)) {
-        set_connect_state(upload->state);
-        m_connect_icon->set_visible(true);
+        set_connect_indicator(upload->state);
         set_visible_cog(false);
         set_visible_bin(false);
     } else {
-        m_connect_icon->set_visible(false);
+        set_connect_indicator(std::nullopt);
         set_visible_cog(!m_state->is_runtime);
         set_visible_bin(m_is_bin_supported && !m_state->is_runtime);
     }
@@ -148,32 +119,9 @@ void PhysicalPrinterSettingsButton::on_selected_physical_printer_changed()
     update_selected();
 }
 
-void PhysicalPrinterSettingsButton::set_connect_state(
-    Biz::ConnectPrinter::ConnectPrinterState state
-)
+void PhysicalPrinterSettingsButton::on_view_will_be_removed()
 {
-    using State = Biz::ConnectPrinter::ConnectPrinterState;
-
-    ImColor color = m_theme->color_imgui(Platform::Color::Text);
-    switch (state) {
-    case State::Finished:
-    case State::Ready: color = m_theme->color_imgui(Platform::Color::Success); break;
-    case State::Stopped:
-    case State::Error: color = m_theme->color_imgui(Platform::Color::Error); break;
-    case State::Unknown:
-    case State::Busy:
-    case State::Attention: color = m_theme->color_imgui(Platform::Color::Warning); break;
-    case State::Printing: color = m_theme->color_imgui(Platform::Color::AccentSecondary); break;
-    case State::Paused: color = m_theme->color_imgui(Platform::Color::AccentTertiary); break;
-    case State::Offline:
-        color = m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled);
-        break;
-    default: break;
-    }
-
-    m_state_btn->set_icon_tint(color);
-    m_state_btn->set_tooltip(Biz::ConnectPrinter::connect_printer_state_to_string(state));
-    m_state_btn->set_visible(true);
+    m_physical_printer_changed_listener_scope.reset();
 }
 
 void PhysicalPrinterSettingsButton::update_tooltip()
