@@ -19,6 +19,9 @@ public:
         const std::string& current_url
     ) override;
 
+    std::pair<int, int> size(int em_unit) const override;
+    std::pair<int, int> min_size(int em_unit) const override;
+
     /**
      * @brief A (possibly refreshed) access token is available - push it to the web app.
      */

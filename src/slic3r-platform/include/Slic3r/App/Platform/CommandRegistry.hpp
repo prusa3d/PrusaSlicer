@@ -8,10 +8,18 @@
 
 namespace Slic3r::App::Platform {
 
+struct ICommandRegistryListener
+{
+    virtual ~ICommandRegistryListener() = default;
+
+    virtual void on_command_added(const ICommand& command) {}
+    virtual void on_command_removed(const ICommand& command) {}
+};
+
 /**
  * @brief Registry for commands user can invoke.
  */
-class CommandRegistry
+class CommandRegistry : public WithListeners<ICommandRegistryListener>
 {
 public:
     using CommandsMap = std::unordered_map<std::string, std::unique_ptr<ICommand>>;

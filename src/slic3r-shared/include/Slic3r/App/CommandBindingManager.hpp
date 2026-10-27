@@ -20,6 +20,7 @@ class GizmoCommandRegistry;
 class UIItemCommand;
 
 class CommandBindingManager :
+    public Platform::ICommandRegistryListener,
     public Biz::UserAccount::IUserAccountListener,
     public Biz::IStatusCacheChangedListener,
     public Biz::ISelectedBedInstancesChangedListener,
@@ -30,9 +31,8 @@ public:
     using UIItemsPerCommandMap =
         std::unordered_map<std::string, std::vector<Yoga::AbstractButton*>>;
 
-    CommandBindingManager(Platform::CommandRegistry& main_command_registry) :
-        m_main_command_registry(main_command_registry)
-    {}
+    CommandBindingManager(Platform::CommandRegistry& main_command_registry);
+    ~CommandBindingManager() override;
 
     void set_gizmos_command_registry(const Scene::GizmoCommandRegistry* gizmos_command_registry)
     {
@@ -54,6 +54,8 @@ public:
 
     const Platform::ICommand& command(const char* command_name) const;
     bool has_command(const char* command_name) const;
+
+    void on_command_removed(const Platform::ICommand& command) override;
 
     void on_user_account_id_success(bool, const std::string&) override;
     void on_user_account_logged_out() override;

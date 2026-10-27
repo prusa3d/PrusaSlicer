@@ -25,7 +25,7 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
         wxID_ANY,
         from_u8(logic->title()),
         wxDefaultPosition,
-        wxSize(logic->size(w_config()->em_unit()).first, logic->size(w_config()->em_unit()).second),
+        wxDefaultSize,
         wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER
     ),
     m_logic(std::move(logic))
@@ -66,9 +66,10 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
     wxBoxSizer* panel_sizer = new wxBoxSizer(wxVERTICAL);
     panel->SetSizer(panel_sizer);
 #endif
-    
-    auto [req_w, req_h] = m_logic->size(w_config()->em_unit());
-    auto [min_w, min_h] = m_logic->min_size(w_config()->em_unit());
+
+    const int em = w_config()->em_unit(this);
+    auto [req_w, req_h] = m_logic->size(em);
+    auto [min_w, min_h] = m_logic->min_size(em);
 
     wxRect client_area = wxDisplay(wxDisplay::GetFromWindow(this)).GetClientArea();
     if (client_area.IsEmpty()) {

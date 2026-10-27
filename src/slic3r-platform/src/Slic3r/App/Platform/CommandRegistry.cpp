@@ -9,6 +9,11 @@ CommandRegistry& CommandRegistry::register_command(std::unique_ptr<ICommand> com
     const char* name = ASSERT_VAL(command->name());
     ASSERT(m_commands_by_id.count(name) == 0, "Command with same name already registered");
     m_commands_by_id[name] = std::move(command);
+    const auto& cmd = *m_commands_by_id.at(name);
+    invoke_listeners<ICommandRegistryListener>(
+        [&cmd](ICommandRegistryListener* listener) { listener->on_command_added(cmd); }
+    );
+
     return *this;
 }
 
@@ -50,6 +55,10 @@ bool CommandRegistry::remove_command(const char* name)
 {
     auto it = m_commands_by_id.find(name);
     if (it != m_commands_by_id.end()) {
+        const auto& cmd = *it->second;
+        invoke_listeners<ICommandRegistryListener>(
+            [&cmd](ICommandRegistryListener* listener) { listener->on_command_removed(cmd); }
+        );
         m_commands_by_id.erase(it);
         return true;
     }

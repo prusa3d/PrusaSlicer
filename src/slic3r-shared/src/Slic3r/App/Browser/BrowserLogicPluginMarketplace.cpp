@@ -211,4 +211,14 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::
     return AbstractBrowserLogic::on_navigation_request_webview_event(new_url, current_url);
 }
 
+std::pair<int, int> BrowserLogicPluginMarketplace::size(int em_unit) const
+{
+    return {130*em_unit, 100*em_unit};
+}
+
+std::pair<int, int> BrowserLogicPluginMarketplace::min_size(int em_unit) const
+{
+    return {40*em_unit, 40*em_unit};
+}
+
 } // namespace Slic3r::App::Browser

@@ -46,6 +46,10 @@ void Menu::clear()
         m_scroll_area->remove_later(item);
     }
     m_items.clear();
+    for (Separator* separator : m_separators) {
+        m_scroll_area->remove_later(separator);
+    }
+    m_separators.clear();
 }
 
 size_t Menu::menu_item_count() const
@@ -60,7 +64,7 @@ MenuItem* Menu::item_at(size_t index) const
 
 void Menu::append_separator()
 {
-    m_scroll_area->emplace_back<Separator>();
+    m_separators.push_back(m_scroll_area->emplace_back<Separator>());
 }
 
 void Menu::close_all_submenus() const
