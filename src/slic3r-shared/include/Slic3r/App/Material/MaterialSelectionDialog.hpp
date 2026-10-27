@@ -85,6 +85,8 @@ protected:
     void create_page_presets();
     void create_page_materials();
 
+    std::optional<std::string> material_type() const;
+
 private:
     struct ProjectContext;
     ProjectContext& context();
@@ -143,6 +145,7 @@ private:
     Biz::Preset::PresetItemCompoundObservableList& m_material_presets;
     Biz::UnsharedPointer<Biz::ObservableListSortFilter<Biz::Preset::PresetItem>> m_material_filter;
     Biz::UnsharedPointer<Biz::ObservableListSearcher<Biz::Preset::PresetItem>> m_material_searcher;
+    size_t m_project_id = Domain::INVALID_ID;
     size_t m_material_index = Domain::INVALID_ID;
     Yoga::ButtonGroup m_material_type_button_group;
     std::map<std::string, Yoga::LayoutButton*> m_type_filter_buttons;

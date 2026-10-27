@@ -96,16 +96,10 @@ public:
 
 private:
     const Domain::Preset::SelectedPreset& selected_preset() const;
-    void run_query();
+    void run_query(Domain::SelectionId project_id);
     bool is_favorite(const Domain::MatDb::Material& mat) const;
 
 private:
-    struct QueryState
-    {
-        MatDbClient::Query query;
-        size_t slot_index;
-        bool only_favorites;
-    };
 
     Domain::Workbench& m_workbench;
     ProjectInteractor& m_project_interactor;
@@ -113,7 +107,6 @@ private:
     std::unique_ptr<MatDbInteractorProjectContexts> m_projects;
     mutable MatDbClient m_client;
     ObservableList<MatDbItem> m_result;
-    std::optional<QueryState> m_query;
 };
 
 }

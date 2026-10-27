@@ -19,10 +19,17 @@
 #endif
 
 namespace Slic3r::Biz::MatDb {
+struct QueryState
+{
+    MatDbClient::Query query;
+    size_t slot_index;
+    bool only_favorites;
+};
 
 struct MatDbInteractorProjectContext
 {
     Domain::SelectionId selected_config_container_id{Domain::INVALID_ID};
+    std::optional<QueryState> query_state;
 };
 
 struct MatDbInteractorProjectContexts : ProjectScoped<MatDbInteractorProjectContext>
@@ -74,8 +81,8 @@ void MatDbInteractor::query(
     if (type.has_value()) {
         query.types.push_back(type.value());
     }
-    m_query = {query, material_index, only_favorites};
-    run_query();
+    m_projects->selected().query_state = {query, material_index, only_favorites};
+    run_query(m_projects->selected_project_id());
 }
 
 void MatDbInteractor::select_material_preset(
@@ -129,7 +136,7 @@ void MatDbInteractor::
     if (project_id == m_projects->selected_project_id()
         && m_projects->project(project_id).selected_config_container_id == config_container_id)
     {
-        run_query();
+        run_query(project_id);
     }
 }
 
@@ -157,13 +164,14 @@ void MatDbInteractor::on_config_container_selection_changed(
 
 void MatDbInteractor::on_preset_bundles_loaded()
 {
-    run_query();
+    run_query(m_projects->selected_project_id());
 }
 
 void MatDbInteractor::on_connect_favorite_materials_changed()
 {
-    if (m_query.has_value() && m_query->only_favorites) {
-        run_query();
+    const auto& query = m_projects->selected().query_state;
+    if (query.has_value() && query->only_favorites) {
+        run_query(m_projects->selected_project_id());
         return;
     }
     for (size_t i = 0; i < m_result.size(); ++i) {
@@ -181,23 +189,17 @@ bool MatDbInteractor::is_favorite(const Domain::MatDb::Material& mat) const
     return m_project_interactor.connect_favorite_material_service().is_favorite(mat.uuid);
 }
 
-void MatDbInteractor::run_query()
+void MatDbInteractor::run_query(Domain::SelectionId project_id)
 {
-    if (!m_query.has_value()) {
+    auto& project_query = m_projects->project(project_id).query_state;
+    if (!project_query.has_value()) {
+        m_result.reset({});
         return;
     }
 
-    // TODO: @zaraka what is point of this "fix", it just silently hides bugs elsewhere
-    // like the one I fixed in PD-9508
-    const size_t slot_count = selected_preset().materials.size();
-    if (slot_count == 0) {
-        return;
-    }
-    m_query->slot_index = std::min(m_query->slot_index, slot_count - 1);
-
-    auto& query = m_query->query;
-    const auto material_index = m_query->slot_index;
-    if (m_query->only_favorites) {
+    auto& query = project_query->query;
+    const auto material_index = project_query->slot_index;
+    if (project_query->only_favorites) {
         query.uuids = m_project_interactor.connect_favorite_material_service()
                           .favorite_material_uuids();
     } else {
@@ -215,11 +217,12 @@ void MatDbInteractor::run_query()
         }
     }
     std::vector<MatDbItem> items;
-    auto resolve_preset = [this, material_index](const Domain::MatDb::Material& mat) -> PresetMatches
+    auto resolve_preset =
+        [this, project_id, material_index](const Domain::MatDb::Material& mat) -> PresetMatches
     {
         const auto& sp = selected_preset();
         auto mpv       = m_preset_interactor.get_material_presets_view(
-            m_projects->selected_project_id(),
+            project_id,
             sp.hw_config.id,
             sp.printer.id,
             sp.print.id,

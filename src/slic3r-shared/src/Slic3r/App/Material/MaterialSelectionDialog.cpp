@@ -146,23 +146,32 @@ MaterialSelectionDialog::Callbacks& MaterialSelectionDialog::material_selection_
     return m_callbacks;
 }
 
+std::optional<std::string> MaterialSelectionDialog::material_type() const
+{
+    const std::optional<std::string> material = m_combobox_material_type->current_index() == 0 ?
+        std::nullopt :
+        std::optional<std::string>{m_combobox_material_type->current_label()};
+    return material;
+}
+
 void MaterialSelectionDialog::set_material_index(size_t material_index)
 {
+    auto project_id = m_project_contexts->selected_project_id();
     if (m_material_index == material_index) {
+        if (m_project_id != project_id) {
+            m_project_id = project_id;
+            update_material_filter();
+
+        }
         return;
     }
 
     m_material_index = material_index;
+    m_project_id = project_id;
 
     update_preset_list();
 
-    m_project_interactor.matdb_interactor()
-        .query(
-            m_material_index,
-            m_input_text_search_materials->text(),
-            std::nullopt,
-            m_only_favorite_materials_button->checked()
-        );
+    update_material_filter();
 }
 
 void MaterialSelectionDialog::on_list_selection_changed(Domain::SelectionId new_selection)
