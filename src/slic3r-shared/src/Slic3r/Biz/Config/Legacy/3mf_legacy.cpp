@@ -21,7 +21,10 @@
 #include <boost/bimap.hpp>
 #include <boost/filesystem.hpp>
 
+#include <exception>
+
 #include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/qi_int.hpp>
@@ -568,6 +571,8 @@ namespace Slic3rLegacy {
         void clear_errors() { m_errors.clear(); }
 
     public:
+        const std::vector<std::string>& errors() const { return m_errors; }
+
         void log_errors()
         {
             for (const std::string& error : m_errors)
@@ -1426,35 +1431,54 @@ namespace Slic3rLegacy {
             XML_Parser& parser;
             _3MF_Importer& importer;
             const mz_zip_archive_file_stat& stat;
+            std::string error;
+            std::exception_ptr exception;
 
             CallbackData(XML_Parser& parser, _3MF_Importer& importer, const mz_zip_archive_file_stat& stat) : parser(parser), importer(importer), stat(stat) {}
         };
 
         CallbackData data(m_xml_parser, *this, stat);
 
-        mz_bool res = 0;
-
-        try
-        {
-            res = mz_zip_reader_extract_to_callback(&archive, stat.m_file_index, [](void* pOpaque, mz_uint64 file_ofs, const void* pBuf, size_t n)->size_t {
-                CallbackData* data = (CallbackData*)pOpaque;
+        // The callback is called from miniz, which is C code. Exceptions must not be thrown through it:
+        // the compiler may assume that miniz functions do not throw (e.g. with LTO) and optimize away
+        // the exception handlers around the call. The callback therefore stores the error and returns 0,
+        // which makes miniz abort the extraction.
+        const mz_bool res = mz_zip_reader_extract_to_callback(&archive, stat.m_file_index, [](void* pOpaque, mz_uint64 file_ofs, const void* pBuf, size_t n)->size_t {
+            CallbackData* data = (CallbackData*)pOpaque;
+            try {
                 if (!XML_Parse(data->parser, (const char*)pBuf, (int)n, (file_ofs + n == data->stat.m_uncomp_size) ? 1 : 0) || data->importer.parse_error()) {
                     char error_buf[1024];
                     ::sprintf(error_buf, "Error (%s) while parsing '%s' at line %d", data->importer.parse_error_message(), data->stat.m_filename, (int)XML_GetCurrentLineNumber(data->parser));
-                    throw Slic3r::FileIOError(error_buf);
+                    data->error = error_buf;
+                    return 0;
                 }
+            } catch (...) {
+                // E.g. version_error thrown by the XML handlers.
+                data->exception = std::current_exception();
+                return 0;
+            }
 
-                return n;
-                }, &data, 0);
+            return n;
+            }, &data, 0);
+
+        if (data.exception) {
+            try {
+                std::rethrow_exception(data.exception);
+            }
+            catch (const version_error& e)
+            {
+                // rethrow the exception
+                throw Slic3r::FileIOError(e.what());
+            }
+            catch (std::exception& e)
+            {
+                add_error(e.what());
+                return false;
+            }
         }
-        catch (const version_error& e)
-        {
-            // rethrow the exception
-            throw Slic3r::FileIOError(e.what());
-        }
-        catch (std::exception& e)
-        {
-            add_error(e.what());
+
+        if (! data.error.empty()) {
+            add_error(data.error);
             return false;
         }
 
@@ -4808,7 +4832,8 @@ bool load_3mf_legacy(
     boost::optional<Semver> &prusaslicer_generator_version,
     Slic3r::Domain::WipeTowersOnBeds& wipe_towers,
     Slic3r::Domain::CustomGCodesOnBeds& custom_gcodes,
-    VirtualExtrudersConfig& out_virtual_extruders_config
+    VirtualExtrudersConfig& out_virtual_extruders_config,
+    std::string* error_message
 )
 {
     // This is set here for the legacy loading. It used to be an argument.
@@ -4822,6 +4847,8 @@ bool load_3mf_legacy(
     Slic3rLegacy::_3MF_Importer         importer;
     bool res = importer.load_model_from_file(path, *model, config, preset_metadata, config_substitutions, check_version, wipe_towers, custom_gcodes, out_virtual_extruders_config);
     importer.log_errors();
+    if (!res && error_message != nullptr)
+        *error_message = boost::algorithm::join(importer.errors(), "\n");
     prusaslicer_generator_version = importer.prusaslicer_generator_version();
 
     return res;
