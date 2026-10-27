@@ -5,6 +5,7 @@
 #include "Slic3r/App/CLI/ProcessTransform.hpp"
 #include "Slic3r/App/CLI/ProfilesSharingUtils.hpp"
 #include "Slic3r/App/ConfigModelDump.hpp"
+#include "Slic3r/App/DisplayStrings.hpp"
 #include "Slic3r/App/Init.hpp"
 #include "Slic3r/App/PresetUpdater/PresetUpdaterCLI.hpp"
 #include "Slic3r/App/Lua/PluginCliOps.hpp"
@@ -78,11 +79,13 @@ namespace Slic3r::App::CLI {
 
 namespace {
 
-std::string format_slicing_errors(const std::vector<Slicing::Error>& slicing_errors)
+std::string format_slicing_errors(
+    const std::vector<Slicing::Error>& slicing_errors, const Project& project
+)
 {
     std::ostringstream error_stream;
     for (const Slicing::Error& slicing_error : slicing_errors) {
-        error_stream << slicing_error << "\n";
+        error_stream << to_display_string(slicing_error, project) << "\n";
     }
 
     if (slicing_errors.empty()) {
@@ -329,7 +332,7 @@ slice_and_export_selected_bed(CLIRuntime& runtime, const std::optional<std::stri
     } else if (current_status.code == Slicing::StatusCode::Removed) {
         return "The slicing input for " + dest_path + " was removed.";
     } else if (current_status.code == Slicing::StatusCode::InvalidData) {
-        return format_slicing_errors(current_status.errors);
+        return format_slicing_errors(current_status.errors, project);
     } else {
         ASSERT(current_status.code == Slicing::StatusCode::Finished);
     }

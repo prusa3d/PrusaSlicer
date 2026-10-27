@@ -440,7 +440,12 @@ static bool apply_config_overrides(CLIRuntime& runtime, const InitParams& init_p
         }
 
         const HwPrinterConfig& hw_config = config_container.selected_preset().hw_config;
+        const bool multi_extruder =
+            Domain::Preset::get_feature<bool>(hw_config.features, "multi_extruder").value_or(false);
         for (const ConfigLocation& override_location : config_item_override.def().overrides_in) {
+            if (!multi_extruder && override_location == ConfigLocation{FDMConfigLocation::Tool}) {
+                continue;
+            }
             const size_t override_slot_count =
                 overriding_config_slot_count(override_location, hw_config);
             for (size_t slot_idx = 0; slot_idx < override_slot_count; ++slot_idx) {
