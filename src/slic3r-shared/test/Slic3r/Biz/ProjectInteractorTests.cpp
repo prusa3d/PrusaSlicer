@@ -842,3 +842,21 @@ TEST_CASE_METHOD(
     CHECK(physical_printers().selected_uuid() == uuid);
     CHECK(selected_filament_type(0) == filament_type);
 }
+
+TEST_CASE_METHOD(
+    PhysicalPrinterFromProjectFixture,
+    "MatDb query with material slot beyond the printer slot count",
+    "[ProjectInteractor][MatDb]"
+)
+{
+    fs::create_directories(temp_dir / "matdb");
+    fs::copy_file(Tests::get_datadir() / "matdb" / "matdb-mini.zip", temp_dir / "matdb" / "matdb.zip");
+    Slic3r::set_data_dir(temp_dir.string());
+    project_interactor->matdb_interactor().init_client();
+    Slic3r::set_data_dir(Tests::get_datadir().string());
+
+    REQUIRE(project_interactor->preset_interactor().selected_printer_preset().materials.size() == 1);
+
+    CHECK_NOTHROW(project_interactor->matdb_interactor().query(2, "", std::nullopt));
+    CHECK(project_interactor->matdb_interactor().result().size() > 0);
+}
