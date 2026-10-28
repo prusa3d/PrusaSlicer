@@ -135,6 +135,7 @@ struct BrimPath {
 
 struct ExtruderExtrusions {
     unsigned extruder_id;
+    bool skirt_last{false};
     std::vector<std::pair<std::size_t, GCode::SmoothPath>> skirt;
     std::vector<BrimPath> brim;
     std::vector<OverridenExtrusions> overriden_extrusions;

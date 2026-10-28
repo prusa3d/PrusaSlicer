@@ -144,15 +144,27 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
                    "This feature slows down both the print and the G-code generation.");
     def->init_fn = init_with(false);
 
-    def = defs.add("avoid_crossing_perimeters_max_detour", typeid(double));
+    def = defs.add("avoid_crossing_printed_areas", typeid(bool));
     def->location = Print;
-    def->label = L("Avoid crossing perimeters - Max detour length");
+    def->label = L("Minimize travel over printed areas");
     def->option_group = ConfigItemDef::OptionGroup::Print_MotionDynamics_TravelAvoidance;
     def->category = ConfigItemDef::Category::Print_MotionDynamics;
     def->order = 2;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Prefer travel paths around the current layer instead of across it. "
+                     "Freshly printed paths are avoided when possible. If no cooler route is available, "
+                     "the fan runs at maximum for two seconds before the next layer.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("avoid_crossing_perimeters_max_detour", typeid(double));
+    def->location = Print;
+    def->label = L("Perimeter-aware travel - Max detour length");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MotionDynamics_TravelAvoidance;
+    def->category = ConfigItemDef::Category::Print_MotionDynamics;
+    def->order = 3;
     def->gui_type = ConfigItemDef::GUIType::textfield;
-    def->tooltip = L("The maximum detour length for avoid crossing perimeters. "
-                     "If the detour is longer than this value, avoid crossing perimeters is not applied for this travel path. ");
+    def->tooltip = L("The maximum detour length for perimeter-aware travel. "
+                     "If the detour is longer than this value, a direct travel path is used instead.");
     def->units = {L("mm")};
     def->min = 0;
     def->max_literal = 1000;
@@ -920,13 +932,26 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
                    "instead of the default inverse order.");
     def->init_fn = init_with(false);
 
+    def = defs.add("alternate_perimeter_order", typeid(bool));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Object, Volume };
+    def->label = L("Alternate perimeter, island and skirt order");
+    def->option_group = ConfigItemDef::OptionGroup::Print_WallsPerimeters_WallsQuality;
+    def->category = ConfigItemDef::Category::Print_WallsPerimeters;
+    def->order = 1;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Reverse the order of perimeter walls and concentric perimeter islands on every other layer. "
+                     "With External perimeters first disabled, odd layers print from the outside in and even layers "
+                     "print from the inside out, pairing leading and trailing skirts with nearby object paths.");
+    def->init_fn = init_with(false);
+
     def = defs.add("extra_perimeters", typeid(bool));
     def->location = Print;
     def->overrides_in = Locations{ Tool, Object, Volume };
     def->label = L("Extra perimeters if needed");
     def->option_group = ConfigItemDef::OptionGroup::Print_WallsPerimeters_WallsQuality;
     def->category = ConfigItemDef::Category::Print_WallsPerimeters;
-    def->order = 1;
+    def->order = 2;
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     def->tooltip = L("Add more perimeters when needed for avoiding gaps in sloping walls. "
                    "Slic3r keeps adding perimeters, until more than 70% of the loop immediately above "
@@ -939,7 +964,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->label = L("Extra perimeters on overhangs (Experimental)");
     def->option_group = ConfigItemDef::OptionGroup::Print_WallsPerimeters_WallsQuality;
     def->category = ConfigItemDef::Category::Print_WallsPerimeters;
-    def->order = 2;
+    def->order = 3;
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     def->tooltip = L("Detect overhang areas where bridges cannot be anchored, and fill them with "
                     "extra perimeter paths. These paths are anchored to the nearby non-overhang area when possible.");

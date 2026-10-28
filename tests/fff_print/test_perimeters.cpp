@@ -21,7 +21,10 @@ using Domain::FullConfigFDM;
 using Domain::ObjectSettings;
 using Domain::VolumeSettings;
 using Domain::FloatOrPercentage;
+using Domain::PerimeterGeneratorType;
 using Domain::Percentage;
+using Domain::TriangleMesh;
+using Biz::Algorithms::TriangleMesh::make_cube;
 
 SCENARIO("Perimeter nesting", "[Perimeters]")
 {
@@ -200,6 +203,194 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
         data.nesting     = { {0,1},{2,3},{4,5},{6,7},{8,9} };
         test(data, config);
     };
+}
+
+SCENARIO("Alternating perimeter order", "[Perimeters]") {
+    TestConfig config;
+    config.print.items.opt("perimeters").set(3);
+    config.print.items.opt("brim_width").set(0.0);
+    config.print.items.opt("alternate_perimeter_order").set(true);
+    config.print.items.opt("overhangs").set(false);
+
+    const Surface
+        surface{stInternal, ExPolygon{Biz::Algorithms::Polygon::scaled({{0, 0}, {30, 0}, {30, 30}, {0, 30}})}};
+    const Flow flow(1., 1., 1.);
+
+    auto perimeter_roles =
+        [&config, &surface, &flow](int layer_id, PerimeterGeneratorType generator) {
+            config.print.items.opt("perimeter_generator").set(generator);
+
+            const auto full_config{std::make_shared<const FullConfigFDM>(config.get_full_config())};
+            Domain::PartialObjectConfigFDM object_config{ObjectSettings{}, full_config->hw_config()};
+            Domain::PartialVolumeConfigFDM volume_config{VolumeSettings{}, full_config->hw_config()};
+            PrintRegionConfigView region_config_view{
+                full_config,
+                std::make_shared<const Domain::PartialObjectConfigFDM>(std::move(object_config)),
+                {std::make_shared<const Domain::PartialVolumeConfigFDM>(std::move(volume_config))}
+            };
+            region_config_view.finalize();
+
+            ExtrusionEntityCollection loops;
+            ExtrusionEntityCollection gap_fill;
+            ExPolygons fill_expolygons;
+            Polygons lower_layer_polygons_cache;
+            PerimeterRegions perimeter_regions;
+            PerimeterGenerator::Parameters params(
+                1., layer_id, flow, flow, flow, flow, region_config_view, perimeter_regions, false
+            );
+
+            if (generator == PerimeterGeneratorType::Arachne)
+                PerimeterGenerator::process_arachne(
+                    params, surface, nullptr, nullptr, lower_layer_polygons_cache, loops, gap_fill,
+                    fill_expolygons
+                );
+            else
+                PerimeterGenerator::process_classic(
+                    params, surface, nullptr, nullptr, lower_layer_polygons_cache, loops, gap_fill,
+                    fill_expolygons
+                );
+
+            ExtrusionEntityCollection flattened = loops.flatten();
+            std::vector<ExtrusionRole> roles;
+            roles.reserve(flattened.size());
+            for (const ExtrusionEntity *entity : flattened)
+                roles.emplace_back(entity->role());
+            return roles;
+        };
+
+    for (PerimeterGeneratorType generator :
+         {PerimeterGeneratorType::Classic, PerimeterGeneratorType::Arachne}) {
+        CAPTURE(generator);
+        CHECK(
+            perimeter_roles(0, generator) ==
+            std::vector<ExtrusionRole>{
+                ExtrusionRole::ExternalPerimeter, ExtrusionRole::Perimeter, ExtrusionRole::Perimeter
+            }
+        );
+        CHECK(
+            perimeter_roles(1, generator) ==
+            std::vector<ExtrusionRole>{
+                ExtrusionRole::Perimeter, ExtrusionRole::Perimeter, ExtrusionRole::ExternalPerimeter
+            }
+        );
+        CHECK(perimeter_roles(2, generator) == perimeter_roles(0, generator));
+
+        config.print.items.opt("external_perimeters_first").set(true);
+        CHECK(
+            perimeter_roles(0, generator) ==
+            std::vector<ExtrusionRole>{
+                ExtrusionRole::Perimeter, ExtrusionRole::Perimeter, ExtrusionRole::ExternalPerimeter
+            }
+        );
+        CHECK(
+            perimeter_roles(1, generator) ==
+            std::vector<ExtrusionRole>{
+                ExtrusionRole::ExternalPerimeter, ExtrusionRole::Perimeter, ExtrusionRole::Perimeter
+            }
+        );
+        config.print.items.opt("external_perimeters_first").set(false);
+    }
+}
+
+SCENARIO("Alternating concentric perimeter island order", "[Perimeters]") {
+    TriangleMesh concentric_islands;
+    auto add_box = [&concentric_islands](double x, double y, double width, double depth) {
+        TriangleMesh box = make_cube(width, depth, 0.8);
+        box.translate(Vec3f(float(x), float(y), 0.f));
+        concentric_islands.merge(box);
+    };
+    auto add_frame = [&add_box](double inset, double size) {
+        constexpr double thickness = 2.;
+        add_box(inset, inset, size, thickness);
+        add_box(inset, inset + size - thickness, size, thickness);
+        add_box(inset, inset + thickness, thickness, size - 2. * thickness);
+        add_box(inset + size - thickness, inset + thickness, thickness, size - 2. * thickness);
+    };
+    add_frame(0., 40.);
+    add_frame(10., 20.);
+    add_box(18., 18., 4., 4.);
+
+    TestConfig config;
+    config.print.items.opt("perimeters").set(1);
+    config.print.items.opt("fill_density").set(Percentage{0.0});
+    config.print.items.opt("top_solid_layers").set(0);
+    config.print.items.opt("bottom_solid_layers").set(0);
+    config.print.items.opt("skirts").set(0);
+    config.print.items.opt("brim_width").set(0.0);
+    config.print.items.opt("layer_height").set(0.4);
+    config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.4});
+    config.print.items.opt("alternate_perimeter_order").set(true);
+    config.print.items.opt("avoid_crossing_printed_areas").set(true);
+    config.print.items.opt("seam_position").set(Domain::SeamPosition::spAligned);
+    config.print.items.opt("external_perimeters_first").set(false);
+    const std::string gcode = Test::slice({concentric_islands}, config);
+
+    struct LoopBounds {
+        bool empty{true};
+        double min_x{0.};
+        double max_x{0.};
+        double min_y{0.};
+        double max_y{0.};
+        double z{0.};
+    } loop;
+    std::map<int, std::vector<double>> widths_by_z;
+    std::map<int, double> max_seam_jump_by_z;
+    std::optional<Vec2d> previous_loop_end;
+    int previous_loop_z = 0;
+    bool in_extrusion_loop = false;
+    auto finish_loop = [&]() {
+        if (!loop.empty) {
+            const double width = loop.max_x - loop.min_x;
+            const double depth = loop.max_y - loop.min_y;
+            if (width > 3. && depth > 3.)
+                widths_by_z[int(std::lround(loop.z * 1000.))].emplace_back(width);
+        }
+        loop = {};
+    };
+    auto add_point = [&loop](double x, double y, double z) {
+        if (loop.empty) {
+            loop = {false, x, x, y, y, z};
+        } else {
+            loop.min_x = std::min(loop.min_x, x);
+            loop.max_x = std::max(loop.max_x, x);
+            loop.min_y = std::min(loop.min_y, y);
+            loop.max_y = std::max(loop.max_y, y);
+        }
+    };
+
+    GCodeReader parser;
+    parser.parse_buffer(gcode, [&](GCodeReader &reader, const GCodeReader::GCodeLine &line) {
+        if (line.extruding(reader) && line.dist_XY(reader) > 0.) {
+            const int z = int(std::lround(reader.z() * 1000.));
+            if (!in_extrusion_loop && previous_loop_end && previous_loop_z == z) {
+                const double seam_jump =
+                    (Vec2d(reader.x(), reader.y()) - *previous_loop_end).norm();
+                max_seam_jump_by_z[z] = std::max(max_seam_jump_by_z[z], seam_jump);
+            }
+            add_point(reader.x(), reader.y(), reader.z());
+            add_point(line.new_X(reader), line.new_Y(reader), reader.z());
+            previous_loop_end = Vec2d(line.new_X(reader), line.new_Y(reader));
+            previous_loop_z = z;
+            in_extrusion_loop = true;
+        } else if (line.dist_XY(reader) > 0.) {
+            finish_loop();
+            in_extrusion_loop = false;
+        }
+    });
+    finish_loop();
+
+    REQUIRE(widths_by_z.count(400) == 1);
+    REQUIRE(widths_by_z.count(800) == 1);
+    const std::vector<double> &outside_in = widths_by_z.at(400);
+    const std::vector<double> &inside_out = widths_by_z.at(800);
+    REQUIRE(inside_out.size() >= 3);
+    REQUIRE(outside_in.size() >= 3);
+    CHECK(outside_in.front() > 30.);
+    CHECK(outside_in.back() < 10.);
+    CHECK(inside_out.front() < 10.);
+    CHECK(inside_out.back() > 30.);
+    CHECK(max_seam_jump_by_z.at(400) < 20.);
+    CHECK(max_seam_jump_by_z.at(800) < 20.);
 }
 
 SCENARIO("Perimeters", "[Perimeters]")

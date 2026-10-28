@@ -106,6 +106,7 @@ ExtrudeConfig::ExtrudeConfig(const Domain::ConfigView& config) :
         config.get<bool>("only_retract_when_crossing_perimeters")
     },
     avoid_crossing_perimeters{config.get<bool>("avoid_crossing_perimeters")},
+    avoid_crossing_printed_areas{config.get<bool>("avoid_crossing_printed_areas")},
     avoid_crossing_curled_overhangs{config.get<bool>("avoid_crossing_curled_overhangs")}
 {}
 

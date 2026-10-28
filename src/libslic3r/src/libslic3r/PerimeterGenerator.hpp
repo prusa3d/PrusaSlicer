@@ -86,6 +86,18 @@ struct Parameters {
     double                       mm3_per_mm;
     double                       mm3_per_mm_overhang;
 
+    bool external_perimeters_first(const size_t extruder_id) const
+    {
+        const bool configured =
+            config.get<std::vector<bool>>("external_perimeters_first").at(extruder_id);
+        if (!config.get<std::vector<bool>>("alternate_perimeter_order").at(extruder_id))
+            return configured;
+
+        // Start at the outside on the first layer so a leading brim / skirt hands off
+        // locally, then end at the outside on the second layer for a trailing skirt.
+        return configured == ((layer_id & 1) != 0);
+    }
+
 private:
     Parameters() = delete;
 };

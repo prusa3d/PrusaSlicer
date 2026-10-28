@@ -7,12 +7,13 @@
 #include <Windows.h>
 #include <shobjidl.h>
 #include <shldisp.h>
-#include <atlbase.h>
-#include <atlcom.h>
+#include <wrl/client.h>
 
 #include <string>
 
 namespace Slic3r::Biz::RemovableDrive {
+
+using Microsoft::WRL::ComPtr;
 
 RemovableDriveService::RemovableDriveService(Platform::IMainThreadDispatcher& dispatcher) :
     m_monitor(std::make_unique<RemovableDriveMonitorWin32>(dispatcher)),
@@ -29,26 +30,34 @@ bool eject_inner(const boost::filesystem::path& path)
         SPDLOG_ERROR("Ejecting of {} has failed: Failed to initialize COM. Error code: {}", path.string(), hr);
         return false;
     }
-    CComPtr<IShellDispatch> pShellDisp;
-    hr = pShellDisp.CoCreateInstance(CLSID_Shell, nullptr, CLSCTX_INPROC_SERVER);
+    ComPtr<IShellDispatch> pShellDisp;
+    hr = CoCreateInstance(
+        CLSID_Shell,
+        nullptr,
+        CLSCTX_INPROC_SERVER,
+        IID_PPV_ARGS(pShellDisp.GetAddressOf())
+    );
     if (!SUCCEEDED(hr)) {
         SPDLOG_ERROR("Ejecting of {} has failed: Attempt to get Shell pointer has failed.", path.string());
         CoUninitialize();
         return false;
     }
-    CComPtr<Folder> pFolder;
+    ComPtr<Folder> pFolder;
     VARIANT vtDrives;
     VariantInit(&vtDrives);
     vtDrives.vt   = VT_I4;
     vtDrives.lVal = ssfDRIVES;
-    hr            = pShellDisp->NameSpace(vtDrives, &pFolder);
+    hr            = pShellDisp->NameSpace(vtDrives, pFolder.GetAddressOf());
     if (!SUCCEEDED(hr)) {
         SPDLOG_ERROR("Ejecting of {} has failed: Attempt to create Namespace has failed.", path.string());
         CoUninitialize();
         return false;
     }
-    CComPtr<FolderItem> pItem;
-    hr = pFolder->ParseName(static_cast<BSTR>(const_cast<wchar_t*>(wpath.c_str())), &pItem);
+    ComPtr<FolderItem> pItem;
+    hr = pFolder->ParseName(
+        static_cast<BSTR>(const_cast<wchar_t*>(wpath.c_str())),
+        pItem.GetAddressOf()
+    );
     if (!SUCCEEDED(hr)) {
         SPDLOG_ERROR("Ejecting of {} has failed: Attempt to Parse name has failed.", path.string());
         CoUninitialize();

@@ -53,6 +53,7 @@ enum class ErrorCode
     ToolOverridesInSingleToolPrint,
     InvalidExtruderOffset,
     AvoidCrossingPerimetersAndAvoidCurledOverhangs, // _u8L("Avoid crossing perimeters option and avoid crossing curled overhangs option cannot be both enabled together.")
+    AvoidCrossingPrintedAreasAndAvoidCurledOverhangs, // _u8L("Minimize travel over printed areas and avoid crossing curled overhangs cannot be both enabled together.")
     SpiralVaseMultipleObjects, // _u8L("Only a single object may be printed at a time in Spiral Vase mode. Either remove all but the last object, or enable sequential mode by \"complete_objects\".")
     SpiralVaseMultipleMaterials, // _u8L("The Spiral Vase option can only be used when printing single material objects.")
     MachineLimitsWithKlipper, // _8L("Machine limits cannot be emitted to G-Code when Klipper firmware flavor is used. Change the value of machine_limits_usage.")

@@ -141,6 +141,7 @@ std::vector<Step> all_steps()
 }
 
 const std::map<std::string, std::vector<Step>> invalidated_by{
+    {"alternate_perimeter_order", steps({propagate(posPerimeters)})},
     {"arc_fitting", steps({propagate(posPerimeters)})},
     {"autoemit_temperature_commands", steps({propagate(psGCodeExport)})},
     {"automatic_extrusion_widths", steps({propagate(posPerimeters)})},
@@ -148,6 +149,7 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"automatic_infill_combination_max_layer_height", steps({propagate(posPrepareInfill)})},
     {"avoid_crossing_curled_overhangs", steps({propagate(posEstimateCurledExtrusions)})},
     {"avoid_crossing_perimeters", steps({propagate(psGCodeExport)})},
+    {"avoid_crossing_printed_areas", steps({propagate(psGCodeExport)})},
     {"avoid_crossing_perimeters_max_detour", steps({propagate(psGCodeExport)})},
     {"bed_custom_model", steps({})},
     {"bed_custom_texture", steps({})},

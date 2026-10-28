@@ -669,6 +669,17 @@ DONE:;
         );
     }
 
+    if (m_config.get<bool>("avoid_crossing_printed_areas")
+        && m_config.get<bool>("avoid_crossing_curled_overhangs"))
+    {
+        errors.push_back(
+            Error{
+                ErrorCode::AvoidCrossingPrintedAreasAndAvoidCurledOverhangs,
+                {"avoid_crossing_printed_areas", "avoid_crossing_curled_overhangs"}
+            }
+        );
+    }
+
     if (m_config.get<bool>("spiral_vase")) {
         size_t total_copies_count = 0;
         for (const PrintObject* object : m_objects)

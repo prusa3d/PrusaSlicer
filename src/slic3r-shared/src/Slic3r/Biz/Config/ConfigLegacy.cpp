@@ -47,7 +47,7 @@ namespace {
         static LegacyKeysAndOverrides out = {
             {
                 "arc_fitting", "autoemit_temperature_commands", "automatic_extrusion_widths", "automatic_infill_combination",
-                "automatic_infill_combination_max_layer_height", "avoid_crossing_curled_overhangs", "avoid_crossing_perimeters",
+                "automatic_infill_combination_max_layer_height", "avoid_crossing_curled_overhangs", "avoid_crossing_perimeters", "avoid_crossing_printed_areas",
                 "avoid_crossing_perimeters_max_detour", "bed_custom_model", "bed_custom_texture", "bed_shape", "bed_temperature",
                 "bed_temperature_extruder", "before_layer_gcode", "between_objects_gcode", "binary_gcode", "bottom_fill_pattern",
                 "bottom_solid_layers", "bottom_solid_min_thickness", "bridge_acceleration", "bridge_angle", "bridge_fan_speed",
@@ -59,7 +59,7 @@ namespace {
                 "dont_support_bridges", "draft_shield", "duplicate_distance", "elefant_foot_compensation",
                 "enable_dynamic_fan_speeds", "enable_dynamic_overhang_speeds", "enable_pressure_advance_during_ramming", "end_filament_gcode", "end_gcode",
                 "ensure_vertical_shell_thickness", "external_perimeter_acceleration", "external_perimeter_extrusion_width",
-                "external_perimeter_speed", "external_perimeters_first", "extra_loading_move", "extra_perimeters",
+                "external_perimeter_speed", "external_perimeters_first", "alternate_perimeter_order", "extra_loading_move", "extra_perimeters",
                 "extra_perimeters_on_overhangs", "extruder_clearance_height", "extruder_clearance_radius", "extruder_colour",
                 "extruder_offset", "extrusion_axis", "extrusion_multiplier", "extrusion_width", "fan_always_on",
                 "fan_below_layer_time", "filament_abrasive", "filament_colour", "filament_cooling_final_speed",

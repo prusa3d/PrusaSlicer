@@ -235,7 +235,7 @@ void AbstractConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* co
 {
     bool have_perimeters = config->opt_int("perimeters") > 0;
     for (auto el : { "extra_perimeters","extra_perimeters_on_overhangs", "thin_walls", "overhangs",
-                    "seam_position","staggered_inner_seams", "external_perimeters_first", "external_perimeter_extrusion_width",
+                    "seam_position","staggered_inner_seams", "external_perimeters_first", "alternate_perimeter_order", "external_perimeter_extrusion_width",
                     "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "enable_dynamic_overhang_speeds"})
         toggle_field(el, have_perimeters);
 
@@ -347,11 +347,13 @@ void AbstractConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* co
     bool have_non_zero_mmu_segmented_region_max_width = config->opt_float("mmu_segmented_region_max_width") > 0.;
     toggle_field("mmu_segmented_region_interlocking_depth", have_non_zero_mmu_segmented_region_max_width);
 
-    toggle_field("avoid_crossing_curled_overhangs", !config->opt_bool("avoid_crossing_perimeters"));
+    const bool have_perimeter_aware_travel = config->opt_bool("avoid_crossing_perimeters") ||
+        config->opt_bool("avoid_crossing_printed_areas");
+    toggle_field("avoid_crossing_curled_overhangs", !have_perimeter_aware_travel);
     toggle_field("avoid_crossing_perimeters", !config->opt_bool("avoid_crossing_curled_overhangs"));
+    toggle_field("avoid_crossing_printed_areas", !config->opt_bool("avoid_crossing_curled_overhangs"));
 
-    bool have_avoid_crossing_perimeters = config->opt_bool("avoid_crossing_perimeters");
-    toggle_field("avoid_crossing_perimeters_max_detour", have_avoid_crossing_perimeters);
+    toggle_field("avoid_crossing_perimeters_max_detour", have_perimeter_aware_travel);
 
     bool have_arachne = config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
     toggle_field("wall_transition_length", have_arachne);

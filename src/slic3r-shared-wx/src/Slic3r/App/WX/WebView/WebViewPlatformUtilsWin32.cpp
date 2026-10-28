@@ -8,7 +8,6 @@
 
 #include <WebView2.h>
 #include <wrl.h>
-#include <atlbase.h>
 #include <unordered_map>
 
 #include <boost/property_tree/ptree.hpp>

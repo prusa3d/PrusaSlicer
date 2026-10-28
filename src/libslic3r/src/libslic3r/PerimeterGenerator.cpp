@@ -1138,7 +1138,7 @@ void PerimeterGenerator::process_arachne(
     Arachne::PerimeterOrder::PerimeterExtrusions ordered_extrusions =
         Arachne::PerimeterOrder::ordered_perimeter_extrusions(
             perimeters,
-            params.config.get<std::vector<bool>>("external_perimeters_first").at(extruder_id)
+            params.external_perimeters_first(extruder_id)
         );
 
     if (ExtrusionEntityCollection extrusion_coll = traverse_extrusions(params, lower_slices_polygons_cache, ordered_extrusions); !extrusion_coll.empty())
@@ -1502,7 +1502,7 @@ void PerimeterGenerator::process_classic(
         // if brim will be printed, reverse the order of perimeters so that
         // we continue inwards after having finished the brim
         // TODO: add test for perimeter order
-        if (params.config.get<std::vector<bool>>("external_perimeters_first").at(extruder_id) ||
+        if (params.external_perimeters_first(extruder_id) ||
             (params.layer_id == 0 && params.config.get<double>("brim_width") > 0))
             entities.reverse();
         // append perimeters for this slice as a collection

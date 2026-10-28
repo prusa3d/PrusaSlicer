@@ -699,6 +699,8 @@ inline bool has_compatible_layer_regions(const PrintRegionConfigView &config, co
         && config.get<bool>("thin_walls") == other_config.get<bool>("thin_walls")
         && config.get<std::vector<bool>>("external_perimeters_first").at(extruder_id)
         == other_config.get<std::vector<bool>>("external_perimeters_first").at(extruder_id)
+        && config.get<std::vector<bool>>("alternate_perimeter_order").at(extruder_id)
+        == other_config.get<std::vector<bool>>("alternate_perimeter_order").at(extruder_id)
         && config.get<std::vector<Domain::FloatOrPercentage>>("infill_overlap").at(extruder_id)
         == other_config.get<std::vector<Domain::FloatOrPercentage>>("infill_overlap")
                .at(extruder_id)

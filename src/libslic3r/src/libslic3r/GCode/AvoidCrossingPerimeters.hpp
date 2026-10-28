@@ -2,6 +2,7 @@
 #define slic3r_AvoidCrossingPerimeters_hpp_
 
 #include <vector>
+#include <optional>
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/ExPolygon.hpp"
@@ -29,15 +30,14 @@ public:
 
     void        init_layer(const Layer &layer);
 
-    Polyline travel_to(
-        const GCodeGenerator& gcodegen,
-        const Point& point,
-        double max_detour,
-        const std::vector<double>& travel_max_lift
-    )
+    // Keep a short history in world coordinates so travel planning can avoid the
+    // hottest extrusion paths and, for loops, prefer the opposite winding direction.
+    void        register_recent_extrusion(Polyline path, std::optional<bool> clockwise);
+    bool        consume_fresh_travel_cooldown()
     {
-        bool could_be_wipe_disabled;
-        return this->travel_to(gcodegen, point, max_detour, travel_max_lift, &could_be_wipe_disabled);
+        const bool result = m_fresh_travel_cooldown;
+        m_fresh_travel_cooldown = false;
+        return result;
     }
 
     Polyline travel_to(
@@ -45,6 +45,26 @@ public:
         const Point& point,
         double max_detour,
         const std::vector<double>& travel_max_lift,
+        bool minimize_travel_over_printed_areas
+    )
+    {
+        bool could_be_wipe_disabled;
+        return this->travel_to(
+            gcodegen,
+            point,
+            max_detour,
+            travel_max_lift,
+            minimize_travel_over_printed_areas,
+            &could_be_wipe_disabled
+        );
+    }
+
+    Polyline travel_to(
+        const GCodeGenerator& gcodegen,
+        const Point& point,
+        double max_detour,
+        const std::vector<double>& travel_max_lift,
+        bool minimize_travel_over_printed_areas,
         bool* could_be_wipe_disabled
     );
 
@@ -82,6 +102,13 @@ private:
     Boundary m_internal;
     // Store all needed data for travels outside object
     Boundary m_external;
+
+    struct RecentExtrusion {
+        Polyline            path;
+        std::optional<bool> clockwise;
+    };
+    std::vector<RecentExtrusion> m_recent_extrusions;
+    bool                          m_fresh_travel_cooldown{false};
 };
 
 } // namespace Slic3r

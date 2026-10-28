@@ -86,6 +86,7 @@ struct ExtrudeConfig
 
     bool only_retract_when_crossing_perimeters{};
     bool avoid_crossing_perimeters{};
+    bool avoid_crossing_printed_areas{};
     bool avoid_crossing_curled_overhangs{};
 };
 

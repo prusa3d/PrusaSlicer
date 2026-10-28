@@ -67,6 +67,48 @@ TEST_CASE("Skirt height is honored", "[Skirt]") {
     REQUIRE(layers_with_skirt.size() == (size_t)config.print.items.opt("skirt_height").get<int>());
 }
 
+TEST_CASE("Skirt alternates between the start and end of each layer", "[Skirt]") {
+    TestConfig config;
+    config.print.items.opt("skirts").set(1);
+    config.print.items.opt("skirt_height").set(4);
+    config.print.items.opt("brim_width").set(0.0);
+    config.print.items.opt("perimeters").set(1);
+    config.print.items.opt("fill_density").set(Percentage{0.0});
+    config.print.items.opt("top_solid_layers").set(0);
+    config.print.items.opt("bottom_solid_layers").set(0);
+    config.print.items.opt("layer_height").set(0.4);
+    config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.4});
+    config.print.items.opt("alternate_perimeter_order").set(true);
+    config.print.items.opt("support_material_speed").set(99.0);
+    config.print.items.opt("perimeter_speed").set(40.0);
+    config.print.items.opt("external_perimeter_speed").set(FloatOrPercentage{40.0});
+    config.filament[0].items.opt("cooling").set(false);
+    config.print.items.opt("first_layer_speed").set(FloatOrPercentage{Percentage{100}});
+    config.print.items.opt("gcode_comments").set(true);
+    const std::string gcode = Test::slice({TestMesh::cube_20x20x20}, config);
+
+    const double skirt_speed = 99. * MM_PER_MIN;
+    std::map<int, std::vector<bool>> skirt_extrusions_by_z;
+    GCodeReader parser;
+    parser.parse_buffer(gcode, [&](GCodeReader &reader, const GCodeReader::GCodeLine &line) {
+        if (line.extruding(reader) && line.dist_XY(reader) > 0.) {
+            skirt_extrusions_by_z[int(std::lround(reader.z() * 1000.))].push_back(
+                reader.f() == Approx(skirt_speed)
+            );
+        }
+    });
+
+    REQUIRE(skirt_extrusions_by_z.size() >= 4);
+    auto layer = skirt_extrusions_by_z.begin();
+    for (size_t layer_id = 0; layer_id < 4; ++layer_id) {
+        CAPTURE(layer_id, layer->first);
+        REQUIRE_FALSE(layer->second.empty());
+        CHECK(layer->second.front() == ((layer_id & 1) == 0));
+        CHECK(layer->second.back() == ((layer_id & 1) != 0));
+        ++layer;
+    }
+}
+
 TEST_CASE("Original Slic3r Skirt/Brim tests", "[SkirtBrim]") {
     GIVEN("A default configuration") {
 	    TestConfig config{4};

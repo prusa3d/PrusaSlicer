@@ -42,7 +42,7 @@
 #ifdef _WIN32
     #include <windows.h>
     #include <netlistmgr.h>
-    #include <atlbase.h>
+    #include <wrl/client.h>
     #include <Iphlpapi.h>
     #pragma comment(lib, "iphlpapi.lib")
 #elif __APPLE__
@@ -149,8 +149,9 @@ static bool check_internet_connection_win()
 
     if (SUCCEEDED(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED))) {
         {
-            CComPtr<INetworkListManager> pNLM;
-            if (pNLM.CoCreateInstance(CLSID_NetworkListManager) == S_OK) {
+            Microsoft::WRL::ComPtr<INetworkListManager> pNLM;
+            if (CoCreateInstance(CLSID_NetworkListManager, nullptr, CLSCTX_INPROC_SERVER,
+                    IID_PPV_ARGS(pNLM.GetAddressOf())) == S_OK) {
                 NLM_CONNECTIVITY status;
                 pNLM->GetConnectivity(&status);
                 internet = (status & (NLM_CONNECTIVITY_IPV4_INTERNET | NLM_CONNECTIVITY_IPV6_INTERNET));

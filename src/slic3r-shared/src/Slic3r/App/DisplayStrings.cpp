@@ -37,6 +37,11 @@ std::string to_display_string(Biz::Slicing::ErrorCode code)
             "Avoid crossing perimeters option and avoid crossing curled overhangs option cannot be "
             "both enabled together."
         );
+    case ErrorCode::AvoidCrossingPrintedAreasAndAvoidCurledOverhangs:
+        return _u8L(
+            "Minimize travel over printed areas and avoid crossing curled overhangs cannot be both "
+            "enabled together."
+        );
     case ErrorCode::SpiralVaseMultipleObjects:
         return _u8L(
             "Only a single object may be printed at a time in Spiral Vase mode. Either remove all "
