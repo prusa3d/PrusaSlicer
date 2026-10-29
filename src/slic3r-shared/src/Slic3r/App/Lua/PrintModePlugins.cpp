@@ -106,14 +106,13 @@ PluginParamValueMap param_values(const Domain::PrintModeParams& params)
     return result;
 }
 
-// The box item decides the type, so a scalar override of a per tool key is just a scalar.
-void set_override(Domain::ConfigOverrides& overrides, const std::string& key, const sol::object& value)
+} // namespace
+
+static void set_box_override(
+    Domain::ConfigOverrides& overrides, const std::string& key, const sol::object& value)
 {
     const Domain::ConfigItem* item{overrides.find(key)};
-    if (!item) {
-        SPDLOG_ERROR("Print mode override '{}' is not a macro overridable key", key);
-        return;
-    }
+    ASSERT(item);
     item->value().visit(Domain::overloaded{
         [&](bool) { overrides.set(key, value.as<bool>()); },
         [&](int) { overrides.set(key, value.as<int>()); },
@@ -129,7 +128,40 @@ void set_override(Domain::ConfigOverrides& overrides, const std::string& key, co
     });
 }
 
-} // namespace
+// A scalar for a per slot key sets every slot box, a table sets the slots it indexes (1-based).
+static void set_override(
+    Domain::MacroOverridesLayerFDM& layer, const std::string& key, const sol::object& value)
+{
+    if (layer.overrides.overrides.find(key)) {
+        if (value.is<sol::table>()) {
+            SPDLOG_ERROR("Print mode override '{}' is not per slot, it takes a single value", key);
+            return;
+        }
+        set_box_override(layer.overrides.overrides, key, value);
+        return;
+    }
+
+    if (layer.slot_overrides.empty() || !layer.slot_overrides.front().overrides.find(key)) {
+        SPDLOG_ERROR("Print mode override '{}' is not a macro overridable key", key);
+        return;
+    }
+
+    if (!value.is<sol::table>()) {
+        for (Domain::MacroSlotOverridesFDM& slot_box : layer.slot_overrides) {
+            set_box_override(slot_box.overrides, key, value);
+        }
+        return;
+    }
+
+    const sol::table slots{value.as<sol::table>()};
+    for (std::size_t slot{}; slot < layer.slot_overrides.size(); ++slot) {
+        const sol::object slot_value{slots.get<sol::object>(slot + 1)};
+        if (!slot_value.valid() || slot_value.get_type() == sol::type::lua_nil) {
+            continue;
+        }
+        set_box_override(layer.slot_overrides.at(slot).overrides, key, slot_value);
+    }
+}
 
 PrintModePlugins::PrintModePlugins(
     PluginSystem& plugin_system, Biz::PrintModeInteractor& interactor) :
@@ -176,7 +208,8 @@ PrintModePlugins::modes(const Domain::Preset::HwPrinterConfig& hw_config) const
 Biz::PrintMode PrintModePlugins::evaluate(
     const std::string& id,
     const std::map<std::string, Domain::ConfigValue>& inputs,
-    const Domain::PrintModeParams& params
+    const Domain::PrintModeParams& params,
+    const Domain::Preset::HwPrinterConfig& hw_config
 ) const
 {
     const auto it{m_plugin_system.plugins().find(id)};
@@ -203,6 +236,7 @@ Biz::PrintMode PrintModePlugins::evaluate(
     Biz::PrintMode mode;
     mode.layer.name = meta.title.value_or(meta.id);
     mode.layer.params = complete_params(meta, params);
+    mode.layer.slot_overrides.resize(hw_config.material_slot_count());
 
     try {
         const sol::object result{it->second.execute(lua, param_values(mode.layer.params))};
@@ -211,7 +245,7 @@ Biz::PrintMode PrintModePlugins::evaluate(
         } else {
             result.as<sol::table>().for_each(
                 [&](const sol::object& key, const sol::object& value) {
-                    set_override(mode.layer.overrides.overrides, key.as<std::string>(), value);
+                    set_override(mode.layer, key.as<std::string>(), value);
                 });
         }
     } catch (const std::exception& e) {
@@ -219,6 +253,7 @@ Biz::PrintMode PrintModePlugins::evaluate(
     }
     if (mode.error) {
         mode.layer.overrides = {};
+        mode.layer.slot_overrides.clear();
     }
     return mode;
 }

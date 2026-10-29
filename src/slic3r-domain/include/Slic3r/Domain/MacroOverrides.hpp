@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace Slic3r::Domain {
 
@@ -26,6 +27,12 @@ public:
     MacroOverridesFDM();
 };
 
+class MacroSlotOverridesFDM : public ConfigBox
+{
+public:
+    MacroSlotOverridesFDM();
+};
+
 class MacroOverridesSLA : public ConfigBox
 {
 public:
@@ -37,6 +44,7 @@ struct MacroOverridesLayerFDM
     std::string name;
     PrintModeParams params;
     MacroOverridesFDM overrides;
+    std::vector<MacroSlotOverridesFDM> slot_overrides;
 
     bool operator==(const MacroOverridesLayerFDM&) const = default;
 };
@@ -58,7 +66,7 @@ Domain::BoxOrBoxesVector to_refs(const Domain::MacroOverridesMapFDM& macro_overr
 
 std::string vase_mode_layer_id();
 
-/// The layer applied by vase mode (spiral vase).
-MacroOverridesLayerFDM make_vase_mode_layer();
+/// The layer applied by vase mode (spiral vase), with one slot box per material slot.
+MacroOverridesLayerFDM make_vase_mode_layer(std::size_t slot_count);
 
 } // namespace Slic3r::Domain

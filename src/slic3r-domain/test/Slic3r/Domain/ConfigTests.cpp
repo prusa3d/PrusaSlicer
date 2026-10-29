@@ -62,6 +62,12 @@ void init(ConfigDefinitions& defs) {
     def->overrides_in = {Filament};
     def->init_fn = []() { return ConfigValue{2}; };
 
+    def = defs.add("print_config_item_with_filament_and_object_override", typeid(int));
+    def->category = ConfigItemDef::Category::Hidden;
+    def->location = Print;
+    def->overrides_in = {Filament, Object};
+    def->init_fn = []() { return ConfigValue{4}; };
+
     def = defs.add("filament_config_item", typeid(int));
     def->category = ConfigItemDef::Category::Hidden;
     def->location = Filament;
@@ -189,6 +195,7 @@ TEST_CASE("Full config can be created from boxes", "[Config]")
             "print_config_item_with_object_override",
             "print_config_item",
             "print_config_item_with_filament_override",
+            "print_config_item_with_filament_and_object_override",
             "filament_config_item",
             "print_enum_config_items_with_filament_override",
         })
@@ -258,7 +265,7 @@ TEST_CASE("Filament overrides are recorded in effective values", "[Config]") {
             ConfigValue{22},
         },
         {
-            EffectiveValue::OverriddenBy{Filament},
+            EffectiveValue::OverriddenBy{Filament, {0, 2}},
             ConfigValue{
                 std::vector<int>{-10, 22, -20},
             },
@@ -312,4 +319,86 @@ TEST_CASE("Partial config effective values record object overrides", "[Config]")
     }};
 
     CHECK(effective_value == expected_value);
+}
+
+BoxRefs filament_refs(const std::vector<TestFilamentSettings>& boxes)
+{
+    return BoxRefs{boxes.begin(), boxes.end()};
+}
+
+TEST_CASE("Partial config from per slot boxes records partially defined slots", "[Config]")
+{
+    std::vector<TestFilamentSettings> filament_settings(3);
+    filament_settings.at(2).overrides.set("print_config_item_with_filament_override", -20);
+    const PartialConfig partial_config{
+        {filament_refs(filament_settings)}, Slic3r::Test::build_fff_printer_config(3, {})};
+
+    CHECK(
+        partial_config.get<std::vector<int>>("print_config_item_with_filament_override")
+        == std::optional{std::vector<int>{-20, -20, -20}});
+    CHECK(partial_config.get<std::vector<int>>("filament_config_item")
+          == std::optional{std::vector<int>{3, 3, 3}});
+    const std::map<std::string, std::set<std::size_t>> expected{
+        {"print_config_item_with_filament_override", {2}}};
+    CHECK(partial_config.partially_defined_slots() == expected);
+}
+
+TEST_CASE("Partial configs differ by partially defined slots", "[Config]")
+{
+    std::vector<TestFilamentSettings> sparse(3);
+    sparse.at(2).overrides.set("print_config_item_with_filament_override", -20);
+    std::vector<TestFilamentSettings> full(3);
+    for (TestFilamentSettings& box : full) {
+        box.overrides.set("print_config_item_with_filament_override", -20);
+    }
+    const Slic3r::Domain::Preset::HwPrinterConfig hw_config{
+        Slic3r::Test::build_fff_printer_config(3, {})};
+    const PartialConfig sparse_config{{filament_refs(sparse)}, hw_config};
+    const PartialConfig full_config{{filament_refs(full)}, hw_config};
+
+    CHECK(sparse_config.values() == full_config.values());
+    CHECK(full_config.partially_defined_slots().empty());
+    CHECK(sparse_config != full_config);
+    CHECK(sparse_config.hash() != full_config.hash());
+    CHECK(
+        sparse_config.diff_keys(full_config)
+        == std::vector<std::string>{"print_config_item_with_filament_override"});
+}
+
+TEST_CASE("Config view merges partially defined slots element-wise", "[Config]")
+{
+    const std::string key{"print_config_item_with_filament_and_object_override"};
+    TestPrintSettings print_settings;
+    print_settings.items.opt(key).set(22);
+    const std::vector<TestFilamentSettings> filament_settings(3);
+    const auto full_config{std::make_shared<TestFullConfig>(print_settings, filament_settings)};
+
+    TestObjectSettings object_settings;
+    object_settings.overrides.set(key, 5);
+    const PartialConfig object_config{{object_settings}, full_config->hw_config()};
+
+    std::vector<TestFilamentSettings> slot_boxes(3);
+    slot_boxes.at(2).overrides.set(key, -20);
+    const PartialConfig slot_config{{filament_refs(slot_boxes)}, full_config->hw_config()};
+
+    SECTION("over the full config")
+    {
+        Slic3r::Domain::ConfigView view{full_config, {slot_config}};
+        view.finalize();
+        CHECK(view.get<std::vector<int>>(key) == std::vector<int>{22, 22, -20});
+    }
+
+    SECTION("over an object override")
+    {
+        Slic3r::Domain::ConfigView view{full_config, {object_config, slot_config}};
+        view.finalize();
+        CHECK(view.get<std::vector<int>>(key) == std::vector<int>{5, 5, -20});
+    }
+
+    SECTION("an object override above a slot override replaces every slot")
+    {
+        Slic3r::Domain::ConfigView view{full_config, {slot_config, object_config}};
+        view.finalize();
+        CHECK(view.get<std::vector<int>>(key) == std::vector<int>{5, 5, 5});
+    }
 }

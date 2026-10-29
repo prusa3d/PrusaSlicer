@@ -414,7 +414,8 @@ TEST_CASE("Legacy spiral_vase is converted to the vase mode layer", "[config]")
     const Domain::MacroOverridesLayerFDM& layer{
         fdm.macro_overrides.at(Domain::vase_mode_layer_id())};
     CHECK(layer.overrides.overrides.get("spiral_vase"));
-    CHECK(layer == Domain::make_vase_mode_layer());
+    CHECK(layer.slot_overrides.size() == fdm.filament.size());
+    CHECK(layer == Domain::make_vase_mode_layer(fdm.filament.size()));
 }
 
 TEST_CASE("Legacy FDM 3MF roundtrip", "[config]")

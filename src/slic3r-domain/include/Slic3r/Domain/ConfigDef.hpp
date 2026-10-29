@@ -25,7 +25,8 @@ enum class FDMConfigLocation
     Project,
     Object,
     Volume,
-    MacroOverrides
+    MacroOverrides,
+    MacroSlotOverrides
 };
 
 enum class SLAConfigLocation
@@ -68,6 +69,9 @@ struct AppConfigLocation
 using ConfigLocation = std::variant<FDMConfigLocation, SLAConfigLocation, PhysicalPrinterLocation, AppConfigLocation>;
 
 std::string get_location_name(const ConfigLocation& location);
+
+struct ConfigItemDef;
+bool is_defined_per_material_slot(const ConfigItemDef& def);
 
 // Static definition of a single config item. Contains all info about what the item is,
 // as well as rules for diplaying it in the UI. All information about the item is here,

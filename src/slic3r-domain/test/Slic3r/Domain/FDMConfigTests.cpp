@@ -414,7 +414,7 @@ TEST_CASE_METHOD(
             random,
         },
         {
-            EffectiveValue::OverriddenBy{FDMConfigLocation::Tool},
+            EffectiveValue::OverriddenBy{FDMConfigLocation::Tool, {0, 2}},
             ConfigValue{expected_after_override},
         },
         {
@@ -516,7 +516,7 @@ TEST_CASE_METHOD(
             ConfigValue{10.0},
         },
         {
-            EffectiveValue::OverriddenBy{FDMConfigLocation::Tool},
+            EffectiveValue::OverriddenBy{FDMConfigLocation::Tool, {2}},
             ConfigValue{std::vector<double>{10.0, 10.0, 20.0}},
         },
         {
@@ -533,28 +533,24 @@ TEST_CASE_METHOD(
     "Macro overrides are recorded in effective values",
     "[FDMConfig]")
 {
-    config_pack.print.items.opt("perimeters").set(3);
-    config_pack.tool.at(0).overrides.set("perimeters", 2);
-    config_pack.macro_overrides[vase_mode_layer_id()].overrides.overrides.set("perimeters", 1);
+    config_pack.print.items.opt("avoid_crossing_perimeters").set(true);
+    config_pack.macro_overrides[vase_mode_layer_id()].overrides.overrides.set(
+        "avoid_crossing_perimeters", false);
 
     const FullConfigFDM full_config{config_pack, extruder_candidates, hw_config};
     const EffectiveValueMap& effective_values{full_config.effective_values()};
 
-    REQUIRE(effective_values.contains("perimeters"));
-    const EffectiveValue& effective_value{effective_values.at("perimeters")};
+    REQUIRE(effective_values.contains("avoid_crossing_perimeters"));
+    const EffectiveValue& effective_value{effective_values.at("avoid_crossing_perimeters")};
 
     const EffectiveValue expected_value{{
         {
             EffectiveValue::SetBy{FDMConfigLocation::Print},
-            ConfigValue{3},
-        },
-        {
-            EffectiveValue::OverriddenBy{FDMConfigLocation::Tool},
-            ConfigValue{std::vector<int>{2, 3, 3}},
+            ConfigValue{true},
         },
         {
             EffectiveValue::OverriddenBy{FDMConfigLocation::MacroOverrides},
-            ConfigValue{1},
+            ConfigValue{false},
         },
     }};
 
@@ -584,4 +580,94 @@ TEST_CASE("Extruders are clamped on a single slot printer", "[FDMConfig]")
     const Preset::HwPrinterConfig multi_hw_config{build_fff_printer_config(3, {})};
     const PartialConfig multi_partial_config{{object_settings}, multi_hw_config};
     CHECK(multi_partial_config.get<int>("infill_extruder") == 3);
+}
+
+TEST_CASE("Macro override boxes split keys by slot definition", "[FDMConfig]")
+{
+    const MacroOverridesFDM global_box;
+    const MacroSlotOverridesFDM slot_box;
+    CHECK(global_box.overrides.find("spiral_vase") != nullptr);
+    CHECK(global_box.overrides.find("perimeters") == nullptr);
+    CHECK(slot_box.overrides.find("perimeters") != nullptr);
+    CHECK(slot_box.overrides.find("temperature") != nullptr);
+    CHECK(slot_box.overrides.find("spiral_vase") == nullptr);
+    CHECK(slot_box.items.all_items().empty());
+}
+
+TEST_CASE_METHOD(
+    FullConfigFDMFixture,
+    "Macro slot overrides apply to their slot only",
+    "[FDMConfig]")
+{
+    config_pack.print.items.opt("perimeters").set(3);
+    config_pack.tool.at(0).overrides.set("perimeters", 2);
+    MacroOverridesLayerFDM& layer{config_pack.macro_overrides[vase_mode_layer_id()]};
+    layer.slot_overrides.resize(extruder_count);
+    layer.slot_overrides.at(2).overrides.set("perimeters", 1);
+
+    const FullConfigFDM full_config{config_pack, extruder_candidates, hw_config};
+    CHECK(full_config.get<std::vector<int>>("perimeters") == std::vector<int>{2, 3, 1});
+
+    const EffectiveValue expected_value{{
+        {
+            EffectiveValue::SetBy{FDMConfigLocation::Print},
+            ConfigValue{3},
+        },
+        {
+            EffectiveValue::OverriddenBy{FDMConfigLocation::Tool, {0}},
+            ConfigValue{std::vector<int>{2, 3, 3}},
+        },
+        {
+            EffectiveValue::OverriddenBy{FDMConfigLocation::MacroSlotOverrides, {2}},
+            ConfigValue{std::vector<int>{2, 3, 1}},
+        },
+    }};
+    CHECK(full_config.effective_values().at("perimeters") == expected_value);
+
+    const PartialConfig macro_partial{to_refs(config_pack.macro_overrides), hw_config};
+    const std::map<std::string, std::set<std::size_t>> expected_slots{{"perimeters", {2}}};
+    CHECK(macro_partial.partially_defined_slots() == expected_slots);
+    CHECK(
+        macro_partial.get<std::vector<int>>("perimeters")
+        == std::optional{std::vector<int>{1, 1, 1}});
+}
+
+TEST_CASE_METHOD(
+    FullConfigFDMFixture,
+    "Macro slot overrides are fitted to the material slot count",
+    "[FDMConfig]")
+{
+    config_pack.print.items.opt("perimeters").set(3);
+    MacroOverridesLayerFDM& layer{config_pack.macro_overrides[vase_mode_layer_id()]};
+
+    SECTION("fewer slot boxes than slots")
+    {
+        layer.slot_overrides.resize(2);
+        layer.slot_overrides.at(1).overrides.set("perimeters", 1);
+        const FullConfigFDM full_config{config_pack, extruder_candidates, hw_config};
+        CHECK(full_config.get<std::vector<int>>("perimeters") == std::vector<int>{3, 1, 3});
+    }
+
+    SECTION("more slot boxes than slots")
+    {
+        layer.slot_overrides.resize(5);
+        layer.slot_overrides.at(1).overrides.set("perimeters", 1);
+        layer.slot_overrides.at(4).overrides.set("perimeters", 7);
+        const FullConfigFDM full_config{config_pack, extruder_candidates, hw_config};
+        CHECK(full_config.get<std::vector<int>>("perimeters") == std::vector<int>{3, 1, 3});
+        const PartialConfig macro_partial{to_refs(config_pack.macro_overrides), hw_config};
+        const std::map<std::string, std::set<std::size_t>> expected_slots{{"perimeters", {1}}};
+        CHECK(macro_partial.partially_defined_slots() == expected_slots);
+    }
+}
+
+TEST_CASE_METHOD(FullConfigFDMFixture, "Vase mode layer overrides every slot", "[FDMConfig]")
+{
+    config_pack.print.items.opt("perimeters").set(3);
+    config_pack.tool.at(1).overrides.set("perimeters", 2);
+    config_pack.macro_overrides[vase_mode_layer_id()] = make_vase_mode_layer(extruder_count);
+
+    const FullConfigFDM full_config{config_pack, extruder_candidates, hw_config};
+    CHECK(full_config.get<bool>("spiral_vase"));
+    CHECK(full_config.get<std::vector<int>>("perimeters") == std::vector<int>{1, 1, 1});
 }

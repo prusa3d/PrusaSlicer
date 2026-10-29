@@ -40,7 +40,11 @@ PrintModeInteractor::set_mode_params(const std::string& id, const Domain::PrintM
         return;
     }
 
-    m_modes[id] = m_provider->evaluate(id, m_config_values, params);
+    m_modes[id] = m_provider->evaluate(
+        id,
+        m_config_values,
+        params,
+        m_project_interactor.preset_interactor().selected_printer_preset().hw_config);
     apply_evaluated();
 
     invoke_listeners<IPrintModesChangedListener>(
@@ -122,7 +126,11 @@ void PrintModeInteractor::reevaluate()
         if (it != mode_params.end()) {
             params = it->second;
         }
-        m_modes[mode.id] = m_provider->evaluate(mode.id, m_config_values, params);
+        m_modes[mode.id] = m_provider->evaluate(
+            mode.id,
+            m_config_values,
+            params,
+            m_project_interactor.preset_interactor().selected_printer_preset().hw_config);
     }
     apply_evaluated();
 }

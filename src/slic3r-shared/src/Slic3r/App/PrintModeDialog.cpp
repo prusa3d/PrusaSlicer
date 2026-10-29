@@ -36,17 +36,68 @@ std::string param_to_string(const Domain::PrintModeParamValue& value)
         value);
 }
 
-/// Hidden items are internal, the user cannot relate them to anything in the settings.
-std::vector<std::reference_wrapper<const Domain::ConfigItem>> visible_items(
-    const Domain::MacroOverridesFDM& overrides)
+struct OverrideRow
 {
-    std::vector<std::reference_wrapper<const Domain::ConfigItem>> items;
-    for (const Domain::ConfigItem& item : overrides.overrides.overridden_items()) {
-        if (item.def().category != Domain::ConfigItemDef::Category::Hidden) {
-            items.emplace_back(item);
+    const Domain::ConfigItemDef* def{nullptr};
+    std::string value;
+};
+
+std::string override_to_string(const Domain::ConfigItem& item)
+{
+    return item.value().holds_alternative<bool>()
+        ? (item.get<bool>() ? Biz::_u8L("On") : Biz::_u8L("Off"))
+        : ConfigItemUtils::config_item_to_string(item);
+}
+
+// One value when every slot agrees, otherwise the slots in order with "-" where untouched.
+std::string slot_overrides_to_string(
+    const std::vector<Domain::MacroSlotOverridesFDM>& slot_boxes, const std::string& key)
+{
+    std::vector<std::string> values;
+    std::set<std::string> distinct;
+    bool every_slot{true};
+    for (const Domain::MacroSlotOverridesFDM& slot_box : slot_boxes) {
+        if (const std::optional<Domain::ConfigItem> item{slot_box.overrides.get(key)}) {
+            values.push_back(override_to_string(*item));
+            distinct.insert(values.back());
+        } else {
+            values.push_back("-");
+            every_slot = false;
         }
     }
-    return items;
+    if (every_slot && distinct.size() == 1) {
+        return values.front();
+    }
+    std::string result;
+    for (const std::string& value : values) {
+        result += (result.empty() ? "" : " / ") + value;
+    }
+    return result;
+}
+
+/// Hidden items are internal, the user cannot relate them to anything in the settings.
+std::vector<OverrideRow> visible_overrides(const Domain::MacroOverridesLayerFDM& layer)
+{
+    std::vector<OverrideRow> rows;
+    for (const Domain::ConfigItem& item : layer.overrides.overrides.overridden_items()) {
+        if (item.def().category != Domain::ConfigItemDef::Category::Hidden) {
+            rows.push_back({&item.def(), override_to_string(item)});
+        }
+    }
+    std::set<std::string> slot_keys;
+    for (const Domain::MacroSlotOverridesFDM& slot_box : layer.slot_overrides) {
+        for (const Domain::ConfigItem& item : slot_box.overrides.overridden_items()) {
+            if (item.def().category != Domain::ConfigItemDef::Category::Hidden) {
+                slot_keys.insert(item.name());
+            }
+        }
+    }
+    for (const std::string& key : slot_keys) {
+        rows.push_back(
+            {&layer.slot_overrides.front().overrides.find(key)->def(),
+             slot_overrides_to_string(layer.slot_overrides, key)});
+    }
+    return rows;
 }
 
 class PrintModeCard : public Item
@@ -105,7 +156,7 @@ public:
             build_error();
         }
         build_param_rows();
-        build_panel(layer.overrides);
+        build_panel(layer);
         // The cards are rebuilt on every change, so the expanded state outlives them in the dialog.
         set_expanded(m_expanded_ids.contains(m_id));
     }
@@ -190,7 +241,7 @@ private:
         }
     }
 
-    void build_panel(const Domain::MacroOverridesFDM& overrides)
+    void build_panel(const Domain::MacroOverridesLayerFDM& layer)
     {
         const ImColor dim{
             m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)};
@@ -221,18 +272,17 @@ private:
         m_table->set_align_items(YGAlignStretch);
         m_table->set_gap(3_fpx);
 
-        std::vector<std::reference_wrapper<const Domain::ConfigItem>> items{
-            visible_items(overrides)};
-        std::ranges::sort(items, {}, [](const Domain::ConfigItem& item) {
-            return std::tuple{item.def().category, item.def().option_group, item.def().order};
+        std::vector<OverrideRow> rows{visible_overrides(layer)};
+        std::ranges::sort(rows, {}, [](const OverrideRow& row) {
+            return std::tuple{row.def->category, row.def->option_group, row.def->order};
         });
 
         // The label alone is ambiguous (e.g. "Perimeters" exists in several groups), so each
         // run of items from the same category and group gets a dim heading in its own row.
         std::optional<std::pair<Domain::ConfigItemDef::Category, Domain::ConfigItemDef::OptionGroup>>
             last_group;
-        for (const Domain::ConfigItem& item : items) {
-            const std::pair group{item.def().category, item.def().option_group};
+        for (const OverrideRow& override_row : rows) {
+            const std::pair group{override_row.def->category, override_row.def->option_group};
             if (last_group != group) {
                 last_group = group;
                 auto heading{m_table->emplace_back<Text>(fmt::format(
@@ -250,15 +300,11 @@ private:
             row->set_gap(12_fpx);
             row->set_padding({12_fpx, 5_fpx, 0_fpx, 5_fpx});
             row->set_flex_shrink(0);
-            auto label{row->emplace_back<Text>(Biz::_u8(item.def().label))};
+            auto label{row->emplace_back<Text>(Biz::_u8(override_row.def->label))};
             label->set_flex_grow(1);
             label->set_flex_shrink(1);
             label->set_wrap_mode(Text::WrapMode::WrapElide);
-            const std::string value{
-                item.value().holds_alternative<bool>()
-                    ? (item.get<bool>() ? Biz::_u8L("On") : Biz::_u8L("Off"))
-                    : ConfigItemUtils::config_item_to_string(item)};
-            auto cell{row->emplace_back<Text>(value, Render::ImguiFontType::Bold)};
+            auto cell{row->emplace_back<Text>(override_row.value, Render::ImguiFontType::Bold)};
             cell->set_width(168_fpx);
         }
     }
@@ -286,7 +332,7 @@ std::string mode_info(const Biz::PrintMode& mode)
     }
     return fmt::format(
         fmt::runtime(Biz::_u8L("Changes {} settings · {} adjustable")),
-        visible_items(mode.layer.overrides).size(),
+        visible_overrides(mode.layer).size(),
         mode.layer.params.size());
 }
 

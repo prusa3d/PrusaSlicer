@@ -36,6 +36,11 @@ BoxOrBoxesVector as_boxes(const ConfigPackFDM& config_pack) {
         macro_overrides.emplace_back(id, layer.overrides);
     }
     result.push_back(std::move(macro_overrides));
+    for (const auto& [_, layer] : config_pack.macro_overrides) {
+        if (!layer.slot_overrides.empty()) {
+            result.push_back(convert_to_box_refs(layer.slot_overrides));
+        }
+    }
     return result;
 }
 
@@ -51,6 +56,11 @@ MutBoxOrBoxesVector as_mut_boxes(ConfigPackFDM& config_pack) {
         macro_overrides.emplace_back(id, layer.overrides);
     }
     result.push_back(std::move(macro_overrides));
+    for (auto& [_, layer] : config_pack.macro_overrides) {
+        if (!layer.slot_overrides.empty()) {
+            result.push_back(convert_to_mut_box_refs(layer.slot_overrides));
+        }
+    }
     return result;
 }
 

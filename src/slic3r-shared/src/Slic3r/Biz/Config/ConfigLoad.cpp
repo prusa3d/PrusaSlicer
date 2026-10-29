@@ -311,6 +311,17 @@ load_fdm(const ordered_json& json, const Domain::Preset::HwPrinterConfig& hw_con
             }
             BoxIssues issues{load_box(layer_json["overrides"], layer.overrides)};
             macro_overrides_issues.merge(issues);
+            if (is_object("slot_overrides", layer_json) && !layer_json["slot_overrides"].empty()) {
+                auto slots_load_result{
+                    load_boxes<Domain::MacroSlotOverridesFDM>(layer_json["slot_overrides"])};
+                for (std::size_t slot{}; slot < slots_load_result.issues.size(); ++slot) {
+                    for (const auto& [key, issue] : slots_load_result.issues.at(slot)) {
+                        macro_overrides_issues
+                            [id + ".slot_overrides." + std::to_string(slot) + "." + key] = issue;
+                    }
+                }
+                layer.slot_overrides = std::move(slots_load_result.settings);
+            }
             macro_overrides.insert_or_assign(id, std::move(layer));
         }
     }
