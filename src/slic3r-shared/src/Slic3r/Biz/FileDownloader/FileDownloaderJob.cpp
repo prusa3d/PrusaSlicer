@@ -3,6 +3,7 @@
 #include "Slic3r/Biz/AppInstance/AppInstanceUtils.hpp"
 #include "Slic3r/Biz/Network/IHttp.hpp"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/nowide/fstream.hpp>
@@ -39,6 +40,29 @@ std::string extract_filename_from_header(const std::string& headers) {
 }
 }
 
+std::string sanitize_filename(const std::string& filename)
+{
+    // Keep only the last path component. Both separators are handled on all platforms,
+    // so a name prepared for Windows cannot traverse there, and the behavior is the same everywhere.
+    const size_t separator = filename.find_last_of("/\\");
+    std::string name       = separator == std::string::npos ? filename : filename.substr(separator + 1);
+    // Prevent ':' (drive letters and alternate data streams on Windows) and control characters.
+    std::erase_if(name, [](unsigned char c) { return c == ':' || c < 32 || c == 127; });
+    // Reject ".", ".." and names made of dots and spaces only (Windows strips trailing dots and spaces, so "... " is "..").
+    if (name.find_first_not_of(". ") == std::string::npos) {
+        return {};
+    }
+    // Prevent Windows reserved device names. Windows 10 and older treat "COM3.gcode" (or the temporary
+    // "COM3.gcode.<pid>.download") as the COM3 device, so the download would be written to a serial port.
+    std::string stem = boost::algorithm::to_upper_copy(name.substr(0, name.find('.')));
+    boost::algorithm::trim_right(stem);
+    static const std::regex reserved_regex("CON|PRN|AUX|NUL|CONIN\\$|CONOUT\\$|(COM|LPT)([0-9]|\xC2\xB9|\xC2\xB2|\xC2\xB3)");
+    if (std::regex_match(stem, reserved_regex)) {
+        name = "_" + name;
+    }
+    return name;
+}
+
 FileDownloaderJobData perform_job(
     Biz::JThread::StopToken stop_token,
     Biz::Platform::IMainThreadDispatcher& dis,
@@ -48,6 +72,11 @@ FileDownloaderJobData perform_job(
 {
     boost::system::error_code ec;
     ASSERT(fs::is_directory(job_data.dest_folder, ec) && !ec);
+    // The name comes from the URL or from Printables, it must not point outside of dest_folder.
+    job_data.input_data.file_name = sanitize_filename(job_data.input_data.file_name);
+    if (job_data.input_data.file_name.empty()) {
+        job_data.input_data.file_name = "download";
+    }
     fs::path dest_path    = job_data.dest_folder / job_data.input_data.file_name;
     std::string extension = dest_path.extension().string();
     std::string just_filename =
@@ -125,6 +154,7 @@ FileDownloaderJobData perform_job(
     bool success                = false;
     Network::IHttp::create(Network::IHttp::RequestMethod::Get, job_data.input_data.file_url, retry_fn)
         ->size_limit(DOWNLOAD_SIZE_LIMIT) // more?
+        .restrict_redirects(10)
         .set_range(range_string)
         .on_progress(
             [&](Network::IHttp::Progress progress, bool& cancel)
@@ -182,7 +212,11 @@ FileDownloaderJobData perform_job(
                  if (new_filename.empty()) {
                      return;
                  }
-                 new_filename = Network::IHttp::unescape_string(new_filename);
+                 // Sanitize after unescaping, so that encoded separators (%2F, %5C) are caught as well.
+                 new_filename = sanitize_filename(Network::IHttp::unescape_string(new_filename));
+                 if (new_filename.empty()) {
+                     return;
+                 }
                  // Find unused filename
                  boost::filesystem::path temp_dest_path = job_data.dest_folder / new_filename;
                  std::string extension                  = temp_dest_path.extension().string();

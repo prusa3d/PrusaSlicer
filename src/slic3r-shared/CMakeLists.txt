@@ -1673,6 +1673,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/SlaPointsOperationsTests.cpp
             test/Slic3r/Biz/Scene/VirtualBedPreviewTests.cpp
             test/Slic3r/Biz/WeakerPointerTests.cpp
+            test/Slic3r/Biz/FileDownloader/FileDownloaderJobTests.cpp
             test/Slic3r/Biz/ObservableListSortFilterTests.cpp
             test/Slic3r/Biz/ObservableListTransformerTests.cpp
             test/Slic3r/Biz/ObservableListSearcherTests.cpp

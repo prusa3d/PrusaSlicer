@@ -1982,6 +1982,9 @@ namespace Slic3rLegacy {
         return Format::VirtualExtruder::deserialize_virtual_extruders_from_json(buffer);
     }
 
+    // PrusaSlicer 2.9 supported at most this many beds and its importer ignored higher bed_idx values.
+    static constexpr int LEGACY_MAX_NUMBER_OF_BEDS = 9;
+
     Slic3r::Domain::CustomGCodesOnBeds _3MF_Importer::_extract_custom_gcode_per_print_z_from_archive(::mz_zip_archive &archive, const mz_zip_archive_file_stat &stat)
     {
         if (stat.m_uncomp_size <= 0) {
@@ -2012,6 +2015,10 @@ namespace Slic3rLegacy {
             } catch (const boost::property_tree::ptree_bad_path&) {
                 // Probably an old project with no bed_idx info. Imagine that we saw 0.
             }
+            // Not a security issue (the result is a map, not a fixed-size vector as in 2.9),
+            // just ignore indices that PrusaSlicer 2.9 could not have written.
+            if (bed_idx < 0 || bed_idx >= LEGACY_MAX_NUMBER_OF_BEDS)
+                continue;
 
             pt::ptree code_tree = bed_block.second;
 
@@ -2088,6 +2095,10 @@ namespace Slic3rLegacy {
                 } catch (const boost::property_tree::ptree_bad_path&) {
                     // Probably an old project with no bed_idx info - pretend that we saw 0.
                 }
+                // Not a security issue (the result is a map, not a fixed-size vector as in 2.9),
+                // just ignore indices that PrusaSlicer 2.9 could not have written.
+                if (bed_idx < 0 || bed_idx >= LEGACY_MAX_NUMBER_OF_BEDS)
+                    continue;
                 double pos_x = bed_block.second.get<double>("<xmlattr>.position_x");
                 double pos_y = bed_block.second.get<double>("<xmlattr>.position_y");
                 double rot_deg = bed_block.second.get<double>("<xmlattr>.rotation_deg");
