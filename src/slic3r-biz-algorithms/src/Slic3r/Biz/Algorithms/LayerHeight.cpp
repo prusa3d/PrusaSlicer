@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/Algorithms/LayerHeight.hpp"
 
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
+#include "Slic3r/Assert.hpp"
 #include "Slic3r/Domain/Config.hpp"
 #include "Slic3r/Domain/ConfigPack.hpp"
 #include "Slic3r/Domain/Constants.hpp"
@@ -354,6 +355,8 @@ generate_object_layers(const GenerateLayersParams& params, const ZHeightPairs& l
 
     const double shrinkage_compensation_z = params.object_shrinkage_compensation_z;
     size_t idx_layer_height_profile       = 0;
+    // A zero minimum layer height would make the loop below never advance.
+    ASSERT(params.min_layer_height > 0.);
     // loop until we have at least one layer and the max slice_z reaches the object height
     double slice_z = print_z + 0.5 * params.min_layer_height;
     while (slice_z < params.object_print_z_height) {

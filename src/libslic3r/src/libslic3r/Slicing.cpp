@@ -24,7 +24,6 @@ using Slic3r::Domain::ZHeightPairs;
 
 namespace Slic3r {
 
-constexpr double MIN_LAYER_HEIGHT         = 0.01;
 constexpr double MIN_LAYER_HEIGHT_DEFAULT = 0.07;
 
 static double
@@ -33,7 +32,7 @@ min_layer_height_from_nozzle(const PrintObjectConfigView& print_config, int idx_
     double min_layer_height =
         print_config.get<std::vector<double>>("min_layer_height").at(idx_nozzle - 1);
     return (min_layer_height == 0.) ? MIN_LAYER_HEIGHT_DEFAULT :
-                                      std::max(MIN_LAYER_HEIGHT, min_layer_height);
+                                      std::max(Domain::MIN_LAYER_HEIGHT, min_layer_height);
 }
 
 static double
@@ -83,7 +82,7 @@ SlicingParameters SlicingParameters::create_from_config(
     params.soluble_interface = soluble_interface;
 
     // Miniumum/maximum of the minimum layer height over all extruders.
-    params.min_layer_height = MIN_LAYER_HEIGHT;
+    params.min_layer_height = Domain::MIN_LAYER_HEIGHT;
     params.max_layer_height = std::numeric_limits<double>::max();
     if (config.get<Domain::SupportMode>("support_material") != Domain::SupportMode::None || params.base_raft_layers > 0 || config.get<int>("support_material_enforce_layers") > 0) {
         // Extruder indices in config are 1-based, but zero has special meaning (don't care).
@@ -109,7 +108,9 @@ SlicingParameters SlicingParameters::create_from_config(
             params.max_layer_height = std::min(params.max_layer_height, max_layer_height_from_nozzle(config, extruder_id + 1));
         }
     }
-    params.min_layer_height = std::min(params.min_layer_height, params.layer_height);
+    // The configured layer height may lie below the printer's minimum layer height, but it must
+    // never drag the minimum down to zero, otherwise layer generation would never advance.
+    params.min_layer_height = std::min(params.min_layer_height, std::max(params.layer_height, Domain::MIN_LAYER_HEIGHT));
     params.max_layer_height = std::max(params.max_layer_height, params.layer_height);
 
     if (! soluble_interface) {
