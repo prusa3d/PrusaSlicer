@@ -4976,6 +4976,20 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->units = {L("mm")};
     def->init_fn = init_with(0.);
 
+    def = defs.add("used_filament_compensation", typeid(double));
+    def->location = Printer;
+    def->label = L("Used filament compensation");
+    def->option_group = ConfigItemDef::OptionGroup::Printer_General_SizeClearances;
+    def->category = ConfigItemDef::Category::Printer_General;
+    def->order = 2;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Multiplier applied to the filament consumption statistics (length, volume, weight and cost) "
+                   "written into the G-code and shown in the UI. It compensates for printers that extrude "
+                   "slightly more or less than commanded. The extrusion moves themselves are not affected.");
+    def->min = 0.5;
+    def->max = 2;
+    def->init_fn = init_with(1.);
+
     def = defs.add("perimeter_generator", typeid(EnumWrapper));
     def->location = Print;
     def->overrides_in = Locations{ Object, MacroOverrides };

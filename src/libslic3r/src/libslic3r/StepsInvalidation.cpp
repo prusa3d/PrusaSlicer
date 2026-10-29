@@ -525,6 +525,7 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"use_firmware_retraction", steps({propagate(psGCodeExport)})},
     {"use_relative_e_distances", steps({propagate(psGCodeExport)})},
     {"use_volumetric_e", steps({propagate(psGCodeExport)})},
+    {"used_filament_compensation", steps({propagate(psGCodeExport)})},
     {"variable_layer_height", steps({propagate(psGCodeExport)})},
     {"wall_distribution_count", steps({propagate(posSlice)})},
     {"wall_transition_angle", steps({propagate(posSlice)})},

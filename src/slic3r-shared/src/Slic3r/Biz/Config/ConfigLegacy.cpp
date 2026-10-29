@@ -133,7 +133,7 @@ namespace {
                 "top_solid_infill_speed", "top_solid_layers", "top_solid_min_thickness", "travel_acceleration",
                 "travel_lift_before_obstacle", "travel_max_lift", "travel_ramping_lift",
                 "travel_short_distance_acceleration", "travel_slope", "travel_speed",
-                "travel_speed_z", "use_firmware_retraction", "use_relative_e_distances", "use_volumetric_e",
+                "travel_speed_z", "use_firmware_retraction", "use_relative_e_distances", "use_volumetric_e", "used_filament_compensation",
                 "variable_layer_height", "wall_distribution_count", "wall_transition_angle", "wall_transition_filter_deviation",
                 "wall_transition_length", "wipe", "wipe_into_infill", "wipe_into_objects", "wipe_tower", "wipe_tower_acceleration",
                 "wipe_tower_bridging", "wipe_tower_brim_width", "wipe_tower_cone_angle", "wipe_tower_extra_flow",

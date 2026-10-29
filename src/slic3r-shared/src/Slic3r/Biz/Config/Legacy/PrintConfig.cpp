@@ -3985,6 +3985,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("used_filament_compensation", coFloat);
+    def->label = L("Used filament compensation");
+    def->tooltip = L("Multiplier applied to the filament consumption statistics (length, volume, weight and cost) "
+                   "written into the G-code and shown in the UI. It compensates for printers that extrude "
+                   "slightly more or less than commanded. The extrusion moves themselves are not affected.");
+    def->min = 0.5;
+    def->max = 2;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(1));
+
     def = this->add("perimeter_generator", coEnum);
     def->label = L("Perimeter generator");
     def->category = L("Layers and Perimeters");

@@ -149,6 +149,7 @@ void ProcessorConfig::reset()
     parking_pos_retraction = 0.0f;
     extra_loading_move = 0.0f;
     kisslicer_toolchange_time_correction = 0.0f;
+    used_filament_compensation = 1.0f;
     bed_shape.clear();
     filaments.reset();
     extruders.reset();
@@ -194,6 +195,7 @@ static const std::vector<std::pair<std::string_view, KeyType>> KEYS = {
     { "spiral_vase"sv,                         KeyType::Boolean },
     { "temperature",                           KeyType::Vector_of_integers },
     { "use_volumetric_e"sv,                    KeyType::Boolean },
+    { "used_filament_compensation"sv,          KeyType::Float },
     { "wipe_tower"sv,                          KeyType::Boolean },
     { "z_offset"sv,                            KeyType::Float },
     { "machine_limits_usage"sv,                KeyType::String },
@@ -441,6 +443,7 @@ ProcessorConfig extract_processor_config_from_prusaslicer_gcode_internal(const s
                         else if (key_it->first == "parking_pos_retraction"sv) parking_pos_retraction = value;
                         else if (key_it->first == "z_offset"sv)               ret.z_offset = value;
                         else if (key_it->first == "filament_change_time"sv)   ret.filament_change_time = value;
+                        else if (key_it->first == "used_filament_compensation"sv) ret.used_filament_compensation = value;
                         break;
                     }
                     case KeyType::String:

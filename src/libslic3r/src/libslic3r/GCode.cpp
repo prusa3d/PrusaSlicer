@@ -218,7 +218,8 @@ void GCodeGenerator::PlaceholderParserIntegration::init(const GCodeWriter &write
 
 void GCodeGenerator::PlaceholderParserIntegration::update_from_gcodewriter(
     const GCodeWriter& writer,
-    const std::optional<WipeTowerData>& wipe_tower_data
+    const std::optional<WipeTowerData>& wipe_tower_data,
+    const double used_filament_compensation
 )
 {
     memcpy(this->position.data(), writer.get_position().data(), sizeof(double) * 3);
@@ -249,7 +250,7 @@ void GCodeGenerator::PlaceholderParserIntegration::update_from_gcodewriter(
                 wt_vol = it->second[e.id()] * e.filament_crossection();
             }
 
-            double v = e.extruded_volume() + wt_vol;
+            double v = (e.extruded_volume() + wt_vol) * used_filament_compensation;
             double w = v * e.filament_density() * 0.001;
             extruded_volume.at(e.id()) = v;
             extruded_weight.at(e.id()) = w;
@@ -651,6 +652,8 @@ namespace DoExport {
         // are considered to be active for the single extruder multi-material printers only.
         processor_config.filament_change_time = (float) config.get<double>("filament_change_time");
 
+        processor_config.used_filament_compensation = float(config.get<double>("used_filament_compensation"));
+
         processor_config.extruders.str_colors = config.get<std::vector<std::string>>("extruder_colour");
 
         processor_config.callbacks.cb_log = [](const std::string& msg){
@@ -854,8 +857,11 @@ namespace DoExport {
                 );
 
                 if (wipe_tower_data) {
+                    // The wipe tower totals are not derived from the G-code processor statistics,
+                    // so the used filament compensation has to be applied here.
                     const double wipe_tower_filament{
                         wipe_tower_data->used_filament_until_layer.back().second[extruder.id()]
+                        * config.get<double>("used_filament_compensation")
                     };
 
                     print_statistics.total_wipe_tower_filament += wipe_tower_filament;
@@ -1742,7 +1748,7 @@ std::string GCodeGenerator::placeholder_parser_process(
 {
     PlaceholderParserIntegration &ppi = m_placeholder_parser_integration;
     try {
-        ppi.update_from_gcodewriter(m_writer, m_print->wipe_tower_data());
+        ppi.update_from_gcodewriter(m_writer, m_print->wipe_tower_data(), m_print->config().get<double>("used_filament_compensation"));
         std::string output = ppi.parser.process(templ, current_extruder_id, config_override, &ppi.output_config, &ppi.context);
         ppi.validate_output_vector_variables();
 

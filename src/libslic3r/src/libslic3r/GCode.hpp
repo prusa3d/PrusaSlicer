@@ -400,7 +400,7 @@ private:
     struct PlaceholderParserIntegration {
         void reset();
         void init(const GCodeWriter &config);
-        void update_from_gcodewriter(const GCodeWriter &writer, const std::optional<WipeTowerData>& wipe_tower_data);
+        void update_from_gcodewriter(const GCodeWriter &writer, const std::optional<WipeTowerData>& wipe_tower_data, double used_filament_compensation);
         void validate_output_vector_variables();
 
         Biz::Parser::PlaceholderParser parser;

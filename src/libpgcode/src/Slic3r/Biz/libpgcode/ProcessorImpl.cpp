@@ -2855,6 +2855,21 @@ void ProcessorImpl::update_basic_statistics()
         m_used_filaments.wipe_tower_volumes_per_extruder;
     basic_print_stats->flush_volumes_per_extruder = m_used_filaments.flush_volumes_per_extruder;
     basic_print_stats->used_filaments_per_role    = m_used_filaments.filaments_per_role;
+
+    // Compensate for printers extruding more or less than commanded.
+    if (const float compensation{m_config.used_filament_compensation}; compensation != 1.0f) {
+        for (float& v : basic_print_stats->volumes_per_color_change)
+            v *= compensation;
+        for (auto* volumes : {&basic_print_stats->volumes_per_extruder,
+                              &basic_print_stats->wipe_tower_volumes_per_extruder,
+                              &basic_print_stats->flush_volumes_per_extruder})
+            for (auto& [id, v] : *volumes)
+                v *= compensation;
+        for (auto& [role, filament] : basic_print_stats->used_filaments_per_role) {
+            filament.first  *= compensation;
+            filament.second *= compensation;
+        }
+    }
 }
 
 void ProcessorImpl::

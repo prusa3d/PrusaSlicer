@@ -93,6 +93,8 @@ struct ProcessorConfig
     float extra_loading_move{ 0.0f };
     float kisslicer_toolchange_time_correction{ 0.0f };
     float filament_change_time{ 0.0f };
+    // Multiplier applied to the filament consumption statistics.
+    float used_filament_compensation{ 1.0f };
     std::string color_change_gcode;
     std::string pause_print_gcode;
     std::string template_custom_gcode;
