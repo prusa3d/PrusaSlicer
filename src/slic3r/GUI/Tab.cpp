@@ -2700,6 +2700,7 @@ void TabPrinter::build_fff()
 
         optgroup->append_single_option_line("max_print_height");
         optgroup->append_single_option_line("z_offset");
+        optgroup->append_single_option_line("used_filament_compensation");
 
         optgroup = page->new_optgroup(L("Capabilities"));
         ConfigOptionDef def;

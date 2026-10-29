@@ -559,6 +559,7 @@ namespace Slic3r {
         bool  m_exclude_e     = false;
         float m_parking_position;
         float m_extra_loading_move;
+        double m_used_filament_compensation;
         float m_extruded_last_z;
         float m_first_layer_height; // mm
         unsigned int m_g1_line_id;
