@@ -990,7 +990,9 @@ tl::expected<void, std::string> PresetInteractor::select_external_printer_config
     auto it = std::ranges::find_if(items, pred);
     if (it != std::ranges::end(items)) {
         auto hw_config = (*it).first.get();
-        duplicate_hw_config_if_needed_and_update(hw_config, bag);
+        if (duplicate_hw_config_if_needed_and_update(hw_config, bag)) {
+            update_changed_printer_configs({hw_config});
+        }
         select_printer_config_internal(hw_config.id, false, bag);
     } else {
         // create new config
@@ -2476,7 +2478,7 @@ void PresetInteractor::select_material_preset(size_t material_index, const std::
     }
 }
 
-void PresetInteractor::duplicate_hw_config_if_needed_and_update(
+bool PresetInteractor::duplicate_hw_config_if_needed_and_update(
     Domain::Preset::HwPrinterConfig& hw_config,
     ListenerInvokeLaterBag& bag
 )
@@ -2506,6 +2508,7 @@ void PresetInteractor::duplicate_hw_config_if_needed_and_update(
     }
     fill_printer_configs(false, bag);
     fill_printer_presets(false, bag);
+    return dup_needed;
 }
 
 bool PresetInteractor::select_printer_tool_item(size_t tool_index, const std::string& id, bool user)

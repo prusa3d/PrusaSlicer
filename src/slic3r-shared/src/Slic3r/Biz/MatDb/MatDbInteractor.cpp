@@ -159,6 +159,8 @@ void MatDbInteractor::run_query()
         return;
     }
 
+    // TODO: @zaraka what is point of this "fix", it just silently hides bugs elsewhere
+    // like the one I fixed in PD-9508
     const size_t slot_count = selected_preset().materials.size();
     if (slot_count == 0) {
         return;

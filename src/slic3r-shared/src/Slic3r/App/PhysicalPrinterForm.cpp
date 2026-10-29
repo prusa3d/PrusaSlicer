@@ -21,6 +21,7 @@
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/Separator.hpp"
 #include "Slic3r/App/Yoga/Validator.hpp"
+#include "Slic3r/Biz/Preset/HwConfigEvaluator.hpp"
 
 #include <fmt/format.h>
 
@@ -254,15 +255,18 @@ void PhysicalPrinterForm::build_form()
     );
     m_combo_sheets->set_source_list(m_sheet_observable_list.get());
     m_combo_sheets->set_flex_shrink(0);
-    m_combo_sheets->callbacks().selection_changed = [this](int sheet_index)
-    {
-        if (sheet_index >= 0) {
-            m_project_interactor.preset_interactor().select_printer_sheet(
-                m_project_interactor.preset_interactor().sheet_items().items().at(sheet_index).id,
-                true
-            );
-        }
-    };
+
+    // TODO: @zaraka what is point of this callback, the hw_config we create in this form is not yet
+    // set to SelectedPreset, but this call updates SelectedPreset's hw_config's sheet
+    // m_combo_sheets->callbacks().selection_changed = [this](int sheet_index)
+    // {
+    //     if (sheet_index >= 0) {
+    //         m_project_interactor.preset_interactor().select_printer_sheet(
+    //             m_project_interactor.preset_interactor().sheet_items().items().at(sheet_index).id,
+    //             true
+    //         );
+    //     }
+    // };
 
     Text* label = emplace_back<Text>(_u8L("Nozzles"), Render::ImguiFontType::Bold);
     label->set_margin(Margins(0, 10_fpx, 0, 0));
@@ -529,16 +533,47 @@ void PhysicalPrinterForm::commit_edits()
     clear_test_status();
     update_test_button_state();
 
-    m_config = edited_config();
+    m_config = edited_config(true);
 
     if (m_callbacks.printer_saved) {
         m_callbacks.printer_saved(m_config);
     }
 }
 
-Biz::PhysicalPrinter::PhysicalPrinterConfig PhysicalPrinterForm::edited_config() const
+PhysicalPrinterConfig PhysicalPrinterForm::edited_config(bool update_hw_config) const
 {
-    Biz::PhysicalPrinter::PhysicalPrinterConfig config = m_config;
+    PhysicalPrinterConfig config = m_config;
+
+    // update hw settings
+    if (update_hw_config && config.hw_config.has_value())
+    {
+        const auto& vendor_bundle =
+            m_project_interactor.workbench().preset_bundle().vendor_bundles.at(
+                config.hw_config->vendor_id
+            );
+
+        ASSERT(m_tool_observable_list->size() == config.hw_config->tools.size());
+        ASSERT(m_tool_observable_list->size() == config.hw_config->tool_count);
+        for (size_t i = 0; i < m_tool_observable_list->size(); i++) {
+            const auto& tool_list          = m_tool_observable_list->at(i);
+            const auto& selected_toold_def = tool_list.items().at(tool_list.selected_index());
+            if (config.hw_config->tools.at(i).id != selected_toold_def.id) {
+                config.hw_config->tools[i] =
+                    Preset::from_def(vendor_bundle.vendor_data, selected_toold_def);
+            }
+        }
+
+        const auto& selected_sheet_def =
+            m_sheet_observable_list->items().at(m_sheet_observable_list->selected_index());
+        if (config.hw_config->sheet.id == selected_sheet_def.id) {
+            config.hw_config->sheet =
+                Preset::from_def(vendor_bundle.vendor_data, selected_sheet_def);
+        }
+        config.hw_config->name = Domain::Preset::
+            suggest_name(config.hw_config.value(), vendor_bundle.vendor_data, false);
+        config.hw_config->short_name =
+            Domain::Preset::suggest_name(config.hw_config.value(), vendor_bundle.vendor_data, true);
+    }
 
     PrinterUpload* up = std::get_if<PrinterUpload>(&config.payload);
     if (up) {

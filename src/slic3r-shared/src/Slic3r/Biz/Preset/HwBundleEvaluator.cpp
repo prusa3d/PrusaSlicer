@@ -184,6 +184,9 @@ HwBundleEvaluator::evaluate_config(const Domain::Preset::HwPrinterConfig& extern
         hw_config.feeders[addr] = from_def(vendor_data, *feeder_def);
     }
 
+    hw_config.name       = Domain::Preset::suggest_name(hw_config, vendor_data, false);
+    hw_config.short_name = Domain::Preset::suggest_name(hw_config, vendor_data, true);
+
     return hw_config;
 }
 

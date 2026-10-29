@@ -480,14 +480,21 @@ PhysicalPrinterConfig PhysicalPrinterInteractor::create_connect_printer_config(
     hw_config.printer_id = full_hw_config->printer_id;
     hw_config.repo_id    = full_hw_config->repo_id;
     hw_config.vendor_id  = full_hw_config->vendor_id;
-    hw_config.name       = full_hw_config->name;
-    hw_config.short_name = full_hw_config->short_name;
     hw_config.visual     = full_hw_config->visual;
     hw_config.sheet      = full_hw_config->sheet;
     for (size_t i = 0; i < std::min(hw_config.tools.size(), full_hw_config->tools.size()); ++i) {
         hw_config.tools[i].id   = full_hw_config->tools[i].id;
         hw_config.tools[i].name = full_hw_config->tools[i].name;
     }
+    auto vendor_it = m_workbench.preset_bundle().vendor_bundles.find(full_hw_config->vendor_id);
+    if (vendor_it != m_workbench.preset_bundle().vendor_bundles.end()) {
+        hw_config.name       = suggest_name(hw_config, vendor_it->second.vendor_data, false);
+        hw_config.short_name = suggest_name(hw_config, vendor_it->second.vendor_data, true);
+    } else {
+        hw_config.name       = full_hw_config->name;
+        hw_config.short_name = full_hw_config->short_name;
+    }
+
     return config;
 }
 

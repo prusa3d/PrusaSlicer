@@ -54,7 +54,7 @@ private:
     void build_form();
     void test_edits();
     void commit_edits();
-    Biz::PhysicalPrinter::PhysicalPrinterConfig edited_config() const;
+    Biz::PhysicalPrinter::PhysicalPrinterConfig edited_config(bool update_hw_config = false) const;
     void update_field_visibility();
     void update_test_button_state();
     void update_save_button_state();

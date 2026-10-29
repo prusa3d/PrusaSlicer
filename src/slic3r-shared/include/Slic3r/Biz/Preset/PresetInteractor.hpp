@@ -1025,7 +1025,7 @@ private:
         Domain::SelectionId config_container_id
     );
 
-    void duplicate_hw_config_if_needed_and_update(Domain::Preset::HwPrinterConfig& hw_config, ListenerInvokeLaterBag& bag);
+    bool duplicate_hw_config_if_needed_and_update(Domain::Preset::HwPrinterConfig& hw_config, ListenerInvokeLaterBag& bag);
 
     void invoke_slicing_input_changed();
     void invoke_on_preset_value_changed(const Domain::ConfigItem& config_item);
