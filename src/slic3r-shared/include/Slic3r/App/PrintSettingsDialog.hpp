@@ -53,6 +53,11 @@ public:
         Biz::Preset::PresetItemType type
     ) override;
 
+    void on_config_container_selection_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id
+    ) override;
+
     void on_preset_value_changed(
         Domain::SelectionId project_id,
         Domain::SelectionId config_container_id,
@@ -104,6 +109,12 @@ private:
     void on_about_to_close() override;
 
     void update_dirty_state();
+    /**
+     * @brief Shows the extruder pages for FFF printers only.
+     * @note If an extruder page is shown when they get hidden, the first category page is
+     * selected instead.
+     */
+    void update_extruders_visibility();
 
 private:
     Biz::ProjectInteractor& m_project_interactor;
@@ -117,6 +128,7 @@ private:
     Yoga::LayoutButton* m_revert_button{nullptr};
     Yoga::LayoutButton* m_save_button{nullptr};
     PageListView* m_category_page_list_view{nullptr};
+    Yoga::Text* m_extruders_label{nullptr};
     PageListView* m_extruder_page_list_view{nullptr};
 
     Yoga::Text* m_bed_name{nullptr};

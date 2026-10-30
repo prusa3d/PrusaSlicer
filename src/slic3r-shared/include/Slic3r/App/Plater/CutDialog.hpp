@@ -233,6 +233,7 @@ private:
     Yoga::PartProcessingItem* m_part_B{nullptr};
 
     Yoga::LayoutButton* m_perform_btn{nullptr};
+    Yoga::Item* m_connectors_btns_wrap{nullptr};
     Yoga::LayoutButton* m_confirm_connectors_btn{nullptr};
     Yoga::LayoutButton* m_cancel_connectors_btn{nullptr};
 

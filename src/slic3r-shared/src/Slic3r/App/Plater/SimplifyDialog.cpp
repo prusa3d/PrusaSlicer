@@ -89,19 +89,16 @@ SimplifyDialog::SimplifyDialog() : GizmoWindow()
         }
     };
 
-    Item* row = content()->emplace_back<Item>();
-    row->set_gap(gap_size());
-    m_apply_btn = row->emplace_back<LayoutButton>(_u8L("Apply"));
-    m_apply_btn->set_background_color(m_theme->color_imgui(Platform::Color::Button));
+    m_progress = content()->emplace_back<ProgressBar>();
+    m_progress->set_height(20_fpx);
+    m_progress->set_show_overlay(true);
+
+    m_apply_btn = add_bottom_bar_button(_u8L("Apply"));
     m_apply_btn->callbacks().action = [this]() {
         if (m_callbacks.apply) {
             m_callbacks.apply();
         }
     };
-
-    m_progress = row->emplace_back<ProgressBar>();
-    m_progress->set_show_overlay(true);
-    m_progress->set_flex_grow(1.f);
 }
 
 void SimplifyDialog::set_mesh_name(const std::string& name)
