@@ -107,9 +107,13 @@ load_external_hw_config(std::string_view json)
             features_node.get_to(ret.features);
         }
 
+        bool tool_count_found = false;
         if (node.contains("tool_count")) {
             node.at("tool_count").get_to(ret.tool_count);
-        } else {
+            tool_count_found = true;
+        }
+        // estimate max_tool index
+        {
             uint8_t max_tool = 0;
             for (const auto& [k, v] : tools_node.items()) {
                 if (auto addr_result = Domain::Preset::to_address(k); !addr_result.has_value()) {
@@ -121,6 +125,18 @@ load_external_hw_config(std::string_view json)
                 } else {
                     max_tool = std::max(addr_result.value().at(0), max_tool);
                 }
+            }
+            if (tool_count_found && ret.tool_count != max_tool + 1) {
+                std::string name;
+                if (node.contains("name")) {
+                    node.at("name").get_to(name);
+                }
+                SPDLOG_WARN(
+                    "External Hw Load of '{}': Mismatched tool_count ({}) and passed indices in tools ({})",
+                    name,
+                    ret.tool_count,
+                    max_tool + 1
+                );
             }
             ret.tool_count = max_tool + 1;
         }
