@@ -563,11 +563,13 @@ PhysicalPrinterConfig PhysicalPrinterForm::edited_config(bool update_hw_config) 
             }
         }
 
-        const auto& selected_sheet_def =
-            m_sheet_observable_list->items().at(m_sheet_observable_list->selected_index());
-        if (config.hw_config->sheet.id == selected_sheet_def.id) {
-            config.hw_config->sheet =
-                Preset::from_def(vendor_bundle.vendor_data, selected_sheet_def);
+        if (config.hw_config.value().technology == Domain::PrinterTechnology::FFF) {
+            const auto& selected_sheet_def =
+                m_sheet_observable_list->items().at(m_sheet_observable_list->selected_index());
+            if (config.hw_config->sheet.id == selected_sheet_def.id) {
+                config.hw_config->sheet =
+                    Preset::from_def(vendor_bundle.vendor_data, selected_sheet_def);
+            }
         }
         config.hw_config->name = Domain::Preset::
             suggest_name(config.hw_config.value(), vendor_bundle.vendor_data, false);
