@@ -26,7 +26,6 @@ public:
         m_actions[UserAccountActionID::TestAccessToken] = std::make_unique<UserAccountActionGetWithEvent>("TEST_ACCESS_TOKEN", sc.account_me_url(), ActionSuccessType::UserID, ActionFailType::Fail);
         //m_actions[UserAccountActionID::TestConnection] = std::make_unique<UserAccountActionGetWithEvent>("TEST_CONNECTION", sc.account_me_url(), ActionSuccessType::None, ActionFailType::Reset);
         m_actions[UserAccountActionID::Avatar] = std::make_unique<UserAccountActionGetWithEvent>("AVATAR", std::string(), ActionSuccessType::Avatar, ActionFailType::Fail, false);
-        m_actions[UserAccountActionID::ConnectStatus] = std::make_unique<UserAccountActionGetWithEvent>("CONNECT_STATUS", sc.connect_status_url(), ActionSuccessType::ConnectStatus, ActionFailType::Fail);
         m_actions[UserAccountActionID::ConnectPrinterModels] = std::make_unique<UserAccountActionGetWithEvent>("CONNECT_PRINTER_MODELS", sc.connect_printer_list_url(), ActionSuccessType::ConnectPrinterModels, ActionFailType::Fail);
         m_actions[UserAccountActionID::ConnectDataFromUuid] = std::make_unique<UserAccountActionGetWithEvent>("CONNECT_DATA_FROM_UUID", sc.connect_printers_url(), ActionSuccessType::PrinterData, ActionFailType::PrinterData);
 	}

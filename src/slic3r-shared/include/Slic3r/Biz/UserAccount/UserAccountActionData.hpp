@@ -17,12 +17,10 @@ enum class UserAccountActionID {
     UserIdAfterTokenSuccess,
     TestAccessToken,
     TestConnection,
-    ConnectStatus, // status of all printers by UUID
     ConnectPrinterModels, // status of all printers by UUID with printer_model. Should be called once to save printer models.
     Avatar,
     ConnectDataFromUuid,
-    PrintablesSecretToken,
-    ConnectPrinterStates
+    PrintablesSecretToken
 };
 
 struct ActionQueueData

@@ -21,8 +21,7 @@ public:
     PrinterNozzleRow(
         size_t index,
         const Biz::Preset::ToolConfigItemObservableList& data,
-        Biz::Preset::PresetInteractor& preset_interactor,
-        const std::function<void(bool)>& validation_updated = nullptr
+        Biz::WeakerPointer<Biz::Preset::ToolConfigItemCompoundObservableList> tool_observable_list
     );
 
     Callbacks& callbacks();
@@ -34,7 +33,7 @@ public:
 private:
     using ComboBoxTools = Yoga::ComboBoxListViewSelection<Domain::Preset::HwToolConfigDef>;
 
-    Biz::Preset::PresetInteractor& m_preset_interactor;
+    Biz::WeakerPointer<Biz::Preset::ToolConfigItemCompoundObservableList> m_tool_observable_list;
     Yoga::Text* m_text_index   = nullptr;
     ComboBoxTools* m_combo_box = nullptr;
     Callbacks m_callbacks;

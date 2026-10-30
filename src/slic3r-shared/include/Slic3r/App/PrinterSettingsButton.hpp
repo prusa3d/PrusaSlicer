@@ -2,14 +2,19 @@
 
 #include "Slic3r/App/Yoga/RectangleButton.hpp"
 #include "Slic3r/App/Render/ImguiTypes.hpp"
+#include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
+
+#include <optional>
 
 namespace Slic3r::App::Yoga {
-
 class Icon;
 class Text;
 class LayoutButton;
+} // namespace Slic3r::App::Yoga
 
-class PrinterSettingsButton : public RectangleButton
+namespace Slic3r::App {
+
+class PrinterSettingsButton : public Yoga::RectangleButton
 {
 public:
     explicit PrinterSettingsButton(const std::string& tooltip = {});
@@ -18,6 +23,7 @@ public:
     void set_printer_name(const std::string& printer_name, bool is_modified = false);
     void set_preset_name(const std::string& preset_name);
     void set_printing_state(int state);
+    void set_connect_indicator(std::optional<Biz::ConnectPrinter::ConnectPrinterState> state);
 
     void set_visible_printer(bool is_visible);
     std::function<void()>& on_printer();
@@ -31,23 +37,25 @@ protected:
 
     virtual void update_btns_visibility();
 
-    LayoutButton* add_button(Render::Icon icon, const std::string& tooltip);
-    Icon* add_extra_icon(Render::Icon icon);
+    Yoga::LayoutButton* add_button(Render::Icon icon, const std::string& tooltip);
+    Yoga::Icon* add_extra_icon(Render::Icon icon);
 
 protected:
-    Icon* m_icon{nullptr};
-    Item* m_texts_wrapper{nullptr};
-    Item* m_btn_wrapper{nullptr};
-    Text* m_preset_name{nullptr};
-    LayoutButton* m_cog_btn{nullptr};
+    Yoga::Icon* m_icon{nullptr};
+    Yoga::Item* m_texts_wrapper{nullptr};
+    Yoga::Item* m_btn_wrapper{nullptr};
+    Yoga::Text* m_printer_name{nullptr};
+    Yoga::Text* m_preset_name{nullptr};
+    Yoga::LayoutButton* m_cog_btn{nullptr};
 
     bool m_is_visible_cog{false};
 
 private:
-    Text* m_printer_name{nullptr};
-    LayoutButton* m_printers_btn{nullptr};
+    Yoga::LayoutButton* m_printers_btn{nullptr};
+    Yoga::LayoutButton* m_state_btn{nullptr};
+    Yoga::Icon* m_connect_icon{nullptr};
 
     bool m_is_visible_printers{false};
 };
 
-} // namespace Slic3r::App::Yoga
+} // namespace Slic3r::App

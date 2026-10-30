@@ -1,16 +1,19 @@
 #include "Slic3r/App/SidebarBed.hpp"
 
 #include "Slic3r/App/Yoga/Text.hpp"
-#include "Slic3r/App/Yoga/PrinterSettingsButton.hpp"
+#include "Slic3r/App/PrinterSettingsButton.hpp"
+#include "Slic3r/App/Yoga/ComboBox.hpp"
 #include "Slic3r/App/Navigator.hpp"
-#include "Slic3r/App/LogicalPrinterSettingsDialog.hpp"
-#include "Slic3r/App/PhysicalPrinterSettingsDialog.hpp"
 #include "Slic3r/App/Material/MaterialSelectionDialog.hpp"
 #include "Slic3r/App/Material/MaterialSettingsDialog.hpp"
 #include "Slic3r/App/PrinterAddDialog.hpp"
+#include "Slic3r/App/PrinterSettingsDialog.hpp"
+#include "Slic3r/App/ColorMix/ColorMixDialog.hpp"
+#include "Slic3r/App/PrinterAdvancedSettingsDialog.hpp"
 
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
+#include "Slic3r/Biz/Preset/PresetSelectionCheck.hpp"
 
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/IDialogManager.hpp"
@@ -24,13 +27,20 @@ namespace Slic3r::App {
 SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& navigator) :
     Window("SidebarBed"),
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
+    m_physical_printer_changed_listener_scope(project_interactor.physical_printer_interactor(), *this),
     m_project_interactor(project_interactor),
     m_navigator(navigator)
 {
     set_transparent(true);
-    m_printer_add_dialog              = emplace_back<PrinterAddDialog>(m_project_interactor);
-    m_logical_printer_settings_dialog = emplace_back<
-        LogicalPrinterSettingsDialog>(project_interactor, m_printer_add_dialog, m_navigator);
+    m_printer_add_dialog = emplace_back<PrinterAddDialog>(m_project_interactor, m_navigator);
+    m_printer_settings_dialog =
+        emplace_back<PrinterSettingsDialog>(project_interactor, m_printer_add_dialog, m_navigator);
+
+    m_advanced_dialog =
+        emplace_back<PrinterAdvancedSettingsDialog>(project_interactor, m_navigator);
+    m_advanced_dialog->attach_to_item(this, Position::Left);
+
+    m_color_mix_dialog = emplace_back<ColorMix::ColorMixDialog>(project_interactor, m_navigator);
 
     m_material_selection_dialog =
         emplace_back<MaterialSelectionDialog>(project_interactor, m_navigator);
@@ -52,27 +62,105 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
     m_logical_printer_button->set_flex_grow(1.f);
     m_logical_printer_button->set_visible_cog(true);
 
-    m_logical_printer_settings_dialog
-        ->attach_to_item(m_logical_printer_button, Position::Left, 40_fpx, AlignU::Start);
-    m_logical_printer_settings_dialog->callbacks().opened = [this]()
-    { m_logical_printer_button->set_checked(true); };
-    m_logical_printer_settings_dialog->callbacks().closed = [this]()
-    { m_logical_printer_button->set_checked(false); };
+    Item* preset_row = emplace_back<Item>();
+    preset_row->set_gap(5_fpx);
 
-    auto toggle_logical_printer_settings_dialog = [this]()
+    Text* preset_label = preset_row->emplace_back<Text>(Biz::_u8L("Preset"));
+    preset_label->set_align({AlignH::Left, AlignV::Center});
+    m_preset_combo_box = preset_row->emplace_back<PresetComboBox>();
+    m_preset_combo_box->set_object_name("PresetComboBox");
+    m_preset_combo_box->set_flex_grow(1);
+    m_preset_combo_box->set_get_name_fn([](const Biz::Preset::PresetItem* preset_item)
+                                        { return preset_item->ui_preset_name(); });
+    m_preset_combo_box->set_source_list(
+        &m_project_interactor.preset_interactor().printer_presets()
+    );
+    m_preset_combo_box->callbacks().selection_changed = [this](int index)
     {
-        if (m_logical_printer_settings_dialog->opened()) {
+        const Biz::Preset::PresetItem& preset =
+            m_project_interactor.preset_interactor().printer_presets().items().at(index);
+        if (!Biz::Preset::PresetSelectionCheck::can_select_printer_preset(
+                m_project_interactor.preset_interactor(),
+                preset.hw_printer_config_id,
+                preset.id
+            ))
+        {
+            return;
+        }
+
+        m_project_interactor.preset_interactor()
+            .select_printer_preset(preset.hw_printer_config_id, preset.id, true);
+        m_project_interactor.undo_provider().take_snapshot(
+            Biz::UndoSnapshotType::SelectPrinterPreset
+        );
+    };
+
+    LayoutButton* button_advanced_setting = preset_row->emplace_back<LayoutButton>(
+        std::string{},
+        Render::Icon::Cog,
+        Biz::_u8L("Preset settings")
+    );
+    button_advanced_setting->set_background_color(Platform::Color::ButtonTransparent);
+    button_advanced_setting->set_content_padding(5_fpx);
+    button_advanced_setting->callbacks().action = [this]
+    {
+        if (m_advanced_dialog->opened()) {
             m_navigator.set_opened_dialog(nullptr);
         } else {
-            m_navigator.set_opened_dialog(m_logical_printer_settings_dialog);
+            m_navigator.set_opened_dialog(m_advanced_dialog);
         }
     };
-    m_logical_printer_button->callbacks().action = [toggle_logical_printer_settings_dialog]()
-    { toggle_logical_printer_settings_dialog(); };
-    m_logical_printer_button->on_cog() = [toggle_logical_printer_settings_dialog, this]()
+    m_advanced_dialog->callbacks().opened = [button_advanced_setting]
+    { button_advanced_setting->set_checked(true); };
+    m_advanced_dialog->callbacks().closed = [button_advanced_setting]
+    { button_advanced_setting->set_checked(false); };
+
+    m_color_mix_dialog->attach_to_center();
+
+    m_color_mix_button = preset_row->emplace_back<LayoutButton>(std::string{},
+        Render::Icon::Palette,
+        Biz::_u8L("Color mix settings")
+    );
+    m_color_mix_button->set_background_color(Platform::Color::ButtonTransparent);
+    m_color_mix_button->set_content_padding(5_fpx);
+    m_color_mix_button->callbacks().action = [this]
     {
-        toggle_logical_printer_settings_dialog();
-        m_logical_printer_settings_dialog->select_page_settings();
+        if (m_color_mix_dialog->opened()) {
+            m_navigator.set_opened_dialog(nullptr);
+        } else {
+            m_navigator.set_opened_dialog(m_color_mix_dialog);
+        }
+    };
+    m_color_mix_dialog->callbacks().opened = [this] { m_color_mix_button->set_checked(true); };
+    m_color_mix_dialog->callbacks().closed = [this] { m_color_mix_button->set_checked(false); };
+
+    this->update_color_mix_visibility();
+
+    m_printer_settings_dialog
+        ->attach_to_item(m_logical_printer_button, Position::Left, 40_fpx, AlignU::Start);
+    m_printer_settings_dialog->callbacks().opened = [this]()
+    { m_logical_printer_button->set_checked(true); };
+    m_printer_settings_dialog->callbacks().closed = [this]()
+    { m_logical_printer_button->set_checked(false); };
+
+    auto toggle_printer_settings_dialog = [this]()
+    {
+        if (m_printer_settings_dialog->opened()) {
+            m_navigator.set_opened_dialog(nullptr);
+        } else {
+            m_navigator.set_opened_dialog(m_printer_settings_dialog);
+        }
+    };
+    m_logical_printer_button->callbacks().action = [toggle_printer_settings_dialog]()
+    { toggle_printer_settings_dialog(); };
+    m_logical_printer_button->on_cog() = [toggle_printer_settings_dialog, this]()
+    {
+        toggle_printer_settings_dialog();
+        if (const Biz::PhysicalPrinter::PhysicalPrinterConfig* physical_printer =
+                m_project_interactor.physical_printer_interactor().selected_physical_printer_data())
+        {
+            m_printer_settings_dialog->select_page_settings(*physical_printer);
+        }
     };
 
     m_list_view = emplace_back<MaterialListView>(MaterialListViewFactory{
@@ -87,10 +175,15 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
                 );
             }
         },
-        [toggle_logical_printer_settings_dialog, this](size_t index)
+        [toggle_printer_settings_dialog, this](size_t index)
         {
-            toggle_logical_printer_settings_dialog();
-            m_logical_printer_settings_dialog->select_page_settings();
+            toggle_printer_settings_dialog();
+            if (const Biz::PhysicalPrinter::PhysicalPrinterConfig* physical_printer =
+                    m_project_interactor.physical_printer_interactor()
+                        .selected_physical_printer_data())
+            {
+                m_printer_settings_dialog->select_page_settings(*physical_printer);
+            }
         },
         m_project_interactor
     });
@@ -179,31 +272,7 @@ void SidebarBed::on_list_selection_changed(Domain::SelectionId new_selection)
         return;
     }
 
-    const auto& preset_interactor = m_project_interactor.preset_interactor();
-    const Biz::Preset::PresetItem& preset_item =
-        preset_interactor.printer_presets().items().at(new_selection);
-
-    const bool is_modified_preset = preset_interactor.is_printer_preset_selected_and_dirty(
-        preset_item.hw_printer_config_id,
-        preset_item.id
-    );
-
-    m_selected_printer_preset_name = preset_item.ui_preset_name();
-    m_logical_printer_button->set_printer_name(m_selected_printer_preset_name, is_modified_preset);
-    m_logical_printer_button->set_preset_name(preset_item.ui_hw_config_name());
-    m_logical_printer_button->set_tooltip(
-        preset_item.ui_preset_name() + "\n" + preset_item.ui_hw_config_name()
-    );
-
-    const Domain::Preset::HwPrinterConfig& printer_config =
-        preset_interactor.current_printer_config();
-
-    if (printer_config.visual.thumbnail.has_value()) {
-        const std::string image_path =
-            printer_config.relative_path_to_assets() + printer_config.visual.thumbnail.value();
-
-        m_logical_printer_button->set_image(image_path);
-    }
+    update_printer_button();
 }
 
 void SidebarBed::on_selected_bed_instances_changed(
@@ -218,8 +287,9 @@ void SidebarBed::on_selected_bed_instances_changed(
     }
 
     Domain::BedInstance* bed_instance =
-        m_project_interactor.selected_project()
-            .find_bed_instance_by_id(bed_selection.last_selected_bed().instance_id);
+        m_project_interactor.selected_project().find_bed_instance_by_id(
+            bed_selection.last_selected_bed().instance_id
+        );
 
     ASSERT(bed_instance);
 
@@ -231,6 +301,24 @@ void SidebarBed::refresh_printer_label_color()
     bool is_modified_preset =
         m_project_interactor.preset_interactor().printer_cbi().config_box_list().lock()->is_dirty();
     m_logical_printer_button->set_printer_name(m_selected_printer_preset_name, is_modified_preset);
+}
+
+void SidebarBed::update_color_mix_visibility()
+{
+    bool can_mix_colors = false;
+    if (m_project_interactor.selected_config_container_id() != Domain::INVALID_ID) {
+        const Domain::ConfigContainer& config_container =
+            m_project_interactor.selected_config_container();
+
+        can_mix_colors = config_container.print_technology() == Domain::PrinterTechnology::FFF
+            && config_container.selected_preset().hw_config.material_slot_count() > 1;
+    }
+
+    m_color_mix_button->set_visible(can_mix_colors);
+
+    if (!can_mix_colors && m_color_mix_dialog->opened()) {
+        m_navigator.set_opened_dialog(nullptr);
+    }
 }
 
 void SidebarBed::update_purging_volumes_button_visibility()
@@ -245,14 +333,63 @@ void SidebarBed::update_purging_volumes_button_visibility()
     const Domain::Preset::SelectedPreset& selected_preset = cc.selected_preset();
     const bool has_wipe_tower =
         selected_preset.print.config_box().items.opt("wipe_tower").get<bool>();
-    const bool has_single_extruder_multi_material =
-        selected_preset.printer.config_box()
-            .items.opt("single_extruder_multi_material")
-            .get<bool>();
-    const bool has_multi_materials = selected_preset.materials.size() > 1;
+    const bool has_single_extruder_multi_material = selected_preset.printer.config_box()
+                                                        .items.opt("single_extruder_multi_material")
+                                                        .get<bool>();
+    const bool has_multi_materials                = selected_preset.materials.size() > 1;
     m_purging_volumes_button->set_visible(
         has_wipe_tower && has_multi_materials && has_single_extruder_multi_material
     );
+}
+
+void SidebarBed::update_printer_button()
+{
+    const auto& preset_interactor              = m_project_interactor.preset_interactor();
+    const Biz::Preset::PresetItem& preset_item = preset_interactor.printer_presets().items().at(
+        preset_interactor.printer_presets().selected_index()
+    );
+
+    const bool is_modified_preset = preset_interactor.is_printer_preset_selected_and_dirty(
+        preset_item.hw_printer_config_id,
+        preset_item.id
+    );
+
+    const Biz::PhysicalPrinter::PhysicalPrinterConfig* physical_printer =
+        m_project_interactor.physical_printer_interactor().selected_physical_printer_data();
+
+    m_selected_printer_preset_name = physical_printer
+        ? Biz::PhysicalPrinter::ui_name(*physical_printer)
+        : preset_item.ui_preset_name();
+    m_logical_printer_button->set_printer_name(m_selected_printer_preset_name, is_modified_preset);
+    m_logical_printer_button->set_visible_cog(
+        !physical_printer
+        || (!physical_printer->is_runtime && !Biz::PhysicalPrinter::is_connect_printer(*physical_printer))
+    );
+    const auto* connect_upload = physical_printer
+        ? std::get_if<Biz::PhysicalPrinter::ConnectUpload>(&physical_printer->payload)
+        : nullptr;
+    m_logical_printer_button->set_connect_indicator(
+        connect_upload ? std::optional{connect_upload->state} : std::nullopt
+    );
+    m_logical_printer_button->set_preset_name(preset_item.ui_hw_config_name());
+    m_logical_printer_button->set_tooltip(
+        fmt::format(
+            "{}\n{}\n{}",
+            m_selected_printer_preset_name,
+            preset_item.ui_preset_name(),
+            preset_item.ui_hw_config_name()
+        )
+    );
+
+    const Domain::Preset::HwPrinterConfig& printer_config =
+        preset_interactor.current_printer_config();
+
+    if (printer_config.visual.thumbnail.has_value()) {
+        const std::string image_path =
+            printer_config.relative_path_to_assets() + printer_config.visual.thumbnail.value();
+
+        m_logical_printer_button->set_image(image_path);
+    }
 }
 
 void SidebarBed::on_preset_value_changed(
@@ -286,20 +423,45 @@ void SidebarBed::on_preset_bundles_loaded()
     refresh_printer_label_color();
 }
 
+void SidebarBed::on_hw_item_selection_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    Biz::Preset::HwItemType type
+)
+{
+    if (m_project_interactor.selected_project_id() == project_id
+        && m_project_interactor.selected_config_container_id() == config_container_id
+        && type == Biz::Preset::HwItemType::ToolItem)
+    {
+        update_color_mix_visibility();
+    }
+}
+
 void SidebarBed::on_preset_selection_changed(
     Domain::SelectionId project_id,
     Domain::SelectionId config_container_id,
     Biz::Preset::PresetItemType type
 )
 {
+    update_color_mix_visibility();
     if (m_project_interactor.selected_project_id() == project_id) {
         update_purging_volumes_button_visibility();
     }
 }
 
-LogicalPrinterSettingsDialog& SidebarBed::logical_printer_settings_dialog()
+void SidebarBed::on_selected_physical_printer_changed()
 {
-    return *m_logical_printer_settings_dialog;
+    update_printer_button();
+}
+
+void SidebarBed::on_selected_physical_printer_updated()
+{
+    update_printer_button();
+}
+
+PrinterSettingsDialog& SidebarBed::logical_printer_settings_dialog()
+{
+    return *m_printer_settings_dialog;
 }
 
 PrinterAddDialog& SidebarBed::printer_add_dialog()
@@ -310,6 +472,16 @@ PrinterAddDialog& SidebarBed::printer_add_dialog()
 MaterialSelectionDialog& SidebarBed::material_selection_dialog()
 {
     return *m_material_selection_dialog;
+}
+
+ColorMix::ColorMixDialog& SidebarBed::color_mix_dialog()
+{
+    return *m_color_mix_dialog;
+}
+
+PrinterAdvancedSettingsDialog& SidebarBed::printer_advanced_settings_dialog()
+{
+    return *m_advanced_dialog;
 }
 
 } // namespace Slic3r::App

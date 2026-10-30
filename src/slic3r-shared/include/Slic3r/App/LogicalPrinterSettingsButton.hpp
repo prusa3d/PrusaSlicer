@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Slic3r/App/Yoga/PrinterSettingsButton.hpp"
+#include "Slic3r/App/PrinterSettingsButton.hpp"
 
 #include "Slic3r/Biz/Platform/ListenerScope.hpp"
 #include "Slic3r/Biz/DataObserver.hpp"
@@ -13,7 +13,7 @@ class LayoutButton;
 namespace Slic3r::App {
 
 class LogicalPrinterSettingsButton :
-    public Yoga::PrinterSettingsButton,
+    public PrinterSettingsButton,
     public Biz::DataObserver<Biz::Preset::PresetItem>,
     public Biz::IListSelectionChangedListener
 {

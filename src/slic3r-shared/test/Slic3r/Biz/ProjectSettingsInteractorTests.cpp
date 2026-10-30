@@ -100,13 +100,13 @@ struct ProjectSettingsInteractorFixture
     void select_printer(Predicate&& predicate)
     {
         auto& preset_interactor = project_interactor.preset_interactor();
-        const auto& printer_items = preset_interactor.printer_presets().items();
+        const auto& printer_items = preset_interactor.printer_configs().items();
         for (size_t i = 0, n = printer_items.size(); i < n; ++i) {
             const auto& item = printer_items.at(i);
             const auto& hw_config =
                 workbench.preset_bundle().printer_configs.at(item.hw_printer_config_id);
             if (predicate(hw_config)) {
-                preset_interactor.select_printer_preset(item.hw_printer_config_id, item.id);
+                preset_interactor.select_printer_config(item.hw_printer_config_id);
                 return;
             }
         }

@@ -399,6 +399,11 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn = []() { return Domain::ConfigValue(std::string()); };
 
+    def = defs.add("last_used_export_destination", typeid(std::string));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(std::string()); };
+
     // TODO: This option needs check after changed field in Preferences.
     def = defs.add("downloads_directory", typeid(std::string));
     def->location = Domain::AppConfigLocation{};
@@ -602,6 +607,11 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->init_fn  = []() { return Domain::ConfigValue{false}; };
 
     def = defs.add("last_material_selection_dialog_tab", typeid(int));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue{0}; };
+
+    def = defs.add("last_printer_settings_dialog_filter", typeid(int));
     def->location = Domain::AppConfigLocation{};
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn  = []() { return Domain::ConfigValue{0}; };

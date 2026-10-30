@@ -1,0 +1,11 @@
+{
+  "base_model" : "SL1",
+  "connect_state" : "OFFLINE",
+  "legacy_printer_model" : "SL1S",
+  "model" : "SL1S",
+  "name" : "SLA1S_DEV_FW_1.8.0-beta.0",
+  "supported_printer_models" : [ ],
+  "tool_count" : 1,
+  "tools" : { },
+  "uuid" : "00000000-0000-0000-0000-000000000000"
+}

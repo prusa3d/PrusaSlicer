@@ -9,7 +9,6 @@ enum class ActionSuccessType
     None,
     UserID,
     UserIDAfterToken,
-    ConnectStatus,
     ConnectPrinterModels,
     Avatar,
     PrinterData,

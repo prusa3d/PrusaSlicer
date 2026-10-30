@@ -257,16 +257,17 @@ void UserAccountCommunicationTokenBase::init_session_thread()
 void UserAccountCommunicationTokenBase::do_clear(bool notify_owner)
 {
     m_session.do_clear(notify_owner);
-    on_username_changed({}, true);
+    on_username_changed({}, {}, true);
     stop_all_timers();
     m_next_token_refresh_at       = 0;
     m_last_token_duration_seconds = 0;
     refresh_token_from_store.clear();
 }
 
-void UserAccountCommunicationTokenBase::on_username_changed(const std::string& username, bool store)
+void UserAccountCommunicationTokenBase::on_username_changed(const std::string& username, const std::string& id, bool store)
 {
     m_username = username;
+    m_user_id = id;
     m_session.set_has_username(!username.empty());
     if (!store && !username.empty()) {
         return;

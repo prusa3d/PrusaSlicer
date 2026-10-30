@@ -1,26 +1,21 @@
 #pragma once
 
 #include "Slic3r/Domain/ConfigPhysical.hpp"
-#include "Slic3r/Biz/ObservableListWithSelection.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
-
-#include "Slic3r/Biz/I18N/I18N.hpp"
-
-#include <string_view>
+#include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
 
 namespace Slic3r::Biz::PhysicalPrinter {
 
-inline constexpr std::string_view LOCAL_DRIVE_UUID     = "00000000-0000-0000-0000-000000000001";
-inline constexpr std::string_view REMOVABLE_DRIVE_UUID = "00000000-0000-0000-0000-000000000002";
-inline constexpr std::string_view PRUSA_CONNECT_UUID   = "00000000-0000-0000-0000-000000000003";
-
-struct ConnectUpload {
+struct ConnectUpload
+{
     std::string team_id;
     std::string printer_uuid;
     std::string access_token; // needs to be filled before upload
+    ConnectPrinter::ConnectPrinterState state{ConnectPrinter::ConnectPrinterState::Unknown};
 };
 
-struct PrinterUpload {
+struct PrinterUpload
+{
     Domain::PrintHostType type;
     std::string api_key;
     std::string username;
@@ -31,29 +26,43 @@ struct PrinterUpload {
     bool ssl_revoke_best_effort{false};
 };
 
-struct FileSystemExport {
+struct FileSystemExport
+{
     bool prefer_removable;
 };
 
-struct PhysicalPrinterConfig {
+struct PhysicalPrinterConfig
+{
     std::variant<FileSystemExport, ConnectUpload, PrinterUpload> payload;
     std::string host;
     std::string name;
     std::string uuid;
-    Domain::Preset::HwPrinterConfig hw_config;
+    std::optional<Domain::Preset::HwPrinterConfig> hw_config;
+    /// Created for a project loaded from 3mf, never stored nor editable.
+    bool is_runtime{false};
 };
 
-PhysicalPrinterConfig filesystem_export_local();
-PhysicalPrinterConfig filesystem_export_removable();
-PhysicalPrinterConfig connect_upload_generic();
+/// Name for the UI, marks runtime printers.
+std::string ui_name(const PhysicalPrinterConfig& printer);
 
-/// True for the fixed uuids of the synthetic entries above; a stored printer must never use them.
-bool is_reserved_uuid(const std::string& uuid);
+bool is_connect_printer(const PhysicalPrinterConfig& printer);
+
+/**
+ * @brief Load external hw config from Connect JSON
+ * @param json Connect JSON describing the printer
+ * @return External hw config (containing only info available in Connect JSON).
+ */
+std::optional<Domain::Preset::HwPrinterConfig> hw_config_from_connect_json(std::string_view json);
+
+/// Connect printer whose data did not resolve to a known printer model, so it is unknown which
+/// logical printer preset belongs to it.
+bool has_unresolved_model(const PhysicalPrinterConfig& printer);
 
 std::string physical_printer_type_to_string(const PhysicalPrinterConfig& data);
 
-bool is_physical_printer_compatible(const PhysicalPrinterConfig& physical_config, const Domain::Preset::HwPrinterConfig& hw_config);
+bool is_physical_printer_compatible(
+    const PhysicalPrinterConfig& physical_config,
+    const Domain::Preset::HwPrinterConfig& hw_config
+);
 
-using PhysicalPrinterObservableList = ObservableListWithSelection<PhysicalPrinterConfig>;
-
-} //namespace Slic3r::Biz::PhysicalPrinter
+} // namespace Slic3r::Biz::PhysicalPrinter

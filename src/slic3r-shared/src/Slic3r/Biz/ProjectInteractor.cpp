@@ -209,6 +209,7 @@ tl::expected<SelectionId, std::string> ProjectInteractor::do_load_project(
                 return report_error(result.error());
             }
         }
+        m_physical_printer_interactor.load_physical_printers_from_3mf(project_id);
 
         if (added_project.config_containers().empty()) {
             added_project.config_containers().emplace_back(std::make_unique<ConfigContainer>());
@@ -987,11 +988,11 @@ void ProjectInteractor::do_result_export(
 {
     set_output_dir(id.project_id, dest_path);
     set_output_extension(id.project_id, dest_path.extension().string());
-    m_physical_printer_interactor.remember_used_destination(std::string(
+    m_export_destination_interactor.remember_used(
         m_removable_drive_service.is_path_on_removable_drive(dest_path) ?
-            PhysicalPrinter::REMOVABLE_DRIVE_UUID :
-            PhysicalPrinter::LOCAL_DRIVE_UUID
-    ));
+            ExportDestination::ExportDestination::RemovableDrive :
+            ExportDestination::ExportDestination::LocalDrive
+    );
     PhysicalPrinter::PhysicalPrinterConfig config;
     config.payload = PhysicalPrinter::FileSystemExport{};
     PrintHost::PrintHostJobData data{std::monostate{}, dest_path};
@@ -1007,7 +1008,8 @@ void ProjectInteractor::do_result_upload(
 )
 {
     set_output_extension(id.project_id, boost::filesystem::path(filename).extension().string());
-    m_physical_printer_interactor.remember_used_destination(print_host_config.uuid);
+    m_export_destination_interactor.remember_used(ExportDestination::ExportDestination::PrintHost);
+    m_physical_printer_interactor.remember_used_printer(print_host_config.uuid);
     PhysicalPrinter::PhysicalPrinterConfig config {print_host_config};
     boost::filesystem::path dest_path(filename);
     PrintHost::PrintHostJobData data{std::monostate{}, dest_path};
@@ -1038,7 +1040,8 @@ void ProjectInteractor::do_result_upload_connect(
         filename = filename_override;
     }
 
-    m_physical_printer_interactor.remember_used_destination(std::string(PhysicalPrinter::PRUSA_CONNECT_UUID));
+    m_export_destination_interactor.remember_used(ExportDestination::ExportDestination::Connect);
+    m_physical_printer_interactor.remember_used_printer(m_physical_printer_interactor.selected_uuid());
     set_output_extension(id.project_id, boost::filesystem::path(filename).extension().string());
     PrintHost::PrintHostJobData data{std::monostate{}, filename};
     data.request_body_json = std::move(body_json);

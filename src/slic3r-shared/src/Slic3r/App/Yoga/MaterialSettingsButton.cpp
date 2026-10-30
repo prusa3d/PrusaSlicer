@@ -26,6 +26,10 @@ MaterialSettingsButton::MaterialSettingsButton(
     RectangleButton(),
     Biz::DataObserver<Biz::Preset::PresetItemObservableList>(index, state),
     m_colors_changed_listener_scope(project_interactor.project_settings_interactor(), *this),
+    m_physical_printer_changed_listener_scope(
+        project_interactor.physical_printer_interactor(),
+        *this
+    ),
     m_button_group(button_group),
     m_on_cog_clicked(on_cog_clicked),
     m_on_nozzle_clicked(on_nozzle_clicked),
@@ -113,10 +117,11 @@ MaterialSettingsButton::MaterialSettingsButton(
     m_nozzle_btn->set_content_align_items(YGAlignCenter);
     m_nozzle_btn->callbacks().action = [this]()
     {
-        if (m_on_nozzle_clicked) {
+        if (m_nozzle_changeable && m_on_nozzle_clicked) {
             m_on_nozzle_clicked(m_index);
         }
     };
+    update_nozzle_button_state();
 
     on_data_update();
 
@@ -282,6 +287,26 @@ void MaterialSettingsButton::hovered_updated_internal()
 void MaterialSettingsButton::update_cog_visibility()
 {
     m_cog_btn->set_visible(this->hovered() || m_cog_btn->hovered());
+}
+
+void MaterialSettingsButton::on_selected_physical_printer_changed()
+{
+    update_nozzle_button_state();
+}
+
+void MaterialSettingsButton::update_nozzle_button_state()
+{
+    m_nozzle_changeable =
+        !m_project_interactor.physical_printer_interactor().is_connect_printer_selected();
+
+    if (m_nozzle_changeable) {
+        m_nozzle_btn->set_background_color(Platform::Color::Button);
+        m_nozzle_btn->set_tooltip(_u8L("Change nozzle size"));
+    } else {
+        const ImColor background = m_theme->color_imgui(Platform::Color::Button);
+        m_nozzle_btn->set_background_color(background, background);
+        m_nozzle_btn->set_tooltip({});
+    }
 }
 
 void MaterialSettingsButton::on_preset_value_changed(

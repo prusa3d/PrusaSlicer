@@ -156,6 +156,11 @@ public:
     const Domain::Preset::EvaluatedPrinterPreset::Preset& current_printer_preset() const;
     const Domain::Preset::SelectedPreset& selected_printer_preset() const;
 
+    PresetItemObservableList& printer_configs()
+    {
+        return m_printer_configs;
+    }
+
     PresetItemObservableList& printer_presets()
     {
         return m_printer_presets;
@@ -224,6 +229,10 @@ public:
         return m_object_settings_interactor;
     }
 
+    void select_printer_config(
+        const std::string& printer_hw_config_id
+    );
+
     /**
      * @param user - set this to true if action came from user (e.g. clicking a button)
      * so this would invalidate Project in a BackupStore
@@ -275,10 +284,6 @@ public:
         const std::optional<std::string>& vendor_id = std::nullopt
     ) const override;
 
-    [[nodiscard]] const Domain::Preset::FeatureDefs* get_vendor_tool_feature_defs(
-        const std::optional<std::string>& vendor_id = std::nullopt
-    ) const;
-
     virtual boost::filesystem::path selected_user_preset_path(
         Domain::Preset::PresetKind kind,
         const std::string& preset_name
@@ -289,6 +294,33 @@ public:
         Domain::SelectionId project_id,
         Domain::SelectionId container_id
     ) override;
+
+    bool validate_external_hw_config(const Domain::Preset::HwPrinterConfig&  hw_config) const;
+
+    /**
+     * @brief Find or create appropriate full hw config for given external one and select it
+     * @param printer External hw config
+     * @return void or error message why full hw config creation failed.
+     */
+    tl::expected<void, std::string> select_external_printer_config(
+        const Domain::Preset::HwPrinterConfig& printer
+    );
+
+    /**
+     * @brief Create full hw config from the preset bundle for given external one
+     * @param printer External hw config
+     * @return Full hw config or error message why its creation failed.
+     */
+    tl::expected<Domain::Preset::HwPrinterConfig, std::string> evaluate_external_printer_config(
+        const Domain::Preset::HwPrinterConfig& printer
+    ) const;
+
+    /**
+     * @brief Human readable summary of hw config
+     * @param hw_config Hw config to describe
+     * @return "Printer model / Tools / Sheet / Feeders", missing parts are skipped.
+     */
+    std::string ui_hw_config_summary(const Domain::Preset::HwPrinterConfig& hw_config) const;
 
     ConfigBoxInteractor& printer_cbi();
     PrintToolConfigBoxInteractor& print_tool_cbi();
@@ -902,7 +934,8 @@ private:
         const Domain::Preset::Bundle& preset_bundle,
         Domain::Preset::HwPrinterConfig& hw_config
     );
-
+    std::vector<Domain::Preset::EvaluatedPrinterPreset>
+    evaluate_presets_for_hw_config(const Domain::Preset::HwPrinterConfig& hw_config) const;
     /**
      * @brief Updates presets for changed hw configuration
      * @return Returns true if the updated presets are valid, otherwise false---the caller is then
@@ -931,6 +964,11 @@ private:
         ListenerInvokeLaterBag& bag
     );
 
+    void select_printer_config_internal(
+        const std::string& printer_hw_config_id,
+        bool no_data_update,
+        ListenerInvokeLaterBag& bag
+    );
     void select_printer_preset_internal(
         const std::string& printer_hw_config_id,
         const std::string printer_preset_id,
@@ -960,6 +998,7 @@ private:
     bool tool_print_has_unsaved_changes(size_t tool_index) const;
     bool material_has_unsaved_changes(size_t tool_index) const;
 
+    void fill_printer_configs(bool no_data_update, ListenerInvokeLaterBag& bag);
     void fill_printer_presets(bool no_data_update, ListenerInvokeLaterBag& bag);
     void fill_print_presets(
         const Domain::Preset::SelectedPreset& selected_preset,
@@ -989,7 +1028,7 @@ private:
         Domain::SelectionId config_container_id
     );
 
-    void duplicate_hw_config_if_needed_and_update(Domain::Preset::HwPrinterConfig& hw_config, ListenerInvokeLaterBag& bag);
+    bool duplicate_hw_config_if_needed_and_update(Domain::Preset::HwPrinterConfig& hw_config, ListenerInvokeLaterBag& bag);
 
     void invoke_slicing_input_changed();
     void invoke_on_preset_value_changed(const Domain::ConfigItem& config_item);
@@ -1022,6 +1061,7 @@ private:
     BackupStore& m_backup_store;
     IO::BundlePaths m_bundle_paths;
 
+    PresetItemObservableList m_printer_configs;
     PresetItemObservableList m_printer_presets;
     PresetItemObservableList m_print_presets;
     PresetItemCompoundObservableList::WriteAccessor m_tool_print_presets_writer;

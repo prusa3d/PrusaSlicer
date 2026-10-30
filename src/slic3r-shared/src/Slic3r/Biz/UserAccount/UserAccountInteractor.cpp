@@ -143,6 +143,12 @@ std::string UserAccountInteractor::wait_for_access_token(
     return communication->wait_for_access_token(timeout, stop_token);
 }
 
+std::string UserAccountInteractor::user_id() const
+{
+    std::lock_guard<std::mutex> lock(m_communication_mutex);
+    return m_communication->user_id();
+}
+
 void UserAccountInteractor::request_printables_secret_token()
 {
     m_communication->request_printables_secret_token();
@@ -178,8 +184,6 @@ void UserAccountInteractor::on_action_success(ActionSuccessType success_type, st
         if (update_menu_callback) {
             update_menu_callback(false);
         }
-        break;
-    case Slic3r::Biz::UserAccount::ActionSuccessType::ConnectStatus:
         break;
     case Slic3r::Biz::UserAccount::ActionSuccessType::ConnectPrinterModels:
         break;
@@ -287,6 +291,8 @@ void UserAccountInteractor::on_user_id(const std::string& body)
             received_keys += key;
             if (value.is_string()) {
                 m_account_user_data[key] = value.get<std::string>();
+            } else if (value.is_number_integer()) {
+                m_account_user_data[key] = std::to_string(value.get<int>());
             }
         }
     } catch (const nlohmann::json::exception&) {
@@ -299,7 +305,8 @@ void UserAccountInteractor::on_user_id(const std::string& body)
         return;
     }
     std::string public_username = m_account_user_data["public_username"];
-    m_communication->on_username_changed(public_username, true);
+    const std::string id = m_account_user_data["id"];
+    m_communication->on_username_changed(public_username, id, true);
 
     if (m_account_user_data.find("email") != m_account_user_data.end()) {
         m_communication->on_email(m_account_user_data["email"]);
@@ -314,8 +321,6 @@ void UserAccountInteractor::on_user_id(const std::string& body)
     } else {
         SPDLOG_ERROR("User ID message from PrusaAuth did not contain avatar info.");
     }
-    // update printers list
-    // enqueue_connect_printer_models_action();
 
     invoke_listeners<IUserAccountListener>(
         [was_logged, public_username](auto* listener)

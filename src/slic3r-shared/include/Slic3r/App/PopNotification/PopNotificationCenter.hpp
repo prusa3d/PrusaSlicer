@@ -12,6 +12,7 @@
 #include "Slic3r/Biz/FileOpen/FileOpeningInteractor.hpp"
 #include "Slic3r/Biz/PrintHost/PrintHostJobInfoTag.hpp"
 #include "Slic3r/Biz/Connect/IConnectHandlerListener.hpp"
+#include "Slic3r/Biz/Preset/IPrinterPresetSelectorListener.hpp"
 #include "Slic3r/App/Platform/IFileExplorerErrorListener.hpp"
 #include "Slic3r/App/LeftBarTabs.hpp"
 #include "Slic3r/App/Lua/IPluginInstallationListener.hpp"
@@ -33,6 +34,7 @@ class PopNotificationCenter :
     public Biz::FileOpen::IFileOpenEventListener,
     public Biz::IArrangeEventsListener,
     public Biz::Connect::IConnectHandlerListener,
+    public Biz::Preset::IPrinterPresetSelectorListener,
     public Platform::IFileExplorerErrorListener,
     public Lua::IPluginInstallationListener
 {
@@ -109,6 +111,7 @@ public:
 
     // Connect Message Hander
     void on_connect_handler_error(const std::string& msg) override;
+    void on_printer_preset_selection_warning(const std::string& msg) override;
 
     // File explorer
     void on_file_explorer_error(

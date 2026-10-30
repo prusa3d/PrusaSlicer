@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/PrintHost/PrintHostPrusaLinkStorage.hpp"
 
 #include "Slic3r/Log.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
 
 #include "fmt/format.h"
 #include <nlohmann/json.hpp>

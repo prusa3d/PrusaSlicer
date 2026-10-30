@@ -153,7 +153,20 @@ public:
 
     void on_updated(const IndexRange& index_range) override
     {
-        search();
+        if (search()) {
+            return;
+        }
+        // Found items did not change, forward the update of the ones still found
+        for (size_t index = index_range.from; index <= index_range.to; ++index) {
+            const Data* data = &m_source_model->at(index);
+            auto it          = std::ranges::find(m_found_items, data);
+            if (it != m_found_items.cend()) {
+                const size_t found_index = size_t(std::distance(m_found_items.begin(), it));
+                this->template invoke_listeners<Biz::IListObserver<Data>>(
+                    [found_index](Biz::IListObserver<Data>* l) { l->on_updated({found_index}); }
+                );
+            }
+        }
     }
 
     void on_reset() override
@@ -179,7 +192,10 @@ public:
         }
     }
 
-    void search()
+    /**
+     * @return true if found items changed
+     */
+    bool search()
     {
         // If we do not have model just clear up everything and early return
         if (!m_source_model.is_valid()) {
@@ -191,8 +207,9 @@ public:
                 this->template invoke_listeners<Biz::IListObserver<Data>>(
                     [&](Biz::IListObserver<Data>* l) { l->on_reset(); }
                 );
+                return true;
             }
-            return;
+            return false;
         }
 
         auto cmp = [](const ScoreItem& a, const ScoreItem& b) { return a.score > b.score; };
@@ -253,7 +270,9 @@ public:
             this->template invoke_listeners<Biz::IListObserver<Data>>(
                 [&](Biz::IListObserver<Data>* l) { l->on_reset(); }
             );
+            return true;
         }
+        return false;
     }
 
     IObservableList<Data>* source_model() const

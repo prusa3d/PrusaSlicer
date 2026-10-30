@@ -11,25 +11,53 @@ class ComboBoxListViewSelection :
     public Biz::IListSelectionChangedListener
 {
 public:
-    void set_source_list(Biz::ObservableListWithSelection<Data>* source_list)
+    using Source        = Biz::ObservableListWithSelection<Data>;
+    using SourcePointer = Biz::WeakerPointer<Source>;
+
+public:
+    // Accept weak_ptr<Source> and weak_ptr<Derived>.
+    template <class Derived>
+        requires std::derived_from<Derived, Source>
+    void set_source_list(const std::weak_ptr<Derived>& source_list)
     {
-        if (m_source_selection_list) {
-            m_source_selection_list->template remove_listener<Biz::IListSelectionChangedListener>(
-                this
-            );
-        }
+        set_source_list(SourcePointer{std::weak_ptr<Source>{source_list}});
+    }
+
+    // Accept WeakerPointer<Derived>.
+    template <class Derived>
+        requires std::derived_from<Derived, Source>
+    void set_source_list(const Biz::WeakerPointer<Derived>& source_list)
+    {
+        set_source_list(SourcePointer{source_list});
+    }
+
+    // Accept raw pointers, including derived pointers and nullptr.
+    void set_source_list(Source* source_list)
+    {
+        set_source_list(SourcePointer{source_list});
+    }
+
+    // Single implementation for all input forms.
+    void set_source_list(const SourcePointer& source_list)
+    {
+        detach_selection_listener();
         m_source_selection_list = source_list;
 
-        if (m_source_selection_list) {
-            ComboBoxListView<Data>::set_source_list(&m_source_selection_list->items());
-            m_source_selection_list->template add_listener<Biz::IListSelectionChangedListener>(
-                this
-            );
+        if (auto* source = m_source_selection_list.get()) {
+            ComboBoxListView<Data>::set_source_list(&source->items());
+
+            source->template add_listener<Biz::IListSelectionChangedListener>(this);
+
             ComboBoxListView<Data>::on_reset();
-            on_list_selection_changed(m_source_selection_list->selected_index());
+            on_list_selection_changed(source->selected_index());
         } else {
             ComboBoxListView<Data>::set_source_list(nullptr);
         }
+    }
+
+    ~ComboBoxListViewSelection()
+    {
+        detach_selection_listener();
     }
 
     void on_list_selection_changed(Domain::SelectionId new_selection) override
@@ -38,7 +66,14 @@ public:
     }
 
 private:
-    Biz::ObservableListWithSelection<Data>* m_source_selection_list = nullptr;
+    void detach_selection_listener()
+    {
+        if (auto* source = m_source_selection_list.get()) {
+            source->template remove_listener<Biz::IListSelectionChangedListener>(this);
+        }
+    }
+
+    SourcePointer m_source_selection_list;
 };
 
 } // namespace Slic3r::App::Yoga

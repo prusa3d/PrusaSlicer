@@ -1,0 +1,6 @@
+kind: tool_print
+id: common MK4
+variants:
+- condition: printer.model=~/(MK4|MK3.9)/
+  name: no tool
+  id: B3a+8PtoRuKBjIXN9jAnzA

@@ -93,7 +93,6 @@ public:
     void on_project_saved(Domain::SelectionId project_id) override;
 
     void on_selected_physical_printer_changed() override;
-    void on_printer_data_changed() override;
 
     void on_menu_updated() override;
 private:

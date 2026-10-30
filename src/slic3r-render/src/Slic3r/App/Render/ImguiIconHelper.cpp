@@ -117,6 +117,7 @@ static const std::unordered_map<Icon, const char*> ICON_FILENAMES = {
 
     // Gizmo Paint-On-Supports
     {Icon::Circle, "circle"},
+    {Icon::CircleFull, "circle_full"},
     {Icon::Triangle, "triangle"},
     {Icon::Square, "square"},
     {Icon::Hexagon, "hexagon"},

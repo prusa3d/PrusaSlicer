@@ -1,8 +1,6 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterStorage.hpp"
 
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterJson.hpp"
-#include "Slic3r/Domain/ConfigPhysical.hpp"
-#include "Slic3r/Domain/Preset/HwConfig.hpp"
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Log.hpp"
 
@@ -25,28 +23,14 @@ inline fs::path storage_dir()
     static const fs::path dir = fs::path{data_dir()} / "physical_printer";
     return dir;
 }
-
-PhysicalPrinterConfig default_new_printer()
-{
-    PrinterUpload up;
-    up.type      = Domain::PrusaLink;
-    up.auth_type = Domain::PrintHostAuthType::ApiKey;
-
-    PhysicalPrinterConfig printer;
-    printer.payload = std::move(up);
-    return printer;
-}
 } // namespace
 
-PhysicalPrinterStorage::PhysicalPrinterStorage() :
-    m_dummy(default_new_printer())
+PhysicalPrinterStorage::PhysicalPrinterStorage()
 {
     load_all();
 }
 
-PhysicalPrinterStorage::~PhysicalPrinterStorage()
-{
-}
+PhysicalPrinterStorage::~PhysicalPrinterStorage() {}
 
 void PhysicalPrinterStorage::load_all()
 {
@@ -61,32 +45,39 @@ void PhysicalPrinterStorage::load_all()
 
     for (const auto& entry : it) {
         boost::nowide::ifstream file(entry.path().string());
-        if (!file.is_open()) continue;
+        if (!file.is_open())
+            continue;
 
         nlohmann::ordered_json json;
         try {
             file >> json;
         } catch (...) {
-            SPDLOG_ERROR("Failed to read physical printer from json file: {}", entry.path().string());
+            SPDLOG_ERROR(
+                "Failed to read physical printer from json file: {}",
+                entry.path().string()
+            );
             continue;
         }
 
         auto printer = printer_from_json(json);
         if (!printer) {
-            SPDLOG_ERROR("Failed to parse physical printer {}: {}", entry.path().string(), printer.error());
+            SPDLOG_ERROR(
+                "Failed to parse physical printer {}: {}",
+                entry.path().string(),
+                printer.error()
+            );
             continue;
         }
         if (printer->uuid.empty()) {
-            SPDLOG_ERROR("Physical printer configuration was not loaded due missing uuid: {}", entry.path().string());
-            continue;
-        }
-        if (is_reserved_uuid(printer->uuid)) {
-            SPDLOG_ERROR("Physical printer configuration uses a reserved uuid and will be deleted: {}", entry.path().string());
+            SPDLOG_ERROR(
+                "Physical printer configuration was not loaded due missing uuid: {}",
+                entry.path().string()
+            );
             continue;
         }
 
         const std::string uuid = printer->uuid;
-        m_map[uuid] = std::move(printer.value());
+        m_map[uuid]            = std::move(printer.value());
     }
 
     consolidate_files();
@@ -162,7 +153,11 @@ void PhysicalPrinterStorage::remove_one(const std::string& uuid)
 
     fs::remove(file_path, ec);
     if (ec) {
-        SPDLOG_ERROR("Failed to delete physical printer file {}: {}", file_path.string(), ec.message());
+        SPDLOG_ERROR(
+            "Failed to delete physical printer file {}: {}",
+            file_path.string(),
+            ec.message()
+        );
     }
 }
 
@@ -178,30 +173,19 @@ const UuidPrinterMap& PhysicalPrinterStorage::all_printers() const
     return m_map;
 }
 
-UuidPrinterMap& PhysicalPrinterStorage::all_printers()
+const Biz::PhysicalPrinter::PhysicalPrinterConfig& PhysicalPrinterStorage::save_or_create(
+    const PhysicalPrinterConfig& printer
+)
 {
-    return m_map;
-}
+    const std::string uuid = printer.uuid.empty() ?
+        boost::uuids::to_string(boost::uuids::random_generator()()) :
+        printer.uuid;
 
-PhysicalPrinterConfig& PhysicalPrinterStorage::dummy()
-{
-    return m_dummy;
-}
+    m_map[uuid]      = printer;
+    m_map[uuid].uuid = uuid;
 
-const PhysicalPrinterConfig& PhysicalPrinterStorage::dummy() const
-{
-    return m_dummy;
-}
-
-std::string PhysicalPrinterStorage::create_from_dummy(const Domain::Preset::HwPrinterConfig& hw_config)
-{
-    std::string uuid{boost::uuids::to_string(boost::uuids::random_generator()())};
-    m_dummy.uuid      = uuid;
-    m_dummy.hw_config = hw_config;
-    m_map[uuid]       = std::move(m_dummy);
-    m_dummy           = default_new_printer();
     save_one(uuid);
-    return uuid;
+    return m_map.at(uuid);
 }
 
-} //namespace Slic3r::Biz::PhysicalPrinter
+} // namespace Slic3r::Biz::PhysicalPrinter

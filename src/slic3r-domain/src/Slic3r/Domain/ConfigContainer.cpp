@@ -10,10 +10,11 @@ std::unique_ptr<ConfigContainer> ConfigContainer::copy(
 {
     std::unique_ptr<ConfigContainer> cc = std::make_unique<ConfigContainer>();
 
-    cc->m_preset               = m_preset;
-    cc->m_project_settings     = m_project_settings;
-    cc->m_sla_project_settings = m_sla_project_settings;
-    cc->m_bed                  = bed_translation_table.at(m_bed);
+    cc->m_preset                     = m_preset;
+    cc->m_project_settings           = m_project_settings;
+    cc->m_sla_project_settings       = m_sla_project_settings;
+    cc->m_physical_printer_selection = m_physical_printer_selection;
+    cc->m_bed                        = bed_translation_table.at(m_bed);
     ASSERT(cc->m_bed);
 
     cc->m_bed_instances.reserve(m_bed_instances.size());

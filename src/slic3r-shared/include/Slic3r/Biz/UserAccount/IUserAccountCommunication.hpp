@@ -21,13 +21,14 @@ public:
     virtual std::string
     wait_for_access_token(std::chrono::milliseconds timeout, JThread::StopToken stop_token) = 0;
     virtual void set_refresh_time(int seconds) = 0;
-    virtual void on_username_changed(const std::string& username, bool store) = 0;
+    virtual void on_username_changed(const std::string& username, const std::string& id, bool store) = 0;
     virtual void on_race_lost(const std::string& body) = 0;
     virtual void add_session_listener(IUserAccountSessionListener* listener) = 0;
     virtual void on_read_token_store_message() = 0;
     virtual void request_refresh() = 0;
     virtual bool validate_and_refresh() = 0;
     virtual std::string username() const = 0;
+    virtual std::string user_id() const = 0;
     virtual void cancel_ongoing_session_action() = 0;
 
     // From UserAccountCommunication
@@ -42,7 +43,6 @@ public:
     virtual std::string email() const = 0;
     virtual void on_email(const std::string& data) = 0;
     virtual void request_printables_secret_token() = 0;
-    virtual void enqueue_connect_printer_states_action() = 0;
     virtual void enqueue_connect_printers_data_action(std::function<void(const std::string&)> succ_fn) = 0;
 };
 

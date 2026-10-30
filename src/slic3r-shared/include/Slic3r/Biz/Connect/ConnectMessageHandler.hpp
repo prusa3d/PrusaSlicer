@@ -17,9 +17,9 @@ namespace Slic3r::Biz::PhysicalPrinter {
 class PhysicalPrinterInteractor;
 } // namespace Slic3r::Biz::PhysicalPrinter
 
-namespace Slic3r::Biz::UserAccount {
-class UserAccountInteractor;
-} // namespace Slic3r::Biz::UserAccount
+namespace Slic3r::Biz::ConnectPrinter {
+class ConnectPrinterService;
+} // namespace Slic3r::Biz::ConnectPrinter
 
 namespace Slic3r::Biz::Connect {
 
@@ -29,7 +29,7 @@ public:
     ConnectMessageHandler(
         Platform::IMainThreadDispatcher& dispatcher,
         Preset::PresetInteractor& preset_interactor,
-        UserAccount::UserAccountInteractor& user_account_interactor,
+        ConnectPrinter::ConnectPrinterService& connect_printer_service,
         PhysicalPrinter::PhysicalPrinterInteractor& physical_printer_interactor
     );
 
@@ -37,34 +37,17 @@ public:
 
     std::string uuid_for_upload();
 
-    void fetch_printer_data_async(
-        const std::string& url,
-        const std::string& access_token,
-        std::function<void(const std::string&)> success_fn,
-        std::function<void(const std::string&)> fail_fn,
-        std::function<void(Network::IHttp::Retry, bool&)> retry_fn =
-            [](Network::IHttp::Retry retry, bool& cancel)
-        {
-            SPDLOG_INFO("Retry attempt {}: {} ms to next attempt",
-                        retry.attempt,
-                        retry.ms_to_next_attempt);
-        },
-        std::function<void(Network::IHttp::Progress, bool&)> progress_fn =
-            [](Network::IHttp::Progress, bool&) {}) const;
-
 private:
-    void do_select_printer_from_connect(const std::string& printer_json);
-
-    void select_printer_tools_from_connect(const nlohmann::json& j);
-
-    void select_printer_materials_from_connect(const nlohmann::json& j);
+    void do_select_printer_from_connect(const std::string& uuid);
 
     void dispatch_error(std::string msg);
+
+    std::string uuid_if_compatible(const std::string& printer_json);
 
 private:
     Platform::IMainThreadDispatcher& m_dispatcher;
     Preset::PresetInteractor& m_preset_interactor;
-    UserAccount::UserAccountInteractor& m_user_account_interactor;
+    ConnectPrinter::ConnectPrinterService& m_connect_printer_service;
     PhysicalPrinter::PhysicalPrinterInteractor& m_physical_printer_interactor;
 
     std::string m_last_printer_json;

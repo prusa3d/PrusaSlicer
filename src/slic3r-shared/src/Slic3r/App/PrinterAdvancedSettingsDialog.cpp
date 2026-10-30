@@ -7,7 +7,7 @@
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/Separator.hpp"
-#include "Slic3r/App/LogicalPrinterSettingsDialog.hpp"
+#include "Slic3r/App/PrinterSettingsDialog.hpp"
 #include <Slic3r/App/AppServices.hpp>
 #include "Slic3r/App/IDialogManager.hpp"
 
@@ -20,14 +20,12 @@ namespace Slic3r::App {
 
 PrinterAdvancedSettingsDialog::PrinterAdvancedSettingsDialog(
     Biz::ProjectInteractor& project_interactor,
-    Navigator& navigator,
-    LogicalPrinterSettingsDialog* logical_printer_settings_dialog
+    Navigator& navigator
 ) :
     ConfigSettingsDialog(project_interactor, navigator, "PrinterAdvancedSettingsDialog"),
     m_list_selection_changed_scope(project_interactor.preset_interactor().printer_presets(), *this),
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
-    m_dirty_categorizer(std::make_shared<DirtyCategorizer>()),
-    m_logical_printer_settings_dialog(logical_printer_settings_dialog)
+    m_dirty_categorizer(std::make_shared<DirtyCategorizer>())
 {
     Tab* tab = append_tab(_u8L("Printer"));
     m_config_tabs.emplace_back(
@@ -39,9 +37,8 @@ PrinterAdvancedSettingsDialog::PrinterAdvancedSettingsDialog(
         )
     );
 
-    m_dirty_categorizer->set_filter_fn(
-        [](const Biz::ConfigItemContext& data) { return data.is_dirty(); }
-    );
+    m_dirty_categorizer->set_filter_fn([](const Biz::ConfigItemContext& data)
+                                       { return data.is_dirty(); });
     m_dirty_categorizer->set_group_by_fn(
         [](const Biz::ConfigItemContext& data,
            std::unordered_set<Domain::ConfigItemDef::Category>& seen_keys) -> bool
@@ -108,8 +105,10 @@ PrinterAdvancedSettingsDialog::PrinterAdvancedSettingsDialog(
     };
     add_footer_button(_u8L("Save preset"))->callbacks().action = [&]
     {
-        m_project_interactor->preset_interactor()
-            .save_user_preset(Domain::Preset::PresetKind::FdmPrinter, 0);
+        m_project_interactor->preset_interactor().save_user_preset(
+            Domain::Preset::PresetKind::FdmPrinter,
+            0
+        );
     };
 }
 
@@ -177,7 +176,7 @@ void PrinterAdvancedSettingsDialog::update_ui_state(const Domain::ConfigItem* ch
 
 void PrinterAdvancedSettingsDialog::close_action()
 {
-    m_navigator.set_opened_dialog(m_logical_printer_settings_dialog);
+    m_navigator.set_opened_dialog(nullptr);
 }
 
 } // namespace Slic3r::App

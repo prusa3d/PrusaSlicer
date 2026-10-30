@@ -19,7 +19,7 @@ class LayoutButton;
 namespace Slic3r::App {
 
 class Navigator;
-class LogicalPrinterSettingsDialog;
+class PrinterSettingsDialog;
 
 class PrinterAdvancedSettingsDialog :
     public ConfigSettingsDialog,
@@ -29,8 +29,7 @@ class PrinterAdvancedSettingsDialog :
 public:
     explicit PrinterAdvancedSettingsDialog(
         Biz::ProjectInteractor& project_interactor,
-        Navigator& navigator,
-        LogicalPrinterSettingsDialog* logical_printer_settings_dialog
+        Navigator& navigator
     );
 
     void on_list_selection_changed(Domain::SelectionId new_selection) override;
@@ -61,7 +60,6 @@ private:
         m_preset_changed_listener_scope;
 
     Biz::UnsharedPointer<DirtyCategorizer> m_dirty_categorizer;
-    LogicalPrinterSettingsDialog* m_logical_printer_settings_dialog{nullptr};
 
     Yoga::Text* m_label_preset_name{nullptr};
     Yoga::LayoutButton* m_revert_button{nullptr};

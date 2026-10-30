@@ -11,13 +11,14 @@ public:
     bool is_active() const override { return false; }
     std::string wait_for_access_token(std::chrono::milliseconds timeout, JThread::StopToken stop_token) override { return {}; }
     void set_refresh_time(int seconds) override {}
-    void on_username_changed(const std::string& username, bool store) override {}
+    void on_username_changed(const std::string& username, const std::string& id, bool store) override {}
     void on_race_lost(const std::string& body) override {}
     void add_session_listener(IUserAccountSessionListener* listener) override {}
     void on_read_token_store_message() override {}
     void request_refresh() override {}
     bool validate_and_refresh() override { return false; }
     std::string username() const override { return {}; }
+    std::string user_id() const override { return {}; }
     void cancel_ongoing_session_action() override {}
 
     void do_log_out(bool notify_owner) override {}
@@ -32,7 +33,6 @@ public:
     void on_email(const std::string& data) override {}
     void on_avatar_success(std::string&& data) const override {}
     void request_printables_secret_token() override {}
-    void enqueue_connect_printer_states_action() override {}
     void enqueue_connect_printers_data_action(std::function<void(const std::string&)> succ_fn) override {}
 };
 

@@ -1,0 +1,249 @@
+{
+  "base_model" : "COREONE_INDX",
+  "connect_state" : "FINISHED",
+  "legacy_printer_model" : "COREONE_INDX8T",
+  "model" : "COREONE_INDX",
+  "name" : "INDX",
+  "supported_printer_models" : [ "COREONE_INDX4T", "COREONE", "COREONEOAK" ],
+  "tool_count" : 8,
+  "tools" : {
+    "0" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : true,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 13.794291555446916
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PLA",
+            "class" : "FFF",
+            "type" : "PLA"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "1" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : true,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 359.8559339399888
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PLA",
+            "class" : "FFF",
+            "type" : "PLA"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "2" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : true,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 140.4649594332232
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PLA",
+            "class" : "FFF",
+            "type" : "PLA"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "3" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : true,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 223.12423174783865
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PLA",
+            "class" : "FFF",
+            "type" : "PLA"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "4" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : true,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 208.30424141057284
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PLA",
+            "class" : "FFF",
+            "type" : "PLA"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "5" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : true,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 48.5729068074634
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PLA",
+            "class" : "FFF",
+            "type" : "PLA"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "6" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : true,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 19.464599259799904
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PETG",
+            "class" : "FFF",
+            "type" : "PETG"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "7" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : true,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PC",
+            "class" : "FFF",
+            "type" : "PC"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    }
+  },
+  "uuid" : "00000000-0000-0000-0000-000000000000"
+}

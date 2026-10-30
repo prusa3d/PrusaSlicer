@@ -222,16 +222,16 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/PrintSettingsDialog.cpp
         include/Slic3r/App/PrintModeDialog.hpp
         src/Slic3r/App/PrintModeDialog.cpp
-        include/Slic3r/App/LogicalPrinterSettingsDialog.hpp
-        src/Slic3r/App/LogicalPrinterSettingsDialog.cpp
+        include/Slic3r/App/PrinterSettingsDialog.hpp
+        src/Slic3r/App/PrinterSettingsDialog.cpp
         include/Slic3r/App/PrinterAdvancedSettingsDialog.hpp
         src/Slic3r/App/PrinterAdvancedSettingsDialog.cpp
-        include/Slic3r/App/PhysicalPrinterSettingsDialog.hpp
-        src/Slic3r/App/PhysicalPrinterSettingsDialog.cpp
         include/Slic3r/App/PhysicalPrinterSettingsButton.hpp
         src/Slic3r/App/PhysicalPrinterSettingsButton.cpp
         include/Slic3r/App/LogicalPrinterSettingsButton.hpp
         src/Slic3r/App/LogicalPrinterSettingsButton.cpp
+        include/Slic3r/App/PrinterSettingsButton.hpp
+        src/Slic3r/App/PrinterSettingsButton.cpp
         include/Slic3r/App/PrinterAddDialog.hpp
         src/Slic3r/App/PrinterAddDialog.cpp
         include/Slic3r/App/PresetUpdater/PresetUpdaterActivityReporter.hpp
@@ -329,8 +329,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Theme.cpp
         include/Slic3r/App/ExtruderIcon.hpp
         src/Slic3r/App/ExtruderIcon.cpp
-        include/Slic3r/App/PhysicalPrinterAdvancedSettingsDialog.hpp
-        src/Slic3r/App/PhysicalPrinterAdvancedSettingsDialog.cpp
+        include/Slic3r/App/PhysicalPrinterForm.hpp
+        src/Slic3r/App/PhysicalPrinterForm.cpp
         include/Slic3r/App/WelcomeDialog.hpp
         src/Slic3r/App/WelcomeDialog.cpp
         src/Slic3r/App/WarningPanel.cpp
@@ -673,8 +673,6 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/App/Yoga/MenuItem.hpp
         src/Slic3r/App/Yoga/Menu.cpp
         include/Slic3r/App/Yoga/Menu.hpp
-        src/Slic3r/App/Yoga/PrinterSettingsButton.cpp
-        include/Slic3r/App/Yoga/PrinterSettingsButton.hpp
         src/Slic3r/App/Yoga/MaterialSettingsButton.cpp
         include/Slic3r/App/Yoga/MaterialSettingsButton.hpp
         include/Slic3r/App/Yoga/ButtonGroup.hpp
@@ -894,6 +892,9 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Preset/PresetInteractorConfigContainerContext.cpp
         include/Slic3r/Biz/Preset/PresetSelectionCheck.hpp
         src/Slic3r/Biz/Preset/PresetSelectionCheck.cpp
+        include/Slic3r/Biz/Preset/PrinterPresetSelector.hpp
+        src/Slic3r/Biz/Preset/PrinterPresetSelector.cpp
+        include/Slic3r/Biz/Preset/IPrinterPresetSelectorListener.hpp
         include/Slic3r/Biz/Preset/PresetSelectionNames.hpp
         include/Slic3r/Biz/Preset/PresetDiffOperation.hpp
         include/Slic3r/Biz/Preset/IPresetDialogManager.hpp
@@ -920,6 +921,10 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Preset/IO/PresetMetadataLegacyLoader.cpp
         include/Slic3r/Biz/Preset/IO/BundleLoader.hpp
         src/Slic3r/Biz/Preset/IO/BundleLoader.cpp
+        include/Slic3r/Biz/Preset/IO/HwConfigConnectJson.hpp
+        src/Slic3r/Biz/Preset/IO/HwConfigConnectJson.cpp
+        include/Slic3r/Biz/Preset/HwBundleEvaluator.hpp
+        src/Slic3r/Biz/Preset/HwBundleEvaluator.cpp
         include/Slic3r/Biz/CerealUtils.hpp
         src/Slic3r/Biz/Yaml/Yaml.hpp
         src/Slic3r/Biz/Yaml/Yaml.cpp
@@ -1075,6 +1080,7 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/Network/TCPConsole.hpp
         include/Slic3r/Biz/Network/ServiceConfig.hpp
         include/Slic3r/Biz/Network/Jwt.hpp
+        include/Slic3r/Biz/Network/MqttSubscriber.hpp
         src/Slic3r/Biz/Network/IHttp.cpp
         src/Slic3r/Biz/Network/HttpCurl.cpp
         src/Slic3r/Biz/Network/Bonjour.cpp
@@ -1082,6 +1088,7 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Network/ServiceConfig.cpp
         src/Slic3r/Biz/Network/Jwt.cpp
         src/Slic3r/Biz/Network/HttpCurlFactory.cpp
+        src/Slic3r/Biz/Network/MqttSubscriber.cpp
 
         include/Slic3r/Biz/SLAResultCache.hpp
         src/Slic3r/Biz/SLAResultCache.cpp
@@ -1120,6 +1127,11 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/Connect/IConnectHandlerListener.hpp
         include/Slic3r/Biz/Connect/ConnectMessageHandler.hpp
         src/Slic3r/Biz/Connect/ConnectMessageHandler.cpp
+
+        include/Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp
+        src/Slic3r/Biz/ConnectPrinter/ConnectPrinter.cpp
+        include/Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp
+        src/Slic3r/Biz/ConnectPrinter/ConnectPrinterService.cpp
 
         include/Slic3r/Biz/SHA256.hpp
 
@@ -1295,6 +1307,14 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/PhysicalPrinter/PhysicalPrinterStorage.cpp
         include/Slic3r/Biz/PhysicalPrinter/IPhysicalPrinterChangedListener.hpp
 
+        include/Slic3r/Biz/ExportDestination/ExportDestination.hpp
+        src/Slic3r/Biz/ExportDestination/ExportDestination.cpp
+        include/Slic3r/Biz/ExportDestination/ExportDestinationInteractor.hpp
+        src/Slic3r/Biz/ExportDestination/ExportDestinationInteractor.cpp
+        include/Slic3r/Biz/ExportDestination/IExportDestinationChangedListener.hpp
+        include/Slic3r/App/ExportDestinationButton.hpp
+        src/Slic3r/App/ExportDestinationButton.cpp
+
         include/Slic3r/App/Undo/Store.hpp
         src/Slic3r/App/Undo/Store.cpp
         include/Slic3r/App/Undo/BedSelectionState.hpp
@@ -1444,6 +1464,7 @@ find_package(yoga CONFIG REQUIRED)
 find_package(nlohmann_json 3.11 REQUIRED)
 find_package(EXPAT CONFIG REQUIRED)
 find_package(pugixml CONFIG REQUIRED)
+find_package(PahoMqttCpp REQUIRED)
 
 if (APPLE)
     set(USE_NATIVE_MENU_DEFINE "-DUSE_NATIVE_MENU")
@@ -1528,6 +1549,7 @@ target_link_libraries(slic3r-shared PUBLIC
         range-v3::range-v3
         libcereal
         libdeflate::libdeflate_static
+        PahoMqttCpp::paho-mqttpp3-static
 )
 target_compile_definitions(slic3r-shared PUBLIC ${SLIC3R_YAML_DEFINE} ${USE_NATIVE_MENU_DEFINE})
 if (SLIC3R_SENTRY_DSN)
@@ -1698,9 +1720,13 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/Preset/IO/HwConfigDefLoaderTests.cpp
             test/Slic3r/Biz/Preset/IO/PresetLoaderTests.cpp
             test/Slic3r/Biz/Preset/IO/PresetMetadataLegacyLoaderTests.cpp
+            test/Slic3r/Biz/Preset/IO/HwConfigConnectJsonTests.cpp
             test/Slic3r/Biz/Preset/PresetCollectionEvaluatorTests.cpp
             test/Slic3r/Biz/Preset/PresetEvaluatorTests.cpp
             test/Slic3r/Biz/Preset/HwConfigEvaluatorTests.cpp
+            test/Slic3r/Biz/Preset/ConnectJsonTestUtils.cpp
+            test/Slic3r/Biz/Preset/ConnectJsonTestUtils.hpp
+            test/Slic3r/Biz/Preset/HwBundleEvaluatorTests.cpp
             test/Slic3r/Biz/Preset/ProjectPresetViewTests.cpp
             test/Slic3r/Biz/Preset/PresetInteractorTests.cpp
             test/Slic3r/Biz/Preset/PresetNameValidatorTests.cpp

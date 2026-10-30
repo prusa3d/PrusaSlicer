@@ -66,8 +66,6 @@ public:
 
     void request_printables_secret_token() override;
 
-    void enqueue_connect_printer_states_action() override;
-
     void enqueue_connect_printers_data_action(std::function<void(const std::string&)> succ_fn) override;
 private:
     std::string m_code_verifier;

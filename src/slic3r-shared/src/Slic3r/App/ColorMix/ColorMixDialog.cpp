@@ -11,7 +11,7 @@
 #include "Slic3r/App/ColorMix/ExtruderFilterButton.hpp"
 #include "Slic3r/App/ColorMix/LayerSequenceBar.hpp"
 #include "Slic3r/App/IDialogManager.hpp"
-#include "Slic3r/App/LogicalPrinterSettingsDialog.hpp"
+#include "Slic3r/App/PrinterSettingsDialog.hpp"
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/WarningPanel.hpp"
 #include "Slic3r/App/Yoga/ColorPickerButton.hpp"
@@ -237,8 +237,7 @@ BlendTileData make_blend_tile_data(
 
 ColorMixDialog::ColorMixDialog(
     ProjectInteractor& project_interactor,
-    Navigator& navigator,
-    LogicalPrinterSettingsDialog* logical_printer_settings_dialog
+    Navigator& navigator
 ) :
     Dialog({_u8L("Color mixing")}, "ColorMixDialog"),
     m_colors_changed_listener_scope(project_interactor.project_settings_interactor(), *this),
@@ -246,7 +245,6 @@ ColorMixDialog::ColorMixDialog(
     m_selected_config_container_changed_listener_scope(project_interactor, *this),
     m_project_interactor(project_interactor),
     m_navigator(navigator),
-    m_logical_printer_settings_dialog(logical_printer_settings_dialog),
     m_extruder_filters(std::make_shared<ObservableList<ExtruderFilterData>>()),
 
     m_blend_candidates(std::make_shared<ObservableList<BlendTileData>>()),
@@ -783,7 +781,7 @@ void ColorMixDialog::update_from_project()
 
 void ColorMixDialog::close_action()
 {
-    m_navigator.set_opened_dialog(m_logical_printer_settings_dialog);
+    m_navigator.set_opened_dialog(nullptr);
 }
 
 void ColorMixDialog::on_accept_clicked()

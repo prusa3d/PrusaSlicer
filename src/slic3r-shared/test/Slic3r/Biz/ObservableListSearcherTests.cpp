@@ -132,3 +132,63 @@ TEST_CASE_METHOD(SearcherFixture, "[ObservableListSearcher] search is case-insen
 
     searcher_matches({"Apple"});
 }
+
+namespace {
+struct UpdateRecorder : IListObserver<std::string>
+{
+    void on_updated(const IndexRange& index_range) override
+    {
+        updated.push_back(index_range.from);
+    }
+
+    void on_reset() override
+    {
+        ++reset_count;
+    }
+
+    std::vector<size_t> updated;
+    int reset_count{0};
+};
+} // namespace
+
+TEST_CASE_METHOD(SearcherFixture, "[ObservableListSearcher] in-place source update is forwarded")
+{
+    source_model->reset({"apple", "banana", "apricot"});
+    UpdateRecorder recorder;
+    searcher->add_listener<IListObserver<std::string>>(&recorder);
+
+    SECTION("empty search text")
+    {
+        source_model->set("banana split", 1);
+
+        REQUIRE(recorder.reset_count == 0);
+        REQUIRE(recorder.updated == std::vector<size_t>{1});
+        searcher_matches({"apple", "banana split", "apricot"});
+    }
+
+    SECTION("item kept by search text")
+    {
+        searcher->set_search_text("ap");
+        recorder.reset_count = 0;
+
+        source_model->set("apricots", 2);
+
+        REQUIRE(recorder.reset_count == 0);
+        REQUIRE(searcher->size() == 2);
+        REQUIRE(recorder.updated.size() == 1);
+        REQUIRE(searcher->at(recorder.updated.front()) == "apricots");
+    }
+
+    SECTION("item filtered out by search text")
+    {
+        searcher->set_search_text("ap");
+        recorder.reset_count = 0;
+
+        source_model->set("banana split", 1);
+
+        REQUIRE(recorder.reset_count == 0);
+        REQUIRE(recorder.updated.empty());
+    }
+
+    searcher->remove_listener<IListObserver<std::string>>(&recorder);
+}

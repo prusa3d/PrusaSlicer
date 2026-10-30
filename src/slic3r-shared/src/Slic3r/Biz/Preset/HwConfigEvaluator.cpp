@@ -104,7 +104,6 @@ Domain::Preset::HwPrinterConfig HwConfigEvaluator::create_printer_config(
     for (const auto& feeder_templ : templ.feeders) {
         const auto* feeder_def = vendor_data.find_feeder_config_def_by_id(feeder_templ.id);
         ASSERT(feeder_def != nullptr, feeder_templ.id);
-        ASSERT(feeder_def->technology == printer_def->technology, feeder_templ.id);
         auto feeder_features = build_features(vendor_data.info.features.feeder);
         Domain::Preset::override_features(feeder_features, feeder_def->features);
         Domain::Preset::override_features(feeder_features, feeder_templ.features);
@@ -191,6 +190,23 @@ Domain::Preset::HwPrinterConfig from_def(
         config.legacy_printer_model = printer_def.legacy_printer_model.front();
     }
     return config;
+}
+
+Domain::Preset::HwFeederConfig from_def(
+    const Domain::Preset::VendorData& vendor_data,
+    const Domain::Preset::HwFeederConfigDef& feeder_def
+)
+{
+    auto feeder_features = build_features(vendor_data.info.features.feeder);
+    Domain::Preset::override_features(feeder_features, feeder_def.features);
+    Domain::Preset::HwFeederConfig feeder_config{
+        .id         = feeder_def.id,
+        .type       = feeder_def.type,
+        .model      = feeder_def.model,
+        .slot_count = feeder_def.slot_count,
+        .features   = feeder_features,
+    };
+    return feeder_config;
 }
 
 Domain::Preset::HwPrinterConfig

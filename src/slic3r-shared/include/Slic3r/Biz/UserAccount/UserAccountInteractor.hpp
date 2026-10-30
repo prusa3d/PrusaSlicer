@@ -132,6 +132,8 @@ public:
     std::string
     wait_for_access_token(std::chrono::milliseconds timeout, JThread::StopToken stop_token = {});
 
+    std::string user_id() const;
+
     void request_printables_secret_token();
 
 private:

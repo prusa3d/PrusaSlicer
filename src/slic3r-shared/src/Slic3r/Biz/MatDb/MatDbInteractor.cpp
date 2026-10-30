@@ -6,6 +6,8 @@
 
 #include <boost/filesystem/path.hpp>
 
+#include <algorithm>
+
 #ifndef MATDB_PRESET_MATCH_DEBUG
 #define MATDB_PRESET_MATCH_DEBUG 0
 #endif
@@ -156,6 +158,14 @@ void MatDbInteractor::run_query()
     if (!m_query.has_value()) {
         return;
     }
+
+    // TODO: @zaraka what is point of this "fix", it just silently hides bugs elsewhere
+    // like the one I fixed in PD-9508
+    const size_t slot_count = selected_preset().materials.size();
+    if (slot_count == 0) {
+        return;
+    }
+    m_query->slot_index = std::min(m_query->slot_index, slot_count - 1);
 
     const auto& query = m_query->query;
     const auto material_index = m_query->slot_index;

@@ -8,6 +8,8 @@
 #include "Slic3r/Biz/Platform/ListenerScope.hpp"
 #include "Slic3r/Biz/IColorsChangedListener.hpp"
 #include "Slic3r/Biz/ProjectSettingsInteractor.hpp"
+#include "Slic3r/Biz/PhysicalPrinter/IPhysicalPrinterChangedListener.hpp"
+#include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 
 namespace Slic3r::Biz {
 class ProjectInteractor;
@@ -30,7 +32,8 @@ class MaterialSettingsButton :
     public Biz::DataObserver<Biz::Preset::PresetItemObservableList>,
     public Biz::IListSelectionChangedListener,
     public Biz::Preset::IPresetChangedListener,
-    public Biz::IColorsChangedListener
+    public Biz::IColorsChangedListener,
+    public Biz::PhysicalPrinter::IPhysicalPrinterChangedListener
 {
 public:
     using FnIndexClicked = std::function<void(size_t)>;
@@ -67,6 +70,8 @@ public:
     ) override;
     void on_preset_bundles_loaded() override;
 
+    void on_selected_physical_printer_changed() override;
+
 protected:
     void on_data_update() override;
     void checked_updated_internal() override;
@@ -79,6 +84,7 @@ protected:
 
 private:
     void update_cog_visibility();
+    void update_nozzle_button_state();
 
 private:
     Biz::ListenerScope<
@@ -86,6 +92,12 @@ private:
         Biz::ProjectSettingsInteractor,
         MaterialSettingsButton>
         m_colors_changed_listener_scope;
+
+    Biz::ListenerScope<
+        Biz::PhysicalPrinter::IPhysicalPrinterChangedListener,
+        Biz::PhysicalPrinter::PhysicalPrinterInteractor,
+        MaterialSettingsButton>
+        m_physical_printer_changed_listener_scope;
 
     ColorPickerButton* m_color_marker{nullptr};
     Text* m_spool_name{nullptr};
@@ -98,6 +110,7 @@ private:
     Biz::ProjectInteractor& m_project_interactor;
 
     std::string m_material_preset_name{};
+    bool m_nozzle_changeable{true};
 };
 
 } // namespace Slic3r::App::Yoga

@@ -2,6 +2,9 @@
 
 #include <imgui_internal.h>
 
+#include <algorithm>
+#include <cfloat>
+
 namespace Slic3r::App::Yoga {
 
 ScrollArea::ScrollArea(const std::string& name) : Item()
@@ -17,9 +20,11 @@ void ScrollArea::render(const Vec2f& p, const Vec2f& size)
 
     render_debug(pos, size);
 
+    const ImVec2 child_size{std::max(size.x(), FLT_MIN), std::max(size.y(), FLT_MIN)};
+
     ImGui::SetNextWindowPos(to_im(pos));
-    ImGui::SetNextWindowSize(to_im(size));
-    ImGui::BeginChild(object_name().c_str(), {size.x(), size.y()}, m_child_flags, m_window_flags);
+    ImGui::SetNextWindowSize(child_size);
+    ImGui::BeginChild(object_name().c_str(), child_size, m_child_flags, m_window_flags);
 
     // normally ImGui scrolls horizontally with SHIFT + Mouse Wheel, we want to use Mouse Wheel
     // only if m_remap_horizontal_scroll is true

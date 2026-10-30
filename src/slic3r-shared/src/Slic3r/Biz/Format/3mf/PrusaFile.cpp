@@ -1702,6 +1702,16 @@ void write(
                 );
         }
 
+        if (const Domain::PhysicalPrinterSelection& physical_printer =
+                config_container->physical_printer_selection();
+            !physical_printer.uuid.empty())
+        {
+            cc_json[PHYSICAL_PRINTER] = {
+                {"uuid", physical_printer.uuid},
+                {"name", physical_printer.name}
+            };
+        }
+
         const auto& cfg_var = config_container->build_print_config();
         cc_json[CONFIGURATION] = std::visit(
             [](const auto& config_pack) { return Biz::Config::to_json(config_pack); }, cfg_var);
@@ -1756,6 +1766,14 @@ void load(
                 Biz::Format::VirtualExtruder::deserialize_virtual_extruders_from_project_json(
                     virtual_extruders_json
                 );
+        }
+
+        if (config_container.contains(PHYSICAL_PRINTER)) {
+            const nlohmann::ordered_json& physical_printer_json = config_container[PHYSICAL_PRINTER];
+            Domain::PhysicalPrinterSelection& physical_printer =
+                config_containers_data.back().physical_printer;
+            from_json(physical_printer_json, "uuid", physical_printer.uuid, collected_issues);
+            from_json(physical_printer_json, "name", physical_printer.name, collected_issues);
         }
 
         if (config_container.contains("beds")) {

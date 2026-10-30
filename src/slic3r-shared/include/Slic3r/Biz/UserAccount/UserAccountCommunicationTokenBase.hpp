@@ -42,7 +42,7 @@ public:
     /**
      * @brief Writes tokens to token store, if store is true or username empty (which is on log out).
      */
-    void on_username_changed(const std::string& username, bool store) override;
+    void on_username_changed(const std::string& username, const std::string& id, bool store) override;
 
     /**
      * @brief Called after enqueue_refresh_race on session failed.
@@ -73,6 +73,11 @@ public:
     std::string username() const override
     {
         return m_username;
+    }
+
+    std::string user_id() const override
+    {
+        return m_user_id;
     }
 
     void cancel_ongoing_session_action() override
@@ -112,6 +117,7 @@ private:
     void enqueue_refresh_race(const std::string& refresh_token);
 
     std::string m_username;
+    std::string m_user_id;
 
     Platform::TimerQueue::TimerID m_token_timer_id;
     Platform::TimerQueue::TimerID m_slave_read_timer_id;

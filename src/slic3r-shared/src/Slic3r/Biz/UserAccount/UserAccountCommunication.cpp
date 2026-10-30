@@ -31,8 +31,8 @@ std::string get_code_from_message(const std::string& url_message)
 }
 } // namespace
 
-UserAccountCommunication::UserAccountCommunication(Platform::IMainThreadDispatcher& dispatcher) :
-    UserAccountCommunicationTokenBase{dispatcher}
+UserAccountCommunication::UserAccountCommunication(Platform::IMainThreadDispatcher& dispatcher)
+    : UserAccountCommunicationTokenBase{dispatcher}
 {}
 
 void UserAccountCommunication::do_log_out(bool notify_owner)
@@ -173,17 +173,6 @@ void UserAccountCommunication::request_printables_secret_token()
          {"Origin", Network::ServiceConfig::instance().printables_url()}}
     };
     m_session.enqueue_action(std::move(action));
-    wakeup_session_thread();
-}
-
-void UserAccountCommunication::enqueue_connect_printer_states_action()
-{
-    ASSERT(m_session.is_initialized());
-    ActionQueueData action{
-        UserAccountActionID::ConnectPrinterStates
-    };
-    m_session.enqueue_action(std::move(action));
-
     wakeup_session_thread();
 }
 

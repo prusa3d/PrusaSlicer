@@ -24,7 +24,7 @@ class ProjectSettingsInteractor;
 } // namespace Slic3r::Biz
 
 namespace Slic3r::App {
-class LogicalPrinterSettingsDialog;
+class PrinterSettingsDialog;
 class Navigator;
 class WarningPanel;
 } // namespace Slic3r::App
@@ -59,8 +59,7 @@ class ColorMixDialog :
 public:
     ColorMixDialog(
         Biz::ProjectInteractor& project_interactor,
-        Navigator& navigator,
-        LogicalPrinterSettingsDialog* logical_printer_settings_dialog
+        Navigator& navigator
     );
 
     void update_from_project();
@@ -186,7 +185,6 @@ private:
 
     Biz::ProjectInteractor& m_project_interactor;
     Navigator& m_navigator;
-    LogicalPrinterSettingsDialog* m_logical_printer_settings_dialog{nullptr};
 
     Domain::SelectionId m_target_project_id{Domain::INVALID_ID};
     Domain::SelectionId m_target_config_container_id{Domain::INVALID_ID};

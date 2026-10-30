@@ -6,9 +6,9 @@
 #include "Slic3r/App/Yoga/Tooltip.hpp"
 
 #include "Slic3r/Biz/I18N/I18N.hpp"
+#include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 
 #include "fmt/format.h"
-#include <type_traits>
 
 using namespace Slic3r::App::Yoga;
 
@@ -19,24 +19,38 @@ PhysicalPrinterSettingsButton::PhysicalPrinterSettingsButton(
     const Biz::PhysicalPrinter::PhysicalPrinterConfig& physical_printer,
     FnIndexClicked on_clicked,
     FnIndexClicked on_cog_clicked,
-    FnIndexClicked on_bin_clicked
+    FnIndexClicked on_bin_clicked,
+    const Biz::Preset::PresetInteractor& preset_interactor,
+    Biz::PhysicalPrinter::PhysicalPrinterInteractor& physical_printer_interactor
 ) :
     Biz::DataObserver<Biz::PhysicalPrinter::PhysicalPrinterConfig>(index, physical_printer),
+    m_physical_printer_changed_listener_scope(std::in_place, physical_printer_interactor, *this),
     m_on_clicked(on_clicked),
     m_on_cog_clicked(on_cog_clicked),
-    m_on_bin_clicked(on_bin_clicked)
+    m_on_bin_clicked(on_bin_clicked),
+    m_preset_interactor(preset_interactor),
+    m_physical_printer_interactor(physical_printer_interactor)
 {
-    m_texts_wrapper->set_min_height(36);
+    // Unresolved model warning in front of the printer name
+    Item* name_row = m_texts_wrapper->emplace<Item>(0);
+    name_row->set_align_items(YGAlignCenter);
+    name_row->set_gap(4_fpx);
 
-    m_attention_icon = m_icon->emplace_back<Icon>(Render::Icon::ErrorTick);
-    m_attention_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
-    m_attention_icon->set_aspect_ratio(1);
-    m_attention_icon->set_tint(m_theme->color_imgui(Platform::Color::Warning));
-    m_attention_icon->set_position_type(YGPositionTypeAbsolute);
-    m_attention_icon->set_width(22_fpx);
-    m_attention_icon->set_left(0_fpx);
-    m_attention_icon->set_bottom(0_fpx);
-    m_attention_icon->set_visible(false);
+    // Same size as the state circle
+    m_unresolved_model_icon = name_row->emplace_back<Icon>(Render::Icon::ExclamationTriangle);
+    m_unresolved_model_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
+    m_unresolved_model_icon->set_aspect_ratio(1);
+    m_unresolved_model_icon->set_tint(m_theme->color_imgui(Platform::Color::Error));
+    m_unresolved_model_icon->set_padding(1_fpx);
+    m_unresolved_model_icon->set_width(12_fpx);
+    m_unresolved_model_icon->set_height(12_fpx);
+    m_unresolved_model_icon->set_flex_shrink(0);
+    m_unresolved_model_icon->set_visible(false);
+
+    name_row->append(m_texts_wrapper->remove(m_printer_name));
+    // WrapElide text has no min width, without flex grow it collapses to zero in a row
+    m_printer_name->set_flex_grow(1);
+    m_printer_name->set_flex_shrink(1);
 
     m_bin_btn = add_button(Render::Icon::DeleteBtnIcon, Biz::_u8L("Delete physical printer"));
 
@@ -72,48 +86,78 @@ void PhysicalPrinterSettingsButton::update_btns_visibility()
 void PhysicalPrinterSettingsButton::update()
 {
     std::string service_name = Biz::PhysicalPrinter::physical_printer_type_to_string(*m_state);
-    std::string model        = m_state->hw_config.name;
-    std::string preset_name  = fmt::format("{} - {}", service_name, model);
+    std::string model        = m_state->hw_config.has_value() ? m_state->hw_config.value().name : "";
+    std::string preset_name =
+        service_name.empty() ? model : fmt::format("{} - {}", service_name, model);
     set_preset_name(preset_name);
-    set_printer_name(m_state->name);
-    m_preset_name->set_visible(true);
+    set_printer_name(Biz::PhysicalPrinter::ui_name(*m_state));
+    m_preset_name->set_visible(!preset_name.empty());
+    set_printer_image();
+    m_unresolved_model_icon->set_visible(Biz::PhysicalPrinter::has_unresolved_model(*m_state));
 
-    std::visit(
-        [this](const auto& arg)
-        {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::ConnectUpload>) {
-                set_preset_name({});
-                m_preset_name->set_visible(false);
-                set_icon(Render::Icon::ConnectUpload);
-                set_visible_cog(false);
-                set_visible_bin(false);
-            } else if constexpr (std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::PrinterUpload>) {
-                // Reuse the picture of the linked logical printer; fall back to the generic icon.
-                if (m_state->hw_config.visual.thumbnail.has_value()) {
-                    set_image(
-                        m_state->hw_config.relative_path_to_assets()
-                        + m_state->hw_config.visual.thumbnail.value()
-                    );
-                } else {
-                    set_icon(Render::Icon::PhysicalPrinterIcon);
-                }
-                set_visible_cog(true);
-                set_visible_bin(m_is_bin_supported);
-            } else if constexpr (
-                std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::FileSystemExport>
-            ) {
-                set_preset_name({});
-                m_preset_name->set_visible(false);
-                set_icon(
-                    arg.prefer_removable ? Render::Icon::ExportToSD : Render::Icon::ExportToLocal
-                );
-                set_visible_cog(false);
-                set_visible_bin(false);
-            }
-        },
-        m_state->payload
-    );
+    if (const auto* upload = std::get_if<Biz::PhysicalPrinter::ConnectUpload>(&m_state->payload)) {
+        set_connect_indicator(upload->state);
+        set_visible_cog(false);
+        set_visible_bin(false);
+    } else {
+        set_connect_indicator(std::nullopt);
+        set_visible_cog(!m_state->is_runtime);
+        set_visible_bin(m_is_bin_supported && !m_state->is_runtime);
+    }
+
+    update_tooltip();
+    update_selected();
+}
+
+void PhysicalPrinterSettingsButton::update_selected()
+{
+    set_checked(m_state->uuid == m_physical_printer_interactor.selected_uuid());
+}
+
+void PhysicalPrinterSettingsButton::on_selected_physical_printer_changed()
+{
+    update_selected();
+}
+
+void PhysicalPrinterSettingsButton::on_view_will_be_removed()
+{
+    m_physical_printer_changed_listener_scope.reset();
+}
+
+void PhysicalPrinterSettingsButton::update_tooltip()
+{
+    std::string tooltip = Biz::PhysicalPrinter::ui_name(*m_state);
+    if (m_state->hw_config.has_value()) {
+        tooltip += "\n" + m_preset_interactor.ui_hw_config_summary(m_state->hw_config.value());
+    }
+    if (const auto* upload = std::get_if<Biz::PhysicalPrinter::ConnectUpload>(&m_state->payload)) {
+        tooltip += "\n" + Biz::ConnectPrinter::connect_printer_state_to_string(upload->state);
+    }
+    if (Biz::PhysicalPrinter::has_unresolved_model(*m_state)) {
+        tooltip += "\n"
+            + Biz::_u8L(
+                       "Prusa Connect did not provide the printer model, it is unknown which "
+                       "printer preset belongs to this printer."
+            );
+    }
+    set_tooltip(tooltip);
+}
+
+void PhysicalPrinterSettingsButton::set_printer_image()
+{
+    // Reuse the picture of the linked logical printer; fall back to the generic icon.
+    if (m_state->hw_config.has_value() && m_state->hw_config->visual.thumbnail.has_value()) {
+        set_image(
+            m_state->hw_config->relative_path_to_assets()
+            + m_state->hw_config->visual.thumbnail.value()
+        );
+        m_icon->set_width(48);
+        m_icon->set_margin(0);
+    } else {
+        set_icon(Render::Icon::PhysicalPrinterIcon);
+        m_icon->set_width(32);
+        m_icon->set_margin(8);
+    }
 }
 
 void PhysicalPrinterSettingsButton::update_button_text()
@@ -157,15 +201,6 @@ std::function<void()>& PhysicalPrinterSettingsButton::on_bin()
 std::string PhysicalPrinterSettingsButton::uuid() const
 {
     return m_state->uuid;
-}
-
-void PhysicalPrinterSettingsButton::set_compatible(bool compatible)
-{
-    const bool show_warning = !compatible
-        && std::holds_alternative<Slic3r::Biz::PhysicalPrinter::PrinterUpload>(m_state->payload);
-
-    m_attention_icon->set_visible(show_warning);
-    set_tooltip(show_warning ? Biz::_u8L("Non-compatible with current selection") : std::string());
 }
 
 } // namespace Slic3r::App

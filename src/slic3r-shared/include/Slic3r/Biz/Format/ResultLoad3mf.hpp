@@ -12,6 +12,7 @@
 #include "Slic3r/Semver.hpp"
 #include "Slic3r/Domain/ProjectMetadata.hpp"
 #include "Slic3r/Domain/OnBeds.hpp"
+#include "Slic3r/Domain/PhysicalPrinterSelection.hpp"
 
 namespace Slic3r {
 
@@ -284,6 +285,7 @@ struct Loaded3MF {
         Domain::WipeTowersOnBeds wipe_towers;
         Domain::CustomGCodesOnBeds custom_gcodes;
         Biz::VirtualExtrudersConfig virtual_extruders_config;
+        Domain::PhysicalPrinterSelection physical_printer;
     };
 
     Domain::ProjectMetadata metadata;
