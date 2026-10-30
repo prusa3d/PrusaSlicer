@@ -11,6 +11,7 @@
 #include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/App/IDialogManager.hpp"
 #include "Slic3r/App/Theme.hpp"
+#include "Slic3r/App/WarningPanel.hpp"
 #include "Slic3r/App/Wildcards.hpp"
 #include "Slic3r/App/Yoga/Item.hpp"
 #include "Slic3r/App/Yoga/Icon.hpp"
@@ -166,6 +167,7 @@ void PhysicalPrinterForm::set_printer_config(
             Biz::Preset::ToolConfigItemObservableList& item = result.emplace_back();
             item.items().set_items(items);
             item.set_selected_index(selected_index);
+            item.add_listener<IListSelectionChangedListener>(this);
         }
     }
     m_tool_observable_list->set_items(std::move(result));
@@ -181,6 +183,11 @@ void PhysicalPrinterForm::set_printer_config(
 
     update_field_visibility();
     update_test_button_state();
+    update_save_button_state();
+}
+
+void PhysicalPrinterForm::on_list_selection_changed(Domain::SelectionId new_selection)
+{
     update_save_button_state();
 }
 
@@ -278,6 +285,14 @@ void PhysicalPrinterForm::build_form()
     m_nozzle_list_view->set_orientation(Orientation::Vertical);
     m_nozzle_list_view->set_gap(5_fpx);
     m_nozzle_list_view->set_source_list(m_tool_observable_list.get());
+
+    m_warning = emplace_back<WarningPanel>();
+    m_warning->set_flex_shrink(0);
+    m_warning->set_warning(
+        Biz::_u8L("Invalid combination"),
+        Biz::_u8L("Selected nozzles cannot be used together on any layer height.")
+    );
+
 
     m_add_connection_button = emplace_back<LayoutButton>(
         Biz::_u8L("Add Connection"),
@@ -555,11 +570,11 @@ PhysicalPrinterConfig PhysicalPrinterForm::edited_config(bool update_hw_config) 
         ASSERT(m_tool_observable_list->size() == config.hw_config->tools.size());
         ASSERT(m_tool_observable_list->size() == config.hw_config->tool_count);
         for (size_t i = 0; i < m_tool_observable_list->size(); i++) {
-            const auto& tool_list          = m_tool_observable_list->at(i);
-            const auto& selected_toold_def = tool_list.items().at(tool_list.selected_index());
-            if (config.hw_config->tools.at(i).id != selected_toold_def.id) {
+            const auto& tool_list         = m_tool_observable_list->at(i);
+            const auto& selected_tool_def = tool_list.items().at(tool_list.selected_index());
+            if (config.hw_config->tools.at(i).id != selected_tool_def.id) {
                 config.hw_config->tools[i] =
-                    Preset::from_def(vendor_bundle.vendor_data, selected_toold_def);
+                    Preset::from_def(vendor_bundle.vendor_data, selected_tool_def);
             }
         }
 
@@ -593,6 +608,16 @@ PhysicalPrinterConfig PhysicalPrinterForm::edited_config(bool update_hw_config) 
     config.host = m_host->text();
 
     return config;
+}
+
+bool PhysicalPrinterForm::validate_hw_config_and_update_ui()
+{
+    auto config = edited_config(true);
+    bool is_valid = config.hw_config.has_value()
+        && m_project_interactor.preset_interactor()
+               .validate_external_hw_config(config.hw_config.value());
+    m_warning->set_visible(!is_valid);
+    return is_valid;
 }
 
 void PhysicalPrinterForm::update_field_visibility()
@@ -680,7 +705,8 @@ bool PhysicalPrinterForm::has_valid_name() const
 
 void PhysicalPrinterForm::update_save_button_state()
 {
-    m_save_button->set_enabled(has_valid_name());
+    bool is_valid = validate_hw_config_and_update_ui() && has_valid_name();
+    m_save_button->set_enabled(is_valid);
 }
 
 void PhysicalPrinterForm::on_connection_test_finished(PrintHostTestResult result)

@@ -955,6 +955,16 @@ void PresetInteractor::on_selected_config_container_changed(
     bag.add([this] { invoke_slicing_input_changed(); });
 }
 
+bool PresetInteractor::validate_external_hw_config(const Domain::Preset::HwPrinterConfig&  hw_config) const
+{
+    auto logic_hw_config = evaluate_external_printer_config(hw_config);
+    if (!logic_hw_config.has_value()) {
+        return false;
+    }
+    auto epps = evaluate_presets_for_hw_config(logic_hw_config.value());
+    return !epps.empty();
+}
+
 tl::expected<void, std::string> PresetInteractor::select_external_printer_config(const Domain::Preset::HwPrinterConfig& printer)
 {
     auto has_system_printer_preset = [this](const std::string& hw_config_id)
@@ -1152,13 +1162,13 @@ bool PresetInteractor::update_changed_printer_configs(
     return true;
 }
 
-bool PresetInteractor::update_changed_selected_preset_hw_config(Domain::Preset::HwPrinterConfig& hw_config)
+std::vector<Domain::Preset::EvaluatedPrinterPreset>
+PresetInteractor::evaluate_presets_for_hw_config(
+    const Domain::Preset::HwPrinterConfig& hw_config
+) const
 {
-    auto& p = get_or_fail_project_context(m_selected_project_id);
-    const std::string& printer_root_id = selected_printer_preset().printer.root_id;
-    std::string selected_printer_preset_id;
-    auto& preset_bundle = m_workbench.preset_bundle();
-    auto& vendor_bundle = preset_bundle.vendor_bundles.at(hw_config.vendor_id);
+    const auto& preset_bundle = m_workbench.preset_bundle();
+    const auto& vendor_bundle = preset_bundle.vendor_bundles.at(hw_config.vendor_id);
     PresetEvaluator preset_evaluator{vendor_bundle.presets, vendor_bundle.vendor_data.info};
     PresetEvaluator::EvaluatedPrinterPresets epps;
     try {
@@ -1167,25 +1177,36 @@ bool PresetInteractor::update_changed_selected_preset_hw_config(Domain::Preset::
             epps,
             [](const Domain::Preset::EvaluatedPrinterPreset& epp) { return epp.prints.empty(); }
         );
-
-        if (epps.empty()) {
-            p.invalid_hw_config = hw_config;
-            return false;
-        }
-
-        p.invalid_hw_config = std::nullopt;
-
-        for (auto& epp : epps) {
-            if (epp.preset.root_id == printer_root_id)
-                selected_printer_preset_id = epp.preset.id;
-        }
-        // we didn't find printer with same root_id, let's just select first one
-        if (selected_printer_preset_id.empty())
-            selected_printer_preset_id = epps.front().preset.id;
-
     } catch (const std::exception& e) {
         SPDLOG_ERROR("{}", e.what());
     }
+
+    return epps;
+}
+
+bool PresetInteractor::update_changed_selected_preset_hw_config(Domain::Preset::HwPrinterConfig& hw_config)
+{
+    auto& p = get_or_fail_project_context(m_selected_project_id);
+    const std::string& printer_root_id = selected_printer_preset().printer.root_id;
+    std::string selected_printer_preset_id;
+    auto& preset_bundle = m_workbench.preset_bundle();
+    auto& vendor_bundle = preset_bundle.vendor_bundles.at(hw_config.vendor_id);
+    PresetEvaluator::EvaluatedPrinterPresets epps = evaluate_presets_for_hw_config(hw_config);
+
+    if (epps.empty()) {
+        p.invalid_hw_config = hw_config;
+        return false;
+    }
+
+    p.invalid_hw_config = std::nullopt;
+
+    for (auto& epp : epps) {
+        if (epp.preset.root_id == printer_root_id)
+            selected_printer_preset_id = epp.preset.id;
+    }
+    // we didn't find printer with same root_id, let's just select first one
+    if (selected_printer_preset_id.empty())
+        selected_printer_preset_id = epps.front().preset.id;
 
     ListenerInvokeLaterBag bag;
 

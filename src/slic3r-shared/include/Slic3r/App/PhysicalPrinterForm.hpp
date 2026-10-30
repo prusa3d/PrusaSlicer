@@ -33,8 +33,9 @@ class Rectangle;
 } // namespace Slic3r::App::Yoga
 
 namespace Slic3r::App {
+class WarningPanel;
 
-class PhysicalPrinterForm : public Yoga::Item
+class PhysicalPrinterForm : public Yoga::Item, Biz::IListSelectionChangedListener
 {
 public:
     struct Callbacks
@@ -50,11 +51,14 @@ public:
 
     void set_printer_config(const Biz::PhysicalPrinter::PhysicalPrinterConfig& config);
 
+    void on_list_selection_changed(Domain::SelectionId new_selection) override;
+
 private:
     void build_form();
     void test_edits();
     void commit_edits();
     Biz::PhysicalPrinter::PhysicalPrinterConfig edited_config(bool update_hw_config = false) const;
+    bool validate_hw_config_and_update_ui();
     void update_field_visibility();
     void update_test_button_state();
     void update_save_button_state();
@@ -92,6 +96,7 @@ private:
 
     Yoga::ComboBoxListViewSelection<Domain::Preset::HwSheetConfigDef>* m_combo_sheets;
     NozzleListView* m_nozzle_list_view{nullptr};
+    WarningPanel* m_warning;
 
     Yoga::InputTextField* m_host{nullptr};
     Yoga::ComboBox* m_host_type{nullptr};

@@ -295,6 +295,8 @@ public:
         Domain::SelectionId container_id
     ) override;
 
+    bool validate_external_hw_config(const Domain::Preset::HwPrinterConfig&  hw_config) const;
+
     /**
      * @brief Find or create appropriate full hw config for given external one and select it
      * @param printer External hw config
@@ -932,7 +934,8 @@ private:
         const Domain::Preset::Bundle& preset_bundle,
         Domain::Preset::HwPrinterConfig& hw_config
     );
-
+    std::vector<Domain::Preset::EvaluatedPrinterPreset>
+    evaluate_presets_for_hw_config(const Domain::Preset::HwPrinterConfig& hw_config) const;
     /**
      * @brief Updates presets for changed hw configuration
      * @return Returns true if the updated presets are valid, otherwise false---the caller is then
