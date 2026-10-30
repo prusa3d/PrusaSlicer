@@ -6,7 +6,7 @@ values:
   pad_enable: 1.0
   pad_max_merge_distance: 50.0
   pad_wall_height: 0.0
-  pad_wall_slope: 45.0
+  pad_wall_slope: 80.0
   pad_wall_thickness: 1.0
   slice_closing_radius: 0.005
   support_base_diameter: 3.0
@@ -31,7 +31,7 @@ values:
   pad_enable: 1.0
   pad_max_merge_distance: 50.0
   pad_wall_height: 0.0
-  pad_wall_slope: 45.0
+  pad_wall_slope: 80.0
   pad_wall_thickness: 1.0
   slice_closing_radius: 0.005
   support_base_diameter: 3.0
@@ -55,14 +55,10 @@ variants:
     id: OQq4+PW4RJqsjZZNnYR/LQ
     values:
       layer_height: 0.025
-      support_head_front_diameter: 0.5
-      support_head_penetration: 0.5
   - name: 0.05 Normal @SL1S
     id: zL255WhoTUaFYT/BWPALjQ
     values:
       layer_height: 0.05
-      support_head_front_diameter: 0.5
-      support_head_penetration: 0.5
   - name: 0.1 Fast @SL1S
     id: g3aU9KKmTwKlbIpFuCqk7g
     values:

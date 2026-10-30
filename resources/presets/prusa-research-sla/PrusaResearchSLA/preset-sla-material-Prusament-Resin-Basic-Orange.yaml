@@ -1,0 +1,55 @@
+id: Prusament Resin Basic Orange
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Model
+  material_colour: '#FF8040'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: eXCfF0AeTIGH9Mrk7CyicA
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [3, 15]
+    delay_after_exposure: [0, 0]
+    tower_hop_height: [0, 0]
+    tower_speed: [layer22, layer22]
+    use_tilt: [1, 1]
+    tilt_down_initial_speed: [layer1750, layer1750]
+    tilt_down_offset_steps: [600, 1200]
+    tilt_down_offset_delay: [0, 0]
+    tilt_down_finish_speed: [move8000, move5120]
+    tilt_down_cycles: [1, 1]
+    tilt_down_delay: [0, 0]
+    tilt_up_initial_speed: [move8000, move8000]
+    tilt_up_offset_steps: [600, 600]
+    tilt_up_offset_delay: [0, 0]
+    tilt_up_finish_speed: [layer600, layer600]
+    tilt_up_cycles: [1, 1]
+    tilt_up_delay: [0, 0]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Basic Orange @SL1S 0.025
+    id: dLIRbBMxRdysSCVPaYcFEQ
+    values:
+      exposure_time: 3.2
+      initial_exposure_time: 6.4
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Basic Orange @SL1S 0.05
+    id: wbTEqtjkQl6Kv/XSohw3rA
+    values:
+      exposure_time: 3.5
+      initial_exposure_time: 7
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Basic Orange @SL1S 0.1
+    id: 336AOyjgRoWtsLrzCnS6Sg
+    values:
+      exposure_time: 4.2
+      initial_exposure_time: 9

@@ -1,2 +1,3 @@
 min_slic3r_version = 3.0.0-alpha0
+1.0.1 Synced with PrusaResearchSLA 1.0.10: added Prusament Resin Basic, Model Prusa Pro Green and Model+ (20 colors), removed obsolete Prusament Resin Tough, updated SLA print support and pad parameters.
 1.0.0 Initial release

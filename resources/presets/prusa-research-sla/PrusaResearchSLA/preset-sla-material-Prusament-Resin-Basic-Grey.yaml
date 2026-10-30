@@ -1,0 +1,55 @@
+id: Prusament Resin Basic Grey
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Model
+  material_colour: '#9C9D9D'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: h6RPndMhR9Ca+9Y9Jfhvtw
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [3, 15]
+    delay_after_exposure: [0, 0]
+    tower_hop_height: [0, 0]
+    tower_speed: [layer22, layer22]
+    use_tilt: [1, 1]
+    tilt_down_initial_speed: [layer1750, layer1750]
+    tilt_down_offset_steps: [600, 1200]
+    tilt_down_offset_delay: [0, 0]
+    tilt_down_finish_speed: [move8000, move5120]
+    tilt_down_cycles: [1, 1]
+    tilt_down_delay: [0, 0]
+    tilt_up_initial_speed: [move8000, move8000]
+    tilt_up_offset_steps: [600, 600]
+    tilt_up_offset_delay: [0, 0]
+    tilt_up_finish_speed: [layer600, layer600]
+    tilt_up_cycles: [1, 1]
+    tilt_up_delay: [0, 0]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Basic Grey @SL1S 0.025
+    id: PPVKhY4FSrCz0aPI9/QnMA
+    values:
+      exposure_time: 3.2
+      initial_exposure_time: 6.4
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Basic Grey @SL1S 0.05
+    id: jstF7c14QoOA0fPhdeZyaA
+    values:
+      exposure_time: 3.5
+      initial_exposure_time: 7
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Basic Grey @SL1S 0.1
+    id: +DT/eD0vT0awS7Bhrt5muw
+    values:
+      exposure_time: 4.2
+      initial_exposure_time: 9
