@@ -27,8 +27,8 @@ std::string to_display_string(Biz::Slicing::ErrorCode code)
         );
     case ErrorCode::ToolOverridesInSingleToolPrint:
         return _u8L(
-            "There are tool overrides, even though the print is single tool."
-            "This can happen if the 3mf or presets are corrupted !"
+            "There are tool overrides, even though the print is single-tool. "
+            "This can happen if the 3MF or presets are corrupted!"
         );
     case ErrorCode::InvalidExtruderOffset:
         return _u8L("The count of extruder offsets does not match the tool count.");
@@ -39,12 +39,12 @@ std::string to_display_string(Biz::Slicing::ErrorCode code)
         );
     case ErrorCode::SpiralVaseMultipleObjects:
         return _u8L(
-            "Only a single object may be printed at a time in Spiral Vase mode. Either remove all "
+            "Only a single object may be printed at a time in Spiral vase mode. Either remove all "
             "but the last object, or enable sequential mode by \"complete_objects\"."
         );
     case ErrorCode::SpiralVaseMultipleMaterials:
         return _u8L(
-            "The Spiral Vase option can only be used when printing single material objects."
+            "The Spiral vase option can only be used when printing single material objects."
         );
     case ErrorCode::MachineLimitsWithKlipper:
         return _u8L(
@@ -65,19 +65,19 @@ std::string to_display_string(Biz::Slicing::ErrorCode code)
             "current print settings and retry."
         );
     case ErrorCode::VariableLayerHeightAndOrganicSupports:
-        return _u8L("Variable layer height is not supported with Organic supports.");
+        return _u8L("Variable layer height is not supported with organic supports.");
     case ErrorCode::WipeTowerDifferentExtruderDiameters:
         return _u8L(
             "The wipe tower is only supported if all extruders use filaments of the same diameter."
         );
     case ErrorCode::WipeTowerGCodeFlavor:
         return _u8L(
-            "The Wipe Tower is currently only supported for the Marlin, Klipper, RepRap/Sprinter, "
+            "The wipe tower is currently only supported for the Marlin, Klipper, RepRap/Sprinter, "
             "RepRapFirmware and Repetier G-code flavors."
         );
     case ErrorCode::WipeTowerAbsoluteDistances:
         return _u8L(
-            "The Wipe Tower is currently only supported with the relative extruder addressing "
+            "The wipe tower is currently only supported with the relative extruder addressing "
             "(use_relative_e_distances=1)."
         );
     case ErrorCode::WipeTowerOozePreventionSingleExtruderMultiMaterial:
@@ -86,32 +86,32 @@ std::string to_display_string(Biz::Slicing::ErrorCode code)
             "'single_extruder_multi_material' is off."
         );
     case ErrorCode::WipeTowerVolumetricE:
-        return _u8L("The Wipe Tower currently does not support volumetric E (use_volumetric_e=0).");
+        return _u8L("The wipe tower currently does not support volumetric E (use_volumetric_e=0).");
     case ErrorCode::WipeTowerSequentialPrint:
         return _u8L(
-            "The Wipe Tower is currently not supported for multimaterial sequential prints."
+            "The wipe tower is currently not supported for multimaterial sequential prints."
         );
     case ErrorCode::WipeTowerDifferentObjectsLayerHeights:
         return _u8L(
-            "The Wipe Tower is only supported for multiple objects if they have equal layer heights."
+            "The wipe tower is only supported for multiple objects if they have equal layer heights."
         );
     case ErrorCode::WipeTowerDifferentObjectsRaftLayerCounts:
         return _u8L(
-            "The Wipe Tower is only supported for multiple objects if they are printed over an "
+            "The wipe tower is only supported for multiple objects if they are printed over an "
             "equal number of raft layers."
         );
     case ErrorCode::WipeTowerDifferentObjectsSupportContactDistance:
         return _u8L(
-            "The Wipe Tower is only supported for multiple objects if they are printed with the "
+            "The wipe tower is only supported for multiple objects if they are printed with the "
             "same support_material_contact_distance."
         );
     case ErrorCode::WipeTowerDifferentObjectsSlicing:
         return _u8L(
-            "The Wipe Tower is only supported for multiple objects if they are sliced equally."
+            "The wipe tower is only supported for multiple objects if they are sliced equally."
         );
     case ErrorCode::WipeTowerDifferentObjectsVariableHeight:
         return _u8L(
-            "The Wipe tower is only supported if all objects have the same variable layer height."
+            "The wipe tower is only supported if all objects have the same variable layer height."
         );
     case ErrorCode::InsufficientExtrusionWidth:
         return _u8L("Extrusion width is too low to be printable at current layer height.");
@@ -119,12 +119,12 @@ std::string to_display_string(Biz::Slicing::ErrorCode code)
         return _u8L("Extrusion width is too large to be printable with the nozzle diameter.");
     case ErrorCode::WipeTowerSoluableUnsynchronizedLayers:
         return _u8L(
-            "For the Wipe Tower to work with the soluble supports, the support layers need to be "
+            "For the wipe tower to work with the soluble supports, the support layers need to be "
             "synchronized with the object layers."
         );
     case ErrorCode::WipeTowerSupporMaterialExtruderSet:
         return _u8L(
-            "The Wipe Tower currently supports the non-soluble supports only if they are printed "
+            "The wipe tower currently supports the non-soluble supports only if they are printed "
             "with the current extruder without triggering a tool change. (both "
             "support_material_extruder and support_material_interface_extruder need to be set to 0)."
         );
@@ -221,7 +221,8 @@ std::string to_display_string(Biz::Slicing::Error error, const Domain::Project& 
         const auto& payload = std::get<Biz::Slicing::InvalidThumbnailRequestPayload>(error.payload);
         std::string error_str = to_display_string(error.code);
         if (payload.invalid_format)
-            error_str += "\n - " + fmt::format(fmt::runtime(_u8L("Invalid input format. Expected vector of dimensions in the following format: \"{}\"")), "XxY/EXT, XxY/EXT, ...");
+            // TRN {} is the expected format of thumbnail sizes, "XxY/EXT, XxY/EXT, ..."
+            error_str +="\n - " + fmt::format(fmt::runtime(_u8L("Invalid input format. Expected vector of dimensions in the following format: \"{}\"")), "XxY/EXT, XxY/EXT, ...");
         if (payload.out_of_range)
             error_str += "\n - " + _u8L("Input value is out of range");
         if (payload.invalid_ext)
@@ -280,8 +281,8 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
         auto payload = std::get_if<CustomGCodeReservedKeywordsWarningPayload>(&warning.payload);
         ASSERT(payload != nullptr, "Expected CustomGCodeReservedKeywordsWarningPayload");
         message = fmt::format(
-        // TRN {} is list of found reserved keywords
             fmt::runtime(_u8L(
+                // TRN {} is list of found reserved keywords
                 "In the custom G-code were found reserved keywords:\n"
                 "{} \n"
                 "This may cause problems in g-code visualization and printing time estimation."
@@ -297,7 +298,7 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
         message = fmt::format(
             fmt::runtime(_u8L(
                 // TRN {} is a custom G-code
-                "G-code Post-Processor encountered an invalid toolchange, maybe from a custom G-code: {}\n"
+                "G-code post-processor encountered an invalid toolchange, maybe from a custom G-code: {}\n"
                 "Generating M104 lines for it was skipped."
             )),
             payload->gcode_line
@@ -345,7 +346,7 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
     case WarningCode::SupportNozzleDiameterDiffer:
         message = _u8L(
             "Printing supports with different nozzle diameters is experimental. "
-            "For best results, switch to Organic supports and assign a specific extruder "
+            "For best results, switch to organic supports and assign a specific extruder "
             "for supports."
         );
         break;
@@ -363,17 +364,17 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
 
     case WarningCode::XYSizeCompensationIgnoredMultiMaterialPainting:
         message = _u8L(
-            "An object has enabled XY Size compensation which will not be used "
+            "An object has enabled XY size compensation which will not be used "
             "because it is also multi-material painted.\n"
-            "XY Size compensation cannot be combined with multi-material painting."
+            "XY size compensation cannot be combined with multi-material painting."
         );
         break;
 
     case WarningCode::XYSizeCompensationIgnoredFuzzySkinPainting:
         message = _u8L(
-            "An object has enabled XY Size compensation which will not be used "
+            "An object has enabled XY size compensation which will not be used "
             "because it is also fuzzy skin painted.\n"
-            "XY Size compensation cannot be combined with fuzzy skin painting."
+            "XY size compensation cannot be combined with fuzzy skin painting."
         );
         break;
 

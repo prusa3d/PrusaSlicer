@@ -1028,7 +1028,7 @@ void FdmViewerWrapper::render_customize_extrusion_roles_colors_popup()
 
     ImGui::OpenPopup(wnd_name.c_str());
     if (ImGui::BeginPopupModal(wnd_name.c_str(), &open, windows_flag)) {
-        ImGui::Text("%s:", _u8L("Extrusion Roles Colors").c_str());
+        ImGui::Text("%s:", _u8L("Extrusion roles colors").c_str());
         if (ImGui::BeginTable("Roles", 1, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInner)) {
             for (uint8_t i = 0; i < uint8_t(GCODE_EXTRUSION_ROLES_COUNT); ++i) {
                 GCodeExtrusionRole role = GCodeExtrusionRole(i);
@@ -1075,7 +1075,7 @@ void FdmViewerWrapper::render_customize_options_colors_popup()
 
     ImGui::OpenPopup(wnd_name.c_str());
     if (ImGui::BeginPopupModal(wnd_name.c_str(), &open, windows_flag)) {
-        ImGui::Text("%s:", _u8L("Options Colors").c_str());
+        ImGui::Text("%s:", _u8L("Options colors").c_str());
         if (ImGui::BeginTable("Options", 1, ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInner)) {
             for (uint8_t i = uint8_t(OptionType::Travels); i <= uint8_t(OptionType::CustomGCodes); ++i) {
                 OptionType option = OptionType(i);

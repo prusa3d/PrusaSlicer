@@ -43,7 +43,7 @@ public:
         button_row->set_justify_content(YGJustifyFlexEnd);
 
         if (dialog_buttons & MsgBoxHandler::AcceptButton) {
-            LayoutButton* btn_ok       = button_row->emplace_back<LayoutButton>(Biz::_u8L("Ok"));
+            LayoutButton* btn_ok       = button_row->emplace_back<LayoutButton>(Biz::_u8L("OK"));
             btn_ok->callbacks().action = [=, this]
             {
                 if (fn_color_picked) {
@@ -113,7 +113,7 @@ public:
         button_row->set_justify_content(YGJustifyFlexEnd);
 
         if (dialog_buttons & MsgBoxHandler::AcceptButton) {
-            LayoutButton* btn_ok       = button_row->emplace_back<LayoutButton>(Biz::_u8L("Ok"));
+            LayoutButton* btn_ok       = button_row->emplace_back<LayoutButton>(Biz::_u8L("OK"));
             btn_ok->callbacks().action = [this, fn_accepted_text, input_text]
             {
                 if (fn_accepted_text) {

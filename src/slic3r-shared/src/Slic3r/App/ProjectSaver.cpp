@@ -92,7 +92,7 @@ bool ProjectSaver::save_project_as(Domain::SelectionId project_id)
     auto& dlg_manager = AppServices::instance().dialog_manager();
     dlg_manager.show_file_dialog(
         FileDialogType::Save,
-        Biz::_u8L("Save Project") + " " + project_name,
+        Biz::_u8L("Save project") + " " + project_name,
         m_project_interactor.project_dir(
             project_id,
             AppServices::instance().app_config().get<std::string>("last_used_directory")

@@ -47,6 +47,7 @@ std::string effective_color_hex(
 
 std::string recipe_title(const VirtualExtruder& virtual_extruder)
 {
+    // TRN {} is the number of the virtual extruder
     return fmt::format(fmt::runtime(_u8L("Virtual extruder #{}")), virtual_extruder.id);
 }
 

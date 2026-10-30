@@ -38,7 +38,7 @@ MeasureDialog::MeasureDialog() : GizmoWindow()
     m_extra_help.init(m_helper_panel);
     m_extra_help.add_item(
         {GizmoHelpFactory::HelpIcon{Render::Icon::MouseLeft}},
-        _u8L("Select Objects")
+        _u8L("Select objects")
     );
 
     // Create main panel

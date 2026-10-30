@@ -27,6 +27,7 @@ public:
 
     std::string formatted_errorstr() const
     {
+        // TRN 1st {} is the name of the ZIP archive, 2nd {} is the error description
         return fmt::format(fmt::runtime(_u8L("Error with ZIP archive {}: {}!")),
                            m_zipname,
                            translate_miniz_error(arch.m_last_error));

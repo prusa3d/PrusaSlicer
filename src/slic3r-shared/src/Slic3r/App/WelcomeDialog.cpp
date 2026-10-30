@@ -391,7 +391,7 @@ ItemPtr create_offline_button_content()
     icon->set_width(25_fpx);
     icon->set_height(25_fpx);
 
-    auto title{result->emplace_back<Text>(Biz::_u8L("Offline (Restricted environments)"))};
+    auto title{result->emplace_back<Text>(Biz::_u8L("Offline (restricted environments)"))};
     title->set_font_type(Render::ImguiFontType::Bold);
     title->set_font_size(18_fpx);
 
@@ -426,7 +426,7 @@ ItemPtr create_offline_button_content()
     local_row->set_gap(gap);
     local_row->set_align_items(YGAlignCenter);
     emplace_dot(local_row, green);
-    local_row->emplace_back<Text>(Biz::_u8L("Local Network printing enabled"));
+    local_row->emplace_back<Text>(Biz::_u8L("Local network printing enabled"));
 
     return result;
 }
@@ -441,7 +441,7 @@ ItemPtr create_online_button_content()
     icon->set_width(25_fpx);
     icon->set_height(25_fpx);
 
-    auto title{result->emplace_back<Text>(Biz::_u8L("Online (Most convenient)"))};
+    auto title{result->emplace_back<Text>(Biz::_u8L("Online (most convenient)"))};
     title->set_font_type(Render::ImguiFontType::Bold);
     title->set_font_size(18_fpx);
 
@@ -464,7 +464,7 @@ ItemPtr create_online_button_content()
     auto printables_icon{printables_row->emplace_back<Icon>(Render::Icon::Printables)};
     printables_icon->set_width(16_fpx);
     printables_icon->set_height(16_fpx);
-    printables_row->emplace_back<Text>(Biz::_u8L("Printables Database integration"));
+    printables_row->emplace_back<Text>(Biz::_u8L("Printables database integration"));
 
     auto connect_row{result->emplace_back<Item>()};
     connect_row->set_flex_shrink(0);
@@ -473,7 +473,7 @@ ItemPtr create_online_button_content()
     auto connect_icon{connect_row->emplace_back<Icon>(Render::Icon::Connect)};
     connect_icon->set_width(16_fpx);
     connect_icon->set_height(16_fpx);
-    connect_row->emplace_back<Text>(Biz::_u8L("PrusaConnect cloud printing"));
+    connect_row->emplace_back<Text>(Biz::_u8L("Prusa Connect cloud printing"));
 
     return result;
 }
@@ -769,6 +769,7 @@ public:
         std::size_t address{0};
         for (Domain::Preset::HwToolConfig& tool_config : config.tools) {
             const Domain::Preset::HwToolConfigDef* hw_tool_config_def{nullptr};
+            const std::size_t tool_number{address + 1};
             const std::string tool_address{std::to_string(address++)};
             auto it{json["tools"].find(tool_address)};
             if (it != json["tools"].end()) {
@@ -785,8 +786,9 @@ public:
                 tool_config = Biz::Preset::from_def(vendor_data, *hw_tool_config_def);
             } else {
                 warnings[create_printer_identifier(json)].push_back(fmt::format(
-                    fmt::runtime(Biz::_u8L("Failed to synchronize {}. tool")),
-                    tool_address));
+                    // TRN {} is the tool number (counted from 1)
+                    fmt::runtime(Biz::_u8L("Failed to synchronize tool {}")),
+                    tool_number));
             }
         }
 
@@ -820,7 +822,7 @@ public:
                             m_title->set_sub_title(fmt::format(
                                 fmt::runtime(Biz::_u8L(
                                     // TRN {} is an error message
-                                    "Synchronization failed: {}. Please add your printers manually")),
+                                    "Synchronization failed: {}. Please add your printers manually.")),
                                 error));
                             reload_content_state();
                         });
@@ -845,7 +847,7 @@ public:
                         [this]()
                         {
                             m_title->set_title(Biz::_u8L("Synchronizing printers failed, retrying..."));
-                            m_title->set_sub_title(Biz::_u8L("You can also choose your printer maually."));
+                            m_title->set_sub_title(Biz::_u8L("You can also choose your printer manually."));
                             reload_content_state();
                         });
             }
@@ -899,7 +901,7 @@ public:
 
                                 for (const nlohmann::json& printer_json : root["printers"]) {
                                     if (!printer_json.is_object()) {
-                                        handle_error(Biz::_u8L("No printers in the respose"));
+                                        handle_error(Biz::_u8L("No printers in the response"));
                                         return;
                                     }
                                     std::optional<PrinterToAdd> printer{
@@ -923,7 +925,7 @@ public:
                                 m_title->set_title(
                                     Biz::_u8L("Successfully synchronized your printers"));
                                 m_title->set_sub_title(Biz::_u8L(
-                                    "If you have any offline printers, you can also add them now"));
+                                    "If you have any offline printers, you can also add them now."));
                             } else if (!parsing_failures.empty()) {
                                 SPDLOG_DEBUG("Response body: {}", body);
                                 if (!printers.empty()) {
@@ -947,6 +949,7 @@ public:
                                     m_errors->emplace_back<WarningPanel>(Platform::Color::Error)};
                                 panel->set_rounding(10);
                                 panel->set_warning(
+                                    // TRN {} is the model of the synchronized printer
                                     fmt::format(fmt::runtime(Biz::_u8L("Unable to synchronize {}")),
                                                 error.model),
                                     {fmt::format("uuid: {}", error.uuid), ""});
@@ -966,6 +969,7 @@ public:
                                     .insert(to_display.end(), warnings.begin(), warnings.end());
 
                                 panel->set_warning(
+                                    // TRN {} is the model of the synchronized printer
                                     fmt::format(fmt::runtime(Biz::_u8L("Issues in {}")),
                                                 identifier.model),
                                     to_display);
@@ -1075,7 +1079,7 @@ private:
 
     std::string m_default_title{Biz::_u8L("Choose your printer")};
     std::string m_default_subtitle{
-        Biz::_u8L("If you have more then one printer you can also add them now.")};
+        Biz::_u8L("If you have more than one printer, you can also add them now.")};
 };
 
 class Note : public Item
@@ -1128,7 +1132,7 @@ ItemPtr WelcomeDialog::create_online_decision_screen(const Theme& theme,
     result->content()->emplace_back<Note>(
         Render::Icon::Cog,
         Biz::_u8L("Need more granular control? You can adjust the options"
-                  " individually anytime in Application Preferences."));
+                  " individually anytime in application preferences."));
 
     return result;
 }
@@ -1149,7 +1153,7 @@ ItemPtr create_sentry_screen(const Theme& theme,
     result->content()->emplace_back<Title>(
         Biz::_u8L("Give us a helping hand"),
         Biz::_u8L(
-            "Enable crash reporting, so when PrusaSlicer crashes, a report is automatically"
+            "Enable crash reporting so that when PrusaSlicer crashes, a report is automatically"
             " sent to Prusa Research with precise information about the crash."
             " This significantly increases the chance that we will be able to fix the issue fast!"));
 
@@ -1183,7 +1187,7 @@ ItemPtr create_sentry_screen(const Theme& theme,
 
     result->content()->emplace_back<Note>(
         Render::Icon::Cog,
-        Biz::_u8L("This can be changed anytime in Application Preferences"));
+        Biz::_u8L("This can be changed anytime in application preferences."));
 
     return result;
 }
@@ -1287,7 +1291,7 @@ public:
         result->content()->emplace_back<Title>(
             Biz::_u8L("Sign in to your Prusa Account"),
             Biz::_u8L(
-                "Click the Sign in button to open an external browser, where you can safely sign in to your Prusa account."));
+                "Click the Sign in button to open an external browser, where you can safely sign in to your Prusa Account."));
 
         auto note_section{result->content()->emplace_back<Rectangle>()};
         note_section->set_flex_shrink(0);

@@ -283,9 +283,10 @@ void SplashScreen::ConstantText::init(const wxFont& init_font, bool is_editor, i
         "{}\n\n{}\n\n{}",
         fmt::format(
             fmt::runtime(
-                // TRN: {} is a placeholder for the application name (e.g., "PrusaSlicer").
-                // Please preserve the "\n" newline characters to maintain the 3-line format of this phrase.
                 Biz::_u8L(
+                    // TRN: {} is a placeholder for the application name (e.g., "PrusaSlicer").
+                    // Please preserve the "\n" newline characters to maintain the 3-line format
+                    // of this phrase.
                     "{} is based on Slic3r\n"
                     "by Alessandro Ranellucci\n"
                     "and the RepRap community."

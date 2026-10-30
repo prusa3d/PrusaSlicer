@@ -160,8 +160,8 @@ void PhysicalPrinterSettingsDialog::create_page_list()
         {
             auto& dlg_manager = App::AppServices::instance().dialog_manager();
             dlg_manager.show_yesno_dialog(
-                _u8L("Remove Physical Printer?"),
-                _u8L("Do you wish to remove the Physical Printer?"),
+                _u8L("Remove physical printer?"),
+                _u8L("Do you wish to remove the physical printer?"),
                 [this, index](bool checked)
                 {
                     if (checked) {

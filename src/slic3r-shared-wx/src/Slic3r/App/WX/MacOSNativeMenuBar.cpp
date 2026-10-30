@@ -21,7 +21,7 @@ namespace {
 // wxWidgets menu labels treat a single '&' as a mnemonic marker (it's dropped on macOS,
 // underlines the next character on Windows/GTK). Menu item names are plain, un-mnemonic'd
 // strings shared with Yoga::MenuItem (which renders them literally), so a literal '&' in a
-// label (e.g. "Preset Sources & Updates") must be escaped as "&&" only for this wx-native
+// label (e.g. "Preset sources & updates") must be escaped as "&&" only for this wx-native
 // consumer, to render as a plain ampersand instead of being swallowed.
 wxString mnemonic_safe_label(const std::string& text)
 {

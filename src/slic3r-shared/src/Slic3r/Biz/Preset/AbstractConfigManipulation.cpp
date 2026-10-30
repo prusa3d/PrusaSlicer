@@ -78,22 +78,22 @@ void AbstractConfigManipulation::update_print_fff_config(DynamicPrintConfig* con
            config->opt_int("support_material_enforce_layers") == 0 &&
            ! config->opt_bool("thin_walls")))
     {
-        std::string msg_text = _u8L("The Spiral Vase mode requires:\n"
+        std::string msg_text = _u8L("The Spiral vase mode requires:\n"
                                 "- one perimeter\n"
                                 "- no top solid layers\n"
                                 "- 0% fill density\n"
                                 "- no support material\n"
                					"- Detect thin walls disabled");
         if (is_global_config)
-            msg_text += "\n\n" + _u8L("Shall I adjust those settings in order to enable Spiral Vase?");
+            msg_text += "\n\n" + _u8L("Shall I adjust those settings in order to enable Spiral vase?");
 
         DynamicPrintConfig new_conf = *config;
 
         bool answer{ false };
         if (is_global_config)
-            answer = ask_user(_u8L("Spiral Vase"), msg_text);
+            answer = ask_user(_u8L("Spiral vase"), msg_text);
         else 
-            warn_user(_u8L("Spiral Vase"), msg_text);
+            warn_user(_u8L("Spiral vase"), msg_text);
 
         bool support = true;
         if (!is_global_config || answer) {
@@ -122,18 +122,18 @@ void AbstractConfigManipulation::update_print_fff_config(DynamicPrintConfig* con
         config->opt_enum<SupportMaterialStyle>("support_material_style") != smsOrganic) {
         if (config->opt_float("support_material_contact_distance") == 0) {
             if (!config->opt_bool("support_material_synchronize_layers")) {
-                std::string msg_text = _u8L("For the Wipe Tower to work with the soluble supports, the support layers\n"
+                std::string msg_text = _u8L("For the wipe tower to work with the soluble supports, the support layers\n"
                                         "need to be synchronized with the object layers.");
                 if (is_global_config)
-                    msg_text += "\n\n" + _u8L("Shall I synchronize support layers in order to enable the Wipe Tower?");
+                    msg_text += "\n\n" + _u8L("Shall I synchronize support layers in order to enable the wipe tower?");
 
                 DynamicPrintConfig new_conf = *config;
 
                 bool answer{ false };
                 if (is_global_config)
-                    answer = ask_user(_u8L("Wipe Tower"), msg_text);
+                    answer = ask_user(_u8L("Wipe tower"), msg_text);
                 else
-                    warn_user(_u8L("Wipe Tower"), msg_text);
+                    warn_user(_u8L("Wipe tower"), msg_text);
 
                 if (!is_global_config || answer) {
                     new_conf.set_key_value("support_material_synchronize_layers", new ConfigOptionBool(true));
@@ -144,19 +144,19 @@ void AbstractConfigManipulation::update_print_fff_config(DynamicPrintConfig* con
             }
         } else {
             if ((config->opt_int("support_material_extruder") != 0 || config->opt_int("support_material_interface_extruder") != 0)) {
-                std::string msg_text = _u8L("The Wipe Tower currently supports the non-soluble supports only "
+                std::string msg_text = _u8L("The wipe tower currently supports the non-soluble supports only "
                                         "if they are printed with the current extruder without triggering a tool change. "
                                         "(both support_material_extruder and support_material_interface_extruder need to be set to 0).");
                 if (is_global_config)
-                    msg_text += "\n\n" + _u8L("Shall I adjust those settings in order to enable the Wipe Tower?");
+                    msg_text += "\n\n" + _u8L("Shall I adjust those settings in order to enable the wipe tower?");
 
                 DynamicPrintConfig new_conf = *config;
 
                 bool answer{ false };
                 if (is_global_config)
-                    answer = ask_user(_u8L("Wipe Tower"), msg_text);
+                    answer = ask_user(_u8L("Wipe tower"), msg_text);
                 else
-                    warn_user(_u8L("Wipe Tower"), msg_text);
+                    warn_user(_u8L("Wipe tower"), msg_text);
 
                 if (!is_global_config || answer) {
                     new_conf.set_key_value("support_material_extruder", new ConfigOptionInt(0));
@@ -182,7 +182,7 @@ void AbstractConfigManipulation::update_print_fff_config(DynamicPrintConfig* con
 
                 DynamicPrintConfig new_conf = *config;
 
-                if (ask_user(_u8L("Support Generator"), msg_text)) {
+                if (ask_user(_u8L("Support generator"), msg_text)) {
                     // Enable "detect bridging perimeters".
                     new_conf.set_key_value("overhangs", new ConfigOptionBool(true));
                 }

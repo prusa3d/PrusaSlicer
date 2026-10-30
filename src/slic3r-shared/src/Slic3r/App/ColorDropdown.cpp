@@ -589,6 +589,7 @@ Label get_label(
     const Label unkown_label{
         .colors = {Domain::ColorRGBA::RED()},
         .name  = fmt::format(
+            // TRN {} is the number of an extruder that does not exist in the current printer
             fmt::runtime(Biz::_u8L("Invalid extruder ({})")),
             with_default ? *index : *index + 1
         ),

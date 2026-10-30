@@ -99,7 +99,7 @@ void init_common_fdm_sla_config_items(ConfigDefinitions& defs, const PrinterTech
     def->order = 1;
     def->gui_type = ConfigItemDef::GUIType::textfield;
     def->tooltip = L("The first layer will be shrunk in the XY plane by the configured value "
-                     "to compensate for the 1st layer squish aka an Elephant Foot effect.");
+                     "to compensate for the 1st layer squish aka an elephant foot effect.");
     def->units = {L("mm")};
     def->min = 0;
     def->init_fn = init_with(0.);
@@ -198,7 +198,7 @@ void init_common_fdm_sla_config_items(ConfigDefinitions& defs, const PrinterTech
     } else {
         def->overrides_in = Locations{ sla_object };
     }
-    def->label = L("Slicing Mode");
+    def->label = L("Slicing mode");
     def->option_group = ConfigItemDef::OptionGroup::Print_PrecisionSlicing_SlicingStrategy;
     def->category = ConfigItemDef::Category::Print_PrecisionSlicing;
     def->order = 0;
@@ -239,14 +239,14 @@ void init_common_fdm_sla_config_items(ConfigDefinitions& defs, const PrinterTech
 
     def = defs.add("default_print", typeid(std::string));
     def->location = printer;
-    def->label = L("Default Print Preset");
+    def->label = L("Default print preset");
     def->category = ConfigItemDef::Category::Hidden;
     def->tooltip = L("Name or ID of print preset to use as default when this printer preset is selected.");
     def->init_fn = init_with("");
 
     def = defs.add("default_material", typeid(std::string));
     def->location = print;
-    def->label = L("Default Material Preset");
+    def->label = L("Default material preset");
     def->category = ConfigItemDef::Category::Hidden;
     def->tooltip = L("Name or ID of material preset to use as default when this print preset is selected.");
     def->init_fn = init_with("");

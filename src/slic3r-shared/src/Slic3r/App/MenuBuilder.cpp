@@ -29,9 +29,9 @@ std::string MenuBuilder::item_name_translated(UniversalMenuItemName menu_item_na
                 case MenuItemName::EditSvgOrText:
                     return Biz::_u8L("Edit");
                 case MenuItemName::SelectAll:
-                    return Biz::_u8L("Select All");
+                    return Biz::_u8L("Select all");
                 case MenuItemName::DeselectAll:
-                    return Biz::_u8L("Deselect All");
+                    return Biz::_u8L("Deselect all");
                 case MenuItemName::DeleteSelected:
                     return Biz::_u8L("Delete selected");
                 case MenuItemName::Undo:
@@ -50,7 +50,7 @@ std::string MenuBuilder::item_name_translated(UniversalMenuItemName menu_item_na
                 case MenuItemName::ReloadFromDisk:
                 case MenuItemName::ReloadObject:
                 case MenuItemName::ReloadVolume:
-                    return Biz::_u8L("Reload From Disk");
+                    return Biz::_u8L("Reload from disk");
                 case MenuItemName::Arrange:
                     return Biz::_u8L("Arrange");
                 case MenuItemName::ArrangeSelection:
@@ -82,67 +82,67 @@ std::string MenuBuilder::item_name_translated(UniversalMenuItemName menu_item_na
                 case MenuItemName::JumpToValue:
                     return Biz::_u8L("Jump to height");
                 case MenuItemName::ShapeGallery:
-                    return Biz::_u8L("Shape Gallery");
+                    return Biz::_u8L("Shape gallery");
                 case MenuItemName::View:
                     return Biz::_u8L("View");
                 case MenuItemName::ShowLabel:
-                    return Biz::_u8L("Show Labels");
+                    return Biz::_u8L("Show labels");
                 case MenuItemName::FullScreen:
                     return Biz::_u8L("Fullscreen");
                 case MenuItemName::ZoomIn:
-                    return Biz::_u8L("Zoom In");
+                    return Biz::_u8L("Zoom in");
                 case MenuItemName::ZoomOut:
-                    return Biz::_u8L("Zoom Out");
+                    return Biz::_u8L("Zoom out");
                 case MenuItemName::CameraProjectionSwitch:
-                    return Biz::_u8L("Switch Projection");
+                    return Biz::_u8L("Switch projection");
                 case MenuItemName::LookAtActiveBed:
-                    return Biz::_u8L("Look at Active Bed");
+                    return Biz::_u8L("Look at active bed");
                 case MenuItemName::CameraDefaultView:
-                    return Biz::_u8L("Default View");
+                    return Biz::_u8L("Default view");
                 case MenuItemName::CameraTopView:
-                    return Biz::_u8L("Top View");
+                    return Biz::_u8L("Top view");
                 case MenuItemName::CameraBottomView:
-                    return Biz::_u8L("Bottom View");
+                    return Biz::_u8L("Bottom view");
                 case MenuItemName::CameraFrontView:
-                    return Biz::_u8L("Front View");
+                    return Biz::_u8L("Front view");
                 case MenuItemName::CameraRearView:
-                    return Biz::_u8L("Rear View");
+                    return Biz::_u8L("Rear view");
                 case MenuItemName::CameraLeftView:
-                    return Biz::_u8L("Left View");
+                    return Biz::_u8L("Left view");
                 case MenuItemName::CameraRightView:
-                    return Biz::_u8L("Right View");
+                    return Biz::_u8L("Right view");
                 case MenuItemName::Configuration:
                     return Biz::_u8L("Configuration");
                 case MenuItemName::ConfigurationWizard:
-                    return Biz::_u8L("Configuration Wizard");
+                    return Biz::_u8L("Configuration wizard");
                 case MenuItemName::CheckConfigUpdates:
-                    return Biz::_u8L("Check for Config Updates");
+                    return Biz::_u8L("Check for config updates");
                 case MenuItemName::CheckAppUpdates:
-                    return Biz::_u8L("Check for Application Updates");
+                    return Biz::_u8L("Check for application updates");
                 case MenuItemName::FlashPrinterFirmware:
-                    return Biz::_u8L("Flash Printer Firmware");
+                    return Biz::_u8L("Flash printer firmware");
                 case MenuItemName::Help:
                     return Biz::_u8L("Help");
                 case MenuItemName::PSWebsite:
-                    return Biz::_u8L("PrusaSlicer Website");
+                    return Biz::_u8L("PrusaSlicer website");
                 case  MenuItemName::Samples:
-                    return Biz::_u8L("Sample G-codes and Models");
+                    return Biz::_u8L("Sample G-codes and models");
                 case  MenuItemName::Releases:
-                    return Biz::_u8L("Software Releases");
+                    return Biz::_u8L("Software releases");
                 case MenuItemName::SystemInfo:
-                    return Biz::_u8L("System Info");
+                    return Biz::_u8L("System info");
                 case MenuItemName::ConfigFolder:
-                    return Biz::_u8L("Show Configuration Folder");
+                    return Biz::_u8L("Show configuration folder");
                 case MenuItemName::ReportAnIssue:
-                    return Biz::_u8L("Report PrusaSlicer Issue");
+                    return Biz::_u8L("Report PrusaSlicer issue");
                 case MenuItemName::About:
                     return Biz::_u8L("About PrusaSlicer");
                 case MenuItemName::TipOfTheDay:
-                    return Biz::_u8L("Show Tip of the Day");
+                    return Biz::_u8L("Show tip of the day");
                 case MenuItemName::KeyboardShortcutsDialog:
-                    return Biz::_u8L("Keyboard Shortcuts");
+                    return Biz::_u8L("Keyboard shortcuts");
                 case MenuItemName::RecentProjects:
-                    return Biz::_u8L("Recent Projects");
+                    return Biz::_u8L("Recent projects");
                 case MenuItemName::Exit:
                     return Biz::_u8L("Exit");
                 case MenuItemName::Export:
@@ -152,18 +152,18 @@ std::string MenuBuilder::item_name_translated(UniversalMenuItemName menu_item_na
                 case MenuItemName::SendGcode:
                     return Biz::_u8L("Send G-code");
                 case MenuItemName::ExportGcodeToFlash:
-                    return Biz::_u8L("Export G-code to SD Card / Flash Drive");
+                    return Biz::_u8L("Export G-code to SD card / flash drive");
                 case MenuItemName::OnlinePresetUpdate:
-                    return Biz::_u8L("Update from Online Presets");
+                    return Biz::_u8L("Update from online presets");
                 case MenuItemName::PresetReposManagement:
                     // TRN Main menu item. Opens the preset sources and updates dialog.
-                    return Biz::_u8L("Preset Sources & Updates");
+                    return Biz::_u8L("Preset sources & updates");
                 case MenuItemName::ArrangeBed:
-                    return Biz::_u8L("Arrange Bed");
+                    return Biz::_u8L("Arrange bed");
                 case MenuItemName::ArrangeSelectionBed:
                     return Biz::_u8L("Arrange selection");
                 case MenuItemName::SelectAllOnBed:
-                    return Biz::_u8L("Select All Objects");
+                    return Biz::_u8L("Select all objects");
                 case MenuItemName::DeleteBed:
                 case MenuItemName::DeleteSelectedObject:
                 case  MenuItemName::DeleteSelectedMultiObjects:
@@ -175,9 +175,9 @@ std::string MenuBuilder::item_name_translated(UniversalMenuItemName menu_item_na
                     return Biz::_u8L("Rename");
                 case MenuItemName::SetNumberOfInstances:
                 case MenuItemName::SetMultiObjectsNumberOfInstances:
-                    return Biz::_u8L("Set Number Of Instances");
+                    return Biz::_u8L("Set number of instances");
                 case MenuItemName::FillBedWithInstances:
-                    return Biz::_u8L("Fill Bed With Instances");
+                    return Biz::_u8L("Fill bed with instances");
                 case MenuItemName::ExportObject:
                 case MenuItemName::ExportVolume:
                     return Biz::_u8L("Export as STL/OBJ") + "...";
@@ -188,11 +188,11 @@ std::string MenuBuilder::item_name_translated(UniversalMenuItemName menu_item_na
                 case MenuItemName::SplitVolume:
                     return Biz::_u8L("Split");
                 case MenuItemName::SplitObjectToObjects:
-                    return Biz::_u8L("To Objects");
+                    return Biz::_u8L("To objects");
                 case MenuItemName::SplitObjectToVolumes:
-                    return Biz::_u8L("To Parts");
+                    return Biz::_u8L("To parts");
                 case MenuItemName::ScaleToPrintVolume:
-                    return Biz::_u8L("Scale To Print Volume");
+                    return Biz::_u8L("Scale to print volume");
                 case MenuItemName::FixMultiObjectWithRepairAlgorithm:
                 case MenuItemName::FixObjectWithRepairAlgorithm:
                 case MenuItemName::FixVolumeWithRepairAlgorithm:
@@ -260,7 +260,7 @@ std::string MenuBuilder::item_name_translated(UniversalMenuItemName menu_item_na
                 case MenuItemName::SupportModifier:
                     return Biz::_u8L("Support modifier");
                 case MenuItemName::SetAsSeparateObject:
-                    return Biz::_u8L("Separate to Object(s)");
+                    return Biz::_u8L("Separate to object(s)");
                 case MenuItemName::MergeMultiObjects:
                     return Biz::_u8L("Merge");
 
@@ -270,11 +270,11 @@ std::string MenuBuilder::item_name_translated(UniversalMenuItemName menu_item_na
                 case MenuItemName::Plugins:
                     return Biz::_u8L("Plugins");
                 case MenuItemName::PluginRescan:
-                    return Biz::_u8L("Rescan Plugins");
+                    return Biz::_u8L("Rescan plugins");
                 case MenuItemName::PluginFolder:
-                    return Biz::_u8L("Show User Plugins Folder");
+                    return Biz::_u8L("Show user plugins folder");
                 case MenuItemName::PluginInstall:
-                    return Biz::_u8L("Install Plugin Bundle");
+                    return Biz::_u8L("Install plugin bundle");
 
                 default:
                     return std::string();

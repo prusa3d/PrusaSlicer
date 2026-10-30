@@ -75,7 +75,7 @@ void SidebarActionButtons::init_physical_printer_ui()
     m_buttons_layout->set_gap(10.0f);
     m_buttons_layout->set_flex_grow(1);
 
-    m_buttons_layout->emplace_back<Yoga::Text>(Biz::_u8L("Select Destination"));
+    m_buttons_layout->emplace_back<Yoga::Text>(Biz::_u8L("Select destination"));
 
     m_physical_printer_button = m_buttons_layout->emplace_back<PhysicalPrinterSettingsButton>(
         0,

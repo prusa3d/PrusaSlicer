@@ -82,8 +82,8 @@ void PresetUpdaterActivityReporter::report_updates_available(
 
     std::string body;
     if (update_count > 0) {
-        // TRN Preset updater notification. {} counts the updates found.
         const std::string format = Biz::_L_PLURAL_u8(
+            // TRN Preset updater notification. {} counts the updates found.
             "{} preset update is available.",
             "{} preset updates are available.",
             static_cast<int>(update_count)
@@ -94,8 +94,8 @@ void PresetUpdaterActivityReporter::report_updates_available(
         if (!body.empty()) {
             body += "\n";
         }
-        // TRN Preset updater notification. {} counts vendors not on this computer yet.
         const std::string format = Biz::_L_PLURAL_u8(
+            // TRN Preset updater notification. {} counts vendors not on this computer yet.
             "{} new vendor is available.",
             "{} new vendors are available.",
             static_cast<int>(new_vendor_count)

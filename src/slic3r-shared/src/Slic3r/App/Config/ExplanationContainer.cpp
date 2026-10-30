@@ -114,8 +114,10 @@ void ExplanationContainer::update_explanation(const Biz::PrintToolItem& print_to
                 fmt::format(
                     fmt::runtime(
                         Biz::_u8L(
-                            "This configuration item requires same value each tool, this is currently "
-                            "not true and therefore we have selected {} value to be applied."
+                            // TRN {} is the value of the configuration item that has been applied
+                            // to all tools (e.g. "0.4 mm" or "Enabled")
+                            "This configuration item requires the same value for each tool. This is "
+                            "currently not the case, so the {} value has been applied."
                         )
                     ),
                     ConfigItemUtils::config_item_to_string(
@@ -142,11 +144,11 @@ void ExplanationContainer::update_explanation(const Biz::PrintToolItem& print_to
                 break;
             case Domain::CompatibilityRule::Max:
                 function_part = ExplanationPart{"Max", text_color, 0, AlignH::Right};
-                explanation_text += Biz::_u8L("Maximazing");
+                explanation_text += Biz::_u8L("Maximizing");
                 break;
             case Domain::CompatibilityRule::Min:
                 function_part = ExplanationPart{"Min", text_color, 0, AlignH::Right};
-                explanation_text += Biz::_u8L("Minifying");
+                explanation_text += Biz::_u8L("Minimizing");
                 break;
             default:
                 PANIC("Unsuported compability rule type");

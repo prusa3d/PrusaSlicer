@@ -132,15 +132,15 @@ public:
                 })};
 
             auto info{emplace_back<Yoga::Text>(Biz::_u8L(
-                "See the errors bellow and fix the custom gcode sections in the printer settings."
+                "See the errors below and fix the custom G-code sections in the printer settings."
             ))};
             if (repairable) {
                 info->set_text(Biz::_u8L(
-                    "This may be caused by loading a 3mf saved from a different version of PrusaSlicer. "
-                    "If that is the case, the easiest solution is to choose a system provided printer in the right panel. "
-                    "Other features loaded from the 3mf, such as multi material painting, will remain unchanged. "
-                    "Alternativelly, if you want keep using the loaded printer profile, "
-                    "you may try the custom gcode automatic repair, but it is not guaranteed to work. "
+                    "This may be caused by loading a 3MF saved in a different version of PrusaSlicer. "
+                    "If that is the case, the easiest solution is to choose a system-provided printer in the right panel. "
+                    "Other features loaded from the 3MF, such as multi-material painting, will remain unchanged. "
+                    "Alternatively, if you want to keep using the loaded printer profile, "
+                    "you may try the automatic custom G-code repair, but it is not guaranteed to work. "
                 ));
             }
             info->set_flex_shrink(0);

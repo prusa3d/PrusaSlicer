@@ -574,7 +574,7 @@ void DesktopApp::finish_init()
     m_project_interactor->matdb_interactor().init_client();
 
     if (m_splash_screen)
-        m_splash_screen->SetText(WX::_L("Initializing Prepare Mode") + dots);
+        m_splash_screen->SetText(WX::_L("Initializing prepare mode") + dots);
 
     auto font_manager = std::make_unique<Biz::WX::FontManager>(data_dir());
 
@@ -590,7 +590,7 @@ void DesktopApp::finish_init()
     );
 
     if (m_splash_screen)
-        m_splash_screen->SetText(WX::_L("Initializing Preview Mode") + dots);
+        m_splash_screen->SetText(WX::_L("Initializing preview mode") + dots);
 
     m_preview_module = std::make_unique<Preview::PreviewRenderModule>(
         m_workbench,

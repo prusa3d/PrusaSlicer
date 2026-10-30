@@ -75,7 +75,7 @@ std::string to_string(GCodeExtrusionRole role)
     case GCodeExtrusionRole::Ironing:                  { return _u8L("Ironing"); }
     case GCodeExtrusionRole::BridgeInfill:             { return _u8L("Bridge infill"); }
     case GCodeExtrusionRole::GapFill:                  { return _u8L("Gap fill"); }
-    case GCodeExtrusionRole::Skirt:                    { return _u8L("Skirt/Brim"); }
+    case GCodeExtrusionRole::Skirt:                    { return _u8L("Skirt/brim"); }
     case GCodeExtrusionRole::SupportMaterial:          { return _u8L("Support material"); }
     case GCodeExtrusionRole::SupportMaterialInterface: { return _u8L("Support material interface"); }
     case GCodeExtrusionRole::WipeTower:                { return _u8L("Wipe tower"); }
@@ -93,12 +93,12 @@ std::string to_string(OptionType type)
     case OptionType::Retractions:     { return _u8L("Retractions"); }
     case OptionType::Unretractions:   { return _u8L("Deretractions"); }
     case OptionType::Seams:           { return _u8L("Seams"); }
-    case OptionType::ToolChanges:     { return _u8L("Tool Changes"); }
-    case OptionType::ColorChanges:    { return _u8L("Color Changes"); }
-    case OptionType::PausePrints:     { return _u8L("Pause Prints"); }
+    case OptionType::ToolChanges:     { return _u8L("Tool changes"); }
+    case OptionType::ColorChanges:    { return _u8L("Color changes"); }
+    case OptionType::PausePrints:     { return _u8L("Pause prints"); }
     case OptionType::CustomGCodes:    { return _u8L("Custom G-codes"); }
-    case OptionType::CenterOfGravity: { return _u8L("Center Of Gravity"); }
-    case OptionType::ToolMarker:      { return _u8L("Tool Marker"); }
+    case OptionType::CenterOfGravity: { return _u8L("Center of gravity"); }
+    case OptionType::ToolMarker:      { return _u8L("Tool marker"); }
     default:                          { return _u8L("Unknown"); }
     }
 }

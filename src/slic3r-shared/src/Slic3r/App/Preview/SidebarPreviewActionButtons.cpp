@@ -154,8 +154,8 @@ void SidebarPreviewActionButtons::update_buttons()
             m_primary_button->set_tooltip("Send to Connect");
             m_primary_button->callbacks().action = ExportActions::send_gcode_to_connect(*m_project_interactor);
         } else if (m_project_interactor->physical_printer_interactor().is_printer_upload_selected()) {
-            m_primary_button->set_label(Biz::_u8L("Send to Printer"));
-            m_primary_button->set_tooltip(Biz::_u8L("Send to Printer"));
+            m_primary_button->set_label(Biz::_u8L("Send to printer"));
+            m_primary_button->set_tooltip(Biz::_u8L("Send to printer"));
             m_primary_button->callbacks().action = ExportActions::upload_gcode_to_print_host(*m_project_interactor);
         } else {
             PANIC("Unreachable!");

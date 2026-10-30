@@ -214,6 +214,7 @@ static void process_mesh(
                 dialog_provider->show_rich_yesno_dialog(
                     _u8L("The object is too small"),
                     fmt::vformat(
+                        // TRN {} is the name of the loaded file
                         _u8L(
                             "The dimensions of the object from file {} seem to be defined in meters.\n"
                             "The internal unit of PrusaSlicer is a millimeter. Do you want to recalculate the dimensions of the object?"
@@ -246,6 +247,7 @@ static void process_mesh(
                 dialog_provider->show_rich_yesno_dialog(
                     _u8L("The object is too small"),
                     fmt::vformat(
+                        // TRN {} is the name of the loaded file
                         _u8L(
                             "The dimensions of the object from file {} seem to be defined in inches.\n"
                             "The internal unit of PrusaSlicer is a millimeter. Do you want to recalculate the dimensions of the object?"
@@ -707,6 +709,8 @@ static std::string skipped_painting_warning_text(const Read3mfIssues& issues)
 
     return fmt::vformat(
         _u8L(
+            // TRN {} is a comma-separated list of the skipped painting types
+            // (e.g. "fuzzy skin, seam")
             "Some painting in the 3MF file was created with a newer, unsupported version of "
             "PrusaSlicer and was not loaded: {}. The geometry was loaded without it."
         ),
@@ -742,6 +746,7 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
             if (loaded_3mf.model.objects.empty()) {
                 return tl::make_unexpected(FileLoadError::error(
                     fmt::vformat(
+                        // TRN {} is the name of the loaded 3MF file
                         _u8L("Model from {} couldn't be read because it's empty"),
                         fmt::make_format_args(ret.file_name)
                     )
@@ -763,6 +768,7 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
         } catch (const Loaded3MFException& e) {
             return tl::make_unexpected(FileLoadError::error(
                 fmt::vformat(
+                    // TRN 1st {} is the name of the 3MF file, 2nd {} is the error message
                     _u8L("Failed to load model from 3MF file {}. {}"),
                     fmt::make_format_args(ret.file_name, e.issue.msg)
                 )
@@ -862,6 +868,7 @@ static tl::expected<ReturnData, FileLoadError> read_and_process_file(
         if (has_zero_volume(mesh.stats())) {
             return tl::make_unexpected(FileLoadError::error(
                 fmt::vformat(
+                    // TRN {} is the name of the loaded file
                     _u8L("Mesh from file {} has zero volume. It will not be loaded."),
                     fmt::make_format_args(file_name)
                 )

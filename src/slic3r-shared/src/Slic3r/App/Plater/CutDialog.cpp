@@ -290,7 +290,7 @@ void CutDialog::init_cut_plane_input_panel()
     Item* build_volume_panel =
         add_non_shrinked_wrap(m_cut_plane_input_panel, Orientation::Vertical, gap_size());
 
-    build_volume_panel->emplace_back<Text>(_u8L("Build Volume"))
+    build_volume_panel->emplace_back<Text>(_u8L("Build volume"))
         ->set_font_type(Render::ImguiFontType::Bold);
 
     Item* build_volume = build_volume_panel->emplace_back<Item>();
@@ -456,10 +456,10 @@ void CutDialog::add_groove_input_panel()
     add_angles_row(
         m_groove_input_panel,
         &m_flap_angle,
-        _u8L("Flap Angle"),
+        _u8L("Flap angle"),
         _u8L("Revert flap angle"),
         &m_groove_angle,
-        _u8L("Groove Angle"),
+        _u8L("Groove angle"),
         _u8L("Revert groove angle")
     );
 

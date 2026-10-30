@@ -177,7 +177,7 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
     m_name = add_input(unused_row, _u8L("Name"),
         _u8L("User given name to distinguish configurations."));
     m_host = add_input(unused_row, _u8L("Hostname, IP or URL"),
-        _u8L("Slic3r can upload G-code files to a printer host.\n"
+        _u8L("PrusaSlicer can upload G-code files to a printer host.\n"
              "This field should contain the hostname, IP address or URL\n"
              "of the printer host instance.\n"
              "Print host behind HAProxy with basic auth enabled can be accessed\n"
@@ -186,7 +186,7 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
 
     // Host type combo
     {
-        Item* row = make_row(_u8L("Host Type"));
+        Item* row = make_row(_u8L("Host type"));
         std::vector<std::string> labels = {
             "PrusaLink", "SL1", "OctoPrint", "Moonraker", "Duet",
             "FlashAir", "AstroBox", "Repetier", "MKS"
@@ -194,7 +194,7 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
         m_host_type = row->emplace_back<ComboBox>(std::move(labels));
         m_host_type->set_flex_grow(1);
         m_host_type->tooltip().set_text(
-            _u8L("Slic3r can upload G-code files to a printer host.\n"
+            _u8L("PrusaSlicer can upload G-code files to a printer host.\n"
                  "This field must contain the kind of the host."));
         m_host_type->callbacks().selection_changed = [this, commit](int) {
             // Available auth types depend on the host type.
@@ -206,7 +206,7 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
 
     // Authorization type combo (options depend on the host type; populated on load)
     {
-        Item* row = make_row(_u8L("Authorization Type"));
+        Item* row = make_row(_u8L("Authorization type"));
         m_auth_type = row->emplace_back<ComboBox>(std::vector<std::string>{});
         m_auth_type->set_flex_grow(1);
         m_auth_type->callbacks().selection_changed = [this, commit](int) {
@@ -215,9 +215,9 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
         };
     }
 
-    m_api_key  = add_input(m_api_key_row, _u8L("API Key / Password"),
-        _u8L("Slic3r can upload G-code files to a printer host.\n"
-             "This field should contain the API Key or the password\n"
+    m_api_key  = add_input(m_api_key_row, _u8L("API key / password"),
+        _u8L("PrusaSlicer can upload G-code files to a printer host.\n"
+             "This field should contain the API key or the password\n"
              "required for authentication."));
     m_user     = add_input(m_user_row, _u8L("User"));
     m_password = add_input(m_password_row, _u8L("Password"));
@@ -227,7 +227,7 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
     m_port->set_input_flags(ImGuiInputTextFlags_CharsDecimal);
     m_port->set_validator(std::make_unique<IntValidator>(0, 65535));
     Item* ca_file_row = nullptr;
-    m_ca_file  = add_input(ca_file_row, _u8L("HTTPS CA File"),
+    m_ca_file  = add_input(ca_file_row, _u8L("HTTPS CA file"),
         _u8L("Custom CA certificate file can be specified for HTTPS OctoPrint connections,\n"
              "in crt/pem format.\n"
              "If left blank, the default OS CA certificate repository is used."));
@@ -250,7 +250,7 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
             std::string{},
             _u8L("Ignore HTTPS certificate revocation checks in case of missing\n"
                  "or offline distribution points.\n"
-                 "One may want to enable this option for self signed certificates\n"
+                 "One may want to enable this option for self-signed certificates\n"
                  "if connection fails."));
         m_ssl_ignore_revoke->callbacks().checked_changed = [commit](bool) { commit(); };
 #ifndef _WIN32
@@ -464,8 +464,8 @@ void PhysicalPrinterAdvancedSettingsDialog::on_connection_test_finished(PrintHos
     update_test_button_state();
 
     if (result.ok) {
-        // TRN {} is the print host name, e.g. "OctoPrint".
         set_test_status(
+            // TRN {} is the print host name, e.g. "OctoPrint".
             fmt::format(fmt::runtime(_u8L("Connection to {} works correctly.")), result.host_name),
             {},
             Platform::Color::Success

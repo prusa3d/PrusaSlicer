@@ -380,6 +380,8 @@ void MainFrame::on_app_config_changed(const std::string& key)
             std::string message = fmt::format(
                 fmt::runtime(
                     Biz::_u8L(
+                        // TRN {} is the English name of the selected language,
+                        // e.g. "Czech (Czechia)"
                         "The selected language \"{}\" has been saved and will be applied the next time the application starts."
                     )
                 ),
@@ -680,7 +682,7 @@ void MainFrame::init_physical_printer_page(Biz::ProjectInteractor& project_inter
     std::string url = build_physical_printer_url(selected_printer.host);
     std::unique_ptr<App::Browser::BrowserLogicPhysicalPrinter> logic = std::make_unique<App::Browser::BrowserLogicPhysicalPrinter>(url, payload->api_key, payload->username, payload->password);
     WX::WebView::AbstractWebViewPanel* webview_panel = WebView::new_web_view_panel(m_left_bar, static_cast<int>(LeftBarTabs::PhysicalPrinter), std::move(logic), false);
-    m_left_bar->InsertNewPage(get_tab_insert_index(m_left_bar, LeftBarTabs::PhysicalPrinter), webview_panel, WX::_L("Physical Printer"), "lb_printers");
+    m_left_bar->InsertNewPage(get_tab_insert_index(m_left_bar, LeftBarTabs::PhysicalPrinter), webview_panel, WX::_L("Physical printer"), "lb_printers");
     webview_panel->set_switch_left_tab_fn(std::bind(&MainFrame::switch_left_tab, this, std::placeholders::_1, std::placeholders::_2));
     m_physical_printer_page_added = true;
 }

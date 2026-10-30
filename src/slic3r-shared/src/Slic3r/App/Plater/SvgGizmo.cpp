@@ -698,6 +698,7 @@ std::string create_fill_warning(const NSVGshape& shape)
     if ((shape.opacity - 1.f + warning_preccission) <= 0.f)
         add_comma_separated(
             warning,
+            // TRN {} is the opacity of the shape, a number from 0 to 1
             fmt::format(fmt::runtime(_u8L("Opacity ({})")), shape.opacity)
         );
 
@@ -706,6 +707,7 @@ std::string create_fill_warning(const NSVGshape& shape)
     if (is_fill_gradient)
         add_comma_separated(
             warning,
+            // TRN {} is the identifier of the gradient in the SVG file
             fmt::format(fmt::runtime(_u8L("Color gradient ({})")), shape.fillGradient)
         );
 
@@ -744,6 +746,7 @@ std::string create_stroke_warning(const NSVGshape& shape, float min_scale)
         add_comma_separated(
             warning,
             fmt::format(
+                // TRN {} is the minimal supported width of the stroke in millimeters
                 fmt::runtime(_u8L("Too thin stroke (minimal width is {} mm).")),
                 minimal_width_in_mm
             )
@@ -753,6 +756,7 @@ std::string create_stroke_warning(const NSVGshape& shape, float min_scale)
     if ((shape.opacity - 1.f + warning_preccission) <= 0.f)
         add_comma_separated(
             warning,
+            // TRN {} is the opacity of the shape, a number from 0 to 1
             fmt::format(fmt::runtime(_u8L("Opacity ({})")), shape.opacity)
         );
 
@@ -760,6 +764,7 @@ std::string create_stroke_warning(const NSVGshape& shape, float min_scale)
     if (is_stroke_gradient)
         add_comma_separated(
             warning,
+            // TRN {} is the identifier of the gradient in the SVG file
             fmt::format(fmt::runtime(_u8L("Color gradient ({})")), shape.strokeGradient)
         );
 
@@ -829,6 +834,7 @@ std::string create_shape_warnings(const Domain::EmbossShape& shape, float min_sc
             add_warning(
                 shape_index * 2,
                 fmt::format(
+                    // TRN {} is the identifier of the shape in the SVG file
                     fmt::runtime(_u8L("Shape is marked as invisible ({}).")),
                     nsvg_shape->id
                 )
@@ -836,10 +842,11 @@ std::string create_shape_warnings(const Domain::EmbossShape& shape, float min_sc
             continue;
         }
         if (std::string fill_warning = create_fill_warning(*nsvg_shape); !fill_warning.empty()) {
-            // TRN: The first placeholder is shape identifier, the second one is text describing the problem.
             add_warning(
                 shape_index * 2,
                 fmt::format(
+                    // TRN 1st {} is the identifier of the shape in the SVG file, 2nd {} is
+                    // a comma-separated list of the unsupported features (e.g. "Opacity (0.5)")
                     fmt::runtime(_u8L("Fill of shape ({}) contains unsupported: {}.")),
                     nsvg_shape->id,
                     fill_warning
@@ -851,6 +858,8 @@ std::string create_shape_warnings(const Domain::EmbossShape& shape, float min_sc
             add_warning(
                 shape_index * 2 + 1,
                 fmt::format(
+                    // TRN 1st {} is the identifier of the shape in the SVG file, 2nd {} is
+                    // a comma-separated list of the unsupported features (e.g. "Opacity (0.5)")
                     fmt::runtime(_u8L("Stroke of shape ({}) contains unsupported: {}.")),
                     nsvg_shape->id,
                     stroke_warning
@@ -984,11 +993,11 @@ Biz::Emboss::BaseData::IssueFn create_issue_fn(
         switch (issue) {
         case JobIssue::no_shape:
             App::AppServices::instance().dialog_manager().show_error_dialog(
-                _u8L("No shape, check SVG that contain path.")
+                _u8L("No shape. Check that the SVG contains a path.")
             );
             break;
         case JobIssue::no_surface:
-            prepend_tooltip(_u8L("No surface, check correct position of the SVG."));
+            prepend_tooltip(_u8L("No surface. Check the position of the SVG."));
             break;
         case JobIssue::canceled: /* prepend_tooltip(_u8L("Job was canceled.")); */
             break;

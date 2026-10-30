@@ -103,6 +103,7 @@ void ExtruderFilterButton::on_data_update()
     this->set_checked(m_state->enabled);
     this->set_tooltip(
         fmt::format(
+            // TRN {} is the extruder number
             fmt::runtime(_u8L("Toggle extruder {} for preset generation")),
             m_state->extruder_id_1based
         )

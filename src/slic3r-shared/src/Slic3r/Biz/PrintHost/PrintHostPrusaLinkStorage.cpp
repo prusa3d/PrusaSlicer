@@ -116,7 +116,7 @@ bool PrintHostPrusaLinkStorage::set_auth(Network::IHttp* http, std::string& err_
         http->auth_digest(auth->username, auth->password);
         break;
     default:
-        err_msg = _u8L("PrusaLink does not support other authentication method than api-key or http digest.");
+        err_msg = _u8L("PrusaLink does not support authentication methods other than API key or HTTP digest.");
         return false;
     }
 

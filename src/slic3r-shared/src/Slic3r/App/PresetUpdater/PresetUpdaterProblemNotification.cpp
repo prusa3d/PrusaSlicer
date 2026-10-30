@@ -38,7 +38,7 @@ std::string problem_sentence(PresetUpdaterReason reason)
     switch (reason) {
     case PresetUpdaterReason::NoUsableVersion:
         // TRN Preset updater notification. The names of the presets follow underneath.
-        return Biz::_u8L("These presets are offered in no version this application can use, and were not checked:");
+        return Biz::_u8L("None of the offered versions of these presets can be used by this application, so they were not checked:");
     case PresetUpdaterReason::IndexUnreadable:
     case PresetUpdaterReason::DataUnreadable:
         // TRN Preset updater notification. The names of the presets follow underneath.
@@ -57,7 +57,7 @@ std::string problem_sentence(PresetUpdaterReason reason)
         return Biz::_u8L("These presets were not installed. What is installed has not changed:");
     case PresetUpdaterReason::SourceUnreachable:
         // TRN Preset updater notification. The names of the sources follow underneath.
-        return Biz::_u8L("These sources could not be read. Nothing they offer is known:");
+        return Biz::_u8L("These sources could not be read, so their content is unknown:");
     case PresetUpdaterReason::SourceDropped:
         // TRN Preset updater notification. The names of the sources follow underneath.
         return Biz::_u8L("These sources are no longer on this computer and were removed from the list:");
@@ -74,7 +74,7 @@ std::string problem_sentence(PresetUpdaterReason reason)
         break;
     }
     // TRN Preset updater notification. The affected names follow underneath.
-    return Biz::_u8L("These presets could not be dealt with:");
+    return Biz::_u8L("These presets could not be processed:");
 }
 
 std::string error_sentence(PresetUpdaterReason reason, const std::string& subject)

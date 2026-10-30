@@ -1152,7 +1152,7 @@ void MenuCommandRegistrar::load_project()
     auto& dlg_manager = AppServices::instance().dialog_manager();
     dlg_manager.show_file_dialog(
         FileDialogType::Open,
-        _u8L("Open Project"),
+        _u8L("Open project"),
         this->default_dialog_folder(),
         "",
         Wildcards::generate_wildcards(Wildcards::TypeFlag::Project3mf),
@@ -1179,7 +1179,7 @@ void MenuCommandRegistrar::install_plugin(Lua::PluginSystem& plugin_system)
     auto& dlg_manager = AppServices::instance().dialog_manager();
     dlg_manager.show_file_dialog(
         FileDialogType::Open,
-        _u8L("Install Plugin"),
+        _u8L("Install plugin"),
         m_project_interactor.project_dir(
             m_project_interactor.selected_project_id(),
             AppServices::instance().app_config().get<std::string>("last_used_directory")
@@ -1211,7 +1211,7 @@ void MenuCommandRegistrar::load_object(Wildcards::TypeFlag specific_type)
     auto& dlg_manager = App::AppServices::instance().dialog_manager();
     dlg_manager.show_file_dialog(
         FileDialogType::OpenMultiple,
-        _u8L("Import File"),
+        _u8L("Import file"),
         this->default_dialog_folder(),
         "",
         specific_type == Wildcards::TypeFlag::None ? Wildcards::generate_wildcards(
@@ -1333,7 +1333,7 @@ MenuCommandRegistrar::load_volume(Domain::ModelVolumeType type, Wildcards::TypeF
     auto& dlg_manager = AppServices::instance().dialog_manager();
     dlg_manager.show_file_dialog(
         FileDialogType::OpenMultiple,
-        _u8L("Import File"),
+        _u8L("Import file"),
         this->default_dialog_folder(),
         "",
         specific_type == Wildcards::TypeFlag::None ? Wildcards::generate_wildcards(
@@ -1549,6 +1549,7 @@ void MenuCommandRegistrar::register_main_menu_edit_commands()
                         dlg_manager.show_warning_dialog(
                             fmt::vformat(
                                 _u8L(
+                                    // TRN {} is the name of the part
                                     "Part {} could not be deleted from the object,\n"
                                     "as removing the last solid part is not permitted."
                                 ),

@@ -809,14 +809,18 @@ std::string to_string(ReadShapeResult issue, const std::string& svg_file_path) {
     auto add_file = [&svg_file_path](const std::string& message) {
         return fmt::format(fmt::runtime(message), svg_file_path);};
     switch (issue) {
-    case ReadShapeResult::file_inaccessible: 
-        return add_file(_u8L("SVG file(\"{}\") is not accessible. Check application rights."));
+    case ReadShapeResult::file_inaccessible:
+        // TRN {} is the path to the SVG file
+        return add_file(_u8L("SVG file (\"{}\") is not accessible. Check application rights."));
     case ReadShapeResult::nsvg_issue:
-        return add_file(_u8L("SVG file(\"{}\") can't be processed by NanoSVG."));
+        // TRN {} is the path to the SVG file
+        return add_file(_u8L("SVG file (\"{}\") can't be processed by NanoSVG."));
     case ReadShapeResult::no_shape:
-        return add_file(_u8L("SVG file(\"{}\") do not contain embossabled path."));
+        // TRN {} is the path to the SVG file
+        return add_file(_u8L("SVG file (\"{}\") does not contain an embossable path."));
     case ReadShapeResult::cant_heal:
-        return add_file(_u8L("SVG file(\"{}\") contain path with unrepairabled shape for emboss."));
+        // TRN {} is the path to the SVG file
+        return add_file(_u8L("SVG file (\"{}\") contains a path with an unrepairable shape for embossing."));
     case ReadShapeResult::success:
         return "sucessfull load of the svg file";
     default: 

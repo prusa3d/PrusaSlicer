@@ -27,7 +27,7 @@ PhysicalPrinterConfig filesystem_export_local()
     return {
         FileSystemExport{false},
         {},
-        _u8L("Local Drive"),
+        _u8L("Local drive"),
         std::string(LOCAL_DRIVE_UUID),
     };
 }
@@ -37,7 +37,7 @@ PhysicalPrinterConfig filesystem_export_removable()
     return {
         FileSystemExport{true},
         {},
-        _u8L("Removable Drive"),
+        _u8L("Removable drive"),
         std::string(REMOVABLE_DRIVE_UUID),
     };
 }

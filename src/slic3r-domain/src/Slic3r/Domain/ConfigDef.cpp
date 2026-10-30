@@ -17,9 +17,9 @@ std::string ConfigItemDef::translate_category(Category category, const PrinterTe
     default:
         PANIC("All categories must be explicitly handled here, you apparently missed one.");
     case ConfigItemDef::Category::Print_LayersSurfaces:
-        return L("Layers & Surfaces");
+        return L("Layers & surfaces");
     case ConfigItemDef::Category::Print_WallsPerimeters:
-        return L("Walls & Perimeters");
+        return L("Walls & perimeters");
     case ConfigItemDef::Category::Print_Infill:
         return L("Infill");
     case ConfigItemDef::Category::Print_BedAdhesion:
@@ -29,13 +29,13 @@ std::string ConfigItemDef::translate_category(Category category, const PrinterTe
     case ConfigItemDef::Category::Print_Speed:
         return L("Speed");
     case ConfigItemDef::Category::Print_MotionDynamics:
-        return L("Motion & Dynamics");
+        return L("Motion & dynamics");
     case ConfigItemDef::Category::Print_ExtrusionRetraction:
-        return L("Extrusion & Retraction");
+        return L("Extrusion & retraction");
     case ConfigItemDef::Category::Print_MultiMaterial:
-        return L("Multi-Material");
+        return L("Multi-material");
     case ConfigItemDef::Category::Print_PrecisionSlicing:
-        return L("Precision & Slicing");
+        return L("Precision & slicing");
     case ConfigItemDef::Category::Print_CustomGCode:
         return L("Custom G-code");
     case ConfigItemDef::Category::Print_Pad:
@@ -47,13 +47,13 @@ std::string ConfigItemDef::translate_category(Category category, const PrinterTe
     case ConfigItemDef::Category::Print_Notes:
         return L("Notes");
     case ConfigItemDef::Category::Filament_MaterialTemperatures:
-        return L("Material & Temperatures");
+        return L("Material & temperatures");
     case ConfigItemDef::Category::Filament_ExtrusionCalibration:
-        return L("Extrusion & Calibration");
+        return L("Extrusion & calibration");
     case ConfigItemDef::Category::Filament_Cooling:
         return L("Cooling");
     case ConfigItemDef::Category::Filament_MultiMaterial:
-        return L("Multi-Material");
+        return L("Multi-material");
     case ConfigItemDef::Category::Filament_Overrides:
         return L("Overrides");
     case ConfigItemDef::Category::Filament_CustomGCode:
@@ -105,7 +105,7 @@ std::string ConfigItemDef::translate_option_group(OptionGroup option_group)
     case ConfigItemDef::OptionGroup::Print_LayerSurfaces_LayerHeight:
         return L("Layer height");
     case ConfigItemDef::OptionGroup::Print_LayerSurfaces_TopBottomShells:
-        return L("Top/Bottom shells");
+        return L("Top/bottom shells");
     case ConfigItemDef::OptionGroup::Print_LayerSurfaces_SurfacePatterns:
         return L("Surface patterns");
     case ConfigItemDef::OptionGroup::Print_LayerSurfaces_OnlyOnePerimeter:
@@ -159,7 +159,7 @@ std::string ConfigItemDef::translate_option_group(OptionGroup option_group)
     case ConfigItemDef::OptionGroup::Print_Speed_Travels:
         return L("Travels");
     case ConfigItemDef::OptionGroup::Print_Speed_SupportAndBridges:
-        return L("Support and Bridges");
+        return L("Support and bridges");
     case ConfigItemDef::OptionGroup::Print_Speed_DynamicOverhangSpeed:
         return L("Dynamic overhang speed");
     case ConfigItemDef::OptionGroup::Print_Speed_VolumetricSpeed:
@@ -167,49 +167,49 @@ std::string ConfigItemDef::translate_option_group(OptionGroup option_group)
     case ConfigItemDef::OptionGroup::Print_Speed_PressureEqualizer:
         return L("Pressure equalizer");
     case ConfigItemDef::OptionGroup::Print_MotionDynamics_VerticalLift:
-        return L("Vertical Lift");
+        return L("Vertical lift");
     case ConfigItemDef::OptionGroup::Print_MotionDynamics_TravelAvoidance:
-        return L("Travel Avoidance");
+        return L("Travel avoidance");
     case ConfigItemDef::OptionGroup::Print_MotionDynamics_BridgesAcceleration:
-        return L("Bridges Acceleration");
+        return L("Bridges acceleration");
     case ConfigItemDef::OptionGroup::Print_MotionDynamics_MainStructureAcceleration:
-        return L("Main Structure Acceleration");
+        return L("Main structure acceleration");
     case ConfigItemDef::OptionGroup::Print_MotionDynamics_FirstLayerAcceleration:
-        return L("First layer Acceleration");
+        return L("First layer acceleration");
     case ConfigItemDef::OptionGroup::Print_MotionDynamics_TravelsAcceleration:
-        return L("Travels Acceleration");
+        return L("Travels acceleration");
     case ConfigItemDef::OptionGroup::Print_MotionDynamics_WipeTowerAcceleration:
-        return L("Wipe Tower Acceleration");
+        return L("Wipe tower acceleration");
     case ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Nozzle:
         return L("Nozzle");
     case ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_ExtrusionWidth:
-        return L("Extrusion Width");
+        return L("Extrusion width");
     case ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction:
         return L("Retraction");
     case ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_IdleToolRetraction:
-        return L("Idle Tool Retraction");
+        return L("Idle tool retraction");
     case ConfigItemDef::OptionGroup::Print_MultiMaterial_ExtruderAssignment:
-        return L("Extruder Assignment");
+        return L("Extruder assignment");
     case ConfigItemDef::OptionGroup::Print_MultiMaterial_OozePrevention:
         return L("Ooze prevention");
     case ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower:
-        return L("Wipe Tower");
+        return L("Wipe tower");
     case ConfigItemDef::OptionGroup::Print_MultiMaterial_BondingInterlocking:
-        return L("Bonding & Interlocking");
+        return L("Bonding & interlocking");
     case ConfigItemDef::OptionGroup::Print_MultiMaterial_ToolChanges:
         return L("Tool changes");
     case ConfigItemDef::OptionGroup::Print_PrecisionSlicing_SlicingStrategy:
-        return L("Slicing Strategy");
+        return L("Slicing strategy");
     case ConfigItemDef::OptionGroup::Print_PrecisionSlicing_DimensionalAccuracy:
-        return L("Dimensional Accuracy");
+        return L("Dimensional accuracy");
     case ConfigItemDef::OptionGroup::Print_PrecisionSlicing_PerimeterGenerator:
-        return L("Perimeter Generator");
+        return L("Perimeter generator");
     case ConfigItemDef::OptionGroup::Print_PrecisionSlicing_ArachnePerimeterGenerator:
         return L("Arachne perimeter generator");
     case ConfigItemDef::OptionGroup::Print_PrecisionSlicing_ResolutionGCodeData:
-        return L("Resolution & G-code Data");
+        return L("Resolution & G-code data");
     case ConfigItemDef::OptionGroup::Print_PrecisionSlicing_ScriptSubstitutions:
-        return L("Scripts & Substitutions");
+        return L("Scripts & substitutions");
     case ConfigItemDef::OptionGroup::Print_Pad_Pad:
         return L("Pad");
     case ConfigItemDef::OptionGroup::Print_Hollowing_Hollowing:
@@ -221,45 +221,45 @@ std::string ConfigItemDef::translate_option_group(OptionGroup option_group)
     case ConfigItemDef::OptionGroup::Print_Notes_Notes:
         return L("Notes");
     case ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_MaterialProperty:
-        return L("Material Property");
+        return L("Material property");
     case ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_BedChamberTemperature:
-        return L("Bed & Chamber Temperature");
+        return L("Bed & chamber temperature");
     case ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_NozzleTemperature:
-        return L("Nozzle Temperature");
+        return L("Nozzle temperature");
     case ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_Corrections:
         return L("Corrections");
     case ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_Exposure:
         return L("Exposure");
     case ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_CostWeight:
-        return L("Cost & Weight");
+        return L("Cost & weight");
     case ConfigItemDef::OptionGroup::Filament_ExtrusionCalibration_ExtrusionCalibration:
-        return L("Extrusion & Calibration");
+        return L("Extrusion & calibration");
     case ConfigItemDef::OptionGroup::Filament_ExtrusionCalibration_Compensation:
         return L("Compensation");
     case ConfigItemDef::OptionGroup::Filament_ExtrusionCalibration_PressureAdvance:
-        return L("Pressure Advance");
+        return L("Pressure advance");
     case ConfigItemDef::OptionGroup::Filament_Cooling_CoolingLogic:
         return L("Cooling logic");
     case ConfigItemDef::OptionGroup::Filament_Cooling_FanControlLimits:
-        return L("Fan Control & Limits");
+        return L("Fan control & limits");
     case ConfigItemDef::OptionGroup::Filament_Cooling_FirstLayers:
-        return L("First Layers");
+        return L("First layers");
     case ConfigItemDef::OptionGroup::Filament_Cooling_CoolingThresholds:
-        return L("Cooling Thresholds");
+        return L("Cooling thresholds");
     case ConfigItemDef::OptionGroup::Filament_Cooling_DynamicFanSpeed:
-        return L("Dynamic Fan Speed");
+        return L("Dynamic fan speed");
     case ConfigItemDef::OptionGroup::Filament_MultiMaterial_MultitoolRamming:
-        return L("Multitool Ramming");
+        return L("Multitool ramming");
     case ConfigItemDef::OptionGroup::Filament_MultiMaterial_TipShapingCooling:
-        return L("Tip Shaping & Cooling");
+        return L("Tip shaping & cooling");
     case ConfigItemDef::OptionGroup::Filament_MultiMaterial_MovementTiming:
-        return L("Movement & Timing");
+        return L("Movement & timing");
     case ConfigItemDef::OptionGroup::Filament_MultiMaterial_WipeTowerPurging:
-        return L("Wipe Tower Purging");
+        return L("Wipe tower purging");
     case ConfigItemDef::OptionGroup::Filament_MultiMaterial_FlushParameters:
         return L("Flush parameters (experimental)");
     case ConfigItemDef::OptionGroup::Filament_Overrides_PrintSpeedOverride:
-        return L("Print Speed Override");
+        return L("Print speed override");
     case ConfigItemDef::OptionGroup::Filament_MaterialPrintingProfile_ProfilesSettings:
         return L("Profile settings");
     case ConfigItemDef::OptionGroup::Filament_CustomGCode:
@@ -269,13 +269,13 @@ std::string ConfigItemDef::translate_option_group(OptionGroup option_group)
     case ConfigItemDef::OptionGroup::Printer_General_FirmwareGCode:
         return L("Firmware & G-code");
     case ConfigItemDef::OptionGroup::Printer_General_SequentialPrintingLimits:
-        return L("Sequential Printing Limits");
+        return L("Sequential printing limits");
     case ConfigItemDef::OptionGroup::Printer_General_SizeClearances:
-        return L("Size & Clearances");
+        return L("Size & clearances");
     case ConfigItemDef::OptionGroup::Printer_General_Advanced:
         return L("Advanced");
     case ConfigItemDef::OptionGroup::Printer_General_CapabilitiesFeatures:
-        return L("Capabilities & Features");
+        return L("Capabilities & features");
     case ConfigItemDef::OptionGroup::Printer_General_Display:
         return L("Display");
     case ConfigItemDef::OptionGroup::Printer_General_Tilt:
@@ -287,26 +287,26 @@ std::string ConfigItemDef::translate_option_group(OptionGroup option_group)
     case ConfigItemDef::OptionGroup::Printer_General_Output:
         return L("Output");
     case ConfigItemDef::OptionGroup::Printer_Bed_SizeAndCoordinates:
-        return L("Size & Coordinates");
+        return L("Size & coordinates");
     case ConfigItemDef::OptionGroup::Printer_MachineLimits_General:
         return L("General");
     case ConfigItemDef::OptionGroup::Printer_MachineLimits_MaximumAccelerations:
-        return L("Maximum Accelerations");
+        return L("Maximum accelerations");
     case ConfigItemDef::OptionGroup::Printer_MachineLimits_MaximumFeedrates:
-        return L("Maximum Feedrates");
+        return L("Maximum feedrates");
     case ConfigItemDef::OptionGroup::Printer_MachineLimits_JerkLimits:
-        return L("Jerk Limits");
+        return L("Jerk limits");
     case ConfigItemDef::OptionGroup::Printer_MachineLimits_JunctionDeviation:
-        return L("Junction Deviation");
+        return L("Junction deviation");
     case ConfigItemDef::OptionGroup::Printer_MachineLimits_MinimumFeedrates:
-        return L("Minimum Feedrates");
+        return L("Minimum feedrates");
     case ConfigItemDef::OptionGroup::Printer_MachineLimits_MinimumAccelerations:
-        return L("Minimum Accelerations");
+        return L("Minimum accelerations");
     case ConfigItemDef::OptionGroup::Printer_MultipleExtruder_Position:
         return L("Position");
     case ConfigItemDef::OptionGroup::
         Printer_SingleExtruderMMSetup_SingleExtruderMultimaterialParameters:
-        return L("Single Extruder Multimaterial parameters");
+        return L("Single extruder multimaterial parameters");
     case ConfigItemDef::OptionGroup::Printer_CustomGCode:
         return L("Custom G-code");
     case ConfigItemDef::OptionGroup::Printer_Notes_Notes:
@@ -318,7 +318,7 @@ std::string ConfigItemDef::translate_option_group(OptionGroup option_group)
     case ConfigItemDef::OptionGroup::AppConfig_Services_General:
         return L("General");
     case ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup:
-        return L("Services Setup");
+        return L("Services setup");
     case ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Speed:
         return L("Speed");
     case ConfigItemDef::OptionGroup::AppConfig_Mouse3D_Deadzone:

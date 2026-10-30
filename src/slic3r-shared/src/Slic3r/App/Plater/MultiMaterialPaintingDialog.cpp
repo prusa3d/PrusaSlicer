@@ -275,11 +275,11 @@ static ItemPtr help()
     const Unit icon_size{16_fpx};
     help.add_item(
         {GizmoHelpFactory::HelpIcon{Render::Icon::MouseLeft, icon_size, icon_size}},
-        _u8L("Paint 1. color")
+        _u8L("Paint color 1")
     );
     help.add_item(
         {GizmoHelpFactory::HelpIcon{Render::Icon::MouseRight, icon_size, icon_size}},
-        _u8L("Paint 2. color")
+        _u8L("Paint color 2")
     );
     help.add_item(
         {{"SHIFT"}, GizmoHelpFactory::HelpIcon{Render::Icon::MouseLeft, icon_size, icon_size}},

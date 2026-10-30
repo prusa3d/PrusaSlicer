@@ -199,7 +199,7 @@ SvgDialog::SvgDialog() : GizmoWindow()
             m_callbacks.unlock_size(checked);
         m_lock_size_btn->set_icon(checked ? Render::Icon::Unlock : Render::Icon::Lock);
         m_lock_size_btn->set_tooltip(
-            checked ? _u8L("Keep current aspect ration.") : _u8L("Free size changing.")
+            checked ? _u8L("Keep current aspect ratio.") : _u8L("Free size changing.")
         );
     };
     m_lock_size_btn->set_checkable(false);
@@ -207,7 +207,7 @@ SvgDialog::SvgDialog() : GizmoWindow()
 
     Item* surface_panel = add_non_shrinked_wrap(content(), Orientation::Vertical, gap_size());
 
-    m_use_surface_row = add_labeled_row(surface_panel, _u8L("Use Surface"));
+    m_use_surface_row = add_labeled_row(surface_panel, _u8L("Use surface"));
     m_use_surface     = m_use_surface_row->emplace_back<ToggleButton>();
     m_use_surface->set_tooltip(_u8L(
         "If checked,\n"
@@ -267,7 +267,7 @@ SvgDialog::SvgDialog() : GizmoWindow()
         m_lock_rotation_btn->set_icon(checked ? Render::Icon::Unlock : Render::Icon::Lock);
         m_lock_rotation_btn->set_tooltip(
             checked ? _u8L("Lock for the 'up vector' during move above surface.") :
-                      _u8L("Free move above surface (can rotate around emboss axe).")
+                      _u8L("Free move above surface (can rotate around emboss axis).")
         );
     };
     m_lock_rotation_btn->set_checkable(false);

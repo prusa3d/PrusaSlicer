@@ -92,7 +92,7 @@ void PrusaLinkStorageListener::on_job_manager_status_changed(const Biz::Platform
                 continue;
             }
 
-            std::string storage = AppServices::instance().dialog_manager().show_combo_dialog(Biz::_u8L("Choose Storage"),Biz::_u8L("Choose storage for upload:"), candidates);
+            std::string storage = AppServices::instance().dialog_manager().show_combo_dialog(Biz::_u8L("Choose storage"),Biz::_u8L("Choose storage for upload:"), candidates);
 
             if (storage.empty()) {
                 // canceled by user

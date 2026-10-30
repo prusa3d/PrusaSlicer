@@ -380,7 +380,7 @@ void MaterialSelectionDialog::create_page_materials()
 
     m_combobox_material_type = filters_wrap->emplace_back<ComboBox>("ComboBoxMaterialType");
     m_combobox_material_type->set_width(140_fpx);
-    std::vector<std::string> types{Biz::_u8L("Any Material")};
+    std::vector<std::string> types{Biz::_u8L("Any material")};
     types.reserve(m_project_interactor.matdb_interactor().types().size() + 1);
     std::ranges::copy(m_project_interactor.matdb_interactor().types(), std::back_inserter(types));
     m_combobox_material_type->set_items(types);

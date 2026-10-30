@@ -385,7 +385,7 @@ static size_t tool_count(const Domain::Preset::HwPrinterConfig& hw_printer_confi
 
 static std::string dialog_name()
 {
-    return Biz::_u8L("Switching Presets: Unsaved Changes");
+    return Biz::_u8L("Switching presets: unsaved changes");
 }
 
 bool can_select_printer_preset(

@@ -44,7 +44,7 @@ OverrideOptionGroup::OverrideOptionGroup(
     m_text_group_name->set_flex_grow(1);
 
     m_remove_all_btn =
-        add_button(label_row, Render::Icon::Minus, Biz::_u8L("Remove all overriden parameters"));
+        add_button(label_row, Render::Icon::Minus, Biz::_u8L("Remove all overridden parameters"));
     m_remove_all_btn->callbacks().action = [this]
     {
         for (int index = m_override_config_filter->size() - 1; index >= 0; --index) {

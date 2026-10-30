@@ -81,7 +81,7 @@ void VariableLayerHeightDialog::add_blend_distance_section(Item* item)
 {
     Item* section_title_row = item->emplace_back<Item>();
     section_title_row->set_flex_shrink(0);
-    Text* section_title     = section_title_row->emplace_back<Text>(_u8L("Blend Distance"));
+    Text* section_title     = section_title_row->emplace_back<Text>(_u8L("Blend distance"));
     section_title->set_font_type(Render::ImguiFontType::Bold);
 
     Item* blend_distance_slider_row = item->emplace_back<Item>();

@@ -214,6 +214,8 @@ BlendTileData make_blend_tile_data(
 
         label += std::to_string(preset.extruder_ids_1based.at(i));
         tooltip += fmt::format(
+            // TRN "Ext" is short for "Extruder". 1st {} is the extruder number, 2nd {} is its
+            // share in the color mix in percent
             fmt::runtime(_u8L("Ext {} ({} %)")),
             preset.extruder_ids_1based.at(i),
             preset.ratios_percent.at(i)
@@ -238,7 +240,7 @@ ColorMixDialog::ColorMixDialog(
     Navigator& navigator,
     LogicalPrinterSettingsDialog* logical_printer_settings_dialog
 ) :
-    Dialog({_u8L("Color Mixing")}, "ColorMixDialog"),
+    Dialog({_u8L("Color mixing")}, "ColorMixDialog"),
     m_colors_changed_listener_scope(project_interactor.project_settings_interactor(), *this),
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
     m_selected_config_container_changed_listener_scope(project_interactor, *this),
@@ -277,7 +279,7 @@ ColorMixDialog::ColorMixDialog(
 
     m_few_extruders_hint = this->content()->emplace_back<Text>(_u8L(
         "Virtual extruders need at least two physical extruders. "
-        "Increase the extruder count in Printer Settings first."
+        "Increase the extruder count in Printer settings first."
     ));
     m_few_extruders_hint->set_wrap_mode(Text::WrapMode::Wrap);
     m_few_extruders_hint->set_margin({16_fpx, 12_fpx, 16_fpx, 0});
@@ -384,7 +386,7 @@ void ColorMixDialog::create_left_panel(Item* parent)
     deselect_catcher->callbacks().action = deselect_action;
 
     Text* panel_title =
-        left_panel->emplace_back<Text>(_u8L("Virtual Extruders"), Render::ImguiFontType::Bold);
+        left_panel->emplace_back<Text>(_u8L("Virtual extruders"), Render::ImguiFontType::Bold);
     panel_title->set_margin({16_fpx, 14_fpx, 16_fpx, 10_fpx});
     panel_title->set_flex_shrink(0);
 
@@ -603,7 +605,7 @@ void ColorMixDialog::create_editor_pane(Item* pane)
     };
 
     m_editor_title =
-        title_row->emplace_back<Text>(_u8L("Virtual Extruder"), Render::ImguiFontType::Bold);
+        title_row->emplace_back<Text>(_u8L("Virtual extruder"), Render::ImguiFontType::Bold);
     m_editor_title->set_flex_grow(1.f);
 
     m_add_component_button = title_row->emplace_back<LayoutButton>(_u8L("Add component"));
@@ -870,6 +872,8 @@ void ColorMixDialog::on_row_remove_clicked(int index)
             _u8L("Remove virtual extruder"),
             fmt::format(
                 fmt::runtime(_u8L(
+                    // TRN 1st {} is the number of the virtual extruder, 2nd {} is the count of
+                    // objects and modifiers that use it
                     "Virtual extruder {} is assigned to {} object(s) or modifier(s). "
                     "Removing it will reset their extruder to default. Continue?"
                 )),
@@ -1111,8 +1115,8 @@ void ColorMixDialog::update_preview_and_validation()
         m_filament_types_warning->set_warning(
             _u8L("Mixed filament types"),
             fmt::format(
-                // TRN {} is a list of filament types, e.g. "PLA + PETG"
                 fmt::runtime(_u8L(
+                    // TRN {} is a list of filament types, e.g. "PLA + PETG"
                     "This blend mixes {}. Different materials usually need different "
                     "temperatures and may not stick to each other, so the print may fail."
                 )),

@@ -45,7 +45,7 @@ DiffDialog::DiffDialog(
     wxDialog(
         wxTheApp->GetTopWindow(),
         wxID_ANY,
-        _L("Compare Presets"),
+        _L("Compare presets"),
         wxDefaultPosition,
         wxDefaultSize,
         wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER
@@ -126,7 +126,7 @@ DiffDialog::DiffDialog(
     main_sizer->Add(m_top_info_line, 0, wxEXPAND | wxALL, border);
     if (show_printers()) {
         main_sizer->Add(
-            new wxStaticText(this, wxID_ANY, _L("Printer Presets") + colon_str),
+            new wxStaticText(this, wxID_ANY, _L("Printer presets") + colon_str),
             0,
             wxEXPAND | wxLEFT | wxRIGHT,
             border
@@ -135,7 +135,7 @@ DiffDialog::DiffDialog(
     }
     if (show_prints()) {
         main_sizer->Add(
-            new wxStaticText(this, wxID_ANY, _L("Print Presets") + colon_str),
+            new wxStaticText(this, wxID_ANY, _L("Print presets") + colon_str),
             0,
             wxEXPAND | wxLEFT | wxRIGHT,
             border
@@ -144,7 +144,7 @@ DiffDialog::DiffDialog(
     }
     if (show_tool_prints()) {
         main_sizer->Add(
-            new wxStaticText(this, wxID_ANY, _L("Tool Print Presets") + colon_str),
+            new wxStaticText(this, wxID_ANY, _L("Tool print presets") + colon_str),
             0,
             wxEXPAND | wxLEFT | wxRIGHT,
             border
@@ -153,7 +153,7 @@ DiffDialog::DiffDialog(
     }
     if (show_materials()) {
         main_sizer->Add(
-            new wxStaticText(this, wxID_ANY, _L("Tool Material Presets") + colon_str),
+            new wxStaticText(this, wxID_ANY, _L("Tool material presets") + colon_str),
             0,
             wxEXPAND | wxLEFT | wxRIGHT,
             border
@@ -460,8 +460,8 @@ void DiffDialog::create_tree()
         m_tree->AppendToggleColumn_(wxString(L"\u2714"), DiffDVCModel::colToggle, 6);
         m_tree->GetColumn(/*DiffDVCModel::colToggle*/ 1)->SetHidden(true);
     }
-    m_tree->AppendBmpTextColumn(_L("Left Preset Value"), DiffDVCModel::colOldValue, 15);
-    m_tree->AppendBmpTextColumn(_L("Right Preset Value"), DiffDVCModel::colModValue, 15);
+    m_tree->AppendBmpTextColumn(_L("Left preset value"), DiffDVCModel::colOldValue, 15);
+    m_tree->AppendBmpTextColumn(_L("Right preset value"), DiffDVCModel::colModValue, 15);
     m_tree->Hide();
 }
 
@@ -765,7 +765,7 @@ void DiffDialog::update_tree()
 
             preset_name = fmt::format(
                 "{} \"{}\" vs \"{}\"",
-                _u8L("Tool Print"),
+                _u8L("Tool print"),
                 get_preset_name(tool_print_preset_left),
                 get_preset_name(tool_print_preset_right)
             );
@@ -805,7 +805,7 @@ void DiffDialog::update_tree()
             config_right = &std::get<Domain::FilamentSettings>(filament_preset_right.values);
             preset_name  = fmt::format(
                 "{} \"{}\" vs \"{}\"",
-                _u8L("Tool Filament"),
+                _u8L("Tool filament"),
                 get_preset_name(filament_preset_left),
                 get_preset_name(filament_preset_right)
             );

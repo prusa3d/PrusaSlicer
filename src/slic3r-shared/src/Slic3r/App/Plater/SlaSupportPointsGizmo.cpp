@@ -340,6 +340,8 @@ void SlaSupportPointsGizmo::update_dialog()
         );
         const size_t count = m_points.size();
         status             = fmt::vformat(
+            // TRN 1st {} is the total count of support points, 2nd {} is the count of manually
+            // added ones, 3rd {} is the count of the ones on islands
             _u8L("{} support points ({} manual, {} on islands)"),
             fmt::make_format_args(count, manual, islands)
         );

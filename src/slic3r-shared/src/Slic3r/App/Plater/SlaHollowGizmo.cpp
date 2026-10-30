@@ -331,6 +331,7 @@ void SlaHollowGizmo::update_dialog()
             status = _u8L("No drainage holes.");
         } else {
             const size_t count = m_holes.size();
+            // TRN {} is the count of drainage holes
             status = fmt::vformat(_u8L("{} drainage holes"), fmt::make_format_args(count));
         }
     }

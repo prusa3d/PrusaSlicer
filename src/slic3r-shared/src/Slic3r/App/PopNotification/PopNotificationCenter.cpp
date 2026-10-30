@@ -74,9 +74,9 @@ const JobNotificationSpec* find_job_spec(const std::string& job_key)
             // TRN Header of an arrange notification while the arrange runs.
             .started_header = L("Arranging..."),
             // TRN Header of a finished arrange notification.
-            .finished_header = L("Arrange Finished"),
+            .finished_header = L("Arrange finished"),
             // TRN Header of a failed arrange notification.
-            .failed_header = L("Arrange Failed"),
+            .failed_header = L("Arrange failed"),
             .icon = Render::Icon::Layout
         },
         JobNotificationSpec{
@@ -84,9 +84,9 @@ const JobNotificationSpec* find_job_spec(const std::string& job_key)
             // TRN Header of a simplify notification while the simplification runs.
             .started_header = L("Simplifying..."),
             // TRN Header of a finished simplify notification.
-            .finished_header = L("Simplify Finished"),
+            .finished_header = L("Simplify finished"),
             // TRN Header of a failed simplify notification.
-            .failed_header = L("Simplify Failed"),
+            .failed_header = L("Simplify failed"),
             .icon = Render::Icon::Simplify
         },
         JobNotificationSpec{
@@ -94,9 +94,9 @@ const JobNotificationSpec* find_job_spec(const std::string& job_key)
             // TRN Header of a repair notification while the mesh repair runs.
             .started_header = L("Repairing..."),
             // TRN Header of a finished repair notification.
-            .finished_header = L("Repair Finished"),
+            .finished_header = L("Repair finished"),
             // TRN Header of a failed repair notification.
-            .failed_header = L("Repair Failed")
+            .failed_header = L("Repair failed")
         }
     };
 
@@ -303,7 +303,7 @@ PopNotificationLayout PopNotificationCenter::download_finished_layout(
 )
 {
     // TRN Header of a finished file download notification.
-    const std::string header{_u8L("Download Finished")};
+    const std::string header{_u8L("Download finished")};
 
     // The file has not been loaded into the scene yet: let the user pick where to open it.
     if (!is_loaded) {
@@ -318,7 +318,7 @@ PopNotificationLayout PopNotificationCenter::download_finished_layout(
                   return true;
               }},
              // TRN Button on a finished download notification: load the file into a new project.
-             {_u8L("Load as New Project"),
+             {_u8L("Load as new project"),
               [this, dest_path]()
               {
                   m_project_interactor.file_opening_interactor().open({dest_path}, {.new_project = true});
@@ -346,7 +346,7 @@ PopNotificationLayout PopNotificationCenter::download_finished_layout(
     if (!dest_path.empty()) {
         buttons.emplace_back(PopNotificationButtonData{
             // TRN Button on a finished download notification: open the download folder.
-            _u8L("Open Folder"),
+            _u8L("Open folder"),
             [dest_path]()
             {
                 ASSERT(!dest_path.empty() && dest_path.has_parent_path());
@@ -390,8 +390,11 @@ void PopNotificationCenter::on_download_job_status_changed(
         || progress.status == JobStatus::None;
     const std::string body = single_file ?
         payload->filename :
-        // TRN Body of a multi-file download notification, {} is number of files (2 or more).
-        fmt::format(fmt::runtime(_u8L("{} files")), total_files);
+        fmt::format(
+            // TRN Body of a multi-file download notification, {} is number of files (2 or more).
+            fmt::runtime(_L_PLURAL_u8("{} file", "{} files", static_cast<int>(total_files))),
+            total_files
+        );
 
     PopNotificationLayout layout;
     PopNotificationLevel level;
@@ -406,7 +409,7 @@ void PopNotificationCenter::on_download_job_status_changed(
         break;
     case JobStatus::Failed:
         // TRN Header of a failed file download notification.
-        layout  = PopNotificationLayoutHeaderText{_u8L("Download Failed"), body};
+        layout  = PopNotificationLayoutHeaderText{_u8L("Download failed"), body};
         level   = PopNotificationLevel::Error;
         timeout = 20s;
         break;
@@ -457,13 +460,13 @@ std::string slicing_status_to_string(const SlicingStatusCode status)
         return _u8L("Slicing");
     case SlicingStatusCode::Finished:
         // TRN Slicing status label.
-        return _u8L("Slicing Finished");
+        return _u8L("Slicing finished");
     case SlicingStatusCode::Modified:
         // TRN Slicing status label.
         return _u8L("Modified");
     case SlicingStatusCode::Stopping:
         // TRN Slicing status label.
-        return _u8L("Slicing Stopped");
+        return _u8L("Slicing stopped");
     case SlicingStatusCode::Removed:
         // TRN Slicing status label.
         return _u8L("Removed");
@@ -796,8 +799,8 @@ PopNotificationLayout storage_resolve_layout(const PrintHostProgressNotification
     }
     case PrintHostJobStatus::Failed: {
         // TRN PrusaLink storage resolve notification.
-        std::string translatable_part = _u8L("Resolving storage has Failed.");
-        std::string msg = fmt::format("{} {}", translatable_part, data.additional_msg);       
+        std::string translatable_part = _u8L("Resolving storage failed.");
+        std::string msg = fmt::format("{} {}", translatable_part, data.additional_msg);
         return PopNotificationLayoutText(std::move(msg));
     }
     default:
@@ -815,7 +818,7 @@ PopNotificationLayout export_layout(const PrintHostProgressNotificationData& dat
     switch (data.status) {
     case PrintHostJobStatus::None:
         // TRN Header of an export notification.
-        header = _u8L("Export Starting");
+        header = _u8L("Export starting");
         return PopNotificationLayoutHeaderText(header, body);
 
     case PrintHostJobStatus::Started:
@@ -825,7 +828,7 @@ PopNotificationLayout export_layout(const PrintHostProgressNotificationData& dat
 
     case PrintHostJobStatus::Finished: {
         // TRN Header of an export notification.
-        header = _u8L("Export Finished");
+        header = _u8L("Export finished");
         
         if (data.target.empty()) {
             return PopNotificationLayoutHeaderText(header, body);
@@ -854,7 +857,7 @@ PopNotificationLayout export_layout(const PrintHostProgressNotificationData& dat
     }
     case PrintHostJobStatus::Failed:
         // TRN Header of an export notification.
-        header = _u8L("Export Failed");
+        header = _u8L("Export failed");
         body = body.empty() ? data.additional_msg : fmt::format("{}\n{}", body, data.additional_msg);
         return PopNotificationLayoutHeaderText(header, body);
         
@@ -1431,7 +1434,7 @@ void PopNotificationCenter::on_fatal_arrange_error(
 void PopNotificationCenter::on_connect_handler_error(const std::string& msg)
 {
     // TRN Header of the Prusa Connect error notification.
-    const std::string header{_u8L("Prusa Connect Error")};
+    const std::string header{_u8L("Prusa Connect error")};
 
     upsert_notification(
         PopNotificationData{
@@ -1450,7 +1453,7 @@ void PopNotificationCenter::on_file_explorer_error(
 )
 {
     // TRN Header of an error notification shown when a folder could not be opened in the system file manager (Explorer, Finder, ...).
-    const std::string header{_u8L("Cannot Open Folder")};
+    const std::string header{_u8L("Cannot open folder")};
 
     std::string body;
     switch (reason) {
@@ -1471,8 +1474,8 @@ void PopNotificationCenter::on_file_explorer_error(
         body = fmt::format(fmt::runtime(_u8L("The folder could not be accessed: {}")), path.string());
         break;
     case Platform::FileExplorerError::LaunchFailed:
-        // TRN Body of an error notification. {} is replaced by the full path of a folder that the system file manager refused to open.
         body = fmt::format(
+            // TRN Body of an error notification. {} is replaced by the full path of a folder that the system file manager refused to open.
             fmt::runtime(_u8L("Failed to open the folder in the file manager: {}")), path.string()
         );
         break;

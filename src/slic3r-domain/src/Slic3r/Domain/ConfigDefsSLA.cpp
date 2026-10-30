@@ -276,7 +276,7 @@ void sla_config_init_fn(ConfigDefinitions& defs)
     // resin_colour, and once that is set, editing the material color has no visible effect.
     def->category = ConfigItemDef::Category::Hidden;
     def->gui_type = ConfigItemDef::GUIType::color;
-    def->tooltip = L("This is only used in the Slic3r interface as a visual help.");
+    def->tooltip = L("This is only used in the PrusaSlicer interface as a visual help.");
     def->init_fn = init_with("#29B2B2");
 
     // The color of the resin used in the project, the SLA twin of extruder_colour. Empty means

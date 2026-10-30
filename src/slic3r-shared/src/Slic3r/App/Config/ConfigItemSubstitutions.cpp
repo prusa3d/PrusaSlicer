@@ -34,7 +34,7 @@ ConfigItemSubstitutions::ConfigItemSubstitutions(
     );
     button_add->callbacks().action = [this] { add_substitution(); };
     m_button_remove_all            = control_row->emplace_back<LayoutButton>(
-        Biz::_u8L("Remove All"),
+        Biz::_u8L("Remove all"),
         Render::Icon::Minus,
         Biz::_u8L("Remove all substitutions")
     );

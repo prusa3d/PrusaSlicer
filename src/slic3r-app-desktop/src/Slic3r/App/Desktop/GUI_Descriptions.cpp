@@ -125,7 +125,7 @@ void FillSizerWithModeColorDescriptions(
 }
 
 Dialog::Dialog(wxWindow* parent, const std::vector<ButtonEntry> &entries) :
-	wxDialog(parent, wxID_ANY, _L("Buttons And Text Colors Description"), wxDefaultPosition, wxDefaultSize),
+	wxDialog(parent, wxID_ANY, _L("Buttons and text colors description"), wxDefaultPosition, wxDefaultSize),
 	m_entries(entries)
 {
 

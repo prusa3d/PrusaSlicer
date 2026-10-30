@@ -228,6 +228,8 @@ bool resolve_missing_files(
             if (dialog_provider != nullptr) {
                 const std::string message = fmt::format(
                     fmt::runtime(
+                        // TRN 1st {} is the name of the selected file, 2nd {} is the name of the
+                        // file the volume was originally loaded from
                         _u8L("The selected file ({}) differs from the original file ({}).")
                         + "\n"
                         + _u8L("Do you want to replace it?")

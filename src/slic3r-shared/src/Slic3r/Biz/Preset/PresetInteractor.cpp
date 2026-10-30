@@ -3399,6 +3399,7 @@ tl::expected<void, std::string> PresetInteractor::update_hw_config_features(
     const auto vendor_it = preset_bundle.vendor_bundles.find(hw_config.vendor_id);
     if (vendor_it == preset_bundle.vendor_bundles.end()) {
         return tl::unexpected(
+            // TRN {} is the identifier of the printer vendor, e.g. "PrusaResearch"
             fmt::format(fmt::runtime(_u8L("Unknown vendor: {}")), hw_config.vendor_id)
         );
     }
@@ -3407,6 +3408,8 @@ tl::expected<void, std::string> PresetInteractor::update_hw_config_features(
     if (vendor_def_it == vendor_bundle.vendor_data.defs.end()) {
         return tl::unexpected(
             fmt::format(
+                // TRN 1st {} is the printer technology ("FFF" or "SLA"), 2nd {} is the identifier
+                // of the printer vendor
                 fmt::runtime(_u8L("Unsupported technology {} for vendor: {}")),
                 magic_enum::enum_name(hw_config.technology),
                 hw_config.vendor_id
@@ -3419,6 +3422,8 @@ tl::expected<void, std::string> PresetInteractor::update_hw_config_features(
     if (printer_it == vendor_defs.printers.end()) {
         return tl::unexpected(
             fmt::format(
+                // TRN 1st {} is the identifier of the printer model, 2nd {} is the identifier of
+                // the printer vendor
                 fmt::runtime(_u8L("Unknown printer id \"{}\" in vendor: {}")),
                 hw_config.printer_id,
                 hw_config.vendor_id
@@ -3434,6 +3439,8 @@ tl::expected<void, std::string> PresetInteractor::update_hw_config_features(
         if (tool_it == vendor_defs.tools.end()) {
             return tl::unexpected(
                 fmt::format(
+                    // TRN 1st {} is the identifier of the tool, 2nd {} is the identifier of
+                    // the printer vendor
                     fmt::runtime(_u8L("Unknown tool id \"{}\" in vendor: {}")),
                     tool_cfg.id,
                     hw_config.vendor_id
@@ -3450,7 +3457,9 @@ tl::expected<void, std::string> PresetInteractor::update_hw_config_features(
         if (feeder_it == vendor_defs.feeders.end()) {
             return tl::unexpected(
                 fmt::format(
-                    fmt::runtime(_u8L("Unknown tool id \"{}\" in vendor: {}")),
+                    // TRN 1st {} is the identifier of the feeder, 2nd {} is the identifier of
+                    // the printer vendor
+                    fmt::runtime(_u8L("Unknown feeder id \"{}\" in vendor: {}")),
                     feeder_cfg.id,
                     hw_config.vendor_id
                 )

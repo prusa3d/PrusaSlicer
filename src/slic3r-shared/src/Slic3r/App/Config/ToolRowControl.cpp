@@ -44,7 +44,8 @@ public:
         m_tool_index = tool_index;
         set_tooltip(
             fmt::format(
-                fmt::runtime(Biz::_u8L("Tool {}\nDrag tool to separate into different group.")),
+                // TRN {} is the tool number
+                fmt::runtime(Biz::_u8L("Tool {}\nDrag the tool to separate it into a different group.")),
                 m_tool_index + 1
             )
         );

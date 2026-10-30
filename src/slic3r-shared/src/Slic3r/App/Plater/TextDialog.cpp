@@ -208,7 +208,7 @@ void TextDialog::add_advanced_panel()
     m_advanced_panel->set_visible(false);
 
     m_use_surface_row = add_row_with_toggle_button(
-        _u8L("Use Surface"),
+        _u8L("Use surface"),
         m_advanced_panel,
         &m_use_surface,
         _u8L("Revert using of model surface.")
@@ -225,14 +225,14 @@ void TextDialog::add_advanced_panel()
     };
 
     m_per_glyph_row = add_row_with_toggle_button(
-        _u8L("Per Glyph"),
+        _u8L("Per glyph"),
         m_advanced_panel,
         &m_per_glyph,
-        _u8L("Revert Transformation per glyph.")
+        _u8L("Revert transformation per glyph.")
     );
     m_per_glyph->set_tooltip(_u8L(
         "If checked,\n"
-        "each letter(glyph) has an independent orthogonal projection, \n"
+        "each letter (glyph) has an independent orthogonal projection;\n"
         "otherwise, the whole text has the same orthogonal projection."
     ));
     m_per_glyph->callbacks().checked_changed = [this](bool checked)

@@ -646,7 +646,7 @@ static void draw_tool_items_details(Render::ImguiRender& imgui_render, const Fdm
         ImGui::PushStyleColor(ImGuiCol_HeaderActive, bg);
 
         ImGui::TableSetupColumn(_u8L("Extruder").c_str());
-        ImGui::TableSetupColumn(_u8L("Used Filament").c_str());
+        ImGui::TableSetupColumn(_u8L("Used filament").c_str());
         ImGui::TableSetupScrollFreeze(0, 1);
 
         ImGui::PushFont(imgui_render.font(Render::ImguiFontType::Bold), GImGui->FontSizeBase);

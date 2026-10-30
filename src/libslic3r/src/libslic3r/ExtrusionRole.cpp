@@ -1,8 +1,6 @@
 #include "libslic3r/ExtrusionRole.hpp"
-#include "libslic3r/I18N_private.hpp"
 
 #include <string>
-#include <string_view>
 #include <cassert>
 
 
@@ -35,21 +33,21 @@ GCodeExtrusionRole extrusion_role_to_gcode_extrusion_role(ExtrusionRole role)
 std::string gcode_extrusion_role_to_string(GCodeExtrusionRole role)
 {
     switch (role) {
-        case GCodeExtrusionRole::None                         : return L("Unknown");
-        case GCodeExtrusionRole::Perimeter                    : return L("Perimeter");
-        case GCodeExtrusionRole::ExternalPerimeter            : return L("External perimeter");
-        case GCodeExtrusionRole::OverhangPerimeter            : return L("Overhang perimeter");
-        case GCodeExtrusionRole::InternalInfill               : return L("Internal infill");
-        case GCodeExtrusionRole::SolidInfill                  : return L("Solid infill");
-        case GCodeExtrusionRole::TopSolidInfill               : return L("Top solid infill");
-        case GCodeExtrusionRole::Ironing                      : return L("Ironing");
-        case GCodeExtrusionRole::BridgeInfill                 : return L("Bridge infill");
-        case GCodeExtrusionRole::GapFill                      : return L("Gap fill");
-        case GCodeExtrusionRole::Skirt                        : return L("Skirt/Brim");
-        case GCodeExtrusionRole::SupportMaterial              : return L("Support material");
-        case GCodeExtrusionRole::SupportMaterialInterface     : return L("Support material interface");
-        case GCodeExtrusionRole::WipeTower                    : return L("Wipe tower");
-        case GCodeExtrusionRole::Custom                       : return L("Custom");
+        case GCodeExtrusionRole::None                         : return std::string("Unknown");
+        case GCodeExtrusionRole::Perimeter                    : return std::string("Perimeter");
+        case GCodeExtrusionRole::ExternalPerimeter            : return std::string("External perimeter");
+        case GCodeExtrusionRole::OverhangPerimeter            : return std::string("Overhang perimeter");
+        case GCodeExtrusionRole::InternalInfill               : return std::string("Internal infill");
+        case GCodeExtrusionRole::SolidInfill                  : return std::string("Solid infill");
+        case GCodeExtrusionRole::TopSolidInfill               : return std::string("Top solid infill");
+        case GCodeExtrusionRole::Ironing                      : return std::string("Ironing");
+        case GCodeExtrusionRole::BridgeInfill                 : return std::string("Bridge infill");
+        case GCodeExtrusionRole::GapFill                      : return std::string("Gap fill");
+        case GCodeExtrusionRole::Skirt                        : return std::string("Skirt/Brim");
+        case GCodeExtrusionRole::SupportMaterial              : return std::string("Support material");
+        case GCodeExtrusionRole::SupportMaterialInterface     : return std::string("Support material interface");
+        case GCodeExtrusionRole::WipeTower                    : return std::string("Wipe tower");
+        case GCodeExtrusionRole::Custom                       : return std::string("Custom");
         default                             : assert(false);
     }
     return {};

@@ -357,7 +357,7 @@ void DoubleSliderForLayers::set_mode_and_only_extruder(
         format(
             _u8L(
                 "Jump to height %s\n"
-                "or Set ruler mode"
+                "or set ruler mode"
             ),
             "(Shift + G)"
         )
@@ -794,7 +794,7 @@ std::string DoubleSliderForLayers::tooltip(int tick /*=-1*/) const
             (m_mode == CustomGCode::Mode::SingleExtruder && tick_code_it->extruder == 1 ?
                  format(_u8L("Color change (\"%1%\")"), gcode(CustomGCode::Type::ColorChange)) :
                  format(
-                     _u8L("Color change (\"%1%\") for Extruder %2%"),
+                     _u8L("Color change (\"%1%\") for extruder %2%"),
                      gcode(CustomGCode::Type::ColorChange),
                      tick_code_it->extruder
                  )) :
@@ -803,7 +803,7 @@ std::string DoubleSliderForLayers::tooltip(int tick /*=-1*/) const
             tick_code_it->type == CustomGCode::Type::Template ?
             format(_u8L("Custom template (\"%1%\")"), gcode(CustomGCode::Type::Template)) :
             tick_code_it->type == CustomGCode::Type::ToolChange ?
-            format(_u8L("Extruder (tool) is changed to Extruder \"%1%\""), tick_code_it->extruder) :
+            format(_u8L("Extruder (tool) is changed to extruder \"%1%\""), tick_code_it->extruder) :
             format_gcode(tick_code_it->extra); // tick_code_it->type == Custom
 
         // If tick is marked as a conflict (exclamation icon),
@@ -814,7 +814,7 @@ std::string DoubleSliderForLayers::tooltip(int tick /*=-1*/) const
         if (conflict == ConflictType::ModeConflict)
             tooltip += _u8L(
                 "G-code associated to this tick mark is in a conflict with print mode.\n"
-                "Editing it will cause changes of Slider data."
+                "Editing it will cause changes of slider data."
             );
         else if (conflict == ConflictType::MeaninglessColorChange)
             tooltip += _u8L(
@@ -1478,18 +1478,18 @@ void DoubleSliderForLayers::render_add_tick_menu()
 {
     if (ImGui::BeginPopup("slider_full_menu_popup")) {
         if (m_mode == CustomGCode::Mode::SingleExtruder) {
-            if (ImGui::MenuItem(_u8L("Add Color Change").c_str()))
+            if (ImGui::MenuItem(_u8L("Add color change").c_str()))
                 add_code_as_tick(CustomGCode::Type::ColorChange);
         } else {
             // render_multi_extruders_menu(); // ysFIXME-spe3494
         }
 
-        if (ImGui::MenuItem(_u8L("Add Pause").c_str()))
+        if (ImGui::MenuItem(_u8L("Add pause").c_str()))
             add_code_as_tick(CustomGCode::Type::PausePrint);
-        if (ImGui::MenuItem(_u8L("Add Custom G-code").c_str()))
+        if (ImGui::MenuItem(_u8L("Add custom G-code").c_str()))
             add_code_as_tick(CustomGCode::Type::Custom);
         if (!gcode(CustomGCode::Type::Template).empty()
-            && ImGui::MenuItem(_u8L("Add Custom Template").c_str()))
+            && ImGui::MenuItem(_u8L("Add custom template").c_str()))
             add_code_as_tick(CustomGCode::Type::Template);
 
         ImGui::EndPopup();
@@ -1526,7 +1526,7 @@ bool DoubleSliderForLayers::render_multi_extruders_menu(bool switch_current_code
         int tick = m_ctrl->active_pos();
 
         if (m_mode == CustomGCode::Mode::MultiAsSingle) {
-            std::string menu_name = switch_current_code ? _u8L("Switch code to Change extruder") :
+            std::string menu_name = switch_current_code ? _u8L("Switch code to change extruder") :
                                                           _u8L("Change extruder");
             if (ImGui::BeginMenu(menu_name.c_str())) {
                 std::array<int, 2> active_extruders =
@@ -1556,7 +1556,7 @@ bool DoubleSliderForLayers::render_multi_extruders_menu(bool switch_current_code
 
         const std::string menu_name = switch_current_code ?
             format(
-                _u8L("Switch code to Color change (%1%) for:"),
+                _u8L("Switch code to color change (%1%) for:"),
                 gcode(CustomGCode::Type::ColorChange)
             ) :
             format(_u8L("Add color change (%1%) for:"), gcode(CustomGCode::Type::ColorChange));
@@ -1807,7 +1807,7 @@ void DoubleSliderForLayers::open_pause_print_dialog(int tick, int extruder, bool
                 2
             )
             + ")",
-        _u8L("Enter short message shown on Printer display when a print is paused") + ":",
+        _u8L("Enter short message shown on printer display when a print is paused") + ":",
         editing ? it->extra : Biz::_u8L("Place bearings in slots and resume printing"),
         [this, tick, extruder, editing, z](const std::string& text)
         {
@@ -1839,7 +1839,7 @@ void DoubleSliderForLayers::open_color_change_dialog(int tick, int extruder, boo
     }
 
     m_navigator.pick_color(
-        _u8L("Select color for Color Change"),
+        _u8L("Select color for color change"),
         color,
         [this, tick, extruder, editing, z](const ColorRGB& color)
         {

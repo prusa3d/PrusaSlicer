@@ -37,7 +37,7 @@ ObjectListWindow::ObjectListWindow(Biz::ProjectInteractor& project_interactor, b
         for_plater ? ObjectListItem::Mode::Plater : ObjectListItem::Mode::Preview;
     if (mode == ObjectListItem::Mode::Plater) {
         m_add_container_button = content()->emplace_back<Yoga::LayoutButton>(
-            _u8L("Add Printer Group"),
+            _u8L("Add printer group"),
             Render::Icon::ConfigContainer
         );
         m_add_container_button->set_flex_shrink(0.f);
@@ -65,7 +65,7 @@ ObjectListWindow::ObjectListWindow(Biz::ProjectInteractor& project_interactor, b
         m_sliced_info->set_flex_shrink(0.f);
 
         Item* si_header = m_sliced_info->emplace_back<Item>();
-        Text* si_label  = si_header->emplace_back<Text>(_u8L("Sliced Info"));
+        Text* si_label  = si_header->emplace_back<Text>(_u8L("Sliced info"));
         si_label->set_font_type(Render::ImguiFontType::Bold);
         si_label->set_flex_grow(1.f);
 

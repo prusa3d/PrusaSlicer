@@ -9,6 +9,7 @@ add_custom_target(gettext_make_pot
         --keyword=L_CONTEXT:1,2c
         --keyword=_ctx_u8L:1,2c
         --keyword=_L_PLURAL:1,2
+        --keyword=_L_PLURAL_u8:1,2
         --add-comments=TRN
         --from-code=UTF-8
         --debug

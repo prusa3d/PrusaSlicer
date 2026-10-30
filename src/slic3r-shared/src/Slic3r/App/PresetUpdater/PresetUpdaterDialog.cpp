@@ -144,8 +144,8 @@ void PresetUpdaterDialog::build_content()
         m_forced_banner->emplace_back<Text>(forced_heading, Render::ImguiFontType::Bold);
     forced_heading_text->set_text_color(m_theme->color_imgui(Platform::Color::Warning));
 
-    // TRN Preset updater dialog. Body of the required updates banner.
     const std::string forced_body = Biz::_u8L(
+        // TRN Preset updater dialog. Body of the required updates banner.
         "The printer presets installed on this computer cannot be used until they are changed. "
         "Only the sources they came from are listed below. Apply the changes to continue, switch a "
         "source off to remove the presets it installed instead, or quit the application."
@@ -171,8 +171,8 @@ void PresetUpdaterDialog::build_content()
     Text* online_blurb            = sections->emplace_back<Text>(online_text);
     online_blurb->set_wrap_mode(Text::WrapMode::Wrap);
 
-    // TRN Preset updater dialog. Shown under the "Online sources" heading.
     const std::string offline_text = Biz::_u8L(
+        // TRN Preset updater dialog. Shown under the "Online sources" heading.
         "Checking these sources over the internet is turned off in Preferences. Presets are still "
         "installed from the files that come with the application and from local sources."
     );

@@ -33,6 +33,7 @@ static const std::vector<std::pair<std::string, PrecisionParams>>& default_step_
 };
 
 LoadStepDialog::LoadStepDialog(const std::string& filename, double linear_precision, double angle_precision, bool multiple_loading)
+        // TRN Dialog title. {} is the name of the STEP file being imported
         : wxDialog(wxTheApp->GetTopWindow(), wxID_ANY, wxString::FromUTF8(fmt::format(fmt::runtime(Biz::_u8L("STEP import quality ({})")), filename)),
         wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
         m_params({ linear_precision, angle_precision })

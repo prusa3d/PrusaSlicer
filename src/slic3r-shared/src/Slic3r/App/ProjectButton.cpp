@@ -102,7 +102,7 @@ void ProjectButton::on_data_update()
     std::string btn_label;
     std::string btn_tooltip;
     if (proj_path.empty()) {
-        std::string new_project = _u8L("New Project");
+        std::string new_project = _u8L("New project");
         if (*m_state) {
             new_project += fmt::format(" ({})", *m_state);
         }

@@ -94,7 +94,7 @@ void ExtruderOptionRow::on_data_update()
 }
 
 ToolToFeatureDialog::ToolToFeatureDialog(Biz::ProjectInteractor& project_interactor) :
-    Dialog({Biz::_u8L("Tool To Feature")}, "ToolToFeatureDialog"),
+    Dialog({Biz::_u8L("Tool to feature")}, "ToolToFeatureDialog"),
     m_project_interactor(project_interactor)
 {
     content()->set_min_width(350_fpx);

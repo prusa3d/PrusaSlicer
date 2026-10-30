@@ -161,6 +161,7 @@ NameValidator::ValidationResult NameValidator::validate(const std::string& prese
         } else {
             // if (existing->is_compatible)
             info_line = fmt::format(
+                // TRN {} is the preset name
                 fmt::runtime(Biz::_u8L("Preset with name \"{}\" already exists.")),
                 existing->name
             );

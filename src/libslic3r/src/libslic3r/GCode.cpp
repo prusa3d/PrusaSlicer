@@ -498,19 +498,19 @@ namespace DoExport {
         if (ret.size() < MAX_TAGS_COUNT) check(_u8L("After layer change G-code"), config.get<std::string>("layer_gcode"));
         if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Tool change G-code"), config.get<std::string>("toolchange_gcode"));
         if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Between objects G-code (for sequential printing)"), config.get<std::string>("between_objects_gcode"));
-        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Color Change G-code"), config.get<std::string>("color_change_gcode"));
-        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Pause Print G-code"), config.get<std::string>("pause_print_gcode"));
-        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Template Custom G-code"), config.get<std::string>("template_custom_gcode"));
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Color change G-code"), config.get<std::string>("color_change_gcode"));
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Pause print G-code"), config.get<std::string>("pause_print_gcode"));
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Template custom G-code"), config.get<std::string>("template_custom_gcode"));
         if (ret.size() < MAX_TAGS_COUNT) {
             for (const std::string& value : config.get<std::vector<std::string>>("start_filament_gcode")) {
-                check(_u8L("Filament Start G-code"), value);
+                check(_u8L("Filament start G-code"), value);
                 if (ret.size() == MAX_TAGS_COUNT)
                     break;
             }
         }
         if (ret.size() < MAX_TAGS_COUNT) {
             for (const std::string& value : config.get<std::vector<std::string>>("end_filament_gcode")) {
-                check(_u8L("Filament End G-code"), value);
+                check(_u8L("Filament end G-code"), value);
                 if (ret.size() == MAX_TAGS_COUNT)
                     break;
             }

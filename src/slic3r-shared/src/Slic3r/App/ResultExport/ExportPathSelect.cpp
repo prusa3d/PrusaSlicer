@@ -57,13 +57,13 @@ std::string post_upload_action_label(Biz::PrintHost::PrintHostAfterUploadAction 
     switch (action) {
     case PrintHostAfterUploadAction::StartPrint:
         // TRN Button on the print host upload dialog.
-        return Biz::_u8L("Upload and Print");
+        return Biz::_u8L("Upload and print");
     case PrintHostAfterUploadAction::StartSimulation:
         // TRN Button on the print host upload dialog.
-        return Biz::_u8L("Upload and Simulate");
+        return Biz::_u8L("Upload and simulate");
     case PrintHostAfterUploadAction::QueuePrint:
         // TRN Button on the print host upload dialog.
-        return Biz::_u8L("Upload to Queue");
+        return Biz::_u8L("Upload to queue");
     case PrintHostAfterUploadAction::None:
         break;
     }
@@ -183,8 +183,8 @@ void validate_bgcode_extension(
 
     if (ext == ".bgcode") {
         AppServices::instance().dialog_manager().show_yesno_dialog(
-            Biz::_u8L("Invalid File Format"),
-            Biz::_u8L("Binary G-Code is disabled in the current printer settings. Save as standard G-Code instead?"),
+            Biz::_u8L("Invalid file format"),
+            Biz::_u8L("Binary G-code is disabled in the current printer settings. Save as standard G-code instead?"),
             [file_path, on_proceed, on_retry](bool yes) {
                 if (yes) {
                     auto new_path = file_path;

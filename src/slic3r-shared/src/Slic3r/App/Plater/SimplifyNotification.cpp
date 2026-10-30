@@ -180,7 +180,7 @@ void SimplifyNotification::recreate_notification(
         .level = PopNotificationLevel::Regular,
         .timeout = 0s,
         .layout = PopNotificationLayoutHeaderTextButtons {
-            .header = _u8L("Reduce Triangle Count"),
+            .header = _u8L("Reduce triangle count"),
             .text = create_message(project_items),
             .buttons = { PopNotificationButtonData {
                 .text = item.button_name,
