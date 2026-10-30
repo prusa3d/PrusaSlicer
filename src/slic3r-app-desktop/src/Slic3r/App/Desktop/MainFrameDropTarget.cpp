@@ -1,6 +1,7 @@
 #include "MainFrameDropTarget.hpp"
 
 #include <boost/filesystem/path.hpp>
+#include <wx/app.h>
 #include "Slic3r/App/Navigator.hpp"
 #include <Slic3r/App/WX/StringConversions.hpp>
 
@@ -35,12 +36,25 @@ bool MainFrameDropTarget::OnDropFiles(wxCoord /*x*/, wxCoord /*y*/, const wxArra
     if (paths.empty())
         return false;
 
-    if (paths.size() == 1 && Biz::FileLoadingLogic::is_project_file(paths.front().string()))
-        m_project_interactor.load_project(paths.front());
-    else {
-        m_project_interactor.load_models_to_project(std::move(paths));
-        m_navigator.navigate_to_module_type(App::Render::ModuleType::Plater);
-    }
+#ifdef WIN32
+    // Hide the system drag image (application icon + "Move" text) right away.
+    // Without this it stays on top of everything until the OLE drop operation
+    // finishes, which is only after this method returns.
+    this->MSWUpdateDragImageOnLeave();
+#endif // WIN32
+
+    // Loading may open a modal dialog (e.g. the STEP import quality dialog).
+    // Running it from inside OnDropFiles() blocks the drop operation that is
+    // still in progress in the shell, so defer the actual loading until the
+    // drop has completed and the event loop is idle again.
+    wxTheApp->CallAfter([this, paths = std::move(paths)]() mutable {
+        if (paths.size() == 1 && Biz::FileLoadingLogic::is_project_file(paths.front().string()))
+            m_project_interactor.load_project(paths.front());
+        else {
+            m_project_interactor.load_models_to_project(std::move(paths));
+            m_navigator.navigate_to_module_type(App::Render::ModuleType::Plater);
+        }
+    });
 
     return true;
 }
