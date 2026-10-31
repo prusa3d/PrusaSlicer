@@ -621,13 +621,17 @@ void add_config_item_override(
         return;
     };
 
+    // The option callbacks are invoked when the command line is parsed, the config box may not
+    // exist anymore at that time.
+    const ConfigLocation location = config_box.location;
+
     config_item.visit(
         [&app,
          &option_name_with_prefix,
          &option_name,
          &option_description,
          &params,
-         &config_box,
+         location,
          config_item_key,
          &config_item_def](auto&& item_value)
         {
@@ -635,11 +639,11 @@ void add_config_item_override(
             if constexpr (std::is_same_v<ValueType, EnumWrapper>) {
                 app.add_option_function<std::string>(
                        option_name_with_prefix,
-                       [&params, &config_box, config_item_key, &config_item_def](
+                       [&params, location, config_item_key, &config_item_def](
                            const std::string& value
                        )
                        {
-                           ConfigItem parsed_config_item{config_item_def, config_box.location};
+                           ConfigItem parsed_config_item{config_item_def, location};
                            parsed_config_item.set(value);
                            params.config_overrides.emplace_back(parsed_config_item);
                        },
@@ -649,11 +653,11 @@ void add_config_item_override(
             } else if constexpr (std::is_same_v<ValueType, Domain::EnumVectorWrapper>) {
                 app.add_option_function<std::vector<std::string>>(
                        option_name_with_prefix,
-                       [&params, &config_box, config_item_key, &config_item_def](
+                       [&params, location, config_item_key, &config_item_def](
                            const std::vector<std::string>& values
                        )
                        {
-                           ConfigItem parsed_config_item{config_item_def, config_box.location};
+                           ConfigItem parsed_config_item{config_item_def, location};
                            parsed_config_item.set(values);
                            params.config_overrides.emplace_back(parsed_config_item);
                        },
@@ -664,11 +668,11 @@ void add_config_item_override(
             } else if constexpr (std::is_same_v<ValueType, Domain::Percentage>) {
                 app.add_option_function<std::string>(
                        option_name_with_prefix,
-                       [&params, &config_box, config_item_key, &config_item_def](
+                       [&params, location, config_item_key, &config_item_def](
                            const std::string& value
                        )
                        {
-                           ConfigItem parsed_config_item{config_item_def, config_box.location};
+                           ConfigItem parsed_config_item{config_item_def, location};
                            parsed_config_item.set(parse_percentage(value));
                            params.config_overrides.emplace_back(parsed_config_item);
                        },
@@ -678,11 +682,11 @@ void add_config_item_override(
             } else if constexpr (std::is_same_v<ValueType, Domain::FloatOrPercentage>) {
                 app.add_option_function<std::string>(
                        option_name_with_prefix,
-                       [&params, &config_box, config_item_key, &config_item_def](
+                       [&params, location, config_item_key, &config_item_def](
                            const std::string& value
                        )
                        {
-                           ConfigItem parsed_config_item{config_item_def, config_box.location};
+                           ConfigItem parsed_config_item{config_item_def, location};
                            parsed_config_item.set(parse_float_or_percentage(value));
                            params.config_overrides.emplace_back(parsed_config_item);
                        },
@@ -692,9 +696,9 @@ void add_config_item_override(
             } else if constexpr (std::is_same_v<ValueType, bool>) {
                 app.add_flag_function(
                     option_name_with_prefix + ",--no-" + option_name,
-                    [&params, &config_box, config_item_key, &config_item_def](const size_t& value)
+                    [&params, location, config_item_key, &config_item_def](const size_t& value)
                     {
-                        ConfigItem parsed_config_item{config_item_def, config_box.location};
+                        ConfigItem parsed_config_item{config_item_def, location};
                         parsed_config_item.set(static_cast<bool>(value));
                         params.config_overrides.emplace_back(parsed_config_item);
                     },
@@ -703,11 +707,9 @@ void add_config_item_override(
             } else {
                 CLI::Option* option = app.add_option_function<ValueType>(
                     option_name_with_prefix,
-                    [&params, &config_box, config_item_key, &config_item_def](
-                        const ValueType& value
-                    )
+                    [&params, location, config_item_key, &config_item_def](const ValueType& value)
                     {
-                        ConfigItem parsed_config_item{config_item_def, config_box.location};
+                        ConfigItem parsed_config_item{config_item_def, location};
                         parsed_config_item.set(value);
                         params.config_overrides.emplace_back(parsed_config_item);
                     },

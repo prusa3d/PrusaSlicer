@@ -33,4 +33,8 @@ TEST_CASE("Command line parses config options", "[cli]")
     REQUIRE(params.config_overrides.size() == 1);
     CHECK(params.config_overrides.front().name() == "skirts");
     CHECK(params.config_overrides.front().get<int>() == 3);
+    CHECK(
+        params.config_overrides.front().location()
+        == Domain::ConfigLocation{Domain::FDMConfigLocation::Print}
+    );
 }
