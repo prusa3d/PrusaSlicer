@@ -20,6 +20,8 @@ struct TestProfileSet
     std::string print_profile_name;
     std::string material_profile_name;
     std::size_t tool_count{0};
+    // Tool overrides are valid in multi-tool prints only.
+    bool multi_extruder{false};
 };
 
 /**
@@ -83,5 +85,10 @@ std::optional<std::string> read_zip_entry(
     const boost::filesystem::path& archive_path,
     const std::string& entry_name
 );
+
+/**
+ * @brief Returns the content of the file.
+ */
+std::string read_file(const boost::filesystem::path& path);
 
 } // namespace Slic3r::App::CLI::Test

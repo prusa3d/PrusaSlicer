@@ -14,11 +14,13 @@
 #include "Slic3r/Domain/Workbench.hpp"
 
 #include <ranges>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/nowide/fstream.hpp>
 
 using namespace Slic3r;
 using namespace Slic3r::Biz;
@@ -34,6 +36,8 @@ using Slic3r::Domain::Preset::Bundle;
 using Slic3r::Domain::Preset::EvaluatedMaterialPreset;
 using Slic3r::Domain::Preset::EvaluatedPrinterPreset;
 using Slic3r::Domain::Preset::EvaluatedPrintPreset;
+using Slic3r::Domain::Preset::FeatureValueMap;
+using Slic3r::Domain::Preset::get_feature;
 using Slic3r::Domain::Preset::SingleToolEvaluatedMaterialPresets;
 
 namespace Slic3r::App::CLI::Test {
@@ -63,6 +67,9 @@ std::vector<TestProfileSet> get_test_printer_profile_sets(
             }
 
             const std::size_t tool_count = printer_preset.hw_config.tool_count;
+            const FeatureValueMap& features = printer_preset.hw_config.features;
+            const bool multi_extruder =
+                get_feature<bool>(features, "multi_extruder").value_or(false);
 
             if (printer_preset.prints.empty()) {
                 continue;
@@ -98,7 +105,8 @@ std::vector<TestProfileSet> get_test_printer_profile_sets(
                 TestProfileSet{.printer_profile_name  = printer_preset.hw_config.name,
                                .print_profile_name    = chosen_print_preset->preset.name,
                                .material_profile_name = chosen_material_preset->preset.name,
-                               .tool_count            = tool_count});
+                               .tool_count            = tool_count,
+                               .multi_extruder        = multi_extruder});
         }
     }
 
@@ -274,6 +282,14 @@ std::optional<std::string> read_zip_entry(
         return std::nullopt;
     }
     return content;
+}
+
+std::string read_file(const boost::filesystem::path& path)
+{
+    boost::nowide::ifstream file{path.string()};
+    std::stringstream content;
+    content << file.rdbuf();
+    return content.str();
 }
 
 } // namespace Slic3r::App::CLI::Test
