@@ -4,19 +4,24 @@
 #include "CLITestUtils.hpp"
 
 #include "Slic3r/App/CLI/CLIApp.hpp"
+#include "Slic3r/App/DisplayStrings.hpp"
 #include "Slic3r/App/Init.hpp"
 #include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
 #include "Slic3r/Biz/FileLoadingLogic.hpp"
 #include "Slic3r/Domain/Bed.hpp"
 #include "Slic3r/Domain/ConfigContainer.hpp"
+#include "Slic3r/Domain/ConfigPack.hpp"
 #include "Slic3r/Domain/ModelObject.hpp"
 #include "Slic3r/Domain/Percentage.hpp"
 #include "Slic3r/Domain/Preset/Bundle.hpp"
+#include "Slic3r/Utils.hpp"
 
 #include <cstdlib>
+#include <sstream>
 
 #include <boost/filesystem.hpp>
+#include <boost/nowide/iostream.hpp>
 
 using Slic3r::Domain::BoundingBox3d;
 using Slic3r::Domain::FloatOrPercentage;
@@ -224,4 +229,36 @@ TEST_CASE("CLI does not export G-code for an SLA printer", "[cli][sla]")
     CHECK_FALSE(fs::exists(gcode_path));
     CHECK(count_gcode_files(temp_dir.path()) == 0);
     CHECK(find_sla_archives(temp_dir.path()).empty());
+}
+
+TEST_CASE("CLI reports slicing errors with their description", "[cli]")
+{
+    const ScopedTempDir temp_dir;
+    const fs::path cube_stl_path = write_cube_stl(temp_dir.path(), "cube.stl", 20.);
+
+    // These two options cannot be enabled together.
+    Domain::ConfigPackFDM config;
+    Domain::ConfigItem avoid_crossing_perimeters =
+        config.print.items.opt("avoid_crossing_perimeters");
+    avoid_crossing_perimeters.set(true);
+    Domain::ConfigItem avoid_crossing_curled_overhangs =
+        config.print.items.opt("avoid_crossing_curled_overhangs");
+    avoid_crossing_curled_overhangs.set(true);
+
+    App::InitParams slice_params = make_params(resolved_profile_sets().front());
+    slice_params.input.input_files.push_back(cube_stl_path.string());
+    slice_params.config_overrides    = {avoid_crossing_perimeters, avoid_crossing_curled_overhangs};
+    slice_params.action.export_gcode = true;
+    slice_params.misc.output         = (temp_dir.path() / "print.gcode").string();
+
+    std::ostringstream errors;
+    {
+        std::streambuf* const cerr_buffer = boost::nowide::cerr.rdbuf(errors.rdbuf());
+        const ScopeGuard restore_cerr{[cerr_buffer]() { boost::nowide::cerr.rdbuf(cerr_buffer); }};
+        App::CLI::run(slice_params);
+    }
+
+    const std::string description =
+        App::to_display_string(Slicing::ErrorCode::AvoidCrossingPerimetersAndAvoidCurledOverhangs);
+    CHECK(errors.str().find(description) != std::string::npos);
 }
