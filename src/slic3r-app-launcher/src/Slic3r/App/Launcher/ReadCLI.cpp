@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cassert>
+#include <cstdint>
 #include <optional>
 #include <thread>
 #include <iostream>
@@ -690,16 +691,19 @@ void add_config_item_override(
                 )
                     ->type_name("N");
             } else if constexpr (std::is_same_v<ValueType, bool>) {
-                app.add_flag_function(
-                    option_name_with_prefix + ",--no-" + option_name,
-                    [&params, &config_box, config_item_key, &config_item_def](const size_t& value)
+                CLI::Option* option = app.add_flag_function(
+                    option_name_with_prefix + ",!--no-" + option_name,
+                    [&params, &config_box, config_item_key, &config_item_def](std::int64_t value)
                     {
+                        // The value is positive for --option and negative for --no-option.
                         ConfigItem parsed_config_item{config_item_def, config_box.location};
-                        parsed_config_item.set(static_cast<bool>(value));
+                        parsed_config_item.set(value > 0);
                         params.config_overrides.emplace_back(parsed_config_item);
                     },
                     option_description
                 );
+                // The last occurrence wins, the occurrences are not summed up.
+                option->take_last();
             } else {
                 CLI::Option* option = app.add_option_function<ValueType>(
                     option_name_with_prefix,
