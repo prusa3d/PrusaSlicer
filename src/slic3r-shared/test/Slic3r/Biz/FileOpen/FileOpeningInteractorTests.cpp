@@ -62,9 +62,9 @@ struct FileOpeningInteractorFixture
 {
     ::Tests::TestTempDir temp;
     Slic3r::App::Platform::StdMainThreadDispatcher dispatcher;
-    ::Tests::JobManagerScope job_manager_scope{dispatcher};
     Slic3r::App::Plater::ThumbnailImageGenerator thumbnail_image_generator;
     Slic3r::Domain::Workbench workbench;
+    ::Tests::JobManagerScope job_manager_scope{dispatcher};
     FakeEventListener events;
     std::unique_ptr<Slic3r::Biz::ProjectInteractor> project_interactor;
 

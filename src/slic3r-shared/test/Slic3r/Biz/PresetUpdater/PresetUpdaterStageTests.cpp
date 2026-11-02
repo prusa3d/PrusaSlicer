@@ -83,9 +83,9 @@ void copy_dir_content(const fs::path& from, const fs::path& to)
 struct ProjectInteractorWrapper
 {
     ProjectInteractorWrapper()
-        : workbench()
-        , dispatcher()
+        : dispatcher()
         , app_instance_message_handler_scope(dispatcher)
+        , workbench()
         , job_manager_scope(dispatcher)
         , thumbnail_image_generator()
         , project_interactor(workbench, dispatcher, thumbnail_image_generator)
@@ -99,11 +99,12 @@ struct ProjectInteractorWrapper
 
     /// Declared between the dispatcher and the project interactor so they are destroyed after the
     /// interactors that cancel jobs through them, and before the dispatcher they hold a reference
-    /// to.
+    /// to. The job manager follows the workbench so running jobs are joined before the data they
+    /// read is destroyed.
     Slic3r::App::Platform::StdMainThreadDispatcher dispatcher;
     Tests::AppInstanceMessageHandlerScope app_instance_message_handler_scope;
-    Tests::JobManagerScope job_manager_scope;
     Slic3r::Domain::Workbench workbench;
+    Tests::JobManagerScope job_manager_scope;
     Slic3r::Test::MockThumbnailImageGenerator thumbnail_image_generator;
     Slic3r::Biz::ProjectInteractor project_interactor;
 };

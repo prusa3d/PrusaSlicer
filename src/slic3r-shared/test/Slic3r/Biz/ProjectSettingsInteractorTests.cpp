@@ -90,9 +90,9 @@ struct ProjectSettingsInteractorFixture
         std::make_unique<Slic3r::Biz::SecretStoreDummy>();
     Slic3r::App::Platform::StdMainThreadDispatcher dispatcher;
     Tests::AppInstanceMessageHandlerScope app_instance_message_handler_scope{dispatcher};
-    Tests::JobManagerScope job_manager_scope{dispatcher};
     Slic3r::App::Plater::ThumbnailImageGenerator thumbnail_image_generator;
     Slic3r::Domain::Workbench workbench;
+    Tests::JobManagerScope job_manager_scope{dispatcher};
     Slic3r::Biz::ProjectInteractor project_interactor{workbench, dispatcher, thumbnail_image_generator};
 
     // Selects the first printer whose hw config matches the predicate.
