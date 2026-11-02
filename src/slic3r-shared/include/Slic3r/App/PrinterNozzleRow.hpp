@@ -13,18 +13,11 @@ class PrinterNozzleRow :
     public Yoga::Item
 {
 public:
-    struct Callbacks
-    {
-        std::function<void(bool)> validation_updated{nullptr};
-    };
-
     PrinterNozzleRow(
         size_t index,
         const Biz::Preset::ToolConfigItemObservableList& data,
         Biz::WeakerPointer<Biz::Preset::ToolConfigItemCompoundObservableList> tool_observable_list
     );
-
-    Callbacks& callbacks();
 
     void on_data_update() override;
     void on_index_update() override;
@@ -36,7 +29,6 @@ private:
     Biz::WeakerPointer<Biz::Preset::ToolConfigItemCompoundObservableList> m_tool_observable_list;
     Yoga::Text* m_text_index   = nullptr;
     ComboBoxTools* m_combo_box = nullptr;
-    Callbacks m_callbacks;
 };
 
 } // namespace Slic3r::App

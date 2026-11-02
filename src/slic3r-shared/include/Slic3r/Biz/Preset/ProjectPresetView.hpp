@@ -399,4 +399,15 @@ private:
     const std::string m_print_id;
     size_t m_slot_index;
 };
+
+/** @brief Returns preset with @p id from preset project @p view, or nullptr. */
+template <typename View>
+const typename View::Value* find_in_view(const View& view, const std::string& id)
+{
+    for (const auto& [preset_ref, is_runtime] : view.items()) {
+        if (preset_ref.get().id == id)
+            return &preset_ref.get();
+    }
+    return nullptr;
+}
 }

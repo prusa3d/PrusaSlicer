@@ -40,11 +40,6 @@ PrinterNozzleRow::PrinterNozzleRow(
     on_index_update();
 }
 
-PrinterNozzleRow::Callbacks& PrinterNozzleRow::callbacks()
-{
-    return m_callbacks;
-}
-
 void PrinterNozzleRow::on_data_update()
 {
     m_combo_box->set_source_list(&m_tool_observable_list->at(m_index));

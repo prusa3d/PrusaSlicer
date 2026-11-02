@@ -91,7 +91,6 @@ struct SelectedPresetIds
     std::vector<std::string> material_ids;
 };
 
-
 /**
  * Manipulates presets associated with config containers.
  */
@@ -155,6 +154,26 @@ public:
     const Domain::Preset::HwPrinterConfig& current_printer_config() const;
     const Domain::Preset::EvaluatedPrinterPreset::Preset& current_printer_preset() const;
     const Domain::Preset::SelectedPreset& selected_printer_preset() const;
+    SelectedPresetIds selected_preset_ids() const;
+
+    /**
+     * @brief Returns ids of presets selected after select_printer_preset()
+     * (or after select_print_preset(), when @p print_id is set). Doesn't modify any state.
+     *
+     * Not selected print/tool/material presets are chosen by the same rule as when their lists
+     * are refilled: keep the old one (by id, or by name and origin), otherwise the default one
+     * from the parent preset, otherwise the first one.
+     * @param print_id  Explicitly selected print preset; chosen by the rule above when empty.
+     */
+    SelectedPresetIds get_preset_ids_after_selection(
+        const std::string& hw_config_id,
+        const std::string& printer_preset_id,
+        const std::string& print_id = {}
+    ) const;
+
+    const Domain::Preset::Bundle& preset_bundle() const;
+    /** @brief Presets loaded at runtime (i.e. coming from 3MF file) of the selected project. */
+    const RuntimePresets& selected_runtime_presets() const;
 
     PresetItemObservableList& printer_configs()
     {
@@ -948,6 +967,12 @@ private:
      */
     bool update_changed_selected_preset_hw_config(Domain::Preset::HwPrinterConfig& hw_config);
 
+    /**
+     * @brief Returns hw configuration which changes of selected config container start from:
+     * the pending invalid one (if it belongs to the selected printer), otherwise the selected one.
+     */
+    Domain::Preset::HwPrinterConfig hw_config_to_change(Domain::SelectionId project_id) const;
+
     const std::string& selected_hw_config_id() const;
 
     void save_user_preset_internal(Domain::Preset::PresetKind kind, size_t slot_index, const KeySet& item_names_to_omit, std::string new_name, InvokeLaterBag& bag);
@@ -1033,6 +1058,8 @@ private:
         Domain::SelectionId config_container_id
     );
 
+    /** @brief Returns count of config containers (in all projects) using hw config @p hw_config_id. */
+    size_t hw_config_use_count(const std::string& hw_config_id) const;
     bool duplicate_hw_config_if_needed_and_update(Domain::Preset::HwPrinterConfig& hw_config, ListenerInvokeLaterBag& bag);
 
     void invoke_slicing_input_changed();
