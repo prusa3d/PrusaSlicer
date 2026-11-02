@@ -5,6 +5,9 @@ name: Prusament PA11 Carbon Fiber
 # No MINI
 condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5)/ and tool.nozzle_diameter >= 0.4 and feeder.base_model!~/.*MMU.*/
 id: Prusament PA11 Carbon Fiber
+features:
+  $.brand.uuid: ae5ff34e-298e-50c9-8f77-92a97fb30b09
+  $.brand.slug: prusament
 values:
   filament_vendor: Prusa Polymers
   first_layer_temperature: 275

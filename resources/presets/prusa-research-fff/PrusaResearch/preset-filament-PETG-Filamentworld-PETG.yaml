@@ -3,6 +3,9 @@ inherits:
 - '*PET*'
 name: Filamentworld PETG
 id: Filamentworld PETG
+features:
+  $.brand.uuid: b9cdf2e7-64f8-5328-85bc-d6b856f64afc
+  $.brand.slug: filamentworld
 values:
   filament_vendor: Filamentworld
   first_layer_bed_temperature: 80

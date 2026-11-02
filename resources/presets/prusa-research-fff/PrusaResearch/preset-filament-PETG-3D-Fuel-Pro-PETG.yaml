@@ -6,6 +6,9 @@ inherits:
 # available for XL, MK4, COREONE family
 name: 3D-Fuel Pro PETG
 id: 3D-Fuel Pro PETG
+features:
+  $.brand.uuid: 3eb597ab-9f9b-5ecf-87e6-8ac1e31f51a8
+  $.brand.slug: 3d-fuel
 values:
   filament_vendor: 3D-Fuel
   extrusion_multiplier: 1

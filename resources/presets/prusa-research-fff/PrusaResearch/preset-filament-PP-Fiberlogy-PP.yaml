@@ -5,6 +5,9 @@ inherits:
 - '*fiberlogypp_MAXVOLSPEED_PP*'
 name: Fiberlogy PP
 id: Fiberlogy PP
+features:
+  $.brand.uuid: 12c3406d-b94f-51c5-a334-dc008cd1bf05
+  $.brand.slug: fiberlogy
 values:
   filament_vendor: Fiberlogy
   first_layer_temperature: 245

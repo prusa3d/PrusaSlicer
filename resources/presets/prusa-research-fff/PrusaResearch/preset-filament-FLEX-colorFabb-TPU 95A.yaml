@@ -3,6 +3,8 @@ inherits:
 - '*FLEX*'
 features:
   $.type: TPU
+  $.brand.uuid: 55dde84a-3fa4-51ad-b456-7d95b1a15622
+  $.brand.slug: colorfabb
 name: colorFabb TPU 95A
 id: colorFabb TPU 95A
 # MK4/XL/C1 family 0.4-0.6

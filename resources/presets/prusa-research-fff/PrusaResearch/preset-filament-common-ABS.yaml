@@ -56,8 +56,52 @@ values:
   pressure_advance: enabled
   cooling_slowdown_logic: consistent_surface
   cooling_perimeter_transition_distance: 10
-## C1
 variants:
+## C1 INDX
+- condition: printer.base_model == "COREONE_INDX"
+  id: sI3xEIJDSCKcD4ZOeTyBIA
+  values:
+    pressure_advance: automatic_calibration
+    cooling_perimeter_transition_distance: 15
+    first_layer_bed_temperature: 110
+    idle_temperature:
+    min_fan_speed: 15
+    max_fan_speed: 20
+    min_print_speed: 15
+    bridge_fan_speed: 25
+    enable_dynamic_fan_speeds: false
+    overhang_fan_speed_0: 15
+    overhang_fan_speed_1: 0
+    overhang_fan_speed_2: 0
+    overhang_fan_speed_3: 0
+    fan_below_layer_time: 30
+    start_filament_gcode: ; Filament g-code
+    filament_multitool_ramming: 1
+    filament_multitool_ramming_flow: 30
+    filament_multitool_ramming_volume: 18
+    filament_minimal_purge_on_wipe_tower: 10
+  variants:
+  # C1 INDX 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*ABS* @COREONEINDX 0.4'
+    id: T79lcjebTImm6Od8eXbCJQ
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 20
+      pressure_advance_value: 0.02
+      filament_infill_max_crossing_speed: 140
+    variants:
+    # C1 INDX HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*ABS* @COREONEINDX HF0.4'
+      id: dmywWTqkQOChz+FRCCiZhg
+      values:
+        filament_max_volumetric_speed: 25
+        pressure_advance_value: 0.02
+        filament_infill_max_crossing_speed: 140
+        temperature: 260
+        first_layer_temperature: 260
+# C1
 - condition: printer.base_model == "COREONE"
   id: yo/MZfPmS2+prbp4l4VqzA
   values:

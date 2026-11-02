@@ -3,6 +3,9 @@ inherits:
 - '*PP*'
 name: Verbatim PP
 id: Verbatim PP
+features:
+  $.brand.uuid: 78375eb2-5656-5697-967f-9223fd575323
+  $.brand.slug: verbatim
 values:
   filament_vendor: Verbatim
   first_layer_temperature: 220

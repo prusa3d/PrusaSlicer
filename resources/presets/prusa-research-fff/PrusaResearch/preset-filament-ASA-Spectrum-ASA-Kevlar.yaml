@@ -4,6 +4,9 @@ inherits:
 - '*SASAKevlar_MAXVOLSPEED*'
 name: Spectrum ASA Kevlar
 id: Spectrum ASA Kevlar
+features:
+  $.brand.uuid: adef694b-7837-5a68-8de3-eee3027accd0
+  $.brand.slug: spectrum
 values:
   filament_vendor: Spectrum
   extrusion_multiplier: 1.04

@@ -3,6 +3,9 @@ inherits:
 - '*PLA*'
 name: Cookiecad PLA
 id: Cookiecad PLA
+features:
+  $.brand.uuid: 9ac91e13-2918-5a9b-bf03-edf6e686eb90
+  $.brand.slug: cookiecad
 values:
   filament_cost: '34.95'
   filament_vendor: Cookiecad

@@ -3,6 +3,9 @@ inherits:
 - '*PET*'
 name: Jessie PETG
 id: Jessie PETG
+features:
+  $.brand.uuid: 76ecbc64-d731-58b7-8fda-2b7ac96df619
+  $.brand.slug: printedsolid
 values:
   filament_vendor: Printed Solid
   filament_density: 1.27

@@ -3,6 +3,9 @@ inherits:
 - '*PLA*'
 name: Elegoo PLA
 id: Elegoo PLA
+features:
+  $.brand.uuid: 1f7b352d-1f99-5a3b-81de-918943bae18f
+  $.brand.slug: elegoo
 values:
   filament_cost: '22'
   filament_vendor: Elegoo

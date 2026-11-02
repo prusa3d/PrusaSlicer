@@ -96,8 +96,8 @@ variants:
         M106 P6 S0 ; dock fan off (baseline)
         {if used_tools > 1}
           ;PET-family (PET/PETG/*-CF...)/CPE/PCTG - dock fan 100 from 3rd layer
-          {if layer_num == 3 and ((is_extruder_used[0] and filament_type[0]=~/(PET|CPE|PCTG)/) or (is_extruder_used[1] and filament_type[1]=~/(PET|CPE|PCTG)/) or (is_extruder_used[2] and filament_type[2]=~/(PET|CPE|PCTG)/) or (is_extruder_used[3] and filament_type[3]=~/(PET|CPE|PCTG)/) or
-        (is_extruder_used[4] and filament_type[4]=~/(PET|CPE|PCTG)/) or (is_extruder_used[5] and filament_type[5]=~/(PET|CPE|PCTG)/) or (is_extruder_used[6] and filament_type[6]=~/(PET|CPE|PCTG)/) or (is_extruder_used[7] and filament_type[7]=~/(PET|CPE|PCTG)/))}
+          {if layer_num == 3 and ((is_extruder_used[0] and filament_type[0]=~/(PET|CPE|PCTG).*/) or (is_extruder_used[1] and filament_type[1]=~/(PET|CPE|PCTG).*/) or (is_extruder_used[2] and filament_type[2]=~/(PET|CPE|PCTG).*/) or (is_extruder_used[3] and filament_type[3]=~/(PET|CPE|PCTG).*/) or
+        (is_extruder_used[4] and filament_type[4]=~/(PET|CPE|PCTG).*/) or (is_extruder_used[5] and filament_type[5]=~/(PET|CPE|PCTG).*/) or (is_extruder_used[6] and filament_type[6]=~/(PET|CPE|PCTG).*/) or (is_extruder_used[7] and filament_type[7]=~/(PET|CPE|PCTG).*/))}
             M106 P6 S100
           {endif}
 
@@ -190,8 +190,9 @@ variants:
 
         G1 F{speed_tc}
         M204 S7000
-
+        ;EXCLUDE_E_START
         G27 W3 Z{travel_max_lift[current_extruder]} P2 R{retract_toolchange} V{tc_retract_speed/60} A{travel_slope[current_extruder]}
+        ;EXCLUDE_E_END
         P0 S1 L0 D0
 
 
@@ -211,9 +212,9 @@ variants:
         ;-------Purge Station specific Gcode Start-----
 
           {if tool_init[next_extruder] == 1}
-            EXCLUDE_E_START
+            ;EXCLUDE_E_START
             G1 E1.6 F{20 * 60} ; Final lock tool
-            EXCLUDE_E_END
+            ;EXCLUDE_E_END
           {endif}
 
           G12 S30 ; eject poop
@@ -225,7 +226,14 @@ variants:
           M109 C{target_temp}
           M104 S{target_temp}
 
-          G1 E{deretract_length} F{tc_deretract_speed}
+          {if tool_init[next_extruder] == 1}
+            ;EXCLUDE_E_START
+            G1 E{retract_toolchange} F{tc_deretract_speed} ; Restore filament retracted by G27 R on park
+            ;EXCLUDE_E_END
+            G1 E{deretract_length - retract_toolchange} F{tc_deretract_speed}
+          {else}
+            G1 E{deretract_length} F{tc_deretract_speed}
+          {endif}
 
           G91 ; use relative coordinates
           M83 ; extruder relative mode
@@ -244,7 +252,7 @@ variants:
           M906 P0 ; Revert extruder current
 
           ; RETRACT AFTER TOOLCHANGE START
-          G1 Y0 E-{retract_length[next_extruder] + 0.04} F{retract_speed[next_extruder] * 60}
+          G1 Y0 E-{retract_length[next_extruder]} F{retract_speed[next_extruder] * 60}
 
           {e_retracted[next_extruder] = retract_length[next_extruder] + retract_restart_extra_toolchange[next_extruder]}
           ; RETRACT AFTER TOOLCHANGE END
@@ -259,7 +267,9 @@ variants:
         {else}
         ;-------Wipe Tower specific Gcode Start-----
 
+          ;EXCLUDE_E_START
           G1 E2.0 F{retract_speed[current_extruder] * 60}
+          ;EXCLUDE_E_END
 
           G750 Y85 F21000 A
           G750 Y93 F21000 A
@@ -271,7 +281,10 @@ variants:
           M109 C{target_temp}
           M104 S{target_temp}
 
-          G1 E{deretract_length-2.0-retract_length[next_extruder]+1.2} F{tc_deretract_speed}
+          ;EXCLUDE_E_START
+          G1 E{retract_toolchange-2.0} F{tc_deretract_speed} ; Restore filament retracted by G27 R on park
+          ;EXCLUDE_E_END
+          G1 E{deretract_length-retract_toolchange-retract_length[next_extruder]+1.2} F{tc_deretract_speed}
           {e_retracted[next_extruder] = retract_length[next_extruder]}
           G1 F{speed_tc} ;revert travel speed
 
@@ -300,6 +313,7 @@ variants:
     multimaterial_purging: '80'
     extruder_clearance_height: 33
     extruder_clearance_radius: 75
+    used_filament_compensation: 0.955
     start_gcode: |-
       {
       global retract_toolchange = 8;

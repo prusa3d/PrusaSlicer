@@ -1,0 +1,143 @@
+kind: filament
+inherits:
+- '*PA*'
+- '*PA11_P_ADVANCE_PA*'
+- '*PA11_CHAMBER*'
+- '*sheets_PA_P11*'
+name: Prusament PA11
+id: Prusament PA11
+# C1 0.4/0.6
+condition: (printer.base_model == "COREONE" and (tool.nozzle_diameter == 0.4 or tool.nozzle_diameter == 0.6))
+features:
+  $.brand.uuid: ae5ff34e-298e-50c9-8f77-92a97fb30b09
+  $.brand.slug: prusament
+values:
+  filament_cost: '104.99'
+  filament_vendor: Prusa Polymers
+  filament_density: 1.03
+  filament_spool_weight: 197
+  first_layer_temperature: 275
+  temperature: 275
+  fan_always_on: false
+  cooling: true
+  min_fan_speed: 15
+  max_fan_speed: 20
+  bridge_fan_speed: 20
+  min_print_speed: 15
+  slowdown_below_layer_time: 20
+  disable_fan_first_layers: 1
+  filament_colour: '#DEE0E6'
+  filament_max_volumetric_speed: 6.5
+  extrusion_multiplier: 1
+  fan_below_layer_time: 15
+  cooling_slowdown_logic: consistent_surface
+  cooling_perimeter_transition_distance: 10
+variants:
+## C1
+- condition: printer.base_model == "COREONE"
+  id: hpTd2bUyR1+Wd3g5hcdjkg
+  values:
+    filament_shrinkage_compensation_xy: 0.4
+    filament_shrinkage_compensation_z: 0.4
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 30QYXbw6QXabn/6/f2A1Qw
+    values:
+      filament_max_volumetric_speed: 6.5
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 6InIUji2SLmjt5kxnuBClg
+    values:
+      filament_max_volumetric_speed: 8
+      min_fan_speed: 20
+      max_fan_speed: 30
+      fan_below_layer_time: 18
+  # END
+  - name: '*quit*'
+    id: CqjqIzLvTV+aC9PdGUT51w
+---
+kind: filament
+# Pressure advance values
+id: '*PA11_P_ADVANCE_PA*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: G82o4OzyQem4dN4/lkotLA
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: ycdKkk9US1GsCJtaWvZ7Hg
+    values:
+      pressure_advance_value: 0.14
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 4HCTk6wOQIe3OrI3FiwmDA
+    values:
+      pressure_advance_value: 0.05
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: U5kldISeTRCzIM+6tcQt5g
+    values:
+      pressure_advance_value: 0.035
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 3gPUckcMS4+s13FVuDAKVg
+    values:
+      pressure_advance_value: 0.025
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: 1wANX+SfSUSZOGWgxzYjTg
+    values:
+      pressure_advance_value: 0.016
+---
+kind: filament
+# Chamber temperature
+id: '*PA11_CHAMBER*'
+## C1
+variants:
+- condition: printer.base_model == "COREONE"
+  id: BE6FbBk2Toy1+Y+aFKBlAg
+  values:
+    chamber_minimal_temperature: 45
+    chamber_temperature: 55
+  variants:
+  ## C1L
+  - condition: printer.model == "COREONEL"
+    id: VyCxesO7Rz24jRS67TpKcg
+    values:
+      chamber_minimal_temperature: 50
+      chamber_temperature: 60
+---
+kind: filament
+id: '*sheets_PA_P11*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "pa_nylon"
+  id: XwtLZyqBTcWcSywd7Wdjzw
+  values:
+    first_layer_bed_temperature: 100
+    bed_temperature: 110
+  variants:
+  - condition: printer.model == "MINI"
+    id: yb7550yJT6KZ0THS8KA8pg
+    values:
+      first_layer_bed_temperature: 100
+      bed_temperature: 100
+  - condition: printer.base_model == "XL"
+    id: lnvUnCJkQY24CUUcVp/t+A
+    values:
+      first_layer_bed_temperature: 100
+      bed_temperature: 105
+# PA sheet
+- condition: sheet.type == "pa_nylon"
+  id: 5hNySvIYQLal5W0OJc8FHw
+  values:
+    first_layer_bed_temperature: 90
+    bed_temperature: 115
+  variants:
+  - condition: printer.base_model == "XL"
+    id: arRPBw0ZTbyeR6fIySbSJQ
+    values:
+      first_layer_bed_temperature: 90
+      bed_temperature: 105

@@ -3,6 +3,9 @@ inherits:
 - '*PLA*'
 name: Filament PM PLA+
 id: Filament PM PLA+
+features:
+  $.brand.uuid: d14b3a61-a841-5f76-8adc-0c5b1c9ecbe4
+  $.brand.slug: filamentpm
 values:
   filament_vendor: Filament PM
   min_fan_speed: 50

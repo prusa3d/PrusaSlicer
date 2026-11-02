@@ -3,7 +3,7 @@ inherits:
 - '*common*'
 - '*sheets_PVB_common*'
 - '*chamber_PVB*'
-condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and feeder.model != "MMU3_32bit"
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and ! printer.supports_mmu3_32bit
 id: '*PVB*'
 features:
   $.type: PVB

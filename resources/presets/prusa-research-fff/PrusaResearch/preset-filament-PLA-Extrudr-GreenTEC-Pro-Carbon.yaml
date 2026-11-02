@@ -5,8 +5,10 @@ features:
   $.type: PLA
   $.tags: [abrasive, contains_carbon_fiber]
   $.properties.min_nozzle_diameter: 0.4
+  $.brand.uuid: 01bb6010-7ea2-5f09-bfae-559113454365
+  $.brand.slug: extrudr
 name: Extrudr GreenTEC Pro Carbon
-condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and ! (feeder.model=~/(MMU2S|MMU3_8bit)/ and ! feeder.single_mode) and tool.nozzle_diameter >= 0.4
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and ! ((printer.supports_mmu2s or printer.supports_mmu3_8bit) and ! feeder.single_mode) and tool.nozzle_diameter >= 0.4
 id: Extrudr GreenTEC Pro Carbon
 values:
   filament_vendor: Extrudr

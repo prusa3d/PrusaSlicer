@@ -3,6 +3,9 @@ inherits:
 - '*PLA220*'
 name: Eolas Prints INGEO 850
 id: Eolas Prints INGEO 850
+features:
+  $.brand.uuid: 9008ad2f-03d9-524b-8d69-2e5e4670dc34
+  $.brand.slug: eolas-prints
 values:
   filament_vendor: Eolas Prints
   filament_cost: 25.9

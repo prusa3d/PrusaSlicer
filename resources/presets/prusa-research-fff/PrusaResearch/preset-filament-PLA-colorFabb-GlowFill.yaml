@@ -7,6 +7,8 @@ features:
   $.type: PLA
   $.tags: [abrasive, glow_in_the_dark]
   $.properties.min_nozzle_diameter: 0.4
+  $.brand.uuid: 55dde84a-3fa4-51ad-b456-7d95b1a15622
+  $.brand.slug: colorfabb
 values:
   filament_cost: '39.72'
   filament_vendor: colorFabb

@@ -76,8 +76,50 @@ values:
   pressure_advance_value: 0
   temperature: 230
   cooling_slowdown_logic: uniform_cooling
-## C1
 variants:
+## C1 INDX
+- condition: printer.base_model == "COREONE_INDX"
+  id: LOGQEVXPTN+P27sBw003pQ
+  values:
+    pressure_advance: enabled
+    pressure_advance_value: 0
+    filament_multitool_ramming: true
+    filament_multitool_ramming_volume: 18
+    filament_multitool_ramming_flow: 2
+    filament_minimal_purge_on_wipe_tower: 15
+    first_layer_temperature: 220
+    temperature: 220
+    first_layer_bed_temperature: 60
+    bed_temperature: 60
+    min_fan_speed: 50
+    max_fan_speed: 50
+    bridge_fan_speed: 70
+    retract_layer_change: false
+    retract_length: 1.5
+    retract_speed: 60
+    deretract_speed: 20
+    cooling: false
+    extrusion_multiplier: 1.08
+    full_fan_speed_layer: 5
+    travel_ramping_lift: false
+    start_filament_gcode: M906 P2 ; set E current
+  variants:
+  # C1 INDX 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*FLEX* @COREONEINDX 0.4'
+    id: ANEolxNiRlK2osn7SZmY4A
+    values:
+      filament_max_volumetric_speed: 2
+      slowdown_below_layer_time: 20
+      pressure_advance_value: 0
+    variants:
+    # C1 INDX HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*FLEX* @COREONEINDX HF0.4'
+      id: 5GL7u7PwQ7qvkXPfaW4RmA
+      values:
+        filament_max_volumetric_speed: 2
+## C1
 - condition: printer.base_model == "COREONE"
   id: G7qAAvlFTYWeHkKXpcsWaQ
   values:

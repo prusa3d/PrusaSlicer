@@ -4,6 +4,9 @@ inherits:
 - '*MAXVOL_3dfuel_tough_PLA*'
 name: 3D-Fuel Tough PLA+
 id: 3D-Fuel Tough PLA+
+features:
+  $.brand.uuid: 3eb597ab-9f9b-5ecf-87e6-8ac1e31f51a8
+  $.brand.slug: 3d-fuel
 values:
   filament_vendor: 3D-Fuel
   filament_cost: 34.9

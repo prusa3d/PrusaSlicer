@@ -125,6 +125,7 @@ variants:
     parking_pos_retraction: '84'
     extra_loading_move: '-52'
     multimaterial_purging: '80'
+    used_filament_compensation: 0.95
     start_gcode: |-
       M17 ; enable steppers
       M862.1 P[nozzle_diameter] A{(filament_abrasive[0] ? 1 : 0)} F{(nozzle_high_flow[0] ? 1 : 0)} ; nozzle check

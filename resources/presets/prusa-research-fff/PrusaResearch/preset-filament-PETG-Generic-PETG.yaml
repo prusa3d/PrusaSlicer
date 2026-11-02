@@ -4,6 +4,8 @@ inherits:
 name: Generic PETG
 condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI|COREONE_INDX)/
 id: Generic PETG
+features:
+  generic: true
 values:
   filament_cost: '19.99'
   filament_vendor: Generic
@@ -13,7 +15,7 @@ variants:
   id: cueV0RryTnWNLuGKiRCo6w
   values:
     pressure_advance: automatic_calibration
-    start_filament_gcode: M573 R
+    start_filament_gcode: '; Filament g-code'
     first_layer_temperature: 245
     temperature: 240
     chamber_minimal_temperature: 0

@@ -7,6 +7,9 @@ name: Forward AM Ultrafuse PET-CF15
 # 0.6 nozzle and bigger
 condition: tool.nozzle_diameter >= 0.6 and feeder.base_model!~/.*MMU.*/
 id: Forward AM Ultrafuse PET-CF15
+features:
+  $.brand.uuid: 0d5d4a94-c898-5b83-9be9-90037a821e23
+  $.brand.slug: forward-am
 values:
   filament_vendor: Forward AM
   filament_type: PET

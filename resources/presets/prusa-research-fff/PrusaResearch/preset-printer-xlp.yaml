@@ -94,6 +94,7 @@ variants:
     use_volumetric_e: 0
     variable_layer_height: 1
     z_offset: 0
+    used_filament_compensation: 0.95
   variants:
   - condition: printer.tool_count == 1
     name: Prusa XL+

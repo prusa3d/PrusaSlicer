@@ -3,6 +3,9 @@ inherits:
 - '*PLA*'
 name: Overture PLA
 id: Overture PLA
+features:
+  $.brand.uuid: fcfcb32b-bb45-5382-8530-b43207990e78
+  $.brand.slug: overture
 values:
   filament_vendor: Overture
   filament_cost: 22

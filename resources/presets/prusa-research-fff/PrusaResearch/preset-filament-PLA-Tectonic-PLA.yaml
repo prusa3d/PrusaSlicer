@@ -5,6 +5,9 @@ inherits:
 - '*TectonicPLA_MAXVOLSPEED*'
 name: Tectonic-3D AURA PLA
 id: Tectonic-3D AURA PLA
+features:
+  $.brand.uuid: 6fc9b6f6-d452-5c2e-a61f-ee0a99ed4af5
+  $.brand.slug: tectonic-3d
 values:
   filament_vendor: Tectonic-3D
   filament_cost: 22

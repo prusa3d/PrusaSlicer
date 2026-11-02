@@ -6,6 +6,8 @@ features:
   $.type: PP
   $.tags: [abrasive, contains_glass_fiber]
   $.properties.min_nozzle_diameter: 0.6
+  $.brand.uuid: 0d5d4a94-c898-5b83-9be9-90037a821e23
+  $.brand.slug: forward-am
 condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5)/ and tool.nozzle_diameter >= 0.6 and feeder.base_model!~/.*MMU.*/
 id: Forward AM Ultrafuse PP-GF30
 values:

@@ -3,6 +3,9 @@ inherits:
 - '*ABS*'
 name: Fiberlogy Easy ABS
 id: Fiberlogy Easy ABS
+features:
+  $.brand.uuid: 12c3406d-b94f-51c5-a334-dc008cd1bf05
+  $.brand.slug: fiberlogy
 values:
   bed_temperature: 100
   first_layer_bed_temperature: 100

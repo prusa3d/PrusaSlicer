@@ -4,6 +4,9 @@ inherits:
 - '*sheets_PET_CPEHT*'
 name: Fiberlogy CPE HT
 id: Fiberlogy CPE HT
+features:
+  $.brand.uuid: 12c3406d-b94f-51c5-a334-dc008cd1bf05
+  $.brand.slug: fiberlogy
 values:
   extrusion_multiplier: 0.98
   filament_cost: '42.67'

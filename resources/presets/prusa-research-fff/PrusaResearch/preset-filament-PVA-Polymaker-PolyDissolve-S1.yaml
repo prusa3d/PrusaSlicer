@@ -4,6 +4,9 @@ inherits:
 name: Polymaker PolyDissolve S1
 condition: printer.base_model=~/(MK2|MK3|MK2.5|MK3.5|XL)/
 id: Polymaker PolyDissolve S1
+features:
+  $.brand.uuid: 561da2d4-41ed-5186-8226-c404d31569d7
+  $.brand.slug: polymaker
 values:
   filament_vendor: Polymaker
   bridge_fan_speed: 40

@@ -3,6 +3,9 @@ inherits:
 - '*PLA*'
 name: Eolas Prints PLA
 id: Eolas Prints PLA
+features:
+  $.brand.uuid: 9008ad2f-03d9-524b-8d69-2e5e4670dc34
+  $.brand.slug: eolas-prints
 values:
   filament_cost: '23.5'
   filament_vendor: Eolas Prints

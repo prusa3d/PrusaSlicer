@@ -4,6 +4,9 @@ inherits:
 - '*NumakersPLAPLUS_P_ADVANCE*'
 name: Numakers PLA+
 id: Numakers PLA+
+features:
+  $.brand.uuid: 79f0f340-bb26-513c-80dc-eee5cab8d3f3
+  $.brand.slug: numakers
 values:
   filament_cost: '20.99'
   filament_vendor: Numakers

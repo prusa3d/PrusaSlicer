@@ -3,5 +3,8 @@ inherits:
 - '*PVA*'
 name: Generic PVA
 id: Generic PVA
+features:
+  generic: true
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI|COREONE_INDX)/ and feeder.model!~/(MMU2S|MMU3)/
 values:
   filament_vendor: Generic

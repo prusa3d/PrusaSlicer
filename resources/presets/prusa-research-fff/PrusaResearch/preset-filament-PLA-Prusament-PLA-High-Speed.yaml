@@ -1,0 +1,238 @@
+kind: filament
+inherits:
+- '*PLA*'
+- '*PLAHS_P_ADVANCE_PLA*'
+name: Prusament PLA High Speed
+id: Prusament PLA High Speed
+# C1 0.4/0.6
+# MK4 family 0.4/0.6
+# XL family 0.4/0.6/0.8
+condition: ((printer.base_model=~/(COREONE|MK4)/ and (tool.nozzle_diameter == 0.4 or tool.nozzle_diameter == 0.6)) or (printer.base_model == "XL" and (tool.nozzle_diameter == 0.4 or tool.nozzle_diameter == 0.6 or tool.nozzle_diameter == 0.8)))
+features:
+  $.brand.uuid: ae5ff34e-298e-50c9-8f77-92a97fb30b09
+  $.brand.slug: prusament
+  $.tags: [high_speed]
+values:
+  filament_cost: '27.99'
+  filament_vendor: Prusa Polymers
+  filament_density: 1.24
+  filament_spool_weight: 278
+  filament_infill_max_crossing_speed: 0
+  first_layer_temperature: 215
+  temperature: 220
+variants:
+## C1
+- condition: printer.base_model == "COREONE"
+  id: /U+GZb9WQKiIkzzHGjzAqg
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: MJoBxbQXQqOawgaOoWdPUw
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 4
+      min_print_speed: 40
+    variants:
+    # C1 HF0.4
+    - condition: tool.nozzle_high_flow
+      id: B54Ovj/YQ8yzByw3ZULznQ
+      values:
+        filament_max_volumetric_speed: 28
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: WYmvEBgsSUKtagWZGczHjw
+    values:
+      filament_max_volumetric_speed: 19
+      slowdown_below_layer_time: 7
+      min_print_speed: 20
+    variants:
+    # C1 HF0.6
+    - condition: tool.nozzle_high_flow
+      id: ORruJsU2QE6G6I8l7UEEWA
+      values:
+        filament_max_volumetric_speed: 31
+  # END
+  - name: '*quit*'
+## MK4S
+    id: BeVVn/IDR0GYzyqoJfZocg
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: 6McszAKHRlGAp+rINArUcw
+  variants:
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: reGhMjnyQWi/xaCU3RScEw
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 3
+      min_print_speed: 40
+    variants:
+    # MK4S HF0.4
+    - condition: tool.nozzle_high_flow
+      id: FXoCUu6xTiOuRWrRCcymvw
+      values:
+        filament_max_volumetric_speed: 28
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: Ri6soPORQqGb4zqxYBE6Bg
+    values:
+      filament_max_volumetric_speed: 19
+      slowdown_below_layer_time: 5
+      min_print_speed: 25
+    variants:
+    # MK4 HF0.6
+    - condition: tool.nozzle_high_flow
+      id: /CZbgbbAQf+uYizLQz1T+g
+      values:
+        filament_max_volumetric_speed: 31
+  # END
+  - name: '*quit*'
+## MK4
+    id: nVx0P46xQuGngpjKqZ2+ag
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: eXXjJU6rScewVwaHVpvEug
+  variants:
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: kQSfAiu6SO+axDnomcxA+g
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 4
+      min_print_speed: 40
+    variants:
+    # MK4 HF0.4
+    - condition: tool.nozzle_high_flow
+      id: W14kMS1QRG6ne7U1b2kMXw
+      values:
+        filament_max_volumetric_speed: 28
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 4Rv9UXo2QeWrwUycGOY1tw
+    values:
+      filament_max_volumetric_speed: 19
+      slowdown_below_layer_time: 9
+      min_print_speed: 20
+    variants:
+    # MK4 HF0.6
+    - condition: tool.nozzle_high_flow
+      id: Wyy6OP3UT6SWr7IhHbYKmg
+      values:
+        filament_max_volumetric_speed: 31
+  # END
+  - name: '*quit*'
+## XL
+    id: vn+MgePDS5OYkk4rYifV9g
+- condition: printer.model == "XL"
+  id: IolvYn1YSN+QuFUc7QVEzA
+  variants:
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: pFvZpwP9TJiGeTHPPC/gpg
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 5
+      min_print_speed: 40
+    variants:
+    # XL HF0.4
+    - condition: tool.nozzle_high_flow
+      id: qgqb+Kv9Quq6iBvjIEcm2A
+      values:
+        filament_max_volumetric_speed: 28
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: qe/V4SWbQjegARwtKeNymQ
+    values:
+      filament_max_volumetric_speed: 19
+      slowdown_below_layer_time: 9
+      min_print_speed: 20
+    variants:
+    # XL HF0.6
+    - condition: tool.nozzle_high_flow
+      id: +g45QxpcQa+HJM7G/EIWkQ
+      values:
+        filament_max_volumetric_speed: 31
+  # XL 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: n2rjO2jgS9aFW0c2AcAWqg
+    values:
+      filament_max_volumetric_speed: 21
+      slowdown_below_layer_time: 14
+      min_print_speed: 20
+    variants:
+    # XL HF0.8
+    - condition: tool.nozzle_high_flow
+      id: gS5I/9mLTwmUCQz5Beemmw
+      values:
+        filament_max_volumetric_speed: 39
+  # END
+  - name: '*quit*'
+## XL+
+    id: Xi7eFI7ARDikhnqCR+bWyg
+- condition: printer.model == "XLP"
+  id: +anyXAbhTC6w5DJn4NpX5A
+  variants:
+  # XL+ 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: j72aJIR8QgCFI6FfeL5OmQ
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 4
+      min_print_speed: 40
+    variants:
+    # XL+ HF0.4
+    - condition: tool.nozzle_high_flow
+      id: 8NEub2M3RkasoEPSoxDL+Q
+      values:
+        filament_max_volumetric_speed: 28
+  # XL+ 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: fXXPq9h7Sj+8NXS5SIyhlA
+    values:
+      filament_max_volumetric_speed: 19
+      slowdown_below_layer_time: 5
+      min_print_speed: 20
+    variants:
+    # XL+ HF0.6
+    - condition: tool.nozzle_high_flow
+      id: uRk1+kexQ7CsWWelzm81Ug
+      values:
+        filament_max_volumetric_speed: 31
+  # XL+ 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: z/p3ltlESrOo8M5etI3vGg
+    values:
+      filament_max_volumetric_speed: 21
+      slowdown_below_layer_time: 11
+      min_print_speed: 20
+    variants:
+    # XL+ HF0.8
+    - condition: tool.nozzle_high_flow
+      id: 0/rvJ2KMReaOwZ5UtHB55A
+      values:
+        filament_max_volumetric_speed: 39
+  # END
+  - name: '*quit*'
+    id: JOPQZxcgR9OvNViApiAfVg
+---
+kind: filament
+# Pressure advance values
+id: '*PLAHS_P_ADVANCE_PLA*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: AWZlxjaDRfOz0inGNy0SzQ
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 5dwAlSgiQTqhk5irRNMNzw
+    values:
+      pressure_advance_value: 0.031
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: yifp1ChTTnCLZpHDL/3VYw
+    values:
+      pressure_advance_value: 0.019
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: LGE5cF1MTaislZ5p3GcFWA
+    values:
+      pressure_advance_value: 0.015

@@ -5,6 +5,9 @@ inherits:
 - '*magnetite_MAXVOLSPEED*'
 name: Prusament PETG Magnetite 40%
 id: Prusament PETG Magnetite 40%
+features:
+  $.brand.uuid: ae5ff34e-298e-50c9-8f77-92a97fb30b09
+  $.brand.slug: prusament
 values:
   filament_vendor: Prusa Polymers
   # first_layer_bed_temperature: 100

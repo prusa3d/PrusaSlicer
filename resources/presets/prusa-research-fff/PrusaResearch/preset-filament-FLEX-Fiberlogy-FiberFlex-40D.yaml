@@ -3,6 +3,8 @@ inherits:
 - '*FLEX*'
 features:
   $.type: TPU
+  $.brand.uuid: 12c3406d-b94f-51c5-a334-dc008cd1bf05
+  $.brand.slug: fiberlogy
 name: Fiberlogy FiberFlex 40D
 id: Fiberlogy FiberFlex 40D
 values:

@@ -3,6 +3,8 @@ inherits:
 - '*PCCF*'
 name: Generic PC-CF
 id: Generic PC-CF
+features:
+  generic: true
 values:
   filament_cost: '45.10'
   filament_vendor: Generic

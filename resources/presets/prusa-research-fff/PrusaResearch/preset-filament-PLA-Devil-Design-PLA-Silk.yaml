@@ -4,6 +4,9 @@ inherits:
 - '*DDPLASilk_P_ADVANCE_PLA*'
 name: Devil Design PLA Silk
 id: Devil Design PLA Silk
+features:
+  $.brand.uuid: 530c7397-83dd-5c1a-aa7d-fe995b46607b
+  $.brand.slug: devil-design
 values:
   filament_cost: '20'
   filament_density: 1.23

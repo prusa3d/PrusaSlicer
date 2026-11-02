@@ -3,5 +3,7 @@ inherits:
 - '*PP*'
 name: Generic PP
 id: Generic PP
+features:
+  generic: true
 values:
   filament_vendor: Generic

@@ -2,8 +2,11 @@ kind: filament
 inherits:
 - '*ABS*'
 name: Filament PM ABS
-condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and feeder.model != "MMU3_32bit"
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and ! printer.supports_mmu3_32bit
 id: Filament PM ABS
+features:
+  $.brand.uuid: d14b3a61-a841-5f76-8adc-0c5b1c9ecbe4
+  $.brand.slug: filamentpm
 values:
   filament_cost: '25'
   filament_vendor: Filament PM

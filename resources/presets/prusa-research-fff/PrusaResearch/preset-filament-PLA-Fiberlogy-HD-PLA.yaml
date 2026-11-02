@@ -3,6 +3,9 @@ inherits:
 - '*PLA*'
 name: Fiberlogy HD PLA
 id: Fiberlogy HD PLA
+features:
+  $.brand.uuid: 12c3406d-b94f-51c5-a334-dc008cd1bf05
+  $.brand.slug: fiberlogy
 values:
   filament_cost: '30.59'
   filament_vendor: Fiberlogy

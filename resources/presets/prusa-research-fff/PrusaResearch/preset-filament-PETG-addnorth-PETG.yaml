@@ -3,6 +3,9 @@ inherits:
 - '*PET*'
 name: addnorth PETG
 id: addnorth PETG
+features:
+  $.brand.uuid: 86a428c4-a603-55f4-9377-16757488cd4b
+  $.brand.slug: addnorth
 values:
   filament_vendor: addnorth
   bed_temperature: 80

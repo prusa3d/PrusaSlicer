@@ -76,7 +76,7 @@ variants:
     overhang_fan_speed_3: 0
     fan_below_layer_time: 35
     filament_infill_max_speed: 200
-    start_filament_gcode: M573 R
+    start_filament_gcode: '; Filament g-code'
     retract_length: 1
     travel_max_lift: 1
     cooling_perimeter_transition_distance: 15

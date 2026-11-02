@@ -1,0 +1,649 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   id="Layer_1"
+   data-name="Layer 1"
+   width="360mm"
+   height="360mm"
+   viewBox="0 0 1020.5 1020.5"
+   version="1.1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs111">
+    <rect
+       x="1267.4229"
+       y="1266.2699"
+       width="34.784466"
+       height="37.474977"
+       id="rect3" />
+  </defs>
+  <rect
+     width="1020.5"
+     height="1020.5"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 5.7px;"
+     id="rect1" />
+  <rect
+     y="765.4"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect84" />
+  <rect
+     x="255.1"
+     y="765.4"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect85" />
+  <polyline
+     points="765.4 992.1 765.4 1020.5 510.2 1020.5 510.2 765.4 765.4 765.4 765.4 935.4"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="polyline85" />
+  <polyline
+     points="765.4 944.9 765.4 765.4 1020.5 765.4 1020.5 1020.5 765.4 1020.5 765.4 984.2"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="polyline86" />
+  <rect
+     y="510.2"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect86" />
+  <rect
+     x="255.1"
+     y="510.2"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect87" />
+  <rect
+     x="510.2"
+     y="510.2"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect88" />
+  <rect
+     x="765.4"
+     y="510.2"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect89" />
+  <rect
+     y="255.1"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect90" />
+  <rect
+     x="255.1"
+     y="255.1"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect91" />
+  <rect
+     x="510.2"
+     y="255.1"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect92" />
+  <rect
+     x="765.4"
+     y="255.1"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect93" />
+  <rect
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect94" />
+  <rect
+     x="255.1"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect95" />
+  <rect
+     x="510.2"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect96" />
+  <rect
+     x="765.4"
+     width="255.1"
+     height="255.1"
+     style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: 1.4px;"
+     id="rect97" />
+  <g
+     id="g84">
+    <rect
+       width="1020.5"
+       height="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="rect2" />
+    <line
+       y1="992.1"
+       x2="1020.5"
+       y2="992.1"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line2" />
+    <line
+       x1="963.89185"
+       y1="963.79999"
+       x2="1020.5"
+       y2="963.79999"
+       style="fill:none;stroke:#ffffff;stroke-width:0.645843px;stroke-miterlimit:10"
+       id="line3" />
+    <line
+       y1="963.79999"
+       x2="736.89807"
+       y2="963.79999"
+       style="fill:none;stroke:#ffffff;stroke-width:0.791548px;stroke-miterlimit:10"
+       id="line4"
+       x1="0" />
+    <line
+       y1="935.4"
+       x2="1020.5"
+       y2="935.4"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line5" />
+    <line
+       y1="907.1"
+       x2="1020.5"
+       y2="907.1"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line6" />
+    <line
+       y1="878.7"
+       x2="1020.5"
+       y2="878.7"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line7" />
+    <line
+       y1="850.4"
+       x2="1020.5"
+       y2="850.4"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line8" />
+    <line
+       y1="822"
+       x2="1020.5"
+       y2="822"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line9" />
+    <line
+       y1="793.7"
+       x2="1020.5"
+       y2="793.7"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line10" />
+    <line
+       y1="765.4"
+       x2="1020.5"
+       y2="765.4"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line11" />
+    <line
+       y1="737"
+       x2="1020.5"
+       y2="737"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line12" />
+    <line
+       y1="708.7"
+       x2="1020.5"
+       y2="708.7"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line13" />
+    <line
+       y1="680.3"
+       x2="1020.5"
+       y2="680.3"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line14" />
+    <line
+       y1="652"
+       x2="1020.5"
+       y2="652"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line15" />
+    <line
+       y1="623.6"
+       x2="1020.5"
+       y2="623.6"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line16" />
+    <line
+       y1="595.3"
+       x2="1020.5"
+       y2="595.3"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line17" />
+    <line
+       y1="566.9"
+       x2="1020.5"
+       y2="566.9"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line18" />
+    <line
+       y1="538.6"
+       x2="1020.5"
+       y2="538.6"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line19" />
+    <line
+       y1="510.2"
+       x2="1020.5"
+       y2="510.2"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line20" />
+    <line
+       y1="481.9"
+       x2="1020.5"
+       y2="481.9"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line21" />
+    <line
+       y1="453.5"
+       x2="1020.5"
+       y2="453.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line22" />
+    <line
+       y1="425.2"
+       x2="1020.5"
+       y2="425.2"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line23" />
+    <line
+       y1="396.9"
+       x2="1020.5"
+       y2="396.9"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line24" />
+    <line
+       y1="368.5"
+       x2="1020.5"
+       y2="368.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line25" />
+    <line
+       y1="340.2"
+       x2="1020.5"
+       y2="340.2"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line26" />
+    <line
+       y1="311.8"
+       x2="1020.5"
+       y2="311.8"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line27" />
+    <line
+       y1="283.5"
+       x2="1020.5"
+       y2="283.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line28" />
+    <line
+       y1="255.1"
+       x2="1020.5"
+       y2="255.1"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line29" />
+    <line
+       y1="226.8"
+       x2="1020.5"
+       y2="226.8"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line30" />
+    <line
+       y1="198.4"
+       x2="1020.5"
+       y2="198.4"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line31" />
+    <line
+       y1="170.1"
+       x2="1020.5"
+       y2="170.1"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line32" />
+    <line
+       y1="141.7"
+       x2="1020.5"
+       y2="141.7"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line33" />
+    <line
+       y1="113.4"
+       x2="1020.5"
+       y2="113.4"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line34" />
+    <line
+       y1="85"
+       x2="1020.5"
+       y2="85"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line35" />
+    <line
+       y1="56.7"
+       x2="1020.5"
+       y2="56.7"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line36" />
+    <line
+       y1="28.3"
+       x2="1020.5"
+       y2="28.3"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line37" />
+    <line
+       x1="992.1"
+       x2="992.1"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line38" />
+    <line
+       x1="963.79999"
+       x2="963.79999"
+       y2="1018.6102"
+       style="fill:none;stroke:#ffffff;stroke-width:0.699309px;stroke-miterlimit:10"
+       id="line39"
+       y1="0.12405901" />
+    <line
+       x1="935.4"
+       y1="984.3"
+       x2="935.4"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line40" />
+    <line
+       x1="935.4"
+       x2="935.4"
+       y2="944.9"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line41" />
+    <line
+       x1="907.1"
+       y1="984.3"
+       x2="907.1"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line42" />
+    <line
+       x1="907.1"
+       x2="907.1"
+       y2="944.9"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line43" />
+    <line
+       x1="878.8"
+       y1="984.3"
+       x2="878.7"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line44" />
+    <line
+       x1="878.7"
+       x2="878.7"
+       y2="944.9"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line45" />
+    <line
+       x1="850.5"
+       y1="984.3"
+       x2="850.4"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line46" />
+    <line
+       x1="850.4"
+       x2="850.4"
+       y2="944.9"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line47" />
+    <line
+       x1="822.1"
+       y1="984.3"
+       x2="822"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line48" />
+    <line
+       x1="822"
+       x2="822"
+       y2="944.9"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line49" />
+    <line
+       x1="793.8"
+       y1="984.3"
+       x2="793.7"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line50" />
+    <line
+       x1="793.7"
+       x2="793.7"
+       y2="944.9"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line51" />
+    <line
+       x1="765.4"
+       x2="765.4"
+       y2="935.4"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line52" />
+    <line
+       x1="737"
+       x2="737"
+       y2="1019.0157"
+       style="fill:none;stroke:#ffffff;stroke-width:0.726935px;stroke-miterlimit:10"
+       id="line54"
+       y1="0" />
+    <line
+       x1="708.70001"
+       x2="708.70001"
+       y2="1019.0157"
+       style="fill:none;stroke:#ffffff;stroke-width:0.726935px;stroke-miterlimit:10"
+       id="line56"
+       y1="0" />
+    <line
+       x1="680.29999"
+       x2="680.29999"
+       y2="1019.0157"
+       style="fill:none;stroke:#ffffff;stroke-width:0.726935px;stroke-miterlimit:10"
+       id="line58"
+       y1="0" />
+    <line
+       x1="652"
+       x2="652"
+       y2="1019.0157"
+       style="fill:none;stroke:#ffffff;stroke-width:0.726935px;stroke-miterlimit:10"
+       id="line60"
+       y1="0" />
+    <line
+       x1="623.59998"
+       x2="623.59998"
+       y2="1019.0157"
+       style="fill:none;stroke:#ffffff;stroke-width:0.726935px;stroke-miterlimit:10"
+       id="line62"
+       y1="0" />
+    <line
+       x1="595.29999"
+       x2="595.29999"
+       y2="1019.0157"
+       style="fill:none;stroke:#ffffff;stroke-width:0.726935px;stroke-miterlimit:10"
+       id="line64"
+       y1="0" />
+    <line
+       x1="566.9"
+       x2="566.9"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line65" />
+    <line
+       x1="538.6"
+       x2="538.6"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line66" />
+    <line
+       x1="510.2"
+       x2="510.2"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line67" />
+    <line
+       x1="481.9"
+       x2="481.9"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line68" />
+    <line
+       x1="453.5"
+       x2="453.5"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line69" />
+    <line
+       x1="425.2"
+       x2="425.2"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line70" />
+    <line
+       x1="396.9"
+       x2="396.9"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line71" />
+    <line
+       x1="368.5"
+       x2="368.5"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line72" />
+    <line
+       x1="340.2"
+       x2="340.2"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line73" />
+    <line
+       x1="311.8"
+       x2="311.8"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line74" />
+    <line
+       x1="283.5"
+       x2="283.5"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line75" />
+    <line
+       x1="255.1"
+       x2="255.1"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line76" />
+    <line
+       x1="226.8"
+       x2="226.8"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line77" />
+    <line
+       x1="198.4"
+       x2="198.4"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line78" />
+    <line
+       x1="170.1"
+       x2="170.1"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line79" />
+    <line
+       x1="141.7"
+       x2="141.7"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line80" />
+    <line
+       x1="113.4"
+       x2="113.4"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line81" />
+    <line
+       x1="85"
+       x2="85"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line82" />
+    <line
+       x1="56.7"
+       x2="56.7"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line83" />
+    <line
+       x1="28.3"
+       x2="28.3"
+       y2="1020.5"
+       style="fill: none; stroke: #fff; stroke-miterlimit: 10; stroke-width: .7px;"
+       id="line84" />
+    <g
+       id="g1"
+       transform="translate(-18.000489)">
+      <g
+         id="g111">
+        <path
+           d="m 770.7,951.3 h 11.6 c 1.6,0 3,0.2 4.1,0.7 1.1,0.5 2,1.1 2.8,1.9 0.7,0.8 1.2,1.7 1.5,2.6 0.3,1 0.5,2 0.5,3 0,1 -0.2,2.1 -0.5,3.1 -0.3,1 -0.8,1.9 -1.5,2.6 -0.7,0.8 -1.6,1.4 -2.8,1.9 -1.2,0.5 -2.5,0.7 -4.1,0.7 h -5.9 v 9.2 h -5.7 z m 5.7,12.1 h 4.4 c 0.6,0 1.3,0 1.9,-0.1 0.6,0 1.1,-0.3 1.6,-0.6 0.5,-0.3 0.8,-0.7 1.1,-1.2 0.3,-0.5 0.4,-1.2 0.4,-2 0,-0.8 -0.1,-1.5 -0.4,-2 -0.3,-0.5 -0.6,-0.9 -1.1,-1.2 -0.5,-0.3 -1,-0.5 -1.6,-0.6 -0.6,0 -1.2,-0.1 -1.9,-0.1 h -4.4 v 7.7 z"
+           style="fill:#ffffff"
+           id="path105" />
+        <path
+           d="m 794.7,951.3 h 13.9 c 1.2,0 2.2,0.2 3.1,0.6 0.9,0.4 1.7,0.9 2.4,1.5 0.7,0.6 1.2,1.4 1.5,2.3 0.3,0.9 0.5,1.8 0.5,2.7 0,1.5 -0.3,2.8 -1,3.9 -0.6,1.1 -1.7,1.9 -3.1,2.5 v 0 c 0.7,0.3 1.3,0.6 1.7,1 0.5,0.4 0.8,0.9 1.1,1.4 0.3,0.6 0.5,1.1 0.6,1.8 0.1,0.6 0.2,1.3 0.3,1.9 0,0.4 0,0.9 0,1.4 0,0.6 0,1.1 0.1,1.7 0,0.6 0.2,1.1 0.3,1.6 0.1,0.5 0.3,1 0.6,1.3 H 811 c -0.2,-0.4 -0.3,-0.9 -0.4,-1.3 -0.1,-0.4 -0.2,-1 -0.2,-1.5 0,-0.5 -0.1,-1.1 -0.1,-1.7 0,-0.6 0,-1.1 -0.2,-1.6 -0.2,-1.3 -0.6,-2.3 -1.2,-3 -0.6,-0.6 -1.6,-0.9 -3.1,-0.9 h -5.7 v 10 h -5.7 v -25.7 z m 5.7,11.6 h 6.2 c 1.3,0 2.2,-0.3 2.9,-0.9 0.7,-0.6 1,-1.5 1,-2.8 0,-1.3 -0.3,-2.2 -1,-2.7 -0.7,-0.6 -1.6,-0.8 -2.9,-0.8 h -6.2 z"
+           style="fill:#ffffff"
+           id="path106" />
+        <path
+           d="m 842.5,967.3 c 0,3.5 -1,6.1 -2.9,7.8 -1.9,1.7 -4.6,2.6 -8.1,2.6 -3.5,0 -6.2,-0.8 -8.1,-2.5 -1.9,-1.7 -2.9,-4.3 -2.9,-7.8 v -16 h 5.7 v 16 c 0,0.7 0,1.4 0.2,2.1 0.2,0.7 0.4,1.3 0.8,1.8 0.4,0.5 0.9,0.9 1.6,1.3 0.7,0.3 1.6,0.5 2.8,0.5 2,0 3.4,-0.5 4.2,-1.4 0.8,-0.9 1.2,-2.3 1.2,-4.2 v -16 h 5.7 v 16 z"
+           style="fill:#ffffff"
+           id="path107" />
+        <path
+           d="m 851.2,968.5 c 0,0.9 0.2,1.6 0.5,2.2 0.3,0.6 0.7,1.1 1.2,1.5 0.5,0.4 1.1,0.6 1.8,0.8 0.7,0.2 1.4,0.3 2.2,0.3 0.8,0 1,0 1.6,-0.1 0.6,0 1.1,-0.2 1.6,-0.5 0.5,-0.3 0.9,-0.6 1.3,-1 0.3,-0.4 0.5,-1 0.5,-1.6 0,-0.6 -0.2,-1.3 -0.7,-1.7 -0.4,-0.4 -1,-0.8 -1.7,-1.1 -0.7,-0.3 -1.5,-0.6 -2.4,-0.8 -0.9,-0.2 -1.8,-0.4 -2.8,-0.7 -1,-0.2 -1.9,-0.5 -2.8,-0.9 -0.9,-0.3 -1.7,-0.8 -2.4,-1.3 -0.7,-0.6 -1.3,-1.2 -1.7,-2.1 -0.4,-0.8 -0.7,-1.8 -0.7,-3 0,-1.2 0.3,-2.5 0.8,-3.4 0.6,-1 1.3,-1.8 2.2,-2.4 0.9,-0.6 1.9,-1.1 3.1,-1.4 1.2,-0.3 2.3,-0.5 3.5,-0.5 1.2,0 2.6,0.2 3.9,0.5 1.2,0.3 2.3,0.8 3.3,1.5 1,0.7 1.7,1.5 2.3,2.6 0.6,1 0.8,2.3 0.8,3.8 h -5.5 c 0,-0.8 -0.2,-1.4 -0.5,-1.9 -0.3,-0.5 -0.6,-0.9 -1.1,-1.2 -0.5,-0.3 -1,-0.5 -1.6,-0.6 -0.6,-0.1 -1.2,-0.2 -1.9,-0.2 -0.7,0 -0.9,0 -1.4,0.1 -0.5,0 -0.9,0.3 -1.2,0.5 -0.4,0.2 -0.7,0.5 -0.9,0.9 -0.2,0.4 -0.4,0.8 -0.4,1.4 0,0.6 0,0.9 0.3,1.2 0.2,0.3 0.6,0.6 1.1,0.8 0.6,0.3 1.3,0.5 2.3,0.8 1,0.3 2.3,0.6 3.9,1 0.3,0 0.7,0.2 1.2,0.3 0.5,0.1 1,0.3 1.6,0.5 0.6,0.2 1.1,0.5 1.7,0.9 0.6,0.4 1.1,0.8 1.5,1.3 0.5,0.5 0.8,1.2 1.1,1.9 0.3,0.7 0.4,1.6 0.4,2.5 0,0.9 -0.2,2.3 -0.7,3.3 -0.5,1 -1.1,1.9 -2,2.6 -0.9,0.7 -2,1.3 -3.3,1.7 -1.3,0.4 -2.9,0.6 -4.6,0.6 -1.7,0 -2.8,-0.2 -4.1,-0.5 -1.3,-0.4 -2.5,-0.9 -3.5,-1.7 -1,-0.7 -1.8,-1.7 -2.4,-2.8 -0.6,-1.2 -0.9,-2.5 -0.9,-4.1 z"
+           style="fill:#ffffff"
+           id="path108" />
+        <path
+           d="m 877.7,951.3 h 5.8 l 9.6,25.7 h -5.9 l -1.9,-5.7 h -9.6 l -2,5.7 H 868 l 9.8,-25.7 z m -0.5,15.8 h 6.7 l -3.2,-9.4 v 0 l -3.3,9.4 z"
+           style="fill:#ffffff"
+           id="path109" />
+        <path
+           d="m 911.7,963.6 -8.3,-12.2 h 6.6 l 5,8.2 5.2,-8.2 h 6.2 l -8.2,12.3 9,13.4 h -6.7 l -5.6,-8.9 -5.7,8.9 h -6.4 l 9,-13.5 z"
+           style="fill:#ffffff"
+           id="path110" />
+        <path
+           d="m 929.4,951.3 h 5.7 v 21 h 12.5 v 4.8 h -18.2 v -25.7 z"
+           style="fill:#ffffff"
+           id="path111" />
+        <path
+           style="font-weight:bold;font-size:12px;font-family:Arial;-inkscape-font-specification:'Arial, Bold';white-space:pre;fill:#ffffff;stroke-width:7.55932"
+           d="m 1270.1699,1275.9812 v -2.2325 h -2.25 v -1.541 h 2.25 v -2.2324 h 1.5 v 2.2324 h 2.2559 v 1.541 h -2.2559 v 2.2325 z"
+           id="text1"
+           transform="matrix(3.0438815,0,0,3.0438212,-2910.6164,-2910.8433)"
+           aria-label="+" />
+      </g>
+    </g>
+  </g>
+</svg>

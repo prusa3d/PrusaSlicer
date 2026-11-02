@@ -5,6 +5,9 @@ inherits:
 - '*UltrafuserPET_MAXVOLSPEED*'
 name: Forward AM Ultrafuse rPET
 id: Forward AM Ultrafuse rPET
+features:
+  $.brand.uuid: 0d5d4a94-c898-5b83-9be9-90037a821e23
+  $.brand.slug: forward-am
 values:
   filament_vendor: Forward AM
   filament_type: PET

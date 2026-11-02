@@ -3,6 +3,8 @@ inherits:
 - '*FLEX*'
 features:
   $.type: TPC
+  $.brand.uuid: 0d5d4a94-c898-5b83-9be9-90037a821e23
+  $.brand.slug: forward-am
 name: Forward AM Ultrafuse TPC-45D
 condition: tool.nozzle_diameter >= 0.4 and printer.base_model=~/(MK3.5|MK3|MK2.5|MK2)/ and feeder.base_model!~/.*MMU.*/
 id: Forward AM Ultrafuse TPC-45D

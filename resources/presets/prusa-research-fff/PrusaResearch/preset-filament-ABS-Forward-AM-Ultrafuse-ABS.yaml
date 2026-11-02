@@ -3,6 +3,9 @@ inherits:
 - '*ABS*'
 name: Forward AM Ultrafuse ABS
 id: Forward AM Ultrafuse ABS
+features:
+  $.brand.uuid: 0d5d4a94-c898-5b83-9be9-90037a821e23
+  $.brand.slug: forward-am
 values:
   filament_cost: 25.87
   filament_vendor: Forward AM

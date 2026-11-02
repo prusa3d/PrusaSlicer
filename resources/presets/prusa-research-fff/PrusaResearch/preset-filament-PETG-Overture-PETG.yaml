@@ -3,6 +3,9 @@ inherits:
 - '*PET*'
 name: Overture PETG
 id: Overture PETG
+features:
+  $.brand.uuid: fcfcb32b-bb45-5382-8530-b43207990e78
+  $.brand.slug: overture
 values:
   filament_vendor: Overture
   first_layer_temperature: 250

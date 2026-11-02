@@ -1,7 +1,7 @@
 kind: vendor
 id: PrusaResearch
 name: Prusa Research FFF
-version: 1.0.11
+version: 1.0.21
 features:
   printer:
     supports_high_flow_nozzle:
@@ -40,6 +40,12 @@ features:
       default: false
     supports_mmu_08_nozzle:
       default: false
+    supports_mmu2s:
+      default: false
+    supports_mmu3_8bit:
+      default: false
+    supports_mmu3_32bit:
+      default: false
     bed_segments_x:
       default: 1
     bed_segments_y:
@@ -66,6 +72,10 @@ features:
   feeder:
     single_mode:
       default: false
+  presets:
+    material:
+      generic:
+        default: false
 printer_families:
   - label: "Core ONE INDX"
     base_model: COREONE_INDX
@@ -172,12 +182,12 @@ features:
     default: true
 visual:
   bed_model: xl_bed.stl
-  bed_texture: xl.svg
+  bed_texture: xlp.svg
   thumbnail: XLP1T_thumbnail.svg
 ---
 kind: printer
 technology: FFF
-name: Prusa CORE One L
+name: Prusa CORE One L & L+
 id: COREONEL
 model:
   base_model: COREONE
@@ -190,6 +200,8 @@ features:
     default: true
   supports_mmu_06_nozzle:
     default: true
+  supports_mmu3_32bit:
+    default: true
 visual:
   bed_model: coreonel_bed.stl
   bed_texture: coreonel.svg
@@ -197,7 +209,7 @@ visual:
 ---
 kind: printer
 technology: FFF
-name: Prusa CORE One
+name: Prusa CORE One & One+
 id: COREONE
 model:
   base_model: COREONE
@@ -209,6 +221,8 @@ features:
   supports_mmu_04_nozzle:
     default: true
   supports_mmu_06_nozzle:
+    default: true
+  supports_mmu3_32bit:
     default: true
 visual:
   bed_model: coreone_bed.stl
@@ -225,10 +239,6 @@ model:
 tool_count: 1
 features:
   input_shaper:
-    default: true
-  supports_mmu_04_nozzle:
-    default: true
-  supports_mmu_06_nozzle:
     default: true
 visual:
   bed_model: coreone_bed.stl
@@ -259,7 +269,7 @@ features:
   supports_08_nozzle:
     default: false
   multi_extruder:
-    default: true  
+    default: true
 visual:
   bed_model: coreoneindx_bed.stl
   bed_texture: coreoneindx.svg
@@ -302,6 +312,8 @@ features:
     default: true
   supports_mmu_06_nozzle:
     default: true
+  supports_mmu3_32bit:
+    default: true
 visual:
   bed_model: mk4_bed.stl
   bed_texture: mk4.svg
@@ -321,6 +333,8 @@ features:
   supports_mmu_04_nozzle:
     default: true
   supports_mmu_06_nozzle:
+    default: true
+  supports_mmu3_32bit:
     default: true
 visual:
   bed_model: mk4_bed.stl
@@ -343,6 +357,8 @@ features:
     default: true
   supports_mmu_06_nozzle:
     default: true
+  supports_mmu3_32bit:
+    default: true
 visual:
   bed_model: mk4_bed.stl
   bed_texture: mk39.svg
@@ -363,6 +379,8 @@ features:
     default: true
   supports_mmu_06_nozzle:
     default: true
+  supports_mmu3_32bit:
+    default: true
 visual:
   bed_model: mk4_bed.stl
   bed_texture: mk39s.svg
@@ -370,7 +388,7 @@ visual:
 ---
 kind: printer
 technology: FFF
-name: Prusa MK3.5
+name: Prusa MK3.5 & MK3.5S
 id: MK3.5
 model:
   base_model: MK3.5
@@ -386,6 +404,8 @@ features:
   supports_mmu_04_nozzle:
     default: true
   supports_mmu_06_nozzle:
+    default: true
+  supports_mmu3_8bit:
     default: true
 visual:
   bed_model: mk3_bed.stl
@@ -423,7 +443,7 @@ visual:
 ---
 kind: printer
 technology: FFF
-name: Prusa MK3S
+name: Prusa MK3S & MK3S+
 id: MK3S
 model:
   base_model: MK3
@@ -444,6 +464,10 @@ features:
     default: true
   supports_mmu_06_nozzle:
     default: true
+  supports_mmu2s:
+    default: true
+  supports_mmu3_8bit:
+    default: true
 visual:
   bed_model: mk3_bed.stl
   bed_texture: mk3.svg
@@ -451,7 +475,7 @@ visual:
 ---
 kind: printer
 technology: FFF
-name: Prusa MINI
+name: Prusa MINI & MINI+
 id: MINI
 model:
   base_model: MINI
@@ -495,6 +519,8 @@ features:
   supports_mmu_04_nozzle:
     default: true
   supports_mmu_06_nozzle:
+    default: true
+  supports_mmu2s:
     default: true
 visual:
   bed_model: mk3_bed.stl
@@ -681,31 +707,42 @@ features:
 ---
 kind: feeder
 technology: FFF
-id: mmu3_32b
+id: mmu3
 name: MMU3
-condition: printer.base_model=~/(COREONE|MK4)/ #and (tool.nozzle_diameter == 0.4 or tool.nozzle_diameter == 0.6) and ! (tool.nozzle_diameter == 0.6 and tool.nozzle_high_flow)
+condition: printer.base_model=~/(COREONE|MK4|MK3S|MK3.5)/
 feeder_type: mmu
 model:
   base_model: MMU3
-  model: MMU3_32bit
+  model: MMU3
 slot_count: 5
----
-kind: feeder
-technology: FFF
-id: mmu3_8b
-name: MMU3 8bit
-condition: printer.model=~/(MK3S|MK3.5)/ #and (tool.nozzle_diameter == 0.25 or tool.nozzle_diameter == 0.4 or tool.nozzle_diameter == 0.6)
-feeder_type: mmu
-model:
-  base_model: MMU3
-  model: MMU3_8bit
-slot_count: 5
+# ---
+# kind: feeder
+# technology: FFF
+# id: mmu3_32b
+# name: MMU3
+# condition: printer.base_model=~/(COREONE|MK4)/
+# feeder_type: mmu
+# model:
+  # base_model: MMU3
+  # model: MMU3_32bit
+# slot_count: 5
+# ---
+# kind: feeder
+# technology: FFF
+# id: mmu3_8b
+# name: MMU3 8bit
+# condition: printer.model=~/(MK3S|MK3.5)/
+# feeder_type: mmu
+# model:
+  # base_model: MMU3
+  # model: MMU3_8bit
+# slot_count: 5
 ---
 kind: feeder
 technology: FFF
 id: mmu2s
 name: MMU2S
-condition: printer.model=~/(MK3S|MK2.5S)/ #and (tool.nozzle_diameter == 0.25 or tool.nozzle_diameter == 0.4 or tool.nozzle_diameter == 0.6)
+condition: printer.model=~/(MK3S|MK2.5S)/
 feeder_type: mmu
 model:
   base_model: MMU2
@@ -801,7 +838,7 @@ features:
 
 kind: printer_config
 id: xl-1t
-name: XL 1T
+name: Prusa XL 1T
 printer: xl
 legacy_printer_model: [XLIS, XL]
 tool_count: 1
@@ -811,7 +848,7 @@ sheet: satin
 ---
 kind: printer_config
 id: xl-2t
-name: XL 2T
+name: Prusa XL 2T
 printer: xl
 legacy_printer_model: [XL2IS, XL2]
 tool_count: 2
@@ -826,7 +863,7 @@ features:
 ---
 kind: printer_config
 id: xl-5t
-name: XL 5T
+name: Prusa XL 5T
 printer: xl
 legacy_printer_model: [XL5IS, XL5]
 tool_count: 5
@@ -841,7 +878,7 @@ features:
 ---
 kind: printer_config
 id: xl+1t
-name: XL+ 1T
+name: Prusa XL+ 1T
 printer: xl+
 legacy_printer_model: [XLP1T]
 tool_count: 1
@@ -851,7 +888,7 @@ sheet: satin
 ---
 kind: printer_config
 id: xl+2t
-name: XL+ 2T
+name: Prusa XL+ 2T
 printer: xl+
 legacy_printer_model: [XLP2T]
 tool_count: 2
@@ -866,7 +903,7 @@ features:
 ---
 kind: printer_config
 id: xl+5t
-name: XL+ 5T
+name: Prusa XL+ 5T
 printer: xl+
 legacy_printer_model: [XLP5T]
 tool_count: 5
@@ -881,7 +918,7 @@ features:
 ---
 kind: printer_config
 id: c1l
-name: Prusa CORE One L
+name: Prusa CORE One L & L+
 printer: COREONEL
 legacy_printer_model: [COREONEL]
 tools:
@@ -890,19 +927,19 @@ sheet: satin
 ---
 kind: printer_config
 id: c1lmmu3
-name: Prusa CORE One L MMU3
+name: Prusa CORE One L & L+ MMU3
 printer: COREONEL
 legacy_printer_model: [COREONELMMU3]
 tools:
-- tool: 0.4
+- tool: '0.4'
 feeders:
-- feeder: mmu3_32b
+- feeder: mmu3
   address: [0]
 sheet: satin
 ---
 kind: printer_config
 id: c1
-name: Prusa CORE One
+name: Prusa CORE One & One+
 printer: COREONE
 legacy_printer_model: [COREONE]
 tools:
@@ -920,13 +957,13 @@ sheet: satin
 ---
 kind: printer_config
 id: c1mmu3
-name: Prusa CORE One MMU3
+name: Prusa CORE One & One+
 printer: COREONE
 legacy_printer_model: [COREONEMMU3]
 tools:
-- tool: 0.4
+- tool: '0.4'
 feeders:
-- feeder: mmu3_32b
+- feeder: mmu3
   address: [0]
 sheet: satin
 ---
@@ -995,7 +1032,7 @@ legacy_printer_model: [MK4ISMMU3]
 tools:
   - tool: '0.4'
 feeders:
-  - feeder: mmu3_32b
+  - feeder: mmu3
     address: [0]
 sheet: satin
 ---
@@ -1014,9 +1051,9 @@ name: Prusa MK4S MMU3
 printer: MK4S
 legacy_printer_model: [MK4SMMU3]
 tools:
-  - tool: 0.4
+  - tool: '0.4'
 feeders:
-  - feeder: mmu3_32b
+  - feeder: mmu3
     address: [0]
 sheet: satin
 ---
@@ -1035,9 +1072,9 @@ name: Prusa MK3.9 MMU3
 printer: MK3.9
 legacy_printer_model: [MK3.9MMU3]
 tools:
-  - tool: 0.4
+  - tool: '0.4'
 feeders:
-  - feeder: mmu3_32b
+  - feeder: mmu3
     address: [0]
 sheet: pei_smooth
 ---
@@ -1056,15 +1093,15 @@ name: Prusa MK3.9S MMU3
 printer: MK3.9S
 legacy_printer_model: [MK3.9SMMU3]
 tools:
-  - tool: 0.4
+  - tool: '0.4'
 feeders:
-  - feeder: mmu3_32b
+  - feeder: mmu3
     address: [0]
 sheet: pei_smooth
 ---
 kind: printer_config
 id: mk3.5
-name: Prusa MK3.5
+name: Prusa MK3.5 & MK3.5S
 printer: MK3.5
 legacy_printer_model: [MK3.5]
 tools:
@@ -1073,19 +1110,19 @@ sheet: pei_smooth
 ---
 kind: printer_config
 id: mk3.5mmu3
-name: Prusa MK3.5 MMU3
+name: Prusa MK3.5 & MK3.5S MMU3
 printer: MK3.5
 legacy_printer_model: [MK3.5MMU3]
 tools:
   - tool: '0.4'
 feeders:
-  - feeder: mmu3_8b
+  - feeder: mmu3
     address: [0]
 sheet: pei_smooth
 ---
 kind: printer_config
 id: mk3s
-name: Prusa MK3S
+name: Prusa MK3S & MK3S+
 printer: MK3S
 legacy_printer_model: [MK3S]
 tools:
@@ -1094,7 +1131,7 @@ sheet: pei_smooth
 ---
 kind: printer_config
 id: mk3smmu2s
-name: Prusa MK3S MMU2S
+name: Prusa MK3S & MK3S+ MMU2S
 printer: MK3S
 legacy_printer_model: [MK3SMMU2S]
 tools:
@@ -1106,13 +1143,13 @@ sheet: pei_smooth
 ---
 kind: printer_config
 id: mk3smmu3
-name: Prusa MK3S MMU3
+name: Prusa MK3S & MK3S+ MMU3
 printer: MK3S
 legacy_printer_model: [MK3SMMU3]
 tools:
   - tool: '0.4'
 feeders:
-  - feeder: mmu3_8b
+  - feeder: mmu3
     address: [0]
 sheet: pei_smooth
 ---
@@ -1127,7 +1164,7 @@ sheet: pei_smooth
 ---
 kind: printer_config
 id: mini
-name: Prusa MINI
+name: Prusa MINI & MINI+
 printer: MINI
 legacy_printer_model: [MINI, MINIIS]
 tools:

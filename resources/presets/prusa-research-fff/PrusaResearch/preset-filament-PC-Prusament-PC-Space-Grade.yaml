@@ -4,6 +4,9 @@ inherits:
 name: Prusament PC Space Grade
 condition: printer.base_model=~/(COREONE|MK4|XL)/ and tool.nozzle_diameter >= 0.4 and feeder.base_model!~/.*MMU.*/
 id: Prusament PC Space Grade
+features:
+  $.brand.uuid: ae5ff34e-298e-50c9-8f77-92a97fb30b09
+  $.brand.slug: prusament
 values:
   filament_vendor: Prusa Polymers
   extrusion_multiplier: 1.02

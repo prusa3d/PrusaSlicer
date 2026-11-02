@@ -4,6 +4,10 @@ inherits:
 - '*PrusamentPETGV0_MAXVOLSPEED*'
 name: Prusament PETG V0
 id: Prusament PETG V0
+features:
+  $.brand.uuid: ae5ff34e-298e-50c9-8f77-92a97fb30b09
+  $.brand.slug: prusament
+  $.tags: [self_extinguishing]
 values:
   extrusion_multiplier: 1.04
   filament_cost: '54.99'

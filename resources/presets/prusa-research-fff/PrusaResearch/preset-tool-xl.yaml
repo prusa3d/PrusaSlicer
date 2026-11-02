@@ -1127,9 +1127,9 @@ variants:
       id: pkZjPd/1RiWK8c7TTOvrSg
       values:
         extrusion_width: 0.27
-        first_layer_extrusion_width: 0.32
+        first_layer_extrusion_width: 0.30
         perimeter_extrusion_width: 0.27
-        external_perimeter_extrusion_width: 0.27
+        external_perimeter_extrusion_width: 0.25
         infill_extrusion_width: 0.27
         solid_infill_extrusion_width: 0.27
         top_infill_extrusion_width: 0.27
@@ -1239,6 +1239,7 @@ variants:
             external_perimeter_acceleration: 1500
             perimeter_acceleration: 2000
             infill_acceleration: 3000
+            perimeter_extrusion_width: 0.25
 # 0.25n/0.12mm layer
       - condition: print.layer_height == 0.12
         id: uW5yFmM9Qlm4nnu34Q0caQ
@@ -1249,6 +1250,7 @@ variants:
           raft_contact_distance: 0.11
           infill_acceleration: 2500
           solid_infill_acceleration: 2500
+          perimeter_extrusion_width: 0.25
         variants:
         - name: 0.12mm STRUCTURAL @XL 0.25
           id: 50ncn+F4RDWWDnrOfIt1yQ
@@ -1517,6 +1519,19 @@ variants:
           id: 52FGcADEQLuh4EesCQNFFg
           values:
             top_solid_infill_acceleration: 1500
+# 0.4n/0.25mm layer
+      - condition: print.layer_height == 0.25
+        id: YT9yp56bRDqGD33XWZvsOg
+        values:
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.25
+          raft_contact_distance: 0.25
+        variants:
+        - name: 0.25mm STRUCTURAL @XL 0.4
+          id: o8W1OYOlTYaCBy3lgEUEHg
+          unconditional_inherits:
+          - DDNldTt3Q/+oaRrThXrHxw
 # 0.5 nozzle
     - condition: tool.nozzle_diameter == 0.5
       id: Fx+w9gCjRtqRMEaUoC238Q
@@ -1639,6 +1654,22 @@ variants:
             perimeter_acceleration: 3000
             solid_infill_acceleration: 3000
             top_solid_infill_speed: 70
+# 0.5n/0.32mm layer
+      - condition: print.layer_height == 0.32
+        id: oZ6OV2e1QcGADHHadK20FA
+        values:
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.32
+          raft_contact_distance: 0.32
+          infill_acceleration: 4000
+          bridge_acceleration: 1000
+          default_acceleration: 2500
+        variants:
+        - name: 0.32mm STRUCTURAL @XL 0.5
+          id: BYX361JqQp6wUbK0FSKjbQ
+          unconditional_inherits:
+          - 0.32mm STRUCTURAL @XL 0.5HF
 # 0.6 nozzle
     - condition: tool.nozzle_diameter == 0.6
       id: jv4tCkkvTJarAK8+FmTfvg

@@ -5,6 +5,9 @@ inherits:
 - '*sheets_PP_ppjet*'
 name: Filament PM PPJet
 id: Filament PM PPJet
+features:
+  $.brand.uuid: d14b3a61-a841-5f76-8adc-0c5b1c9ecbe4
+  $.brand.slug: filamentpm
 values:
   filament_vendor: Filament PM
   extrusion_multiplier: 1.15

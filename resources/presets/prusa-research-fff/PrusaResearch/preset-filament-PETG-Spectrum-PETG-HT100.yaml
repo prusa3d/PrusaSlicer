@@ -4,6 +4,9 @@ inherits:
 - '*sheets_PET_HT100*'
 name: Spectrum PETG HT100
 id: Spectrum PETG HT100
+features:
+  $.brand.uuid: adef694b-7837-5a68-8de3-eee3027accd0
+  $.brand.slug: spectrum
 values:
   filament_vendor: Spectrum
   filament_density: 1.18

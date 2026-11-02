@@ -4,6 +4,9 @@ inherits:
 - '*NumakersPETG-HS_P_ADVANCE*'
 name: Numakers PETG-HS
 id: Numakers PETG-HS
+features:
+  $.brand.uuid: 79f0f340-bb26-513c-80dc-eee5cab8d3f3
+  $.brand.slug: numakers
 values:
   filament_vendor: Numakers
   extrusion_multiplier: 1.02

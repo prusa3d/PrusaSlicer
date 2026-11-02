@@ -3,6 +3,9 @@ inherits:
 - '*ASA*'
 name: Fillamentum ASA
 id: Fillamentum ASA
+features:
+  $.brand.uuid: 65d50d8d-52dd-5e96-8932-a5a06abe3e9c
+  $.brand.slug: fillamentum
 values:
   filament_vendor: Fillamentum
   filament_cost: 38.7

@@ -3,6 +3,8 @@ inherits:
 - '*FLEX*'
 features:
   $.type: TPU
+  $.brand.uuid: fcfcb32b-bb45-5382-8530-b43207990e78
+  $.brand.slug: overture
 name: Overture High Speed TPU
 id: Overture High Speed TPU
 values:

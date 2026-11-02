@@ -4,6 +4,9 @@ inherits:
 - '*sheets_PET_colorFabbHT*'
 name: colorFabb HT
 id: colorFabb HT
+features:
+  $.brand.uuid: 55dde84a-3fa4-51ad-b456-7d95b1a15622
+  $.brand.slug: colorfabb
 values:
   filament_vendor: colorFabb
   filament_density: 1.18

@@ -3,6 +3,9 @@ inherits:
 - '*PLA*'
 name: eSun PLA
 id: eSun PLA
+features:
+  $.brand.uuid: db92e17c-3c30-5fa9-bec9-1022e233a216
+  $.brand.slug: esun
 values:
   filament_cost: '10'
   filament_vendor: eSun

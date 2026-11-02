@@ -5,6 +5,9 @@ inherits:
 - '*PolyTerraPLA_MAXVOLSPEED*'
 name: Polymaker PolyTerra PLA
 id: Polymaker PolyTerra PLA
+features:
+  $.brand.uuid: 561da2d4-41ed-5186-8226-c404d31569d7
+  $.brand.slug: polymaker
 values:
   filament_vendor: Polymaker
   filament_cost: 25

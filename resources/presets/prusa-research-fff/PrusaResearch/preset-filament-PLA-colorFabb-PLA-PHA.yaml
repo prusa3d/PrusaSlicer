@@ -3,6 +3,9 @@ inherits:
 - '*PLA*'
 name: colorFabb PLA-PHA
 id: colorFabb PLA-PHA
+features:
+  $.brand.uuid: 55dde84a-3fa4-51ad-b456-7d95b1a15622
+  $.brand.slug: colorfabb
 values:
   filament_cost: '39.98'
   filament_vendor: colorFabb

@@ -3,6 +3,9 @@ inherits:
 - '*PC*'
 name: Filatech PC-ABS
 id: Filatech PC-ABS
+features:
+  $.brand.uuid: 86078d56-d085-5d4d-9873-f639e07a19d3
+  $.brand.slug: filatech
 values:
   filament_vendor: Filatech
   extrusion_multiplier: 0.95

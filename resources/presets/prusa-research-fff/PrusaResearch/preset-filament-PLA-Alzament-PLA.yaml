@@ -3,6 +3,9 @@ inherits:
 - '*PLA*'
 name: Alzament Basic PLA
 id: Alzament Basic PLA
+features:
+  $.brand.uuid: 7ae5029b-4b66-54ce-b63f-e73ee236c1c1
+  $.brand.slug: alzament
 values:
   filament_cost: '10'
   filament_vendor: Alzament

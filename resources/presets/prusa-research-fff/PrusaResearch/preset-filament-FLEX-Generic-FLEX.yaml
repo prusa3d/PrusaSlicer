@@ -2,9 +2,11 @@ kind: filament
 inherits:
 - '*FLEX*'
 features:
+  generic: true
   $.type: TPU
 name: Generic FLEX
 id: Generic FLEX
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI|COREONE_INDX)/ and tool.nozzle_diameter >= 0.4 and (feeder.base_model!~/.*MMU.*/ or (feeder.base_model=~/.*MMU.*/ and feeder.single_mode))
 values:
   filament_cost: '40'
   filament_vendor: Generic

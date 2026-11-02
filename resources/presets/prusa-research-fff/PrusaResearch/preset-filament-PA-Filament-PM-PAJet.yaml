@@ -5,6 +5,9 @@ inherits:
 - '*sheets_PA_PMPAJet*'
 name: Filament PM PAJet
 id: Filament PM PAJet
+features:
+  $.brand.uuid: d14b3a61-a841-5f76-8adc-0c5b1c9ecbe4
+  $.brand.slug: filamentpm
 values:
   filament_vendor: Filament PM
   first_layer_temperature: 245
@@ -104,7 +107,7 @@ kind: filament
 id: '*sheets_PA_PMPAJet*'
 variants:
 # STANDARD sheet
-- condition: sheet.type != "PA"
+- condition: sheet.type != "pa_nylon"
   id: 74665yikRT+ffrDSRSrpnA
   values:
     first_layer_bed_temperature: 110
@@ -121,7 +124,7 @@ variants:
       first_layer_bed_temperature: 105
       bed_temperature: 105
 # PA sheet
-- condition: sheet.type == "PA"
+- condition: sheet.type == "pa_nylon"
   id: 8I2R8Db9Q1CBno0CZRxswg
   values:
     first_layer_bed_temperature: 90

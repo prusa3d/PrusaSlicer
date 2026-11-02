@@ -3,6 +3,9 @@ inherits:
 - '*PLA220*'
 name: Extrudr PLA NX1
 id: Extrudr PLA NX1
+features:
+  $.brand.uuid: 01bb6010-7ea2-5f09-bfae-559113454365
+  $.brand.slug: extrudr
 values:
   filament_cost: '22.76'
   filament_vendor: Extrudr

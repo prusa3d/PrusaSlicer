@@ -3,6 +3,8 @@ inherits:
 - '*FLEX*'
 features:
   $.type: TPU
+  $.brand.uuid: 8be5d0ce-97f2-5b16-ba9e-9a8e3e6c402c
+  $.brand.slug: sainsmart
 name: SainSmart TPU
 id: SainSmart TPU
 values:

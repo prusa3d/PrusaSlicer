@@ -3,6 +3,8 @@ features:
   $.type: PETG
   $.tags: [abrasive, contains_metal]
   $.properties.min_nozzle_diameter: 0.4
+  $.brand.uuid: ae5ff34e-298e-50c9-8f77-92a97fb30b09
+  $.brand.slug: prusament
 id: Prusament PETG Ultraglow
 condition: feeder.base_model!~/.*MMU.*/
 values:

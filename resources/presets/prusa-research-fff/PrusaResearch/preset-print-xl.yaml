@@ -323,6 +323,10 @@ variants:
         id: NaHmyj5mTtC6Yb4eeZPQyQ
         values:
           layer_height: 0.20
+      - name: 0.25mm
+        id: dn/LCSaPQV2DY3WmRh1Q5A
+        values:
+          layer_height: 0.25
   # XL 0.5
     - condition: tool.nozzle_diameter == 0.5
       id: /vY3wQ+OT7abIAG7XNDhuw
@@ -343,6 +347,10 @@ variants:
         id: 1CDkKEeiTharI2x7pMresg
         values:
           layer_height: 0.25
+      - name: 0.32mm
+        id: WVm5lFR7Rk6TXwaLRV/lWg
+        values:
+          layer_height: 0.32
   # XL 0.6
     - condition: tool.nozzle_diameter == 0.6
       id: NyTYcHBCSseaX6D2P4BsPQ

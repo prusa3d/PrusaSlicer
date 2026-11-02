@@ -4,6 +4,9 @@ inherits:
 # XL/MK4/COREONE family 0.25-0.8
 name: colorFabb PLA High Speed PRO
 id: colorFabb PLA High Speed PRO
+features:
+  $.brand.uuid: 55dde84a-3fa4-51ad-b456-7d95b1a15622
+  $.brand.slug: colorfabb
 values:
   filament_cost: '21.34'
   filament_vendor: colorFabb

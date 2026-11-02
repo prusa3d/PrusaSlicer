@@ -4,6 +4,9 @@ inherits:
 # COREONE/MK4/XL family 0.4-0.6
 name: colorFabb PETG
 id: colorFabb PETG
+features:
+  $.brand.uuid: 55dde84a-3fa4-51ad-b456-7d95b1a15622
+  $.brand.slug: colorfabb
 values:
   filament_cost: '21.2'
   filament_density: 1.28

@@ -5,6 +5,9 @@ inherits:
 name: colorFabb ASA
 id: colorFabb ASA
 # COREONE/MK4/XL family 0.4 and 0.6 only
+features:
+  $.brand.uuid: 55dde84a-3fa4-51ad-b456-7d95b1a15622
+  $.brand.slug: colorfabb
 values:
   filament_cost: '32.29'
   filament_vendor: colorFabb

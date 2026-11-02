@@ -3,6 +3,9 @@ inherits:
 - '*PLAFILL*'
 name: Fillamentum Timberfill
 id: Fillamentum Timberfill
+features:
+  $.brand.uuid: 65d50d8d-52dd-5e96-8932-a5a06abe3e9c
+  $.brand.slug: fillamentum
 values:
   filament_vendor: Fillamentum
   extrusion_multiplier: 1.08

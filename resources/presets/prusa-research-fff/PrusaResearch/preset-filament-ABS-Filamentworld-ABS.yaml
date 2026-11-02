@@ -3,6 +3,9 @@ inherits:
 - '*ABS*'
 name: Filamentworld ABS
 id: Filamentworld ABS
+features:
+  $.brand.uuid: b9cdf2e7-64f8-5328-85bc-d6b856f64afc
+  $.brand.slug: filamentworld
 values:
   filament_cost: '24.9'
   filament_vendor: Filamentworld

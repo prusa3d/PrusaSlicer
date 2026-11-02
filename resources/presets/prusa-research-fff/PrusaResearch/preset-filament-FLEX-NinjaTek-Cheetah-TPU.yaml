@@ -3,6 +3,8 @@ inherits:
 - '*FLEX*'
 features:
   $.type: TPU
+  $.brand.uuid: 1f3f426c-77e6-5c8e-bd9d-e11f85df9d62
+  $.brand.slug: ninjatek
 name: NinjaTek Cheetah TPU
 id: NinjaTek Cheetah TPU
 values:

@@ -3,6 +3,9 @@ inherits:
 - '*PET*'
 name: Extrudr PETG
 id: Extrudr PETG
+features:
+  $.brand.uuid: 01bb6010-7ea2-5f09-bfae-559113454365
+  $.brand.slug: extrudr
 values:
   filament_vendor: Extrudr
   bed_temperature: 78

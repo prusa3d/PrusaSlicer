@@ -3,6 +3,9 @@ inherits:
 - '*ABS*'
 name: Fillamentum ABS
 id: Fillamentum ABS
+features:
+  $.brand.uuid: 65d50d8d-52dd-5e96-8932-a5a06abe3e9c
+  $.brand.slug: fillamentum
 values:
   filament_cost: '32.4'
   filament_vendor: Fillamentum

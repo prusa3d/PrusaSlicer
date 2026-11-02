@@ -5,6 +5,9 @@ inherits:
 - '*SunluPLA20_MAXVOLSPEED*'
 name: Sunlu PLA+ 2.0
 id: Sunlu PLA+ 2.0
+features:
+  $.brand.uuid: 757543af-9dad-5132-9777-171583cb8dfd
+  $.brand.slug: sunlu
 values:
   filament_vendor: Sunlu
   filament_cost: 22

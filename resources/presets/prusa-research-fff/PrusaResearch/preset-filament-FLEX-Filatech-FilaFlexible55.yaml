@@ -3,6 +3,8 @@ inherits:
 - '*FLEX*'
 features:
   $.type: TPE
+  $.brand.uuid: 86078d56-d085-5d4d-9873-f639e07a19d3
+  $.brand.slug: filatech
 name: Filatech FilaFlexible55
 condition: tool.nozzle_diameter >= 0.4 and printer.base_model=~/(MK3.5|MK3|MK2.5|MK2)/ and feeder.base_model!~/.*MMU.*/
 id: Filatech FilaFlexible55

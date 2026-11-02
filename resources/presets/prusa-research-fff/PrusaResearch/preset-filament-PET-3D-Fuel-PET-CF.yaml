@@ -6,6 +6,9 @@ name: 3D-Fuel PET-CF
 # XL/C1/MK4 family 0.6 nozzle
 condition: printer.base_model=~/(COREONE|MK4|XL|)/ and tool.nozzle_diameter > 0.4 and feeder.base_model!~/.*MMU.*/
 id: 3D-Fuel PET-CF
+features:
+  $.brand.uuid: 3eb597ab-9f9b-5ecf-87e6-8ac1e31f51a8
+  $.brand.slug: 3d-fuel
 values:
   filament_vendor: 3D-Fuel
   filament_type: PET

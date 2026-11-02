@@ -4,6 +4,8 @@ inherits:
 - '*igusi150_MAXVOLSPEED*'
 features:
   $.type: ''
+  $.brand.uuid: 26032531-4bc1-50fe-aded-2ddf5c099d4a
+  $.brand.slug: igus
 name: igus® iglidur® i150
 id: igus® iglidur® i150
 condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and ! (feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode)

@@ -5,6 +5,9 @@ inherits:
 - '*GreenyHT_MAXVOLSPEED*'
 name: Spectrum GreenyHT
 id: Spectrum GreenyHT
+features:
+  $.brand.uuid: adef694b-7837-5a68-8de3-eee3027accd0
+  $.brand.slug: spectrum
 values:
   filament_vendor: Spectrum
   disable_fan_first_layers: 3

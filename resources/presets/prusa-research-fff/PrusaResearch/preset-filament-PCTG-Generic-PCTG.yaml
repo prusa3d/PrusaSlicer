@@ -3,5 +3,7 @@ inherits:
 - '*PCTG*'
 name: Generic PCTG
 id: Generic PCTG
+features:
+  generic: true
 values:
   filament_vendor: Generic

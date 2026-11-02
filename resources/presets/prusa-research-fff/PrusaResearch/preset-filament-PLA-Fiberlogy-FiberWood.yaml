@@ -3,6 +3,9 @@ inherits:
 - '*PLAFILL*'
 name: Fiberlogy FiberWood
 id: Fiberlogy FiberWood
+features:
+  $.brand.uuid: 12c3406d-b94f-51c5-a334-dc008cd1bf05
+  $.brand.slug: fiberlogy
 values:
   filament_vendor: Fiberlogy
   extrusion_multiplier: 1

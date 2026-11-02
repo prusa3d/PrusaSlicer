@@ -5,6 +5,9 @@ inherits:
 - '*ecoPLA_MAXVOLSPEED_PLA*'
 name: 3DJAKE ecoPLA
 id: 3DJAKE ecoPLA
+features:
+  $.brand.uuid: 36fdf853-5d01-50f1-867b-41839f735a96
+  $.brand.slug: 3djake
 values:
   extrusion_multiplier: 1.01
   filament_cost: '22'

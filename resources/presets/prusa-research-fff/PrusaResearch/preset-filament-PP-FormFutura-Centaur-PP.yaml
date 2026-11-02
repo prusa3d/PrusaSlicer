@@ -4,6 +4,9 @@ inherits:
 - '*sheets_PP_centaurPP*'
 name: FormFutura Centaur PP
 id: FormFutura Centaur PP
+features:
+  $.brand.uuid: a303a210-832c-5023-9fc7-2174a749251e
+  $.brand.slug: formfutura
 values:
   filament_vendor: FormFutura
   bridge_fan_speed: 100

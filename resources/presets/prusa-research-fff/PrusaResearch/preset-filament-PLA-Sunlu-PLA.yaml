@@ -5,6 +5,9 @@ inherits:
 - '*SunluPLA_MAXVOLSPEED_PLA*'
 name: Sunlu PLA
 id: Sunlu PLA
+features:
+  $.brand.uuid: 757543af-9dad-5132-9777-171583cb8dfd
+  $.brand.slug: sunlu
 values:
   filament_cost: '15'
   filament_density: 1.23

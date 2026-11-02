@@ -5,6 +5,9 @@ id: Prusament PLA
 inherits:
 - '*PLA*'
 - '*sheets_Prusament_PLA*'
+features:
+  $.brand.uuid: ae5ff34e-298e-50c9-8f77-92a97fb30b09
+  $.brand.slug: prusament
 values:
   bridge_fan_speed: 100
   cooling: 1
@@ -185,7 +188,7 @@ variants:
     filament_infill_max_crossing_speed: 200
     filament_infill_max_speed: 0
     fan_below_layer_time: 40
-    start_filament_gcode: M573 R
+    start_filament_gcode: ; Filament g-code
     filament_loading_speed: 0
     filament_loading_speed_start: 0
     filament_toolchange_delay: 0
@@ -351,6 +354,7 @@ variants:
     min_fan_speed: 80
     max_fan_speed: 100
     fan_below_layer_time: 20
+    enable_dynamic_fan_speeds: true
     overhang_fan_speed_0: 100
     overhang_fan_speed_1: 100
     overhang_fan_speed_2: 100

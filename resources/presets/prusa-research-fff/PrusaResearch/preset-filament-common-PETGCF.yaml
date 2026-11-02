@@ -16,8 +16,29 @@ values:
   first_layer_temperature: 265
   temperature: 265
   filament_abrasive: true
-## C1
+## C1 INDX
 variants:
+- condition: printer.base_model == "COREONE_INDX"
+  id: s4JkR1TpQ0me1tH/BOs+NA
+  values:
+    extrusion_multiplier: 1.02
+  variants:
+  # C1 INDX 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @COREONEINDX 0.4'
+    id: pxoYskMYR9Kv2uahBNVmWw
+    values:
+      filament_max_volumetric_speed: 12
+      pressure_advance_value: 0.048
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # C1 INDX HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @COREONEINDX HF0.4'
+      id: GZTnCb5eQvidQS2QGdtlLg
+      values:
+        filament_max_volumetric_speed: 12
+## C1
 - condition: printer.base_model == "COREONE"
   id: iy9PUFFjTEyBTGbRu2uB3g
   variants:

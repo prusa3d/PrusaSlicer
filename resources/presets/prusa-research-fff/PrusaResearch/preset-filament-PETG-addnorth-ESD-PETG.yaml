@@ -5,6 +5,9 @@ inherits:
 - '*sheets_PET_addnorthESDPETG*'
 name: addnorth ESD-PETG
 id: addnorth ESD-PETG
+features:
+  $.brand.uuid: 86a428c4-a603-55f4-9377-16757488cd4b
+  $.brand.slug: addnorth
 values:
   filament_vendor: addnorth
   extrusion_multiplier: 0.98

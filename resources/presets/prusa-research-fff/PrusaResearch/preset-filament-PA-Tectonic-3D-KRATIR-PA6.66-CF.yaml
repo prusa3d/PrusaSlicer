@@ -7,6 +7,9 @@ name: Tectonic-3D KRATIR PA6.66 CF
 # No MINI
 condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5)/ and tool.nozzle_diameter >= 0.4 and feeder.base_model!~/.*MMU.*/
 id: Tectonic-3D KRATIR PA6.66 CF
+features:
+  $.brand.uuid: 6fc9b6f6-d452-5c2e-a61f-ee0a99ed4af5
+  $.brand.slug: tectonic-3d
 values:
   filament_vendor: Tectonic-3D
   first_layer_temperature: 265
@@ -35,7 +38,7 @@ kind: filament
 id: '*sheets_PACF_kratirpa6cf*'
 variants:
 # STANDARD sheet
-- condition: sheet.type != "PA"
+- condition: sheet.type != "pa_nylon"
   id: Hn4lGOvqRuOC/hjGZvQ3Wg
   values:
     first_layer_bed_temperature: 100
@@ -46,7 +49,7 @@ variants:
       # first_layer_bed_temperature: 100
       # bed_temperature: 100
 # PA sheet
-- condition: sheet.type == "PA"
+- condition: sheet.type == "pa_nylon"
   id: Oae80phiQ3+qBknHPz+ySw
   values:
     first_layer_bed_temperature: 90

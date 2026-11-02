@@ -3,6 +3,9 @@ inherits:
 - '*PC*'
 name: Polymaker PC-Max
 id: Polymaker PC-Max
+features:
+  $.brand.uuid: 561da2d4-41ed-5186-8226-c404d31569d7
+  $.brand.slug: polymaker
 values:
   filament_vendor: Polymaker
   filament_cost: 77.3

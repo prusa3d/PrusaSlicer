@@ -4,6 +4,9 @@ inherits:
 - '*sheets_PLA_GreenyHT*'
 name: Spectrum Tough PLA
 id: Spectrum Tough PLA
+features:
+  $.brand.uuid: adef694b-7837-5a68-8de3-eee3027accd0
+  $.brand.slug: spectrum
 values:
   filament_vendor: Spectrum
   extrusion_multiplier: 0.95

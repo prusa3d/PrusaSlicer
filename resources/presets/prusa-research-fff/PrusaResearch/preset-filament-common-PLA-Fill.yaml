@@ -13,6 +13,24 @@ values:
   cooling_slowdown_logic: consistent_surface
   cooling_perimeter_transition_distance: 10
 variants:
+  ## C1 INDX
+- condition: printer.base_model == "COREONE_INDX"
+  id: IbHuT84zQqS4U9CQefPeKw
+  variants:
+  # C1 INDX 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLAFILL* @COREONEINDX 0.4'
+    id: +40+QpxmQ3aqZ1fnrT4FSA
+    values:
+      filament_max_volumetric_speed: 10
+      pressure_advance_value: 0.03
+    variants:
+    # C1 INDX HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLAFILL* @COREONEINDX HF0.4'
+      id: LgUpVv9OSiWJxfxQ3S9sJA
+      values:
+        filament_max_volumetric_speed: 10
   ## C1
 - condition: printer.base_model == "COREONE"
   id: UrPHOpmjT8+oq5hRzctG1g

@@ -3,6 +3,9 @@ inherits:
 - '*PLA*'
 name: Print With Smile PLA
 id: Print With Smile PLA
+features:
+  $.brand.uuid: 31b2337a-d131-59c1-9af3-cdcd67efa655
+  $.brand.slug: print-with-smile
 values:
   filament_cost: '535'
   filament_vendor: Print With Smile

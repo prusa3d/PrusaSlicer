@@ -4,6 +4,9 @@ inherits:
 - '*DDPETG_P_ADVANCE*'
 name: Devil Design PETG
 id: Devil Design PETG
+features:
+  $.brand.uuid: 530c7397-83dd-5c1a-aa7d-fe995b46607b
+  $.brand.slug: devil-design
 values:
   filament_vendor: Devil Design
   filament_cost: 20.99

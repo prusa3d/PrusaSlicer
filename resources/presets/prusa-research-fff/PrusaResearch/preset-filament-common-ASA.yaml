@@ -75,7 +75,7 @@ variants:
     overhang_fan_speed_2: 0
     overhang_fan_speed_3: 0
     fan_below_layer_time: 20
-    start_filament_gcode: M573 R
+    start_filament_gcode: '; Filament g-code'
     retract_length: 0.8
     travel_max_lift: 0.6
     filament_multitool_ramming: 1

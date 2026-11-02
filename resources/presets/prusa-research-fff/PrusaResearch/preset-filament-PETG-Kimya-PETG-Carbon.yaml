@@ -3,6 +3,9 @@ inherits:
 - '*PETCF*'
 name: Kimya PETG Carbon
 id: Kimya PETG Carbon
+features:
+  $.brand.uuid: e8fef7d9-d618-5b98-8566-ea543e46f84e
+  $.brand.slug: kimya
 values:
   filament_vendor: Kimya
   extrusion_multiplier: 1.05

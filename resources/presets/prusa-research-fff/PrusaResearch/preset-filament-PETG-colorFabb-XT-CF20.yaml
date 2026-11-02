@@ -4,6 +4,9 @@ inherits:
 - '*XTCF20_MAXVOLSPEED*'
 name: colorFabb XT-CF20
 id: colorFabb XT-CF20
+features:
+  $.brand.uuid: 55dde84a-3fa4-51ad-b456-7d95b1a15622
+  $.brand.slug: colorfabb
 values:
   filament_vendor: colorFabb
   extrusion_multiplier: 1.05

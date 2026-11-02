@@ -5,6 +5,9 @@ inherits:
 name: Buddy3D ASA
 condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/
 id: Buddy3D ASA
+features:
+  $.brand.uuid: 95fea50b-25ab-5de3-9659-f84a90b29066
+  $.brand.slug: buddy3d
 values:
   filament_cost: '23.99'
   filament_vendor: Buddy3D

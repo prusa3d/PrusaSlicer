@@ -4,6 +4,8 @@ inherits:
 - '*genericpla_P_ADVANCE_PLA*'
 name: Generic PLA
 id: Generic PLA
+features:
+  generic: true
 condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI|COREONE_INDX)/
 values:
   filament_cost: '19.99'
@@ -28,7 +30,7 @@ variants:
     filament_infill_max_crossing_speed: 200
     filament_infill_max_speed: 0
     fan_below_layer_time: 40
-    start_filament_gcode: M573 R
+    start_filament_gcode: '; Filament g-code'
     filament_loading_speed: 0
     filament_loading_speed_start: 0
     filament_toolchange_delay: 0

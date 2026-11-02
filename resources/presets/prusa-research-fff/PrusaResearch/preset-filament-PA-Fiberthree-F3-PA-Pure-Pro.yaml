@@ -3,6 +3,9 @@ inherits:
 - '*PA*'
 name: Fiberthree F3 PA Pure Pro
 id: Fiberthree F3 PA Pure Pro
+features:
+  $.brand.uuid: d67bf685-f87e-5d91-9872-235d6c4e7d4a
+  $.brand.slug: fiberthree
 values:
   filament_vendor: Fiberthree
   first_layer_temperature: 285

@@ -4,7 +4,7 @@ inherits:
 - '*chamber_PVA*'
 features:
   $.type: PVA
-condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and feeder.model!~/(MMU2S|MMU3_8bit|MMU3_32bit)/
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and feeder.model!~/(MMU2S|MMU3)/
 id: '*PVA*'
 values:
   temperature: 220
@@ -50,8 +50,55 @@ values:
   filament_stamping_loading_speed: 29
   filament_ramming_parameters: 250 100 39.9677 40.1613 40.2581 40.1613 40.0645| 0.05 39.9548 0.45 40.1484 0.95 40.1484 1.45 40.1484 1.95 40.1484 2.45 40.1484 2.95 40.1484 3.45 40.1484 3.95 40.1484 4.45 40.1484 4.95 40.1484
   filament_purge_multiplier: 200%
-## C1
 variants:
+## C1 INDX
+- condition: printer.base_model == "COREONE_INDX"
+  id: dGS7OHHLRmaKrduw/wZjDA
+  values:
+    pressure_advance: automatic_calibration
+    chamber_minimal_temperature: 0
+    chamber_temperature: 0
+    first_layer_temperature: 215
+    temperature: 210
+    start_filament_gcode: ; Filament g-code
+    filament_loading_speed: 0
+    filament_loading_speed_start: 0
+    filament_toolchange_delay: 0
+    filament_cooling_moves: 0
+    filament_cooling_initial_speed: 0
+    filament_cooling_final_speed: 0
+    filament_stamping_loading_speed: 0
+    filament_stamping_distance: 0
+    filament_purge_multiplier: 100%
+    filament_unloading_speed: 0
+    filament_unloading_speed_start: 0
+    retract_length: 0.8
+    retract_length_toolchange: 0.8
+    wipe: true
+    enable_dynamic_fan_speeds: false
+    retract_before_wipe: 70%
+    bridge_fan_speed: 80
+    filament_multitool_ramming: true
+    filament_multitool_ramming_flow: 30
+    filament_multitool_ramming_volume: 18
+    filament_minimal_purge_on_wipe_tower: 10
+  variants:
+  # C1 INDX 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PVA* @COREONEINDX 0.4'
+    id: DRyHtc4bR8ivQ18NIPPwSw
+    values:
+      filament_max_volumetric_speed: 4
+      slowdown_below_layer_time: 10
+      pressure_advance_value: 0.02
+    variants:
+    # C1 INDX HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PVA* @COREONEINDX HF0.4'
+      id: 1HTrUzJwTAGm4GBJMNQCIA
+      values:
+        filament_max_volumetric_speed: 4
+## C1
 - condition: printer.base_model == "COREONE"
   id: Izv2YSRGSUeZQHIThF4kEw
   values:

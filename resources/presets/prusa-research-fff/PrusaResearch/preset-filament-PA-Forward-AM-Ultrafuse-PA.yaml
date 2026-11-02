@@ -4,6 +4,9 @@ inherits:
 - '*ultrafusepa_MAXVOLSPEED_PA*'
 name: Forward AM Ultrafuse PA
 id: Forward AM Ultrafuse PA
+features:
+  $.brand.uuid: 0d5d4a94-c898-5b83-9be9-90037a821e23
+  $.brand.slug: forward-am
 values:
   filament_vendor: Forward AM
   first_layer_temperature: 240

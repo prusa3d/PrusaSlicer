@@ -4,6 +4,9 @@ inherits:
 - '*sheets_PA_FilatechPA*'
 name: Filatech PA
 id: Filatech PA
+features:
+  $.brand.uuid: 86078d56-d085-5d4d-9873-f639e07a19d3
+  $.brand.slug: filatech
 values:
   filament_vendor: Filatech
   first_layer_temperature: 275
@@ -228,7 +231,7 @@ kind: filament
 id: '*sheets_PA_FilatechPA*'
 variants:
 # STANDARD sheet
-- condition: sheet.type != "PA"
+- condition: sheet.type != "pa_nylon"
   id: cSD8a2WGTiCAzYA4awoQXA
   values:
     first_layer_bed_temperature: 110
@@ -239,7 +242,7 @@ variants:
       # first_layer_bed_temperature: 80
       # bed_temperature: 80
 # PA sheet
-- condition: sheet.type == "PA"
+- condition: sheet.type == "pa_nylon"
   id: LxqVAZ1+R6GR6DaSP6R6eQ
   values:
     first_layer_bed_temperature: 90
