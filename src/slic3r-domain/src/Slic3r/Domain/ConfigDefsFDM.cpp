@@ -4981,7 +4981,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->location = Printer;
     def->label = L("Used filament compensation");
     def->option_group = ConfigItemDef::OptionGroup::Printer_General_SizeClearances;
-    def->category = ConfigItemDef::Category::Printer_General;
+    def->category = ConfigItemDef::Category::Hidden;
     def->order = 2;
     def->gui_type = ConfigItemDef::GUIType::textfield;
     def->tooltip = L("Multiplier applied to the filament consumption statistics (length, volume, weight and cost) "
