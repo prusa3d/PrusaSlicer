@@ -133,7 +133,7 @@ PlaterRenderModule::PlaterRenderModule(
     m_undo_store(undo_store),
     m_font_manager(std::move(font_manager)),
     m_plugin_system(
-        {resources_dir() + "/lua", data_dir() + "/lua"},
+        {{resources_dir() + "/lua", true}, {data_dir() + "/lua", false}},
         project_interactor,
         *m_font_manager
     ),

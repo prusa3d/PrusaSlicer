@@ -469,7 +469,9 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Browser/BrowserLogicPrintablesToConnect.cpp
         include/Slic3r/App/Browser/BrowserLogicPhysicalPrinter.hpp
         src/Slic3r/App/Browser/BrowserLogicPhysicalPrinter.cpp
-
+        include/Slic3r/App/Browser/BrowserLogicPluginMarketplace.hpp
+        src/Slic3r/App/Browser/BrowserLogicPluginMarketplace.cpp
+        
         src/Slic3r/App/Scene/Scene.cpp
         include/Slic3r/App/Scene/Scene.hpp
         src/Slic3r/App/Scene/Node.cpp
@@ -1357,9 +1359,11 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Lua/PluginCliOps.cpp
         src/Slic3r/App/Lua/PluginCliOpsLicenses.hpp
         src/Slic3r/App/Lua/PluginCliOpsLicenses.cpp
-        include/Slic3r/App/Lua/AuthorRegistry.hpp
-        src/Slic3r/App/Lua/AuthorRegistry.cpp
+        include/Slic3r/App/Lua/PublicKeyRegistry.hpp
+        src/Slic3r/App/Lua/PublicKeyRegistry.cpp
         include/Slic3r/App/Lua/IPluginInstallationListener.hpp
+        include/Slic3r/App/Lua/MarketplaceClient.hpp
+        src/Slic3r/App/Lua/MarketplaceClient.cpp
     
         src/Slic3r/App/Console/ConsoleInput.hpp
         src/Slic3r/App/Console/ConsoleInput.cpp
@@ -1612,6 +1616,10 @@ if (SLIC3R_REPO_URL)
     target_compile_definitions(slic3r-shared PRIVATE SLIC3R_REPO_URL="${SLIC3R_REPO_URL}")
 endif()
 
+if (SLIC3R_ALLOW_LOCALHOST_SERVICES)
+    target_compile_definitions(slic3r-shared PRIVATE SLIC3R_ALLOW_LOCALHOST_SERVICES)
+endif()
+
 if (SLIC3R_ENABLE_WEBKIT)
     target_compile_definitions(slic3r-shared PRIVATE SLIC3R_HAS_WEBKIT)
 endif()
@@ -1662,6 +1670,9 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/App/DialogNavigationTests.cpp
             test/Slic3r/App/OpenFiles/OpenFilesDialogModelTests.cpp
+
+            test/Slic3r/App/Lua/PluginBundleTests.cpp
+            test/Slic3r/App/Lua/MarketplaceClientTests.cpp
 
             test/Slic3r/App/Config/CategoryUtilsTests.cpp
 

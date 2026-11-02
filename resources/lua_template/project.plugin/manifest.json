@@ -2,7 +2,7 @@
 	"id": "{{id}}",
 	"name": "{{name}}",
 	"version": "1.0.0",
-	"min_slicer_version": "3.0.0",
+	"min_slicer_version": "{{slicer_version}}",
 	"author": "{{author}}",
 	"description": "{{description}}",
 	"license": "{{license}}",

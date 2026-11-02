@@ -34,6 +34,7 @@ enum class PopNotificationType
     PresetUpdaterError,
     PluginInstallationError,
     PluginInstallationSuccess,
+    PluginBundleDownloaded,
     GeometryOnlyImport,
     ArchiveFilesSkipped,
     ArchiveOpenPostponed

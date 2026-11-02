@@ -11,6 +11,17 @@ namespace Slic3r::App {
 
 static auto translator = [](const std::string& s) { return Biz::_u8(s); };
 
+CommandBindingManager::CommandBindingManager(Platform::CommandRegistry& main_command_registry) :
+    m_main_command_registry(main_command_registry)
+{
+    m_main_command_registry.add_listener<ICommandRegistryListener>(this);
+}
+
+CommandBindingManager::~CommandBindingManager()
+{
+    m_main_command_registry.remove_listener<ICommandRegistryListener>(this);
+}
+
 void
 CommandBindingManager::bind_menu_item(const UIItemCommand* command, Yoga::MenuItem* ui_item)
 {
@@ -72,6 +83,18 @@ bool CommandBindingManager::has_command(const char* command_name) const
     if (m_gizmos_command_registry && m_gizmos_command_registry->has_command(command_name))
         return true;
     return m_main_command_registry.has_command(command_name);
+}
+
+void CommandBindingManager::on_command_removed(const Platform::ICommand& command)
+{
+    const auto it = m_ui_items.find(command.name());
+    if (it == m_ui_items.end()) {
+        return;
+    }
+    for (const auto* item : it->second) {
+        m_ui_item_to_command.erase(item);
+    }
+    m_ui_items.erase(it);
 }
 
 void CommandBindingManager::update_ui_items()

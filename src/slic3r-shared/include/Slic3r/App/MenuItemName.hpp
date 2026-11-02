@@ -179,6 +179,7 @@ enum class MenuItemName
     PluginRescan,
     PluginFolder,
     PluginInstall,
+    PluginMarketplace,
 };
 
 class UniversalMenuItemName: public std::variant<MenuItemName, std::string>

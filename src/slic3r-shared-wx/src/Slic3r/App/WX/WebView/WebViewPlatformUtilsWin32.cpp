@@ -18,6 +18,7 @@
 #include <wx/webview.h>
 #include <wrl/client.h>
 #include <string>
+#include <string_view>
 
 namespace pt = boost::property_tree;
 using Microsoft::WRL::ComPtr;
@@ -298,6 +299,45 @@ void load_request(wxWebView* web_view, const std::string& address, const std::st
     hr = webview2_2->NavigateWithWebResourceRequest(request.Get());
     if (FAILED(hr)) {
         SPDLOG_ERROR("{} Failed: NavigateWithWebResourceRequest failed. HRESULT: {:x}", __FUNCTION__, (unsigned int)hr);
+    }
+}
+
+void run_script(wxWebView* web_view, const std::string& javascript)
+{
+    if (!web_view) {
+        SPDLOG_ERROR("{} Failed: web_view is null.", __FUNCTION__);
+        return;
+    }
+
+    ICoreWebView2* native_backend = static_cast<ICoreWebView2*>(web_view->GetNativeBackend());
+    if (!native_backend) {
+        SPDLOG_ERROR("{} Failed: Native WebView2 is null.", __FUNCTION__);
+        return;
+    }
+
+    // ExecuteScript reports only COM failures; a throwing script completes with S_OK and a
+    // null result. Catch in JS and hand the message back as the result string instead.
+    // No eval() involved, so this stays within a strict Content-Security-Policy.
+    const std::string wrapped =
+        "(function () { try { " + javascript + " } catch (e) { return 'error: ' + e; } })()";
+    std::wstring w_script = wxString::FromUTF8(wrapped).ToStdWstring();
+
+    HRESULT hr = native_backend->ExecuteScript(
+        w_script.c_str(),
+        Microsoft::WRL::Callback<ICoreWebView2ExecuteScriptCompletedHandler>(
+            [](HRESULT error_code, LPCWSTR result_json) -> HRESULT {
+                if (FAILED(error_code)) {
+                    SPDLOG_ERROR("WebView script failed. HRESULT: {:x}", (unsigned int)error_code);
+                    return S_OK;
+                }
+                // result_json is JSON: `null` on success, `"error: ..."` from the catch above.
+                if (result_json && std::wstring_view(result_json).starts_with(L"\"error: ")) {
+                    SPDLOG_ERROR("WebView script failed: {}", boost::nowide::narrow(result_json));
+                }
+                return S_OK;
+            }).Get());
+    if (FAILED(hr)) {
+        SPDLOG_ERROR("{} Failed: ExecuteScript failed. HRESULT: {:x}", __FUNCTION__, (unsigned int)hr);
     }
 }
 

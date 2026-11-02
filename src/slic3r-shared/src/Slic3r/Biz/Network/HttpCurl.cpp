@@ -112,7 +112,9 @@ HttpCurl::HttpCurl(RequestMethod request_method, std::string&& url, RetryFn fn) 
         throw Slic3r::RuntimeError(std::string("Could not construct Curl object"));
     }
 
-    std::string user_agent = fmt::format("{}/{} ({})",SLIC3R_APP_NAME, SLIC3R_VERSION, platform_to_string(platform()));
+    // boost::format placeholders (%1%) do nothing in fmt::format - this used to send
+    // the literal "{}/{} ({})" as the User-Agent on every request.
+    std::string user_agent = fmt::format("{}/{} ({})", SLIC3R_APP_NAME, SLIC3R_VERSION, platform_to_string(platform()));
 
     timeout_connection(DEFAULT_TIMEOUT_CONNECT);
     timeout_total(DEFAULT_TIMEOUT_MAX);

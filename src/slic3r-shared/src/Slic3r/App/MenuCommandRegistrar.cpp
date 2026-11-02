@@ -22,6 +22,7 @@
 #include "Slic3r/App/Lua/ProjectApi.hpp"
 #include "Slic3r/App/Platform/IFileExplorerHandler.hpp"
 #include "Slic3r/App/ProjectSaver.hpp"
+#include "Slic3r/App/Browser/BrowserLogicPluginMarketplace.hpp"
 
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
@@ -1172,7 +1173,7 @@ void MenuCommandRegistrar::install_plugin(Lua::PluginSystem& plugin_system)
             Biz::Platform::PlatformServices::instance()
                 .main_thread_dispatcher()
                 .dispatch_on_main_thread([&plugin_system, file_path = file_paths.front().string()]
-                                         { plugin_system.install(file_path); });
+                                         { plugin_system.install_file(file_path); });
         }
     };
 
@@ -2317,13 +2318,28 @@ void MenuCommandRegistrar::update_main_menu_plugin_commands(Lua::PluginSystem& p
 
 void MenuCommandRegistrar::register_main_menu_plugin_commands(Lua::PluginSystem& plugin_system)
 {
-    bool any_plugin = false;
-    for (auto& plugin : plugin_system.plugins() | std::views::values) {
-        if (plugin.meta().type == Lua::PluginType::PrintMode) {
-            continue;
-        }
+    // sort plugins by its menu path
+    std::vector<std::tuple<std::string, std::vector<std::string>>> entries;
+    std::ranges::transform(
+        plugin_system.plugins()
+            | std::views::values
+            | std::views::filter(
+                [](const auto& plugin) { return plugin.meta().type != Lua::PluginType::PrintMode; }
+            ),
+        std::back_inserter(entries),
+        [](const auto& p) -> std::tuple<std::string, std::vector<std::string>>
+        { return std::make_tuple(p.meta().id, p.meta().menu); }
+    );
+    std::ranges::sort(entries, {}, [](const auto& p) { return std::get<1>(p); });
+    auto plugin_range =
+        entries
+        | std::views::transform(
+            [&plugin_system](const auto& p) -> const Lua::Plugin&
+            { return plugin_system.plugins().at(std::get<0>(p)); }
+        );
 
-        any_plugin = true;
+    // register menu items of plugin entries
+    for (auto& plugin : plugin_range) {
         std::vector<UniversalMenuItemName> path;
         if (plugin.meta().menu.empty()) {
             path = {
@@ -2352,9 +2368,35 @@ void MenuCommandRegistrar::register_main_menu_plugin_commands(Lua::PluginSystem&
             )
         );
     }
-    if (any_plugin) {
+
+    // register other plugin related menu items
+    if (!entries.empty()) {
         m_menu_manager.register_menu_separator_item({MenuItemName::Plugins});
     }
+    m_menu_manager.register_menu_item(
+        {MenuItemName::Plugins, MenuItemName::PluginMarketplace},
+        std::make_unique<UIItemCommand>(
+            CommandName::PluginMarketplace,
+            [&]
+            {
+                Biz::Platform::PlatformServices::instance()
+                    .main_thread_dispatcher()
+                    .dispatch_on_main_thread(
+                        [&]
+                        {
+                            AppServices::instance().dialog_manager().show_webview_dialog(
+                                std::make_unique<Browser::BrowserLogicPluginMarketplace>(
+                                    m_project_interactor,
+                                    plugin_system
+                                ),
+                                &m_project_interactor
+                            );
+                        }
+                    );
+            }
+        )
+    );
+    m_menu_manager.register_menu_separator_item({MenuItemName::Plugins});
     m_menu_manager.register_menu_item(
         {MenuItemName::Plugins, MenuItemName::PluginRescan},
         std::make_unique<UIItemCommand>(

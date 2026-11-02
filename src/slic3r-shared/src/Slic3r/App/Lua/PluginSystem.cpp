@@ -87,16 +87,20 @@ private:
 }
 
 PluginSystem::PluginSystem(
-    std::initializer_list<std::string> plugin_paths,
+    std::initializer_list<PluginPath> plugin_paths,
     Biz::ProjectInteractor& project_interactor,
     Biz::Emboss::IFontManager& font_manager
 ) :
     m_plugin_paths(plugin_paths),
     m_project_interactor(project_interactor),
-    m_font_manager(font_manager)
-{}
+    m_font_manager(font_manager),
+    m_fav_fonts(font_manager.create_favorit())
+{
+    m_marketplace_client.add_listener<IMarketplaceClientListener>(this);
+}
 
-void PluginSystem::install(const std::string& zip_file_path)
+void PluginSystem::
+    install_file(const std::string& zip_file_path, PublicKeyLookupStrategy key_lookup_strategy)
 {
     auto zip_source = Biz::Crypto::create_zip_source(zip_file_path);
     if (zip_source == nullptr) {
@@ -114,7 +118,7 @@ void PluginSystem::install(const std::string& zip_file_path)
         return;
 
     }
-    PluginBundle plugin_bundle{std::move(zip_source)};
+    PluginBundle plugin_bundle{std::move(zip_source), zip_file_path, true};
     if (auto load_meta_result = plugin_bundle.load_meta(); !load_meta_result.has_value()) {
         invoke_listeners<IPluginInstallationListener>(
             [&load_meta_result](auto* listener)
@@ -123,7 +127,9 @@ void PluginSystem::install(const std::string& zip_file_path)
         return;
     }
 
-    if (auto install_result = m_registry.install(plugin_bundle); !install_result.has_value()) {
+    if (auto install_result = m_registry.install(plugin_bundle, key_lookup_strategy);
+        !install_result.has_value())
+    {
         invoke_listeners<IPluginInstallationListener>(
             [&install_result](auto* listener)
             { listener->on_plugin_installation_error(install_result.error()); }
@@ -140,14 +146,110 @@ void PluginSystem::install(const std::string& zip_file_path)
 
 }
 
+void PluginSystem::
+    download_file(const std::string& plugin_id, const std::string& version, const std::string& url)
+{
+    Biz::FileDownloader::FileDownloaderMultiTicket ticket;
+    Biz::FileDownloader::FileDownloaderJobInput job_input;
+    job_input.file_name = fmt::format("{}@{}.zip", plugin_id, version);
+    job_input.file_url = url;
+    ticket.jobs.emplace_back(std::move(job_input));
+
+    auto tag = std::make_shared<Biz::FileDownloader::PluginFileDownloaderTag>();
+    tag->plugin_id = plugin_id;
+    tag->version = version;
+
+    ticket.tag = tag;
+    m_project_interactor.file_downloader_interactor().init_multi_job(std::move(ticket));
+}
+
+std::vector<InstalledBundle> PluginSystem::installed_bundles() const
+{
+    const auto& bundles = m_registry.plugin_bundles();
+    std::vector<InstalledBundle> result;
+    result.reserve(bundles.size());
+    for (const auto& bundle : bundles) {
+        const auto& meta = bundle.meta();
+        if (meta.id.empty()) {
+            continue;
+        }
+        result.push_back({meta.id, meta.version.to_string(), bundle.is_protected()});
+    }
+    return result;
+}
+
+void PluginSystem::install_marketplace_bundle(const BundleRequestConfig& config)
+{
+    m_marketplace_client.download_bundle(config);
+}
+
+void PluginSystem::uninstall_bundle(const std::string& bundle_id, const std::string& version)
+{
+    if (auto result = m_registry.uninstall(bundle_id, version); result.has_value()) {
+        rescan();
+        invoke_listeners<IPluginInstallationListener>(
+            [&bundle_id, &version](auto* listener)
+            { listener->on_plugin_uninstallation_succeeded(bundle_id, version); }
+        );
+    } else {
+        invoke_listeners<IPluginInstallationListener>(
+            [&result](auto* listener)
+            { listener->on_plugin_uninstallation_error(result.error()); }
+        );
+    }
+}
+
 Yoga::Passthrough<PluginDialog>& PluginSystem::init_dialog()
 {
     m_dialog = std::make_unique<PluginDialog>([this](const auto& meta, const auto& params)
     {
         m_current_plugin_data = std::make_optional<PluginData>(meta, params);
         finalize_run();
-    });
+    }, m_font_manager.get_fonts(), m_fav_fonts.front().path);
     return m_dialog;
+}
+
+void PluginSystem::on_download_error(const std::string& plugin_id, const std::string& message)
+{
+    SPDLOG_ERROR("Marketplace bundle download failed for {}: {}", plugin_id, message);
+    std::string error_message = fmt::format(
+        fmt::runtime(
+            // TRN {0} is a plugin id, {1} describes what went wrong
+            Biz::_u8L("Cannot download plugin {0}: {1}")
+        ),
+        plugin_id,
+        message
+    );
+    invoke_listeners<IPluginInstallationListener>(
+        [&error_message](auto* listener)
+        { listener->on_plugin_installation_error(error_message); }
+    );
+}
+
+bool PluginSystem::on_bundle_verified(const VerifiedBundleData& data)
+{
+    std::string key_id = data.plugin_id;
+    try {
+        auto version = Semver(data.version);
+        key_id = fmt::format("{}@{}", data.plugin_id, version.to_string());
+        m_registry.public_key_registry().store_key(key_id, data.public_key);
+    } catch (std::exception& e) {
+        // Runs on the main thread from the marketplace job callback - letting this
+        // escape would take the app down instead of failing the installation.
+        SPDLOG_ERROR("Cannot store author public key {}: {}", key_id, e.what());
+        on_download_error(data.plugin_id, e.what());
+        return false;
+    }
+    return true;
+}
+
+void PluginSystem::on_bundle_downloaded(
+    const std::string& plugin_id,
+    const std::string& version,
+    const std::string& zip_path
+)
+{
+    install_file(zip_path, PublicKeyLookupStrategy::VersionedBundle);
 }
 
 void PluginSystem::execute_plugin(const std::string& id)
@@ -159,20 +261,24 @@ void PluginSystem::execute_plugin(const std::string& id)
     }
     const auto& plugin = it->second;
     ASSERT(m_dialog.get() != nullptr);
-    m_dialog->show_plugin(
-        plugin.meta(),
-        m_last_plugin_data.has_value() && m_last_plugin_data->meta.id == id ?
-            m_last_plugin_data->param_values :
-            PluginParamValueMap{}
-    );
-    Biz::Platform::PlatformServices::instance().render_request_handler().request_render();
+    try {
+        m_dialog->show_plugin(
+            plugin.meta(),
+            m_last_plugin_data.has_value() && m_last_plugin_data->meta.id == id ?
+                m_last_plugin_data->param_values :
+                PluginParamValueMap{}
+        );
+        Biz::Platform::PlatformServices::instance().render_request_handler().request_render();
+    } catch (std::exception& e) {
+        SPDLOG_ERROR("Executin plugin {} failed with error: {}", plugin.path(), e.what());
+    }
 }
 
 void PluginSystem::finalize_run()
 {
     ASSERT(m_current_plugin_data.has_value());
 
-    ProjectApi project_api(m_project_interactor, m_font_manager);
+    ProjectApi project_api(m_project_interactor, m_font_manager, m_fav_fonts);
     Biz::Lua::LuaEngine lua;
     lua.open_registry([&project_api](auto& lua) { project_api.register_api(lua); });
     PackageRegistry package_registry;
@@ -206,16 +312,16 @@ void PluginSystem::clear()
     m_current_plugin_data = std::nullopt;
 }
 
-void PluginSystem::scan(const std::string& path)
+void PluginSystem::scan(const std::string& path, bool is_protected)
 {
-    m_registry.scan(path);
+    m_registry.scan(path, is_protected);
 }
 
 void PluginSystem::rescan()
 {
     clear();
     for (const auto& path : m_plugin_paths) {
-        scan(path);
+        scan(path.path, path.is_protected);
     }
     invoke_listeners<IPluginRescanListener>([this](auto* l) { l->on_plugins_scanned(m_registry); });
 }

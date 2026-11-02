@@ -117,6 +117,7 @@
 @end
 
 #include "Slic3r/Assert.hpp"
+#include "Slic3r/Log.hpp"
 
 namespace Slic3r::App::WX::WebView {
 void setup_webview_with_credentials(wxWebView* web_view, const std::string& username, const std::string& password)
@@ -175,6 +176,23 @@ void load_request(wxWebView* web_view, const std::string& address, const std::st
     NSString *auth_value = [NSString stringWithFormat:@"External %@", token_string];
     [request setValue:auth_value forHTTPHeaderField:@"Authorization"];
     [backend loadRequest:request];
+}
+
+void run_script(wxWebView* web_view, const std::string& javascript)
+{
+    WKWebView* backend = static_cast<WKWebView*>(web_view->GetNativeBackend());
+    if (!backend) {
+        SPDLOG_ERROR("{} Failed: Native WKWebView is null.", __FUNCTION__);
+        return;
+    }
+    // UTF-8 on purpose: the script carries JSON (tokens, plugin ids) that must survive intact.
+    NSString *script_string = [NSString stringWithCString:javascript.c_str() encoding:NSUTF8StringEncoding];
+    // Runs the string verbatim (no eval wrapper). The completion handler is called on the main thread.
+    [backend evaluateJavaScript:script_string completionHandler:^(id result, NSError *error) {
+        if (error) {
+            SPDLOG_ERROR("WebView script failed: {}", [[error localizedDescription] UTF8String]);
+        }
+    }];
 }
 
 void setup_webview_devtools(wxWebView* web_view)

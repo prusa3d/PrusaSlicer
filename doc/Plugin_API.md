@@ -84,7 +84,10 @@ The table `info` describes plugin with following keys:
     - `float` (UI: number input)
     - `int` (UI: number input)
     - `bool` (UI: checkbox)
-  - `default` (number or string) default value
+    - `combox` (UI: combo box)
+    - `font` (UI: combo box with fill)
+  - `default` (number or string) default value, only for `type` in one of `float`, `int` or `bool`
+  - `allowed_values` (array of strings) list of items to choose from, only for `type="combobox"`
 
 ### Plugin `execute` function
 

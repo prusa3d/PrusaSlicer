@@ -299,14 +299,16 @@ PopNotificationLayout PopNotificationCenter::download_finished_layout(
     const std::string& body,
     const boost::filesystem::path& dest_path,
     const std::string& printables_url,
-    bool is_loaded
+    bool is_loaded,
+    bool is_from_printables
 )
 {
     // TRN Header of a finished file download notification.
     const std::string header{_u8L("Download finished")};
 
+    auto icon = is_from_printables ? Render::Icon::Printables : Render::Icon::None;
     // The file has not been loaded into the scene yet: let the user pick where to open it.
-    if (!is_loaded) {
+    if (!is_loaded && is_from_printables) {
         return PopNotificationLayoutHeaderTextButtons{
             header,
             body,
@@ -324,7 +326,7 @@ PopNotificationLayout PopNotificationCenter::download_finished_layout(
                   m_project_interactor.file_opening_interactor().open({dest_path}, {.new_project = true});
                   return true;
               }}},
-            Render::Icon::Printables
+            icon
         };
     }
 
@@ -359,10 +361,10 @@ PopNotificationLayout PopNotificationCenter::download_finished_layout(
     }
 
     if (buttons.empty()) {
-        return PopNotificationLayoutHeaderText{header, body, Render::Icon::Printables};
+        return PopNotificationLayoutHeaderText{header, body, icon};
     }
     return PopNotificationLayoutHeaderTextButtons{
-        header, body, std::move(buttons), Render::Icon::Printables
+        header, body, std::move(buttons), icon
     };
 }
 
@@ -377,10 +379,16 @@ void PopNotificationCenter::on_download_job_status_changed(
         // Ignore progress without payload
         return;
     }
+    auto icon = Render::Icon::None;
+    auto tag = std::dynamic_pointer_cast<FileDownloader::PrintablesFileDownloaderTag>(payload->tag);
+    const bool is_printables = tag != nullptr;
+    if (is_printables) {
+        icon = Render::Icon::Printables;
+    }
     const size_t download_id{payload->download_id};
     const boost::filesystem::path dest_path{payload->final_path};
     const std::string printables_url{payload->project_url};
-    const bool is_loaded{payload->load_count > 0};
+    const bool is_loaded{payload->load_count > 0 || !is_printables};
     const size_t total_files{payload->total_files};
 
     // While downloading, the payload always describes a single file. The aggregated "N files"
@@ -402,7 +410,7 @@ void PopNotificationCenter::on_download_job_status_changed(
 
     switch (progress.status) {
     case JobStatus::Finished:
-        layout  = download_finished_layout(body, dest_path, printables_url, is_loaded);
+        layout  = download_finished_layout(body, dest_path, printables_url, is_loaded, is_printables);
         level   = PopNotificationLevel::ProgressWithClose;
         timeout = 20s;
         timeout = is_loaded ? 20s : 0s;
@@ -421,11 +429,11 @@ void PopNotificationCenter::on_download_job_status_changed(
         if (progress.percent) {
             const int perc = (int) (progress.percent.value().value * 100);
             layout = PopNotificationLayoutHeaderTextProgress{
-                header, body, perc, Render::Icon::Printables
+                header, body, perc, icon
             };
             level  = PopNotificationLevel::ProgressNoClose;
         } else {
-            layout = PopNotificationLayoutHeaderText{header, body, Render::Icon::Printables};
+            layout = PopNotificationLayoutHeaderText{header, body, icon};
             level  = PopNotificationLevel::ProgressWithClose;
         }
         timeout = 0s;
@@ -1556,6 +1564,49 @@ void PopNotificationCenter::on_plugin_installation_succeeded(
         never_equal_matcher
     );
 
+}
+
+void PopNotificationCenter::on_plugin_uninstallation_error(const std::string& error_message)
+{
+    m_notification_list.close_notifications_of_type(PopNotificationType::PluginInstallationError);
+    m_notification_list.close_notifications_of_type(PopNotificationType::PluginInstallationSuccess);
+
+    const std::string header{_u8L("Plugin uninstallation error")};
+    upsert_notification(
+        PopNotificationData{
+            PopNotificationType::PluginInstallationError,
+            PopNotificationLevel::Error,
+            0s,
+            PopNotificationLayoutHeaderText{header, error_message}
+        },
+        never_equal_matcher
+    );
+}
+
+void PopNotificationCenter::
+    on_plugin_uninstallation_succeeded(const std::string& bundle_id, const std::string& version)
+{
+    m_notification_list.close_notifications_of_type(PopNotificationType::PluginInstallationSuccess);
+    m_notification_list.close_notifications_of_type(PopNotificationType::PluginInstallationError);
+
+    const std::string header{_u8L("Plugin installation")};
+    upsert_notification(
+        PopNotificationData{
+            PopNotificationType::PluginInstallationSuccess,
+            PopNotificationLevel::Regular,
+            5s,
+            PopNotificationLayoutHeaderText{
+                header,
+                fmt::format(
+                    // TRN First {} is a plugin identifier, second {} is plugin version
+                    fmt::runtime(_u8L("Plugin {}@{} uninstalled successfully")),
+                    bundle_id,
+                    version
+                )
+            }
+        },
+        never_equal_matcher
+    );
 }
 
 } // namespace Slic3r::App::PopNotification

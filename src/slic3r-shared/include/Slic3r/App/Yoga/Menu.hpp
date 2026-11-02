@@ -5,6 +5,7 @@
 
 namespace Slic3r::App::Yoga {
 
+class Separator;
 class MenuItem;
 class ScrollArea;
 
@@ -29,6 +30,7 @@ public:
 
 private:
     std::vector<MenuItem*> m_items;
+    std::vector<Separator*> m_separators;
     ScrollArea* m_scroll_area{nullptr};
 };
 

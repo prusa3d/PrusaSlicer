@@ -41,25 +41,49 @@ std::string filename_from_url(const std::string& url)
 bool validate_and_complete_input(FileDownloaderJobInput& input)
 {
     const std::string& escaped_url = input.file_url;
-
+    
     constexpr std::string_view prefix = "https://";
-    if (!escaped_url.starts_with(prefix)) {
+    if (
+         !escaped_url.starts_with(prefix)
+#if !defined(NDEBUG) || defined(SLIC3R_ALLOW_LOCALHOST_SERVICES)
+         && !escaped_url.starts_with("http://localhost")
+#endif
+     )
+    {
         std::string msg = fmt::format(
             "Download won't start. Download URL isn't secure (https) : {}",
             escaped_url
         );
         SPDLOG_ERROR("{}", msg);
-        return false;
+        return {};
     }
 
-    if (!is_any_subdomain(escaped_url, {"printables.com", "testprusaverse.com", "thingiverse.com", "cults3d.com"})) {
+    // subdomain check
+    if (!is_any_subdomain(
+            escaped_url,
+            {
+                "prusa.com",
+                "prusa3d.com",
+                "prusa.cz",
+                "prusa3d.cz",
+                "prusa3d.dev",
+                "printables.com",
+                "testprusaverse.com",
+                "thingiverse.com",
+                "cults3d.com",
+#if !defined(NDEBUG) || defined(SLIC3R_ALLOW_LOCALHOST_SERVICES)
+                "localhost",
+#endif
+            }
+        ))
+    {
         std::string msg = fmt::format(
             "Download won't start. Download URL doesn't point to allowed subdomains : {}",
             escaped_url
         );
         SPDLOG_ERROR("{}", msg);
         // TODO: dispatch msg to notification
-        return false;
+        return {};
     }
 
     if (input.file_name.empty()) {
@@ -72,12 +96,10 @@ bool validate_and_complete_input(FileDownloaderJobInput& input)
 } // namespace
 
 void FileDownloaderInteractor::download_files_prusaslicer_url(
-    const std::vector<std::string>& files_url,
-    bool open_in_new_project
+    const std::vector<std::string>& files_url, const FileDownloaderTagPtr& tag
 )
 {
     FileDownloaderMultiTicket ticket;
-    ticket.new_project = open_in_new_project;
 
     for (const std::string& full_url : files_url) {
         std::string escaped_url            = Network::IHttp::unescape_string(full_url);
@@ -94,21 +116,13 @@ void FileDownloaderInteractor::download_files_prusaslicer_url(
         }
         FileDownloaderJobInput input;
         input.file_url = escaped_url;
-        input.load_count = open_in_new_project ? 1 : 0;
-
-        if (open_in_new_project) {
-            ticket.jobs.emplace_back(std::move(input));
-        } else {
-            init_download_job(std::move(input));
-        }
-    }
-
-    if (!ticket.jobs.empty()) {
-        init_multi_job(std::move(ticket));
+        input.load_count = 0;
+        init_download_job(std::move(input), tag);
     }
 }
 
-void FileDownloaderInteractor::init_download_job(FileDownloaderJobInput input_data)
+void FileDownloaderInteractor::
+    init_download_job(FileDownloaderJobInput input_data, FileDownloaderTagPtr tag)
 {
     if (!validate_and_complete_input(input_data)) {
         return;
@@ -121,14 +135,15 @@ void FileDownloaderInteractor::init_download_job(FileDownloaderJobInput input_da
         std::move(dest_directory),
         0.0, 
         1.0,
-        1
+        1,
+        tag
     };
 
     Platform::JobManager::JobManager& job_manager =
         Platform::PlatformServices::instance().job_manager();
     job_manager.create_job("file_download" + std::to_string(data.id), perform_job, std::move(data))
         .on_result(
-            [this](FileDownloaderJobData job_data)
+            [this, tag](FileDownloaderJobData job_data)
             {
                 if (!job_data.finished) {
                     return;
@@ -140,7 +155,7 @@ void FileDownloaderInteractor::init_download_job(FileDownloaderJobInput input_da
                 }
                 if (!paths.empty()) {
                     invoke_listeners<IFileDownloaderListener>(
-                        [paths](auto* listener) { listener->on_model_downloaded(paths, false); }
+                        [paths, tag](auto* listener) { listener->on_files_downloaded(paths, tag); }
                     );
                 }
             }
@@ -171,7 +186,7 @@ void FileDownloaderInteractor::init_multi_job(FileDownloaderMultiTicket ticket)
                               ) -> MultiFileDownloaderJobData
     {
         MultiFileDownloaderJobData results;
-        results.new_project = ticket.new_project;
+        results.tag = ticket.tag;
 
         for (size_t i = 0; i < ticket.jobs.size(); i++)
         {
@@ -189,7 +204,8 @@ void FileDownloaderInteractor::init_multi_job(FileDownloaderMultiTicket ticket)
                 std::move(dest_directory),
                 percent_chunk * i, 
                 percent_chunk *(i + 1),
-                ticket.jobs.size()
+                ticket.jobs.size(),
+                ticket.tag
             };
 
             results.data.emplace_back(perform_job(stop_token, dis, job_progress, std::move(data)));
@@ -216,10 +232,10 @@ void FileDownloaderInteractor::init_multi_job(FileDownloaderMultiTicket ticket)
                 }
 
                 if (!paths.empty()) {
-                    bool new_project = job_data.new_project;
+                    auto tag = job_data.tag;
                     invoke_listeners<IFileDownloaderListener>(
-                        [paths, new_project](auto* listener)
-                        { listener->on_model_downloaded(paths, new_project); }
+                        [paths, tag](auto* listener)
+                        { listener->on_files_downloaded(paths, tag); }
                     );
                 }
                 

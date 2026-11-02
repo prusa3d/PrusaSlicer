@@ -641,7 +641,8 @@ using ExposedConfigValue = std::variant<
 
 ProjectApi::ProjectApi(
     Biz::ProjectInteractor& project_interactor,
-    Biz::Emboss::IFontManager& font_manager
+    Biz::Emboss::IFontManager& font_manager,
+        const Domain::FontList& m_fav_fonts
 ) :
     m_project_interactor(project_interactor),
     m_font_manager(font_manager),
@@ -650,7 +651,7 @@ ProjectApi::ProjectApi(
         Slic3r::data_dir() + "/text_emboss_presets_scripts.cereal",
         project_interactor
     ),
-    m_fav_fonts(font_manager.create_favorit())
+    m_fav_fonts(m_fav_fonts)
 {
     m_text_preset_manager.init();
 }
@@ -694,6 +695,21 @@ void ProjectApi::register_api(Biz::Lua::LuaEngine& lua)
     //--@field type integer The element type identifier.
     //- local ModelElement = {}
     state.new_usertype<ModelElement>("ModelElement", sol::no_constructor, "type", sol::property(&ModelElement::type));
+
+    //--@class FloatOrPercentage
+    //--@field is_percentage bool
+    //- local FloatOrPercentage = {}
+
+    //-- Get absolue float value.
+    //--@param ratio_over number A value to be used as baseline for percentage.
+    //--@return number Absolute float value
+    //- function FloatOrPercentage:get_abs_value(ratio_over) end
+    state.new_usertype<Domain::FloatOrPercentage>(
+        "FloatOrPercentage",
+        sol::no_constructor,
+        "get_abs_value", &Domain::FloatOrPercentage::get_abs_value,
+        "is_percentage", sol::readonly_property(&Domain::FloatOrPercentage::is_percentage)
+    );
 
     //--@class ConfigBox
     //- local ConfigBox = {}

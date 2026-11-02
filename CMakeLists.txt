@@ -28,6 +28,7 @@ endif ()
 option(SLIC3R_ASAN "Enable ASan on Clang and GCC" 0)
 option(SLIC3R_UBSAN "Enable UBSan on Clang and GCC" 0)
 option(SLIC3R_REPO_URL "Preset repo URL")
+option(SLIC3R_ALLOW_LOCALHOST_SERVICES "Let PRUSA_*_URL env overrides point at localhost (local development only, never for release builds)" OFF)
 option(SLIC3R_RELEASE_DEBUG_SYMBOLS "Build release build with debug symbols" ON)
 option(SLIC3R_ENABLE_PROFILING "Enable Tracy profiling instrumentation" OFF)
 

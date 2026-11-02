@@ -1055,19 +1055,25 @@ void ProjectInteractor::on_download_models(const std::vector<std::string>& messa
     }
     m_file_downloader_interactor.download_files_prusaslicer_url(
         message,
-        selected_project_is_empty()
+        std::make_shared<FileDownloader::PrintablesFileDownloaderTag>()
     );
 }
-
 void ProjectInteractor::download_model_from_printables_tab(FileDownloader::FileDownloaderMultiTicket data)
 {
     m_file_downloader_interactor.init_multi_job(std::move(data));
 }
 
-void ProjectInteractor::on_model_downloaded(const std::vector<boost::filesystem::path>& paths, bool in_new_project)
+void ProjectInteractor::on_files_downloaded(
+    const std::vector<boost::filesystem::path>& paths,
+    FileDownloader::FileDownloaderTagPtr tag
+)
 {
-    ASSERT(!paths.empty());
-    m_file_opening_interactor.open(paths, {.new_project = in_new_project, .as_geometry = !in_new_project});
+    if (auto printables_tag =
+            std::dynamic_pointer_cast<FileDownloader::PrintablesFileDownloaderTag>(tag)) {
+        bool in_new_project = printables_tag->new_project;
+        ASSERT(!paths.empty());
+        m_file_opening_interactor.open(paths, {.new_project = in_new_project, .as_geometry = !in_new_project});
+    }
 }
 
 std::string ProjectInteractor::get_project_name(Domain::SelectionId project_id) const
