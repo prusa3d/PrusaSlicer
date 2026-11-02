@@ -74,7 +74,7 @@ private:
     FnIndexClicked m_on_cog_clicked;
     FnIndexClicked m_on_bin_clicked;
     const Biz::Preset::PresetInteractor& m_preset_interactor;
-    const Biz::PhysicalPrinter::PhysicalPrinterInteractor& m_physical_printer_interactor;
+    Biz::PhysicalPrinter::PhysicalPrinterInteractor& m_physical_printer_interactor;
 
     Yoga::LayoutButton* m_bin_btn{nullptr};
     Yoga::Icon* m_expand_icon{nullptr};

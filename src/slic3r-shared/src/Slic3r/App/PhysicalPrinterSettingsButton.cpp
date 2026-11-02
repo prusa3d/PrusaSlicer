@@ -72,6 +72,9 @@ PhysicalPrinterSettingsButton::PhysicalPrinterSettingsButton(
 
 void PhysicalPrinterSettingsButton::on_data_update()
 {
+    if (!m_physical_printer_changed_listener_scope) {
+        m_physical_printer_changed_listener_scope.emplace(m_physical_printer_interactor, *this);
+    }
     update();
 }
 
