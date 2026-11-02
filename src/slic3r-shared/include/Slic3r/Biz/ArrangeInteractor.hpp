@@ -12,14 +12,6 @@
 
 namespace Slic3r::Biz {
 
-struct ArrangeBed
-{
-    const Domain::BedInstance* bed_instance;
-    double offset{};
-};
-
-using ArrangeBeds = std::vector<ArrangeBed>;
-
 struct Pack
 {
     Arrange::InstanceTransforms trafos;

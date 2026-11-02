@@ -116,6 +116,12 @@ struct InstanceMeshes
     std::vector<InstanceMesh> meshes;
 };
 
+struct ArrangeBed
+{
+    Vec2ds contour;
+    double offset{};
+};
+
 struct CanceledException : public std::runtime_error
 {
     CanceledException() : std::runtime_error{"canceled"} {}
@@ -148,9 +154,8 @@ std::optional<ArbitraryShape> extract_outline(const InstanceMeshes& meshes, cons
 
 Points get_bed_contour(const ArrangeBed& arrange_bed, const Settings& settings)
 {
-    const Domain::Bed& bed{arrange_bed.bed_instance->bed.get()};
     Points points;
-    for (const Vec2d& point : bed.contour()) {
+    for (const Vec2d& point : arrange_bed.contour) {
         points.push_back(scaled(point));
     }
 
@@ -292,21 +297,24 @@ double get_max_brim(const ConstModelInstanceList& instances, double print_brim_w
     return result;
 }
 
-ArrangeBed get_arrange_bed(
+const BedInstance& find_bed_instance(
     const SelectionId project_id,
     const BedRef& bed_ref,
-    const double brim_width,
-    const Settings& settings,
     const Workbench& workbench
 )
 {
     const Project& project{workbench.project(project_id)};
     const ConfigContainer* config_container{project.find_config_container(bed_ref.config_container_id)};
+    return ASSERT_VAL(config_container)->find_bed_instance(bed_ref.instance_id);
+}
 
-    const BedInstance& bed_instance{
-        ASSERT_VAL(config_container)->find_bed_instance(bed_ref.instance_id)
-    };
-    return {&bed_instance, std::max(brim_width, settings.unscaled_bed_offset)};
+ArrangeBed get_arrange_bed(
+    const BedInstance& bed_instance,
+    const double brim_width,
+    const Settings& settings
+)
+{
+    return {bed_instance.bed.get().contour(), std::max(brim_width, settings.unscaled_bed_offset)};
 }
 
 struct BedWithInstances
@@ -424,15 +432,11 @@ ModelInstancesPerBed get_arrange_input_per_bed(
         const double arrangeable_brim{
             get_max_brim(bed.arrangeable, print_brim_width, print_brim_enabled)};
 
-        ArrangeBed arrange_bed{get_arrange_bed(
-            project_id,
-            bed.ref,
-            std::max(extra_brim, arrangeable_brim),
-            settings,
-            workbench)};
+        const BedInstance& bed_instance{find_bed_instance(project_id, bed.ref, workbench)};
+        ArrangeBed arrange_bed{
+            get_arrange_bed(bed_instance, std::max(extra_brim, arrangeable_brim), settings)};
 
-        const Vec3d bed_translation{
-            arrange_bed.bed_instance->transformation.get_matrix().translation()};
+        const Vec3d bed_translation{bed_instance.transformation.get_matrix().translation()};
         result.push_back(
             {bed.ref,
              bed.index,
