@@ -252,32 +252,30 @@ KeyCode get_key_code_from_event(const wxKeyEvent& event)
     return KeyCode::None;
 }
 
-static wxGLAttributes create_wxglattributes()
+static wxGLAttributes create_wxglattributes(bool multisample)
 {
-    //
-    // TODO:
-    // port missing settings from OpenGLManager::create_wxglcanvas
-    //
-
     wxGLAttributes ret;
-    ret.PlatformDefaults()
-        .DoubleBuffer()
-        .RGBA()
-        .MinRGBA(8, 8, 8, 8)
-        .Depth(24)
-        .SampleBuffers(1)
-        .Samplers(4)
+    ret.PlatformDefaults().DoubleBuffer().RGBA().MinRGBA(8, 8, 8, 8).Depth(24);
+    if (multisample) {
+        ret.SampleBuffers(1).Samplers(4);
+    }
 #ifdef __APPLE__
-        // on MAC the method RGBA() has no effect
-        .SetNeedsARB(true);
-#else
-        ;
+    // on MAC the method RGBA() has no effect
+    ret.SetNeedsARB(true);
 #endif // __APPLE__
     ret.EndList();
+    return ret;
+}
 
+static wxGLAttributes create_wxglattributes()
+{
+    // Displays without multisampled visuals (e.g. Xvfb) get a canvas without antialiasing.
+    wxGLAttributes ret = create_wxglattributes(true);
+    if (wxGLCanvas::IsDisplaySupported(ret)) {
+        return ret;
+    }
+    ret = create_wxglattributes(false);
     DEBUG_ASSERT(wxGLCanvas::IsDisplaySupported(ret));
-    if (!wxGLCanvas::IsDisplaySupported(ret))
-        ret.Reset();
     return ret;
 }
 
