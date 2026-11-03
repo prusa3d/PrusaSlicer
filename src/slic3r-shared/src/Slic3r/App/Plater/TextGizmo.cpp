@@ -318,10 +318,10 @@ TextGizmo::TextGizmo(
         const Domain::ModelVolume& volume         = (ref.volume_id != 0) ?
             *project.find_volume_by_id(ref.object_id, ref.volume_id) :
             *project.find_object_by_id(ref.object_id)->volumes.front();
-        Domain::Transform3d to_world              = instance.get_matrix() * volume.get_matrix();
+        Domain::Transform3d to_world              = instance.get_matrix() * volume.right_handed_matrix();
         const Domain::Transform3d& instance_tr    = instance.get_matrix();
         const Domain::Transform3d instance_tr_inv = instance_tr.inverse();
-        const Domain::Transform3d& volume_tr_inv  = volume.get_matrix().inverse();
+        const Domain::Transform3d& volume_tr_inv  = volume.right_handed_matrix().inverse();
 
         Domain::Vec3d world_position                         = to_world.translation();
         const Biz::Emboss::TextPresetManager::Preset& preset = m_preset_manager.get_preset();

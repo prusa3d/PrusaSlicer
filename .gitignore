@@ -32,3 +32,4 @@ CMakeUserPresets.json
 
 # Copied from the deps install prefix at configure time
 /resources/matdb/
+compile_commands.json

@@ -83,6 +83,33 @@ void rotate(Domain::ModelObject& model_object, double angle, const Domain::Vec3d
     model_object.invalidate_bounding_box();
 }
 
+void normalize_instance_handedness(Domain::ModelObject& model_object)
+{
+    const bool all_left_handed = !model_object.instances.empty()
+        && std::ranges::all_of(model_object.instances, [](const Domain::ModelInstance* instance) {
+               return instance->is_left_handed();
+           });
+    if (!all_left_handed) {
+        return;
+    }
+
+    Domain::MirrorAxes flip;
+    flip.flip(Domain::X);
+    const Domain::Transform3d reflection{flip.matrix()};
+
+    for (Domain::ModelInstance* instance : model_object.instances) {
+        instance->set_transformation(Domain::Transformation{instance->get_matrix() * reflection});
+    }
+    for (Domain::ModelVolume* volume : model_object.volumes) {
+        Domain::MirrorAxes axes{volume->mirror_axes()};
+        axes.flip(Domain::X);
+        volume->set_transformation(Domain::Transformation{reflection * volume->get_matrix()});
+        volume->set_mirror_axes(axes);
+    }
+
+    model_object.invalidate_bounding_box();
+}
+
 void mirror(Domain::ModelObject& model_object, Domain::Axis axis)
 {
     for (Domain::ModelVolume* v : model_object.volumes) {

@@ -150,6 +150,7 @@ if(SLIC3R_BUILD_TESTS)
         test/Slic3r/Biz/Algorithms/OptimizersTests.cpp
         test/Slic3r/Biz/Algorithms/ZipArchiveTests.cpp
         test/Slic3r/Biz/Algorithms/SlaPointsTests.cpp
+        test/Slic3r/Biz/Algorithms/MirrorAxesTests.cpp
 
     )
     target_include_directories(slic3r-biz-algorithms-tests PRIVATE test)

@@ -15,6 +15,7 @@
 #include "Slic3r/Domain/SLA/DrainHole.hpp"
 #include "Slic3r/Domain/SLA/SupportPoint.hpp"
 
+#include <array>
 #include <optional>
 
 namespace Slic3r::Biz::Algorithms::ModelObject {
@@ -49,6 +50,25 @@ enum class ModelVolumeType : int
     PARAMETER_MODIFIER,
     SUPPORT_BLOCKER,
     SUPPORT_ENFORCER,
+};
+
+/**
+ * Which local axes of a volume the user mirrored. UI state only: the transformation matrix stays
+ * the single geometric truth, these flags make the per-axis indicator, the rotation / scale
+ * readouts and the revert actions well defined for left-handed matrices. See design/mirror.md.
+ */
+struct MirrorAxes
+{
+    std::array<bool, 3> axes{false, false, false};
+
+    bool operator==(const MirrorAxes&) const = default;
+
+    bool is_odd() const { return (axes[0] + axes[1] + axes[2]) % 2 == 1; }
+    bool any() const { return axes[0] || axes[1] || axes[2]; }
+    void flip(Axis axis) { axes[axis] = !axes[axis]; }
+    Transform3d matrix() const;
+
+    template<class Archive> void serialize(Archive& ar) { ar(axes); }
 };
 
 /**
@@ -211,6 +231,13 @@ public:
     void                                set_mirror(const Vec3d& mirror) override;
     void                                set_mirror(Axis axis, double mirror) override;
 
+    /// Flags validated against the matrix: when their parity disagrees with the determinant
+    /// sign, a left-handed matrix reports X mirrored and a right-handed one reports none.
+    MirrorAxes                          mirror_axes() const;
+    void                                set_mirror_axes(const MirrorAxes& mirror_axes);
+    /// get_matrix() with the mirror of mirror_axes() removed; always right-handed.
+    Transform3d                         right_handed_matrix() const;
+
     const Transform3d&                  get_matrix() const override;
     Transform3d                         get_matrix_no_offset() const override;
 
@@ -254,6 +281,7 @@ private:
     // The convex hull of this model's mesh.
     std::shared_ptr<const TriangleMesh> m_convex_hull;
     Transformation                      m_transformation;
+    MirrorAxes                          m_mirror_axes;
 
     // flag to optimize the checking if the volume is splittable
     //     -1   ->   is unknown value (before first cheking)
@@ -288,7 +316,7 @@ private:
         : ObjectBase(other), name(other.name), source(other.source), cut_info(other.cut_info), volume_settings(other.volume_settings), supported_facets(other.supported_facets)
         , seam_facets(other.seam_facets), mm_segmentation_facets(other.mm_segmentation_facets), fuzzy_skin_facets(other.fuzzy_skin_facets)
         , sla_support_points(other.sla_support_points), sla_drain_holes(other.sla_drain_holes), text_configuration(other.text_configuration), emboss_shape(other.emboss_shape)
-        , object(object), m_mesh(other.m_mesh), m_type(other.m_type), m_convex_hull(other.m_convex_hull), m_transformation(other.m_transformation)
+        , object(object), m_mesh(other.m_mesh), m_type(other.m_type), m_convex_hull(other.m_convex_hull), m_transformation(other.m_transformation), m_mirror_axes(other.m_mirror_axes)
     {
         assert(this->id().valid());
         assert(this->supported_facets.id().valid());
@@ -310,7 +338,7 @@ private:
     // It doesn't initialize m_convex_hull.
     ModelVolume(ModelObject* object, const ModelVolume& other, TriangleMesh&& mesh)
         : name(other.name), source(other.source), cut_info(other.cut_info), volume_settings(other.volume_settings), text_configuration(other.text_configuration), emboss_shape(other.emboss_shape)
-        , object(object), m_mesh(new TriangleMesh(std::move(mesh))), m_type(other.m_type), m_transformation(other.m_transformation)
+        , object(object), m_mesh(new TriangleMesh(std::move(mesh))), m_type(other.m_type), m_transformation(other.m_transformation), m_mirror_axes(other.m_mirror_axes)
     {
         assert(this->id().valid());
         assert(this->supported_facets.id().valid());

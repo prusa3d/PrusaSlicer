@@ -164,6 +164,7 @@ enum class Read3mfIssueType: unsigned short {
     project_volume_bad_id,
     project_volume_unknown_type,
     project_volume_config_issue,
+    project_volume_mirror_issue,
 
     project_source_unknown_property,
     project_source_offset_issue,

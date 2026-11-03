@@ -199,7 +199,7 @@ static std::optional<Biz::Scene::OrientedBoundingBox> get_volume_obb(
         project_id,
         selection,
         workbench,
-        (instance->get_matrix() * volume->get_matrix()).rotation()
+        (instance->get_matrix() * volume->right_handed_matrix()).rotation()
     );
 }
 

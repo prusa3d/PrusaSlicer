@@ -5,6 +5,8 @@
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/App/Plater/PlaterGizmosHelper.hpp"
 #include "Slic3r/Math.hpp"
+#include <array>
+#include <tuple>
 
 using namespace Slic3r::App::Yoga;
 
@@ -49,7 +51,7 @@ static std::optional<Domain::Vec3d> get_volume_relative_scale(
     const double max_angle_diff{Slic3r::deg2rad(0.001)};
 
     if (!same_euler_angels(
-            (instance.get_matrix() * volume.get_matrix()).rotation(),
+            (instance.get_matrix() * volume.right_handed_matrix()).rotation(),
             obb.rotation,
             max_angle_diff
         ))
@@ -57,7 +59,7 @@ static std::optional<Domain::Vec3d> get_volume_relative_scale(
         return std::nullopt;
     }
 
-    return get_relative_scale(volume.get_matrix().matrix().block(0, 0, 3, 3));
+    return get_relative_scale(volume.right_handed_matrix().matrix().block(0, 0, 3, 3));
 }
 
 static std::optional<Domain::Vec3d> get_current_absolute_scale(
@@ -284,9 +286,92 @@ ScaleWidget::ScaleWidget(
         apply_relative_scale(scale_by);
     };
 
+    auto mirror_row{scaling_section->emplace_back<Item>()};
+    mirror_row->set_object_name("MirrorRow");
+    mirror_row->set_gap(5_fpx);
+    const std::array<std::tuple<Render::Icon, std::string, std::string>, 3> mirror_icons{
+        std::tuple{Render::Icon::MirrorX, _u8L("Mirror along X axis"), "MirrorXButton"},
+        std::tuple{Render::Icon::MirrorY, _u8L("Mirror along Y axis"), "MirrorYButton"},
+        std::tuple{Render::Icon::MirrorZ, _u8L("Mirror along Z axis"), "MirrorZButton"}
+    };
+    for (int i{}; i < 3; ++i) {
+        const auto& [icon, tooltip, object_name]{mirror_icons[i]};
+        m_mirror_buttons[i] = mirror_row->emplace_back<Yoga::LayoutButton>("", icon, tooltip);
+        m_mirror_buttons[i]->set_object_name(object_name);
+        m_mirror_buttons[i]->set_flex_grow(1);
+        m_mirror_buttons[i]->set_height(icon_size);
+        m_mirror_buttons[i]->set_content_padding(3_fpx);
+        m_mirror_buttons[i]->set_checkable(true);
+        m_mirror_buttons[i]->set_background_color_checked(Platform::Color::AccentSecondary);
+        m_mirror_buttons[i]->callbacks().action = [this, i]() {
+            mirror(static_cast<Domain::Axis>(i));
+        };
+    }
+    auto mirror_row_suffix{mirror_row->emplace_back<Item>()};
+    mirror_row_suffix->set_width(20_fpx);
+
     m_place_on_bed_button = scaling_section->emplace_back<PlaceOnBedButton>(m_project_interactor);
 
     m_reference_frame_picker = reference_frame_picker;
+}
+
+static std::optional<Domain::MirrorAxes> get_selection_mirror_axes(
+    const Biz::ProjectInteractor& project_interactor
+)
+{
+    const Domain::Project& project{
+        project_interactor.workbench().project(project_interactor.selected_project_id())
+    };
+    std::optional<Domain::MirrorAxes> common;
+    auto merge = [&common](const Domain::ModelVolume& volume) {
+        const Domain::MirrorAxes axes{volume.mirror_axes()};
+        if (!common) {
+            common = axes;
+        } else if (*common != axes) {
+            common = Domain::MirrorAxes{};
+        }
+    };
+    for (const Domain::ElementRef& element :
+         project_interactor.scene_interactor().object_selection().elements)
+    {
+        if (element.is_wipe_tower()) {
+            continue;
+        }
+        if (element.has_volume()) {
+            if (const Domain::ModelVolume* volume{
+                    project.find_volume_by_id(element.object_id, element.volume_id)})
+            {
+                merge(*volume);
+            }
+            continue;
+        }
+        if (const Domain::ModelObject* object{project.find_object_by_id(element.object_id)}) {
+            for (const Domain::ModelVolume* volume : object->volumes) {
+                merge(*volume);
+            }
+        }
+    }
+    return common;
+}
+
+void ScaleWidget::mirror(const Domain::Axis axis)
+{
+    const std::optional<Biz::Scene::SelectionExtents> selection_bounding_box{
+        m_project_interactor.scene_interactor().selection_bounding_box()
+    };
+    if (!selection_bounding_box) {
+        return;
+    }
+    const bool was_floating{selection_bounding_box->is_floating()};
+    m_project_interactor.scene_interactor().mirror_selection(axis);
+    if (!was_floating) {
+        Domain::SquareMatrix4d relative_transform_world{Domain::SquareMatrix4d::Identity()};
+        relative_transform_world.col(3).z() =
+            -m_project_interactor.scene_interactor().selection_bounding_box()->min_z();
+        m_project_interactor.scene_interactor().transform_selection(relative_transform_world);
+    }
+    m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::Mirror);
+    reload();
 }
 
 ScaleWidget::~ScaleWidget()
@@ -374,6 +459,13 @@ void ScaleWidget::reload(std::optional<Domain::SelectionId> project_id)
     } else {
         m_revert_button->set_visible(true);
     }
+
+    const Domain::MirrorAxes mirror_axes{
+        get_selection_mirror_axes(m_project_interactor).value_or(Domain::MirrorAxes{})
+    };
+    for (int i{}; i < 3; ++i) {
+        m_mirror_buttons[i]->set_checked(mirror_axes.axes[i]);
+    }
 }
 
 void ScaleWidget::apply_relative_scale(const Domain::Vec3d& scale_by)
@@ -422,12 +514,15 @@ void ScaleWidget::apply_relative_scale(const Domain::Vec3d& scale_by)
 }
 
 static Domain::SquareMatrix4d remove_scale(
-    const Domain::Transform3d& volume_trafo,
+    const Domain::ModelVolume& volume,
     const Domain::Transform3d& instance_trafo,
     const Domain::Vec3d& center
 )
 {
-    const Domain::SquareMatrix3d rotation{volume_trafo.rotation()};
+    const Domain::Transform3d volume_trafo{volume.get_matrix()};
+    const Domain::SquareMatrix3d rotation{
+        (volume.right_handed_matrix().rotation() * volume.mirror_axes().matrix()).linear()
+    };
 
     const Domain::Vec3d center_in_volume_coords{
         volume_trafo.inverse() * instance_trafo.inverse() * center
@@ -476,7 +571,7 @@ Biz::Scene::SceneInteractor::ElementTransforms ScaleWidget::get_reset_scale_cand
             };
             const Domain::Transform3d volume_matrix{volume->get_matrix()};
             const SquareMatrix4d no_scale{
-                remove_scale(volume_matrix, instance_matrix, bounding_box.center)
+                remove_scale(*volume, instance_matrix, bounding_box.center)
             };
             if (!volume_matrix.matrix().isApprox(no_scale)) {
                 result.insert_or_assign(ref, no_scale);
@@ -486,7 +581,7 @@ Biz::Scene::SceneInteractor::ElementTransforms ScaleWidget::get_reset_scale_cand
                 const Domain::ElementRef ref{element.object_id, 0, volume->id().id};
                 const Domain::Transform3d volume_matrix{volume->get_matrix()};
                 const SquareMatrix4d no_scale{
-                    remove_scale(volume_matrix, instance_matrix, bounding_box.center)
+                    remove_scale(*volume, instance_matrix, bounding_box.center)
                 };
                 if (!volume_matrix.matrix().isApprox(no_scale)) {
                     result.insert_or_assign(ref, no_scale);

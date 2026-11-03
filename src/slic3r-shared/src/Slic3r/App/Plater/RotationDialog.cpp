@@ -195,12 +195,15 @@ Domain::SquareMatrix4d remove_rotation(
 }
 
 Domain::SquareMatrix4d remove_rotation(
-    const Domain::Transform3d& volume_trafo,
+    const Domain::ModelVolume& volume,
     const Domain::Transform3d& instance_trafo,
     const Domain::Vec3d& center
 )
 {
-    const Domain::SquareMatrix3d inverse_rotation{volume_trafo.rotation().transpose()};
+    const Domain::Transform3d volume_trafo{volume.get_matrix()};
+    const Domain::SquareMatrix3d inverse_rotation{
+        volume.right_handed_matrix().rotation().transpose()
+    };
     const Domain::Vec3d local_center{instance_trafo.inverse() * center};
 
     Domain::SquareMatrix4d local{Domain::SquareMatrix4d::Identity()};
@@ -254,7 +257,7 @@ Biz::Scene::SceneInteractor::ElementTransforms RotationDialog::get_reset_rotatio
             const Domain::Transform3d volume_matrix{volume->get_matrix()};
 
             const SquareMatrix4d no_rotation{
-                remove_rotation(volume_matrix, instance_matrix, bounding_box.center)
+                remove_rotation(*volume, instance_matrix, bounding_box.center)
             };
             if (!volume_matrix.matrix().isApprox(no_rotation)) {
                 result.insert_or_assign(ref, no_rotation);
@@ -272,7 +275,7 @@ Biz::Scene::SceneInteractor::ElementTransforms RotationDialog::get_reset_rotatio
                 const Domain::ElementRef volume_ref{element.object_id, 0, volume->id().id};
                 const Domain::Transform3d volume_matrix{volume->get_matrix()};
                 const SquareMatrix4d no_rotation{remove_rotation(
-                    volume_matrix,
+                    *volume,
                     Domain::Transform3d{instance_no_rotation},
                     bounding_box.center
                 )};

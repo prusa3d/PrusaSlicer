@@ -142,6 +142,26 @@ void ModelVolume::set_mirror(const Vec3d& mirror) { m_transformation.set_mirror(
 
 void ModelVolume::set_mirror(const Axis axis, double mirror) { m_transformation.set_mirror(axis, mirror); }
 
+Transform3d MirrorAxes::matrix() const
+{
+    return Transform3d(Eigen::Scaling(axes[0] ? -1. : 1., axes[1] ? -1. : 1., axes[2] ? -1. : 1.));
+}
+
+MirrorAxes ModelVolume::mirror_axes() const
+{
+    const bool left_handed = m_transformation.is_left_handed();
+    if (m_mirror_axes.is_odd() == left_handed)
+        return m_mirror_axes;
+    return MirrorAxes{{left_handed, false, false}};
+}
+
+void ModelVolume::set_mirror_axes(const MirrorAxes& mirror_axes) { m_mirror_axes = mirror_axes; }
+
+Transform3d ModelVolume::right_handed_matrix() const
+{
+    return m_transformation.get_matrix() * mirror_axes().matrix();
+}
+
 const Transform3d& ModelVolume::get_matrix() const { return m_transformation.get_matrix(); }
 
 Transform3d ModelVolume::get_matrix_no_offset() const { return m_transformation.get_matrix_no_offset(); }

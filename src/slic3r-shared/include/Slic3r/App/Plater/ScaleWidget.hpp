@@ -58,6 +58,7 @@ private:
     TripleInput* m_relative_input{nullptr};
     Yoga::Item* m_relative_input_item{nullptr};
     Yoga::LayoutButton* m_lock{nullptr};
+    std::array<Yoga::LayoutButton*, 3> m_mirror_buttons{};
     PlaceOnBedButton* m_place_on_bed_button{nullptr};
     ReferenceFramePicker* m_reference_frame_picker;
 
@@ -73,6 +74,7 @@ private:
     void reload(std::optional<Domain::SelectionId> project_id = std::nullopt);
     void apply_relative_scale(const Domain::Vec3d& scale);
     void reset_scale();
+    void mirror(Domain::Axis axis);
     Biz::Scene::SceneInteractor::ElementTransforms get_reset_scale_candidates() const;
 };
 } // namespace Slic3r::App::Plater

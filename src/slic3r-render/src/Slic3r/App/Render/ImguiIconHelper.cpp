@@ -176,6 +176,10 @@ static const std::unordered_map<Icon, const char*> ICON_FILENAMES = {
     {Icon::ReflectionX, "reflection_x"},
     {Icon::ReflectionY, "reflection_y"},
 
+    {Icon::MirrorX, "mirror_x"},
+    {Icon::MirrorY, "mirror_y"},
+    {Icon::MirrorZ, "mirror_z"},
+
     {Icon::Layers, "layers"},
     {Icon::WallsPerimeters, "walls_and_perimeters"},
     {Icon::Infill, "infill"},

@@ -575,3 +575,32 @@ TEST_CASE("3MF failing in the legacy loader reports the reason", "[3mf]")
     REQUIRE_FALSE(imported.has_value());
     CHECK_THAT(imported.error(), Catch::Matchers::ContainsSubstring("at line 4"));
 }
+
+TEST_CASE("3MF round trip keeps the volume mirror flags and matrix", "[3mf]")
+{
+    Project project;
+    project.model() = Test::generate_cubes(1, 1);
+
+    ModelVolume* volume = project.model().objects.front()->volumes.front();
+    const Domain::Transform3d mirrored{
+        Domain::Transform3d(Eigen::AngleAxisd(0.3, Vec3d::UnitZ())) * Eigen::Scaling(-1., -1., 1.)
+    };
+    volume->set_transformation(Domain::Transformation{mirrored});
+    volume->set_mirror_axes(Domain::MirrorAxes{{true, true, false}});
+
+    const fs::path temp_dir =
+        fs::temp_directory_path() / fs::unique_path("slic3r-3mf-test-%%%%-%%%%");
+    fs::create_directories(temp_dir);
+    const fs::path file_path = temp_dir / "mirror_round_trip.3mf";
+    store_3mf(file_path.string(), project);
+
+    const Loaded3MF loaded = load_3mf(file_path.string());
+    boost::system::error_code cleanup_error;
+    fs::remove_all(temp_dir, cleanup_error);
+
+    REQUIRE(loaded.model.objects.size() == 1);
+    REQUIRE(loaded.model.objects.front()->volumes.size() == 1);
+    const ModelVolume* loaded_volume = loaded.model.objects.front()->volumes.front();
+    CHECK(loaded_volume->mirror_axes() == Domain::MirrorAxes{{true, true, false}});
+    CHECK(loaded_volume->get_matrix().matrix().isApprox(mirrored.matrix()));
+}

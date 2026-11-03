@@ -461,14 +461,14 @@ Domain::ElementRefs SceneInteractor::selected_volumes_with_shear() const
             const Domain::ElementRef ref{element.object_id, 0, element.volume_id};
             const Domain::ModelVolume* volume{m_workbench.project(m_selected_project_id)
                                                   .find_volume_by_id(ref.object_id, ref.volume_id)};
-            if (has_shear(volume->get_matrix().matrix())) {
+            if (has_shear(volume->right_handed_matrix().matrix())) {
                 result.push_back(ref);
             }
         } else {
             ASSERT(element.has_instance());
             for (const Domain::ModelVolume* volume : instance->get_object()->volumes) {
                 const Domain::ElementRef ref{element.object_id, 0, volume->id().id};
-                if (has_shear(volume->get_matrix().matrix())) {
+                if (has_shear(volume->right_handed_matrix().matrix())) {
                     result.push_back(ref);
                 }
             }
@@ -2868,6 +2868,123 @@ void SceneInteractor::set_element_transforms(const SceneInteractor::ElementTrans
             }
         );
     }
+}
+
+static Transform3d reflection_through(const Vec3d& center, const Transform3d& reflection)
+{
+    return Eigen::Translation3d(center) * reflection * Eigen::Translation3d(-center);
+}
+
+static Transform3d reflection_in_instance_frame(
+    const SelectionReferenceFrame frame,
+    const ModelInstance& instance,
+    const ModelVolume& volume,
+    const Vec3d& center,
+    const Transform3d& reflection
+)
+{
+    const Transform3d instance_inverse{instance.get_matrix().inverse()};
+    switch (frame) {
+    case SelectionReferenceFrame::Volume: {
+        const Transform3d volume_trafo{volume.get_matrix()};
+        return volume_trafo
+            * reflection_through(volume_trafo.inverse() * instance_inverse * center, reflection)
+            * volume_trafo.inverse();
+    }
+    case SelectionReferenceFrame::Instance:
+        return reflection_through(instance_inverse * center, reflection);
+    case SelectionReferenceFrame::Bed:
+        return instance_inverse * reflection_through(center, reflection) * instance.get_matrix();
+    }
+    UNREACHABLE();
+    return Transform3d::Identity();
+}
+
+void SceneInteractor::mirror_selection(const Domain::Axis axis)
+{
+    const std::optional<SelectionExtents> extents{selection_bounding_box()};
+    if (!extents) {
+        return;
+    }
+    const Vec3d center{extents->oriented_bounding_box().center};
+    const SelectionReferenceFrame frame{object_selection_reference_frame()};
+    Project& project{m_workbench.project(m_selected_project_id)};
+
+    Domain::MirrorAxes flip;
+    flip.flip(axis);
+    const Transform3d reflection{flip.matrix()};
+
+    ElementTransforms transforms;
+    std::set<size_t> bed_mirrored_objects;
+    auto mirror_volume = [&](const ModelInstance& instance,
+                             ModelVolume& volume,
+                             const Transform3d& local_reflection) {
+        const ElementRef ref{instance.get_object()->id().id, 0, volume.id().id};
+        if (transforms.contains(ref)) {
+            return;
+        }
+        transforms[ref] = (local_reflection * volume.get_matrix()).matrix();
+        Domain::MirrorAxes axes{volume.mirror_axes()};
+        axes.flip(axis);
+        volume.set_mirror_axes(axes);
+    };
+
+    for (const ElementRef& element : object_selection().elements) {
+        if (element.is_wipe_tower()) {
+            continue;
+        }
+        ModelInstance* instance{
+            project.find_instance_by_id(element.object_id, element.instance_id)
+        };
+        if (!instance) {
+            continue;
+        }
+        if (element.has_volume()) {
+            ModelVolume* volume{project.find_volume_by_id(element.object_id, element.volume_id)};
+            ASSERT(volume);
+            mirror_volume(
+                *instance,
+                *volume,
+                reflection_in_instance_frame(frame, *instance, *volume, center, reflection)
+            );
+            continue;
+        }
+        if (frame == SelectionReferenceFrame::Bed) {
+            transforms[ElementRef{element.object_id, element.instance_id}] =
+                (reflection_through(center, reflection) * instance->get_matrix() * reflection)
+                    .matrix();
+            bed_mirrored_objects.insert(element.object_id);
+            for (ModelVolume* volume : instance->get_object()->volumes) {
+                mirror_volume(*instance, *volume, reflection);
+            }
+            continue;
+        }
+        for (ModelVolume* volume : instance->get_object()->volumes) {
+            mirror_volume(
+                *instance,
+                *volume,
+                reflection_in_instance_frame(frame, *instance, *volume, center, reflection)
+            );
+        }
+    }
+
+    for (const size_t object_id : bed_mirrored_objects) {
+        const ModelObject* object{project.find_object_by_id(object_id)};
+        ASSERT(object);
+        for (const ModelInstance* other : object->instances) {
+            const ElementRef ref{object_id, other->id().id};
+            if (transforms.contains(ref)) {
+                continue;
+            }
+            const Vec3d pivot{Biz::Algorithms::BoundingBox::center(
+                Biz::Algorithms::ModelObject::instance_bounding_box(*object, *other)
+            )};
+            transforms[ref] =
+                (reflection_through(pivot, reflection) * other->get_matrix() * reflection).matrix();
+        }
+    }
+
+    set_element_transforms(transforms);
 }
 
 void SceneInteractor::transform_selection(

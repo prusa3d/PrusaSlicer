@@ -122,6 +122,11 @@ enum class Icon : wchar_t
     ReflectionX,
     ReflectionY,
 
+    // Scale widget
+    MirrorX,
+    MirrorY,
+    MirrorZ,
+
     // Gizmo Arrange
     ArrangeTopLeft,
     ArrangeTopRight,

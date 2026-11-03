@@ -24,6 +24,14 @@ void rotate(Domain::ModelObject& model_object, double angle, const Domain::Vec3d
 
 void mirror(Domain::ModelObject& model_object, Domain::Axis axis);
 
+/**
+ * Instances are expected to be right-handed; files from other software may carry left-handed
+ * instance matrices. When every instance of the object is left-handed, the X reflection is moved
+ * from the instances into the volumes (matrix and mirror flag), which leaves the geometry
+ * unchanged. Objects with mixed handedness are left alone.
+ */
+void normalize_instance_handedness(Domain::ModelObject& model_object);
+
 Domain::ModelVolume* add_volume(Domain::ModelObject* model_object, const Domain::TriangleMesh& mesh);
 
 Domain::ModelVolume* add_volume(Domain::ModelObject* model_object, Domain::TriangleMesh&& mesh, Domain::ModelVolumeType type);

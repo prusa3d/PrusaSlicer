@@ -18,6 +18,7 @@ enum class UndoSnapshotType
     Scale,
     SetScale,
     RevertScale,
+    Mirror,
     PlaceOnFace,
     Arrange,
     Cut,

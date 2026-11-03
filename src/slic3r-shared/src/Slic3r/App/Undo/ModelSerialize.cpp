@@ -4,6 +4,7 @@
 #include <cereal/archives/adapters.hpp>
 #include <cereal/archives/binary.hpp>
 #include <cereal/cereal.hpp>
+#include <cereal/types/array.hpp>
 #include <cereal/types/optional.hpp>
 #include <cereal/types/polymorphic.hpp>
 #include <cereal/types/string.hpp>
@@ -259,6 +260,7 @@ void load(Archive& ar, Slic3r::Domain::ModelVolume& model_volume)
 
     ar(model_volume.m_type,
        model_volume.m_transformation,
+       model_volume.m_mirror_axes,
        model_volume.m_is_splittable,
        model_volume.cut_info,
        model_volume.volume_settings,
@@ -289,6 +291,7 @@ void save(Archive& ar, const Slic3r::Domain::ModelVolume& model_volume)
 
     ar(model_volume.m_type,
        model_volume.m_transformation,
+       model_volume.m_mirror_axes,
        model_volume.m_is_splittable,
        model_volume.cut_info,
        model_volume.volume_settings,

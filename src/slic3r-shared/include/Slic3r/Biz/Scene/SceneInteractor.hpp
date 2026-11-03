@@ -554,6 +554,14 @@ public:
     void set_element_transforms(const ElementTransforms& transforms);
 
     /**
+     * @brief Mirror the selection along @p axis of the current reference frame, through the
+     * selection centre. Volumes take the reflection and the matching mirror flag; a whole
+     * instance mirrored in the bed frame additionally has its own matrix conjugated by the
+     * reflection, which keeps it right-handed. See design/mirror.md.
+     */
+    void mirror_selection(Domain::Axis axis);
+
+    /**
      * @name Transforming selection
      * @{
      */

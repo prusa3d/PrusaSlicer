@@ -1121,9 +1121,37 @@ constexpr std::string_view SOURCE             = "source";            // more in 
 constexpr std::string_view CUT_INFO           = "cutInfo";           // more in CutSerialization
 constexpr std::string_view SLA_SUPPORT_POINTS = "slaSupportPoints";  // in mesh coordinates, more in SlaSupportPointsSerialization
 constexpr std::string_view SLA_DRAIN_HOLES    = "slaDrainHoles";     // in mesh coordinates, more in SlaDrainHolesSerialization
+constexpr std::string_view MIRROR             = "mirror";            // local axes the user mirrored, subset of "xyz"
 
-NamesType VOLUME_NAMES{{ID, VOLUME_UUID, VOLUME_TYPE, VOLUME_SETTINGS, SOURCE, 
-                        TEXT_CONFIGURATION, SHAPE, CUT_INFO, SLA_SUPPORT_POINTS, SLA_DRAIN_HOLES}};
+NamesType VOLUME_NAMES{{ID, VOLUME_UUID, VOLUME_TYPE, VOLUME_SETTINGS, SOURCE,
+                        TEXT_CONFIGURATION, SHAPE, CUT_INFO, SLA_SUPPORT_POINTS, SLA_DRAIN_HOLES, MIRROR}};
+
+constexpr std::string_view MIRROR_AXIS_NAMES = "xyz";
+
+std::string mirror_axes_to_json(const Domain::MirrorAxes& mirror_axes)
+{
+    std::string result;
+    for (size_t i = 0; i < 3; ++i)
+        if (mirror_axes.axes[i])
+            result += MIRROR_AXIS_NAMES[i];
+    return result;
+}
+
+bool mirror_axes_from_json(const json& volume_json, Domain::MirrorAxes& mirror_axes, Read3mfIssues& collected_issues)
+{
+    std::string axes;
+    if (!from_json(volume_json, MIRROR, axes, collected_issues, RT::project_volume_mirror_issue))
+        return false;
+    for (const char axis : axes) {
+        const size_t index = MIRROR_AXIS_NAMES.find(axis);
+        if (index == std::string_view::npos) {
+            collected_issues.add_issue(Read3mfIssue(RT::project_volume_mirror_issue, std::string("unknown axis"), axes));
+            return false;
+        }
+        mirror_axes.axes[index] = true;
+    }
+    return true;
+}
 
 using VolumeTypeToName = boost::bimap<ModelVolumeType, std::string_view>;
 const VolumeTypeToName volume_type_to_name = boost::assign::list_of<VolumeTypeToName::relation>
@@ -1164,6 +1192,8 @@ json volumes_to_json(const ModelVolumePtrs &volumes, const VolumeToObjectid &v2i
             add(volume_json, SLA_SUPPORT_POINTS, SlaSupportPointsSerialization::to_json(volume.sla_support_points));
         if (!volume.sla_drain_holes.empty())
             add(volume_json, SLA_DRAIN_HOLES, SlaDrainHolesSerialization::to_json(volume.sla_drain_holes));
+        if (volume.mirror_axes().any())
+            volume_json[MIRROR] = mirror_axes_to_json(volume.mirror_axes());
         if (!volume_json.empty())
             volumes_json.push_back(std::move(volume_json));
     }
@@ -1282,6 +1312,11 @@ void load_volume(const json &volume_json, const VolumeMap &volume_map, Read3mfIs
         SlaDrainHolesSerialization::from_json(*sla_holes_json_it, holes, collected_issues);
         for (ModelVolume *mv : mvs)
             mv->sla_drain_holes = holes;
+    }
+
+    if (Domain::MirrorAxes mirror_axes; mirror_axes_from_json(volume_json, mirror_axes, collected_issues)) {
+        for (ModelVolume *mv : mvs)
+            mv->set_mirror_axes(mirror_axes);
     }
 }
 } // namespace VolumeSerialization

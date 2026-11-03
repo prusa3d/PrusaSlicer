@@ -204,9 +204,15 @@ void PlaceOnFaceGizmo::recreate_planes_and_nodes()
     Domain::Transform3f trafo = new_object->volumes.front()->get_transformation().get_matrix_no_offset().cast<float>();
     Domain::Transform3f trafo_inv = new_object->volumes.front()->get_transformation().get_matrix().inverse().cast<float>();
 
+    const bool volume_left_handed = new_object->volumes.front()->get_transformation().is_left_handed();
+
     for (PlaneData& plane : planes) {
         for (Domain::Vec3f& pt : plane.its.vertices)
             pt = trafo_inv * pt;
+        if (volume_left_handed) {
+            for (stl_triangle_vertex_indices& face : plane.its.indices)
+                std::swap(face[1], face[2]);
+        }
         plane.normal = trafo.inverse().matrix().block(0,0,3,3).inverse().transpose() * plane.normal;
     }
 

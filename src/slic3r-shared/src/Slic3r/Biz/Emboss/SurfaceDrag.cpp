@@ -125,14 +125,14 @@ bool SurfaceDrag::on_drag_start(const App::Scene::GizmoEventContext& ctx, const 
         ASSERT(instance_ptr != nullptr);
 
         m_drag = std::make_unique<Drag>();
-        m_drag->to_world = instance_ptr->get_matrix() * volume.get_matrix();
+        m_drag->to_world = instance_ptr->get_matrix() * volume.right_handed_matrix();
         m_drag->instance = instance_ptr->get_matrix();
         m_drag->instance_inv = instance_ptr->get_matrix().inverse();
-        m_drag->volume_inv = volume.get_matrix().inverse();
+        m_drag->volume_inv = volume.right_handed_matrix().inverse();
 
         Domain::Transform3d dist_tr{ Eigen::Translation<double, 3>(Domain::Vec3d(0, 0, -distance.value_or(0.))) };
         Domain::Vec3d surface_point = distance.has_value() ?
-            (Domain::Vec3d)(instance_ptr->get_matrix() * (volume.get_matrix() * dist_tr)).translation() :
+            (Domain::Vec3d)(instance_ptr->get_matrix() * (volume.right_handed_matrix() * dist_tr)).translation() :
             (Domain::Vec3d)m_drag->to_world.translation();
 
         // Settings for cross hair
@@ -300,7 +300,7 @@ Domain::Transform3d world_tr(const Domain::Project& project, const Domain::Eleme
     const Domain::ModelVolume& volume = (ref.volume_id != 0) ?
         *project.find_volume_by_id(ref.object_id, ref.volume_id) :
         *project.find_object_by_id(ref.object_id)->volumes.front();
-    return instance.get_matrix() * volume.get_matrix();
+    return instance.get_matrix() * volume.right_handed_matrix();
 }
 
 std::optional<float> calc_rotation(const Domain::Project& project, const Domain::ElementRef& ref) 
@@ -366,7 +366,7 @@ void transform_selection_relative(const Domain::Transform3d& tr, Biz::ProjectInt
     const Domain::ModelVolume& volume = (el.volume_id != 0) ?
         *project.find_volume_by_id(el.object_id, el.volume_id) :
         *project.find_object_by_id(el.object_id)->volumes.front();
-    Domain::Transform3d volume_tr = volume.get_matrix();
+    Domain::Transform3d volume_tr = volume.right_handed_matrix();
     Domain::Transform3d world_relative = instance_tr * volume_tr * tr * volume_tr.inverse() * instance_tr.inverse();
     scene_interactor.transform_selection(world_relative.matrix());
 }

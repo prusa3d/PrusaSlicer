@@ -680,17 +680,25 @@ static Loaded3MF load_legacy_project(const std::string& file_path, OptionalPrese
     return loaded_3mf;
 }
 
+static Loaded3MF with_right_handed_instances(Loaded3MF loaded_3mf)
+{
+    for (ModelObject* object : loaded_3mf.model.objects) {
+        Biz::Algorithms::ModelObject::normalize_instance_handedness(*object);
+    }
+    return loaded_3mf;
+}
+
 Loaded3MF
 load_from_project(const boost::filesystem::path& project_file_path, OptionalPresetBundle bundle)
 {
     const std::string project_file_name = project_file_path.string();
     try {
-        return load_3mf(project_file_name);
+        return with_right_handed_instances(load_3mf(project_file_name));
     } catch (const Loaded3MFException& e) {
         if (e.issue.type != Read3mfIssueType::legacy_loader_required)
             throw;
     }
-    return load_legacy_project(project_file_name, bundle);
+    return with_right_handed_instances(load_legacy_project(project_file_name, bundle));
 }
 
 static std::string skipped_painting_warning_text(const Read3mfIssues& issues)

@@ -37,7 +37,12 @@ void MeshRenderNodeComponent::render(const Node& node, const Camera& camera, con
     material.set_uniform(UNIFORM_PROJECTION_VIEW_MODEL_MATRIX, pvm);
     material.set_uniform(UNIFORM_VIEW_NORMAL_MATRIX, normal);
 
+    const bool left_handed = model.block<3, 3>(0, 0).determinant() < 0.f;
+    if (left_handed)
+        cmd_buffer.set_cull_face_mode(Render::CullFaceMode::Front);
     cmd_buffer.bind_and_draw(*m_geometry, material);
+    if (left_handed)
+        cmd_buffer.set_cull_face_mode(Render::CullFaceMode::Back);
 }
 
 void MeshRenderNodeComponent::set_geometry(
