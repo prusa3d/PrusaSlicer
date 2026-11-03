@@ -1,0 +1,17 @@
+name: Upload flathub symbols to sentry
+
+on:
+  workflow_dispatch:
+    inputs:
+      flatpak_commit:
+        description: 'Ostree commit of com.prusa3d.PrusaSlicer as published on flathub (stable or beta)'
+        required: true
+        type: string
+
+jobs:
+  upload_flathub_symbols:
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/upload_flathub_symbols.yml@master
+    secrets: inherit
+    with:
+      actions_branch: master
+      flatpak_commit: ${{ inputs.flatpak_commit }}
