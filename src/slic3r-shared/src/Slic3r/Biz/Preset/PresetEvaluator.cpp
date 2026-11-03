@@ -9,6 +9,7 @@
 #include "Slic3r/TypeInfo.hpp"
 #include "Slic3r/Log.hpp"
 
+#include <algorithm>
 #include <ranges>
 
 
@@ -145,6 +146,20 @@ struct CastingGetterVisitor
     }
 };
 
+bool is_enum_value(const Domain::EnumValueDefs& defs, const std::string& value)
+{
+    return std::ranges::any_of(
+        defs,
+        [&value](const Domain::EnumValueDef& def) { return def.str_serialized == value; }
+    );
+}
+
+bool are_enum_values(const Domain::EnumValueDefs& defs, const std::vector<std::string>& values)
+{
+    const auto is_value = [&defs](const std::string& value) { return is_enum_value(defs, value); };
+    return std::ranges::all_of(values, is_value);
+}
+
 struct ConfigValueSetterVisitor
 {
     Domain::ConfigItem& item;
@@ -193,6 +208,13 @@ struct ConfigValueSetterVisitor
             );
             return false;
         }
+        // The preset may come from another version, e.g. a user preset saved by a newer one.
+        if (item.holds_alternative<Domain::EnumWrapper>()
+            && !is_enum_value(item.get<Domain::EnumWrapper>().def(), v))
+        {
+            SPDLOG_ERROR("Invalid value {} for item {}", v, item.name());
+            return false;
+        }
         item.set(v);
         return true;
     }
@@ -216,6 +238,13 @@ struct ConfigValueSetterVisitor
                 type_name(v),
                 dest_type_name
             );
+            return false;
+        } else if (
+            item.holds_alternative<Domain::EnumVectorWrapper>()
+            && !are_enum_values(item.get<Domain::EnumVectorWrapper>().def(), v)
+        )
+        {
+            SPDLOG_ERROR("Invalid value {} for item {}", fmt::join(v, ","), item.name());
             return false;
         } else
             item.set(v);
