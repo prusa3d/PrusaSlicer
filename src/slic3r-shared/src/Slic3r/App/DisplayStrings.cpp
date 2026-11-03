@@ -23,7 +23,7 @@ std::string to_display_string(Biz::Slicing::ErrorCode code)
     case ErrorCode::InconsistentConfig:
         return _u8L(
             "The supplied config is internally inconsistent. "
-            "This can happen if the 3mf or presets are corrupted !"
+            "This can happen if the 3MF or presets are corrupted!"
         );
     case ErrorCode::ToolOverridesInSingleToolPrint:
         return _u8L(
