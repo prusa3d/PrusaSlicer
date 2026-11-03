@@ -1,7 +1,9 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace Slic3r::Biz::FileDownloader {
 
