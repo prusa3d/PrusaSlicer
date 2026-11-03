@@ -2,7 +2,12 @@
 
 #include <iostream>
 #include <Slic3r/Assert.hpp>
-#include <GL/glew.h>
+
+#ifdef __EMSCRIPTEN__
+#include <glad/gles2.h>
+#else
+#include <glad/gl.h>
+#endif
 
 #ifdef NDEBUG
 #define glCheck()

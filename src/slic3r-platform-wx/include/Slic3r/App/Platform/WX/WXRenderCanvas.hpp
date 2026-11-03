@@ -3,7 +3,7 @@
 #include <memory>
 #include <chrono>
 
-#include <GL/glew.h>
+#include <glad/gl.h>
 #include <wx/glcanvas.h>
 
 #include "Slic3r/App/Platform/AbstractRenderCanvas.hpp"

@@ -14,7 +14,6 @@
 #include "Slic3r/App/Render/GL/GLRenderbufferInternal.hpp"
 
 #include "Slic3r/Assert.hpp"
-#include "GL/glew.h"
 
 #define RENDER_TRACE_LOG 0
 #define RENDER_TRACE_DRAW 0
