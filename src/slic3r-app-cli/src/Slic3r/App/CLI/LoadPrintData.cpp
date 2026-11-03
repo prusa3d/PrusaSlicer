@@ -343,7 +343,11 @@ overriding_config_slot_count(const ConfigLocation& location, const HwPrinterConf
 {
     if (const FDMConfigLocation* fdm_location = std::get_if<FDMConfigLocation>(&location)) {
         if (*fdm_location == FDMConfigLocation::Tool) {
-            return hw_config.tool_count;
+            // Tool overrides are only valid in multi-tool prints, see Print::validate().
+            const bool multi_extruder =
+                Domain::Preset::get_feature<bool>(hw_config.features, "multi_extruder")
+                    .value_or(false);
+            return multi_extruder ? hw_config.tool_count : 0;
         }
         if (*fdm_location == FDMConfigLocation::Filament) {
             return hw_config.material_slot_count();

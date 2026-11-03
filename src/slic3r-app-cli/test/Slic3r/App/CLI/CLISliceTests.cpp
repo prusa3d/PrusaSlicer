@@ -10,10 +10,12 @@
 #include "Slic3r/Biz/FileLoadingLogic.hpp"
 #include "Slic3r/Domain/Bed.hpp"
 #include "Slic3r/Domain/ConfigContainer.hpp"
+#include "Slic3r/Domain/ConfigPack.hpp"
 #include "Slic3r/Domain/ModelObject.hpp"
 #include "Slic3r/Domain/Percentage.hpp"
 #include "Slic3r/Domain/Preset/Bundle.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 
 #include <boost/filesystem.hpp>
@@ -73,6 +75,40 @@ TEST_CASE("CLI slices multiple STL inputs into separate G-codes", "[cli][timeout
 
     REQUIRE(App::CLI::run(slice_params) == EXIT_SUCCESS);
     REQUIRE(count_gcode_files(temp_dir.path()) == 2);
+}
+
+TEST_CASE("CLI applies tool overridable options on single-tool printers", "[cli][timeout]")
+{
+    const ScopedTempDir temp_dir;
+    const fs::path cube_stl_path = write_cube_stl(temp_dir.path(), "cube.stl", 20.);
+    const fs::path gcode_path    = temp_dir.path() / "print.gcode";
+
+    // perimeters can be overridden per tool, but tool overrides are not valid in single-tool prints.
+    Domain::ConfigPackFDM config;
+    Domain::ConfigItem perimeters = config.print.items.opt("perimeters");
+    perimeters.set(7);
+    // Text G-code, so that the config stored in it can be checked.
+    Domain::ConfigItem binary_gcode = config.printer.items.opt("binary_gcode");
+    binary_gcode.set(false);
+
+    const std::vector<TestProfileSet>& profile_sets = resolved_profile_sets();
+
+    const auto single_tool_profile_set = std::ranges::find_if(
+        profile_sets,
+        [](const TestProfileSet& profile_set) { return !profile_set.multi_extruder; }
+    );
+    REQUIRE(single_tool_profile_set != profile_sets.end());
+
+    App::InitParams slice_params = make_params(*single_tool_profile_set);
+    slice_params.input.input_files.push_back(cube_stl_path.string());
+    slice_params.config_overrides    = {perimeters, binary_gcode};
+    slice_params.action.export_gcode = true;
+    slice_params.misc.output         = gcode_path.string();
+
+    REQUIRE(App::CLI::run(slice_params) == EXIT_SUCCESS);
+    REQUIRE(fs::exists(gcode_path));
+
+    CHECK(read_file(gcode_path).find("\n; perimeters = 7\n") != std::string::npos);
 }
 
 TEST_CASE("CLI reports objects scaled outside the print volume instead of freezing", "[cli]")
