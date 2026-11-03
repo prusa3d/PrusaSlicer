@@ -33,9 +33,8 @@ jobs:
 
   ui_tests:
     needs: build_flatpak
-    uses: Prusa-Development/PrusaSlicer-Testing/.github/workflows/run_ui_tests.yml@nc_yoga_test_framework
+    uses: Prusa-Development/PrusaSlicer-Testing/.github/workflows/run_fast_tests.yml@main
     secrets: inherit
     with:
-      flatpak_branch: ${{ needs.build_flatpak.outputs.flatpak_branch }}
-      flatpak_commit: ${{ needs.build_flatpak.outputs.flatpak_commit }}
-      testing_branch: nc_yoga_test_framework
+      build: ${{ github.sha }}
+      testing_branch: main
