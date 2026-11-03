@@ -214,7 +214,7 @@ semver_parse_version (const char *str, semver_t *ver) {
 static int
 compare_prerelease (char *x, char *y) {
   char *lastx, *lasty, *xptr, *yptr, *endptr;
-  size_t xlen, ylen, xn, yn, min;
+  size_t xlen, ylen, xn, yn, xd, yd, min;
   int xisnum, yisnum, xnum, ynum;
   int res;
   if (x == NULL && y == NULL) return 0;
@@ -247,9 +247,16 @@ compare_prerelease (char *x, char *y) {
       /* String comparison */
       xn = xptr - lastx;
       yn = yptr - lasty;
-      min = xn < yn ? xn : yn;
+      xd = xn;
+      while (xd > 0 && lastx[xd - 1] >= '0' && lastx[xd - 1] <= '9') xd--;
+      yd = yn;
+      while (yd > 0 && lasty[yd - 1] >= '0' && lasty[yd - 1] <= '9') yd--;
+      min = xd < yd ? xd : yd;
       if ((res = strncmp(lastx, lasty, min))) return res < 0 ? -1 : 1;
-      if (xn != yn) return xn < yn ? -1 : 1;
+      if (xd != yd) return xd < yd ? -1 : 1;
+      xnum = strtol(lastx + xd, NULL, 10);
+      ynum = strtol(lasty + yd, NULL, 10);
+      if (xnum != ynum) return xnum < ynum ? -1 : 1;
     }
 
     lastx = xptr + 1;

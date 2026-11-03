@@ -668,9 +668,10 @@ void AppConfig::handle_legacy_config(AppConfig& app_config)
     }
 
     const boost::optional<Semver> semver{Semver::parse(app_config.get<std::string>("version"))};
-    if (!semver.has_value()) {
-        return;
+    if (semver.has_value() && *semver < Semver("3.0.0-alpha13")) {
+        app_config.set("initialized", false);
     }
+    app_config.set("version", std::string(Slic3r::VERSION));
 }
 
 AppConfig::AppConfig() :
