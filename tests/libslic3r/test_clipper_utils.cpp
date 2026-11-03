@@ -388,3 +388,74 @@ TEST_CASE("Traversing Clipper PolyTree", "[ClipperUtils]") {
         REQUIRE(count_polys(output) == reference.size());
     }
 }
+
+TEST_CASE("Dense touching grid clipping preserves islands and holes", "[ClipperUtils][dense-grid]")
+{
+    using namespace ClipperLib;
+    constexpr int count = 64;
+    constexpr cInt pitch = 1500000, width = 500000, margin = 1000000;
+    constexpr cInt extent = (count - 1) * pitch + width;
+    int transform = 0;
+    SECTION("Axis aligned") { transform = 0; }
+    SECTION("Rotated by ninety degrees") { transform = 1; }
+    SECTION("Sheared with exact integer coordinates") { transform = 2; }
+    auto rectangle = [transform](cInt x0, cInt y0, cInt x1, cInt y1) {
+        Path path{{x0, y0}, {x1, y0}, {x1, y1}, {x0, y1}};
+        for (IntPoint &point : path) {
+            if (transform == 1)
+                point = IntPoint(-point.y(), point.x());
+            else if (transform == 2)
+                point.x() += point.y();
+        }
+        return path;
+    };
+    Paths subject{rectangle(-margin, -margin, extent + margin, extent + margin)};
+    Paths clip;
+    for (int x = 0; x < count - 1; ++x) {
+        Path hole = rectangle(x * pitch + width, 0, (x + 1) * pitch, extent);
+        std::reverse(hole.begin(), hole.end());
+        subject.push_back(std::move(hole));
+    }
+    for (int x = 0; x < count; ++x)
+        for (int y = 0; y < count - 1; ++y)
+            clip.push_back(rectangle(x * pitch, y * pitch + width, x * pitch + width, (y + 1) * pitch));
+
+    Clipper difference;
+    difference.AddPaths(subject, ptSubject, true);
+    difference.AddPaths(clip, ptClip, true);
+    Paths paths;
+    REQUIRE(difference.Execute(ctDifference, paths, pftNonZero, pftNonZero));
+    const double expected_area = double(extent + 2 * margin) * (extent + 2 * margin)
+        - double(count - 1) * (pitch - width) * extent
+        - double(count) * (count - 1) * width * (pitch - width);
+    double actual_area = 0.;
+    for (const Path &path : paths)
+        actual_area += ClipperLib::Area(path);
+    REQUIRE(actual_area == Approx(expected_area));
+
+    Clipper hierarchy;
+    hierarchy.AddPaths(paths, ptSubject, true);
+    PolyTree tree;
+    REQUIRE(hierarchy.Execute(ctUnion, tree, pftNonZero, pftNonZero));
+    auto transform_point = [transform](cInt x, cInt y) {
+        return transform == 1 ? IntPoint(-y, x) : transform == 2 ? IntPoint(x + y, y) : IntPoint(x, y);
+    };
+    auto contains = [](const PolyNode &node, const IntPoint &point, auto &&self) -> bool {
+        for (const PolyNode *child : node.Childs)
+            if (ClipperLib::PointInPolygon(point, child->Contour) > 0)
+                return self(*child, point, self);
+        return node.Parent && !node.IsHole();
+    };
+    REQUIRE(contains(tree, transform_point(-margin / 2, -margin / 2), contains));
+    // Check the solid islands and both directions of the empty channels.
+    // Contour counts are scan-direction dependent for exactly touching inputs.
+    for (int x = 0; x < count; ++x) {
+        for (int y = 0; y < count; ++y) {
+            REQUIRE(contains(tree, transform_point(x * pitch + width / 2, y * pitch + width / 2), contains));
+            if (x + 1 < count)
+                REQUIRE_FALSE(contains(tree, transform_point(x * pitch + width + (pitch - width) / 2, y * pitch + width / 2), contains));
+            if (y + 1 < count)
+                REQUIRE_FALSE(contains(tree, transform_point(x * pitch + width / 2, y * pitch + width + (pitch - width) / 2), contains));
+        }
+    }
+}
