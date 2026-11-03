@@ -486,6 +486,10 @@ PhysicalPrinterConfig PhysicalPrinterInteractor::create_connect_printer_config(
         hw_config.tools[i].id   = full_hw_config->tools[i].id;
         hw_config.tools[i].name = full_hw_config->tools[i].name;
     }
+    for (const auto& [addr, feeder] : full_hw_config->feeders) {
+        hw_config.feeders[addr].id = feeder.id;
+    }
+
     auto vendor_it = m_workbench.preset_bundle().vendor_bundles.find(full_hw_config->vendor_id);
     if (vendor_it != m_workbench.preset_bundle().vendor_bundles.end()) {
         hw_config.name       = suggest_name(hw_config, vendor_it->second.vendor_data, false);
