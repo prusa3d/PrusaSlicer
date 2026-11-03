@@ -38,6 +38,29 @@ target_link_libraries(slic3r-platform-wx PUBLIC
     imgui_backend_ogl3
     slic3r-shared
 )
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # The wx libraries are static and their CONFIG package does not propagate
+    # what wxGLCanvas needs, so repeat it here. wx guards its Xlib code with
+    # GDK_WINDOWING_X11 and its Wayland code with GDK_WINDOWING_WAYLAND, so
+    # follow GTK, which installs a pkg-config file per backend it was built for.
+    find_package(PkgConfig REQUIRED)
+    find_package(OpenGL REQUIRED COMPONENTS EGL)
+    target_link_libraries(slic3r-platform-wx PUBLIC OpenGL::EGL)
+
+    pkg_check_modules(GTK3_X11 gtk+-x11-3.0)
+    if (GTK3_X11_FOUND)
+        # wx core uses Xlib in src/unix/utilsx11.cpp whatever the GL backend is.
+        find_package(X11 REQUIRED)
+        target_link_libraries(slic3r-platform-wx PUBLIC X11::X11)
+    endif ()
+
+    pkg_check_modules(GTK3_WAYLAND gtk+-wayland-3.0)
+    if (GTK3_WAYLAND_FOUND)
+        pkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-client wayland-egl)
+        target_link_libraries(slic3r-platform-wx PUBLIC PkgConfig::WAYLAND)
+    endif ()
+endif ()
+
 target_include_directories(slic3r-platform-wx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 if (UNIX AND NOT APPLE)

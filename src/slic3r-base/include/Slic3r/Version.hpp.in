@@ -4,10 +4,12 @@
 #define SLIC3R_APP_KEY "@SLIC3R_APP_KEY@"
 #define SLIC3R_VERSION "@SLIC3R_VERSION@"
 #define SLIC3R_BUILD_ID "@SLIC3R_BUILD_ID@"
+#define SLIC3R_DESKTOP_FILE_NAME "@SLIC3R_DESKTOP_FILE_NAME@"
 
 namespace Slic3r {
     constexpr const char* APP_NAME = SLIC3R_APP_NAME;
     constexpr const char* APP_KEY = SLIC3R_APP_KEY;
     constexpr const char* VERSION = SLIC3R_VERSION;
     constexpr const char* BUILD_ID = SLIC3R_BUILD_ID;
+    constexpr const char* DESKTOP_FILE_NAME = SLIC3R_DESKTOP_FILE_NAME;
 }
