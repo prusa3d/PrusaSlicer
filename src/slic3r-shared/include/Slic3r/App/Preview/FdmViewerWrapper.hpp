@@ -17,6 +17,7 @@
 #include "Slic3r/Biz/Units.hpp"
 
 #include <array>
+#include <optional>
 
 namespace Slic3r::Biz::libpgcode {
 struct ProcessorResult;
@@ -117,6 +118,7 @@ public:
     );
     void load_from_result(
         const Biz::libpgcode::ProcessorResult& result,
+        const std::optional<Domain::CustomGCode::Info>& custom_gcode,
         const Scene::Transform& transform
     );
 
@@ -247,5 +249,13 @@ private:
     void render_customize_range_colors_popup();
     void render_customize_scale_factor_popup();
 };
+
+/**
+ * @brief Extracts the wrapper input data from the G-code processor result. Exposed for tests.
+ */
+FdmViewerWrapperInputData extract_wrapper_input_data_from_result(
+    const Biz::libpgcode::ProcessorResult& result,
+    const std::optional<Domain::CustomGCode::Info>& custom_gcode
+);
 
 } // namespace Slic3r::App::Preview

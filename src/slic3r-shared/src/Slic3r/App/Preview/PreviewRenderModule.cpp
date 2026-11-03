@@ -1134,7 +1134,11 @@ void PreviewRenderModule::update_fdm_viewer_data(const Domain::SlicingId id)
         return;
     }
 
-    m_fdm_viewer.load_from_result(*fdm_result, bed_instance->transformation.get_matrix());
+    m_fdm_viewer.load_from_result(
+        *fdm_result,
+        bed_instance->custom_gcode,
+        bed_instance->transformation.get_matrix()
+    );
 
     update_toolbar_visibility();
 

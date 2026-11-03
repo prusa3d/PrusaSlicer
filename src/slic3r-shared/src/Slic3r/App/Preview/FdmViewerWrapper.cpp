@@ -405,13 +405,19 @@ static WipeTowerAndFlushFilamentUsageData extract_wipe_tower_and_flush_filament_
     );
 }
 
-static FdmViewerWrapperInputData extract_wrapper_input_data_from_result(const ProcessorResult& result)
+FdmViewerWrapperInputData extract_wrapper_input_data_from_result(
+    const ProcessorResult& result,
+    const std::optional<CustomGCode::Info>& custom_gcode
+)
 {
     FdmViewerWrapperInputData ret;
 
     CustomGCode::Info ticks_info_from_model;
     ticks_info_from_model.mode = CustomGCode::Mode::SingleExtruder;// should be  Undef; -> ysFIXME-spe3494.
-    ticks_info_from_model.gcodes = result.custom_gcode_per_print_z;
+    // Not from result.custom_gcode_per_print_z: it has no custom G-code text, and slider edits
+    // write the ticks back to the project.
+    if (custom_gcode.has_value())
+        ticks_info_from_model.gcodes = custom_gcode->gcodes;
     ret.producer = result.producer;
     ret.custom_gcode_info = ticks_info_from_model;
     ret.print_settings = result.print_settings;
@@ -430,11 +436,15 @@ static FdmViewerWrapperInputData extract_wrapper_input_data_from_result(const Pr
     return ret;
 }
 
-void
-FdmViewerWrapper::load_from_result(const ProcessorResult& result, const Scene::Transform& transform)
+void FdmViewerWrapper::load_from_result(
+    const ProcessorResult& result,
+    const std::optional<CustomGCode::Info>& custom_gcode,
+    const Scene::Transform& transform
+)
 {
     FdmViewerInputData viewer_data = extract_viewer_input_data_from_result(result);
-    FdmViewerWrapperInputData wrapper_data = extract_wrapper_input_data_from_result(result);
+    FdmViewerWrapperInputData wrapper_data =
+        extract_wrapper_input_data_from_result(result, custom_gcode);
 
     load(std::move(wrapper_data), std::move(viewer_data), transform);
 }

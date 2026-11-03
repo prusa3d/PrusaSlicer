@@ -1686,6 +1686,8 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/App/Plater/SurfaceMesh.cpp
 
+            test/Slic3r/App/Preview/FdmViewerWrapperTests.cpp
+
             test/Slic3r/App/PresetUpdater/PresetUpdaterControllerStateTests.cpp
             test/Slic3r/App/PresetUpdater/PresetUpdaterControllerTests.cpp
 
