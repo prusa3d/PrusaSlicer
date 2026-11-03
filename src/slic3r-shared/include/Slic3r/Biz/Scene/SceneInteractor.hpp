@@ -441,6 +441,11 @@ public:
 
     void prepare_added_project(Domain::SelectionId project_id);
 
+    /**
+     * Forget the scene state of a project which is being removed.
+     */
+    void remove_project(Domain::SelectionId project_id);
+
     Domain::BedInstance& add_bed_instance(size_t config_container_id);
 
     /**

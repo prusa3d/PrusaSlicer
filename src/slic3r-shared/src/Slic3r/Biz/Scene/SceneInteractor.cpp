@@ -2137,6 +2137,12 @@ void SceneInteractor::prepare_added_project(Domain::SelectionId project_id)
     layout_after_project_load(project);
 }
 
+void SceneInteractor::remove_project(Domain::SelectionId project_id)
+{
+    // The project context refers to the project, it must not outlive it.
+    m_projects.erase(project_id);
+}
+
 Domain::BedInstance& SceneInteractor::add_bed_instance(size_t config_container_id)
 {
     SceneInteractorProjectContext& project_context{m_projects.find(m_selected_project_id)->second};
