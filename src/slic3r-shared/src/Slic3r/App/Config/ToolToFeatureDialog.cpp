@@ -6,6 +6,7 @@
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Yoga/Namespace.hpp"
 #include "Slic3r/App/Yoga/Separator.hpp"
+#include "Slic3r/App/Navigator.hpp"
 
 #include "Slic3r/Biz/IConfigBoxSetter.hpp"
 #include "Slic3r/Biz/PrintToolConfigBoxInteractor.hpp"
@@ -93,9 +94,13 @@ void ExtruderOptionRow::on_data_update()
     ));
 }
 
-ToolToFeatureDialog::ToolToFeatureDialog(Biz::ProjectInteractor& project_interactor) :
-    Dialog({Biz::_u8L("Tool to feature")}, "ToolToFeatureDialog"),
-    m_project_interactor(project_interactor)
+ToolToFeatureDialog::ToolToFeatureDialog(
+    Biz::ProjectInteractor& project_interactor,
+    Navigator& navigator
+) :
+    Dialog({Biz::_u8L("Extruder Assignment")}, "ExtruderAssignmentDialog"),
+    m_project_interactor(project_interactor),
+    m_navigator(navigator)
 {
     content()->set_min_width(350_fpx);
     content()->set_padding(20_fpx);
@@ -131,4 +136,10 @@ ToolToFeatureDialog::ToolToFeatureDialog(Biz::ProjectInteractor& project_interac
     m_extruder_assignment_list_view->set_gap(8_fpx);
     m_extruder_assignment_list_view->set_source_list(m_extruder_assignment_filter.get());
 }
+
+void ToolToFeatureDialog::close_action()
+{
+    m_navigator.set_opened_dialog(nullptr);
+}
+
 } // namespace Slic3r::App

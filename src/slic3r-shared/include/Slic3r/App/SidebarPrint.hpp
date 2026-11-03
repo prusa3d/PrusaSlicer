@@ -5,11 +5,13 @@
 #include "Slic3r/App/Yoga/ComboBoxListViewSelection.hpp"
 #include "Slic3r/Biz/Preset/IMacroOverridesChangedListener.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
+#include "Slic3r/Biz/ObservableListSortFilter.hpp"
 #include "Slic3r/App/SidebarToolHeadRow.hpp"
 #include "Slic3r/App/Yoga/ListView.hpp"
 
 namespace Slic3r::Biz {
 class ProjectInteractor;
+struct PrintToolItem;
 } // namespace Slic3r::Biz
 
 namespace Slic3r::App {
@@ -30,7 +32,8 @@ class ScrollArea;
 class SidebarPrint :
     public Yoga::Window,
     public Biz::Preset::IPresetChangedListener,
-    public Biz::Preset::IMacroOverridesChangedListener
+    public Biz::Preset::IMacroOverridesChangedListener,
+    public Biz::IListObserver<Biz::PrintToolItem>
 {
 public:
     explicit SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator& navigator);
@@ -60,9 +63,13 @@ public:
 
     void on_macro_overrides_changed() override;
 
+    /// Called by m_dirty_extruder_assignments whenever its content changes.
+    void on_reset() override;
+
 private:
     void add_separator();
     void refresh_print_mode_button();
+    void refresh_extruder_assignment_button();
 
     void create_print_extras();
     void create_favorite_params();
@@ -81,6 +88,8 @@ private:
             Biz::Preset::PresetItemObservableList,
             Biz::ProjectInteractor&>>;
 
+    using DirtyExtruderAssignmentFilter = Biz::ObservableListSortFilter<Biz::PrintToolItem>;
+
     Biz::ListenerScope<
         Biz::Preset::IPresetChangedListener,
         Biz::Preset::PresetInteractor,
@@ -95,11 +104,14 @@ private:
     Biz::ProjectInteractor& m_project_interactor;
     Navigator& m_navigator;
 
+    /// Extruder assignment options which differ from the selected print/tool presets.
+    Biz::UnsharedPointer<DirtyExtruderAssignmentFilter> m_dirty_extruder_assignments;
+
     Yoga::LayoutButton* m_settings_set_btn{nullptr};
     Yoga::LayoutButton* m_print_mode_btn{nullptr};
+    Yoga::LayoutButton* m_extruder_assignment_btn{nullptr};
     Yoga::ScrollArea* m_content_area{nullptr};
     ToolToFeatureDialog* m_tool_to_feature_dialog{nullptr};
-    Yoga::Item* m_extruder_assignment_item{nullptr};
     PrintToolFavoritesItem* m_favorite_params{nullptr};
 
     Yoga::ComboBoxListViewSelection<Biz::Preset::PresetItem>* m_combo_print{nullptr};

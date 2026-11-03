@@ -18,6 +18,7 @@
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Preset/PresetSelectionCheck.hpp"
 #include "Slic3r/Biz/PrintToolConfigObservableList.hpp"
+#include "Slic3r/Biz/PrintToolItem.hpp"
 
 #include <Slic3r/Log.hpp>
 
@@ -33,13 +34,27 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
     m_macro_overrides_listener_scope(project_interactor.preset_interactor(), *this),
     m_project_interactor(project_interactor),
-    m_navigator(navigator)
+    m_navigator(navigator),
+    m_dirty_extruder_assignments(std::make_shared<DirtyExtruderAssignmentFilter>())
 {
     set_transparent(true);
+
+    m_dirty_extruder_assignments->set_filter_fn(
+        [](const Biz::PrintToolItem& item)
+        {
+            return item.print_item->def().option_group
+                    == Domain::ConfigItemDef::OptionGroup::Print_MultiMaterial_ExtruderAssignment
+                && item.is_dirty();
+        }
+    );
+    m_dirty_extruder_assignments->set_source_model(
+        m_project_interactor.preset_interactor().print_tool_cbi().observable_list()
+    );
+
     m_print_settings_dialog = emplace_back<PrintSettingsDialog>(project_interactor, m_navigator);
     m_print_mode_dialog     = emplace_back<PrintModeDialog>(project_interactor, m_navigator);
 
-    m_tool_to_feature_dialog = emplace_back<ToolToFeatureDialog>(m_project_interactor);
+    m_tool_to_feature_dialog = emplace_back<ToolToFeatureDialog>(m_project_interactor, m_navigator);
 
     set_orientation(Orientation::Vertical);
     set_gap(5_fpx);
@@ -123,15 +138,13 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
     update_tools_visibility();
     refresh_tools_comboboxes_label_colors();
 
-    m_tool_to_feature_dialog->attach_to_item(this, Position::Left, 20_fpx);
-
-    m_print_mode_dialog->attach_to_item(this, Position::Left, 20);
-    m_print_mode_dialog->callbacks().opened = [this] { m_print_mode_btn->set_checked(true); };
-    m_print_mode_dialog->callbacks().closed = [this] { m_print_mode_btn->set_checked(false); };
-
     create_print_extras();
 
+    // Listen only once the button exists, as on_reset() refreshes it.
+    m_dirty_extruder_assignments->add_listener<Biz::IListObserver<Biz::PrintToolItem>>(this);
+
     refresh_print_mode_button();
+    refresh_extruder_assignment_button();
     update_extruder_assignment_visibility();
 
     create_favorite_params();
@@ -147,7 +160,8 @@ void SidebarPrint::create_print_extras()
 {
     add_separator();
 
-    auto add_extras_button = [this](const std::string& label, Render::Icon icon) -> LayoutButton*
+    auto add_extras_button =
+        [this](const std::string& label, Render::Icon icon, Yoga::Dialog* dialog) -> LayoutButton*
     {
         Item* wrap = m_content_area->emplace_back<Item>();
         wrap->set_orientation(Orientation::Horizontal);
@@ -159,21 +173,25 @@ void SidebarPrint::create_print_extras()
         button->set_content_justify_content(YGJustifyFlexStart);
         button->set_flex_grow(1);
         button->set_self_align(YGAlignCenter);
+        button->callbacks().action = [this, dialog]
+        { m_navigator.set_opened_dialog(dialog->opened() ? nullptr : dialog); };
+
+        dialog->attach_to_item(this, Position::Left, 20_fpx);
+        dialog->callbacks().opened = [button] { button->set_checked(true); };
+        dialog->callbacks().closed = [button] { button->set_checked(false); };
         return button;
     };
 
-    m_print_mode_btn = add_extras_button(Biz::_u8L("Print Goals"), Render::Icon::PrintGoals);
-    m_print_mode_btn->callbacks().action = [this]
-    {
-        m_navigator.set_opened_dialog(
-            m_print_mode_dialog->opened() ? nullptr : m_print_mode_dialog
-        );
-    };
-
-    LayoutButton* extruder_assignment_btn =
-        add_extras_button(Biz::_u8L("Extruder Assignment"), Render::Icon::ExtruderAssignment);
-    extruder_assignment_btn->callbacks().action = [this]() { m_tool_to_feature_dialog->open(); };
-    m_extruder_assignment_item                  = extruder_assignment_btn->parent_item();
+    m_print_mode_btn = add_extras_button(
+        Biz::_u8L("Print Goals"),
+        Render::Icon::PrintGoals,
+        m_print_mode_dialog
+    );
+    m_extruder_assignment_btn = add_extras_button(
+        Biz::_u8L("Extruder Assignment"),
+        Render::Icon::ExtruderAssignment,
+        m_tool_to_feature_dialog
+    );
 
     add_separator();
 }
@@ -197,9 +215,12 @@ void SidebarPrint::update_tools_visibility()
 
 void SidebarPrint::update_extruder_assignment_visibility()
 {
-    m_extruder_assignment_item->set_visible(
-        m_project_interactor.preset_interactor().selected_printer_preset().materials.size() > 1
-    );
+    const bool visible =
+        m_project_interactor.preset_interactor().selected_printer_preset().materials.size() > 1;
+    if (!visible && m_tool_to_feature_dialog->opened()) {
+        m_navigator.set_opened_dialog(nullptr);
+    }
+    m_extruder_assignment_btn->parent_item()->set_visible(visible);
 }
 
 void SidebarPrint::refresh_print_combobox_label_color()
@@ -222,6 +243,14 @@ void SidebarPrint::refresh_print_mode_button()
     )};
     const bool active{overrides && !overrides->empty()};
     m_print_mode_btn->set_label_color(
+        m_theme->color_imgui(active ? Platform::Color::AccentTertiary : Platform::Color::Text)
+    );
+}
+
+void SidebarPrint::refresh_extruder_assignment_button()
+{
+    const bool active{m_dirty_extruder_assignments->size() > 0};
+    m_extruder_assignment_btn->set_label_color(
         m_theme->color_imgui(active ? Platform::Color::AccentTertiary : Platform::Color::Text)
     );
 }
@@ -332,6 +361,11 @@ void SidebarPrint::on_config_container_selection_changed(
 void SidebarPrint::on_macro_overrides_changed()
 {
     refresh_print_mode_button();
+}
+
+void SidebarPrint::on_reset()
+{
+    refresh_extruder_assignment_button();
 }
 
 } // namespace Slic3r::App

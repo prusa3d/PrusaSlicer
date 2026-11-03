@@ -15,6 +15,8 @@ class IConfigBoxSetter;
 
 namespace Slic3r::App {
 
+class Navigator;
+
 class ExtruderOptionRow : public Biz::DataObserver<Biz::PrintToolItem>, public Yoga::Item
 {
 public:
@@ -38,7 +40,10 @@ private:
 class ToolToFeatureDialog : public Yoga::Dialog
 {
 public:
-    explicit ToolToFeatureDialog(Biz::ProjectInteractor& project_interactor);
+    ToolToFeatureDialog(Biz::ProjectInteractor& project_interactor, Navigator& navigator);
+
+protected:
+    void close_action() override;
 
 private:
     using ExtruderAssignmentFilter = Biz::ObservableListSortFilter<Biz::PrintToolItem>;
@@ -52,6 +57,7 @@ private:
         Yoga::ListView<ExtruderOptionRow, Biz::PrintToolItem, ExtruderOptionListViewFactory>;
 
     Biz::ProjectInteractor& m_project_interactor;
+    Navigator& m_navigator;
 
     ToolToFeatureDialogHeader* m_header{nullptr};
 

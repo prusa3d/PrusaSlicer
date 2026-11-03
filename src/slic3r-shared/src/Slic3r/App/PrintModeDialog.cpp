@@ -339,7 +339,7 @@ std::string mode_info(const Biz::PrintMode& mode)
 } // namespace
 
 PrintModeDialog::PrintModeDialog(Biz::ProjectInteractor& project_interactor, Navigator& navigator) :
-    Dialog({Biz::_u8L("Print mode")}, "PrintModeDialog"),
+    Dialog({Biz::_u8L("Print Goals")}, "PrintGoalsDialog"),
     m_project_interactor(project_interactor),
     m_navigator(navigator),
     m_print_mode_listener_scope(project_interactor.print_mode_interactor(), *this),
