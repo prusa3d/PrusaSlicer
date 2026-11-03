@@ -170,6 +170,17 @@ public:
         const std::string& printer_preset_id,
         const std::string& print_id = {}
     ) const;
+    /**
+     * @brief Same as above, but presets of @p hw_config are taken from @p bundle and @p runtime
+     * (e.g. from evaluate_new_hw_config_bundle() for a hw config which isn't stored yet).
+     */
+    SelectedPresetIds get_preset_ids_after_selection(
+        const Domain::Preset::Bundle& bundle,
+        const RuntimePresets& runtime,
+        const Domain::Preset::HwPrinterConfig& hw_config,
+        const std::string& printer_preset_id,
+        const std::string& print_id = {}
+    ) const;
 
     const Domain::Preset::Bundle& preset_bundle() const;
     /** @brief Presets loaded at runtime (i.e. coming from 3MF file) of the selected project. */
@@ -251,6 +262,15 @@ public:
     void select_printer_config(
         const std::string& printer_hw_config_id
     );
+    /**
+     * @brief Returns id of the printer preset which select_printer_config() selects
+     * for @p hw_config_id: the one with the short name of the selected printer preset,
+     * otherwise the first system one.
+     */
+    std::string printer_preset_id_for_hw_config(const std::string& hw_config_id) const;
+    /** @brief Same as above, but chosen from @p printer_presets. */
+    std::string
+    printer_preset_id_for_hw_config(const PrinterPresetProjectView& printer_presets) const;
 
     /**
      * @param user - set this to true if action came from user (e.g. clicking a button)
@@ -324,6 +344,23 @@ public:
     tl::expected<void, std::string> select_external_printer_config(
         const Domain::Preset::HwPrinterConfig& printer
     );
+    /**
+     * @brief Returns id of an existing hw config which select_external_printer_config() selects
+     * for @p printer, or std::nullopt if a new hw config would be created.
+     */
+    std::optional<std::string> find_external_printer_config(
+        const Domain::Preset::HwPrinterConfig& printer
+    ) const;
+    /**
+     * @brief Evaluates presets of @p hw_config, which isn't stored in the preset bundle yet,
+     * into a bundle containing only this hw config, i.e. what select_external_printer_config()
+     * stores for a new hw config. Doesn't modify any state.
+     * @return std::nullopt if select_external_printer_config() fails for @p hw_config
+     *         (no printer presets, or no system one).
+     */
+    std::optional<Domain::Preset::Bundle> evaluate_new_hw_config_bundle(
+        const Domain::Preset::HwPrinterConfig& hw_config
+    ) const;
 
     /**
      * @brief Create full hw config from the preset bundle for given external one
@@ -900,7 +937,15 @@ public:
     [[nodiscard]] SheetItems
     get_sheet_items(const Domain::Preset::HwPrinterConfig& hw_config);
 
-    bool update_changed_printer_configs(const std::vector<Domain::Preset::HwPrinterConfig>& hw_configs);
+    /**
+     * @param select_same_root_printer_preset  If true, the printer preset with the root id
+     *        of the selected one is selected from @p hw_configs. Set to false, when the caller
+     *        selects the printer preset itself (the unsaved changes are applied only once).
+     */
+    bool update_changed_printer_configs(
+        const std::vector<Domain::Preset::HwPrinterConfig>& hw_configs,
+        bool select_same_root_printer_preset = true
+    );
 
     tl::expected<bool, std::string> migrate_hw_config(
         Domain::Preset::HwPrinterConfig& hw_config

@@ -44,10 +44,13 @@ public:
         std::vector<PrinterEntry> printers;
     };
 
+    /**
+     * @param add_printer Returns false if the printer wasn't added; the printer form is kept open.
+     */
     AddPrinterPanel(
         Biz::ProjectInteractor& project_interactor,
         std::function<void()> close,
-        std::function<void(const Biz::PhysicalPrinter::PhysicalPrinterConfig&)> add_printer
+        std::function<bool(const Biz::PhysicalPrinter::PhysicalPrinterConfig&)> add_printer
     );
 
     void on_preset_bundles_reloaded() override
@@ -57,7 +60,7 @@ public:
 
 private:
     Biz::ProjectInteractor& m_project_interactor;
-    std::function<void(const Biz::PhysicalPrinter::PhysicalPrinterConfig&)> m_add_printer;
+    std::function<bool(const Biz::PhysicalPrinter::PhysicalPrinterConfig&)> m_add_printer;
     std::string m_search_text;
     std::optional<std::string> m_selected_vendor;
     std::string m_vendor_name;

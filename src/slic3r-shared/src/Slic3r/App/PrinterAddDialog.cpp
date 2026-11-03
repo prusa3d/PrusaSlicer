@@ -25,10 +25,14 @@ PrinterAddDialog::PrinterAddDialog(
         nullptr,
         [this](const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer)
         {
-            m_project_interactor.physical_printer_interactor().create_or_save_physical_printer(
-                printer
-            );
+            if (!m_project_interactor.physical_printer_interactor().create_or_save_physical_printer(
+                    printer
+                ))
+            {
+                return false;
+            }
             m_navigator.set_opened_dialog(nullptr);
+            return true;
         }
     );
     m_add_printer_panel->set_flex_grow(1);

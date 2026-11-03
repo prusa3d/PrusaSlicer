@@ -303,13 +303,13 @@ struct SelectedPresetPtrs
     std::vector<const Domain::Preset::EvaluatedMaterialPreset::Preset*> materials;
 };
 
-/** @brief Returns presets of the selected project given by @p ids. */
-static SelectedPresetPtrs
-get_presets_by_ids(const PresetInteractor& preset_interactor, const SelectedPresetIds& ids)
+/** @brief Returns presets from @p bundle and @p runtime given by @p ids. */
+static SelectedPresetPtrs get_presets_by_ids(
+    const Domain::Preset::Bundle& bundle,
+    const RuntimePresets& runtime,
+    const SelectedPresetIds& ids
+)
 {
-    const Domain::Preset::Bundle& bundle = preset_interactor.preset_bundle();
-    const RuntimePresets& runtime        = preset_interactor.selected_runtime_presets();
-
     SelectedPresetPtrs presets{
         .printer = find_in_view(
             PrinterPresetProjectView{bundle, runtime, ids.hw_config_id},
@@ -340,6 +340,17 @@ get_presets_by_ids(const PresetInteractor& preset_interactor, const SelectedPres
     }
 
     return presets;
+}
+
+/** @brief Returns presets of the selected project given by @p ids. */
+static SelectedPresetPtrs
+get_presets_by_ids(const PresetInteractor& preset_interactor, const SelectedPresetIds& ids)
+{
+    return get_presets_by_ids(
+        preset_interactor.preset_bundle(),
+        preset_interactor.selected_runtime_presets(),
+        ids
+    );
 }
 
 static PresetSelectionNames preset_names(const SelectedPresetPtrs& presets)
@@ -415,6 +426,68 @@ static bool resolve_unsaved_changes(
     return ret;
 }
 
+static bool has_multiple_extruders(const Domain::Preset::HwPrinterConfig& hw_config)
+{
+    return Domain::Preset::get_feature<bool>(hw_config.features, "multi_extruder").value_or(false);
+}
+
+/**
+ * @brief Shows unsaved changes dialog for switching to a printer with @p hw_config.
+ * @param get_presets_new  Returns presets which are going to be selected. It isn't called
+ *                         if printer technology is changed (new configuration isn't shown then).
+ */
+template <typename GetPresetsFn>
+static bool resolve_printer_switch(
+    PresetInteractor& preset_interactor,
+    const Domain::Preset::HwPrinterConfig& hw_config,
+    GetPresetsFn&& get_presets_new
+)
+{
+    const bool multi_extruder = has_multiple_extruders(hw_config);
+
+    // if printer technology is changed, there is no need to get new selected configuration
+    // and show it in dialog
+    if (preset_interactor.selected_printer_preset().technology() != hw_config.technology) {
+        return resolve_unsaved_changes(
+            preset_interactor,
+            original_config(preset_interactor),
+            nullptr,
+            multi_extruder
+        );
+    }
+
+    const SelectedPresetPtrs presets_new = get_presets_new();
+    return resolve_unsaved_changes(
+        preset_interactor,
+        original_config(preset_interactor),
+        &presets_new,
+        multi_extruder
+    );
+}
+
+/** @brief Same as can_select_printer_preset(), but without the check of the dirty state. */
+static bool resolve_printer_preset_switch(
+    PresetInteractor& preset_interactor,
+    const std::string& printer_hw_config_id,
+    const std::string& printer_preset_id
+)
+{
+    return resolve_printer_switch(
+        preset_interactor,
+        preset_interactor.get_printer_config(printer_hw_config_id).first.get(),
+        [&]
+        {
+            return get_presets_by_ids(
+                preset_interactor,
+                preset_interactor.get_preset_ids_after_selection(
+                    printer_hw_config_id,
+                    printer_preset_id
+                )
+            );
+        }
+    );
+}
+
 bool can_select_printer_preset(
     PresetInteractor& preset_interactor,
     const std::string& printer_hw_config_id,
@@ -424,32 +497,82 @@ bool can_select_printer_preset(
     if (!is_dirty_selected_preset(preset_interactor))
         return true;
 
-    const auto& hw_printer_config =
-        preset_interactor.get_printer_config(printer_hw_config_id).first.get();
-    const bool multi_extruder =
-        Domain::Preset::get_feature<bool>(hw_printer_config.features, "multi_extruder")
-            .value_or(false);
+    return resolve_printer_preset_switch(
+        preset_interactor,
+        printer_hw_config_id,
+        printer_preset_id
+    );
+}
 
-    // if printer technology is changed, there is no need to get new selected configuration
-    // and show it in dialog
-    if (preset_interactor.selected_printer_preset().technology() != hw_printer_config.technology) {
-        return resolve_unsaved_changes(
-            preset_interactor,
-            original_config(preset_interactor),
-            nullptr,
-            multi_extruder
-        );
+/** @brief Same as can_select_printer_config(), but without the check of the dirty state. */
+static bool
+resolve_printer_config_switch(PresetInteractor& preset_interactor, const std::string& hw_config_id)
+{
+    // Presets are refilled even when the same hw config is selected,
+    // so the unsaved changes have to be resolved too.
+    return resolve_printer_preset_switch(
+        preset_interactor,
+        hw_config_id,
+        preset_interactor.printer_preset_id_for_hw_config(hw_config_id)
+    );
+}
+
+bool can_select_printer_config(PresetInteractor& preset_interactor, const std::string& hw_config_id)
+{
+    if (!is_dirty_selected_preset(preset_interactor))
+        return true;
+
+    return resolve_printer_config_switch(preset_interactor, hw_config_id);
+}
+
+bool can_select_external_printer_config(
+    PresetInteractor& preset_interactor,
+    const Domain::Preset::HwPrinterConfig& printer
+)
+{
+    if (!is_dirty_selected_preset(preset_interactor))
+        return true;
+
+    if (const std::optional<std::string> hw_config_id =
+            preset_interactor.find_external_printer_config(printer))
+    {
+        return resolve_printer_config_switch(preset_interactor, *hw_config_id);
     }
 
-    const SelectedPresetPtrs presets_new = get_presets_by_ids(
+    // A new hw config is created on selection. Its presets are evaluated into a separate bundle
+    // to get the new presets for the dialog.
+    const tl::expected<Domain::Preset::HwPrinterConfig, std::string> hw_config =
+        preset_interactor.evaluate_external_printer_config(printer);
+    if (!hw_config.has_value())
+        return true; // The selection fails, so presets aren't switched.
+
+    const std::optional<Domain::Preset::Bundle> new_bundle =
+        preset_interactor.evaluate_new_hw_config_bundle(*hw_config);
+    if (!new_bundle.has_value())
+        return true; // The selection fails, so presets aren't switched.
+
+    // a new hw config has no runtime presets
+    const RuntimePresets no_runtime_presets;
+    return resolve_printer_switch(
         preset_interactor,
-        preset_interactor.get_preset_ids_after_selection(printer_hw_config_id, printer_preset_id)
-    );
-    return resolve_unsaved_changes(
-        preset_interactor,
-        original_config(preset_interactor),
-        &presets_new,
-        multi_extruder
+        *hw_config,
+        [&]
+        {
+            const std::string printer_preset_id = preset_interactor.printer_preset_id_for_hw_config(
+                PrinterPresetProjectView{*new_bundle, no_runtime_presets, hw_config->id}
+            );
+            // returned presets point into new_bundle, which outlives the dialog
+            return get_presets_by_ids(
+                *new_bundle,
+                no_runtime_presets,
+                preset_interactor.get_preset_ids_after_selection(
+                    *new_bundle,
+                    no_runtime_presets,
+                    *hw_config,
+                    printer_preset_id
+                )
+            );
+        }
     );
 }
 

@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
+#include "Slic3r/Biz/Preset/PresetSelectionCheck.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
@@ -212,7 +213,33 @@ void PhysicalPrinterInteractor::clear_selection()
     );
 }
 
+bool PhysicalPrinterInteractor::can_apply_hw_config(const PhysicalPrinterConfig& printer)
+{
+    // the same branches as in apply_selection()
+    if (!printer.hw_config.has_value()) {
+        return true;
+    }
+    if (printer.is_runtime) {
+        return Preset::PresetSelectionCheck::can_select_printer_config(
+            m_preset_interactor,
+            printer.hw_config->id
+        );
+    }
+    return Preset::PresetSelectionCheck::can_select_external_printer_config(
+        m_preset_interactor,
+        printer.hw_config.value()
+    );
+}
+
 bool PhysicalPrinterInteractor::select_uuid(const std::string& uuid)
+{
+    if (!can_apply_hw_config(printer_config_at(index_of(uuid)))) {
+        return false;
+    }
+    return select_uuid_internal(uuid);
+}
+
+bool PhysicalPrinterInteractor::select_uuid_internal(const std::string& uuid)
 {
     if (!apply_selection(uuid, true)) {
         return false;
@@ -283,11 +310,17 @@ bool PhysicalPrinterInteractor::is_connect_printer_selected() const
     return printer != nullptr && is_connect_printer(*printer);
 }
 
-void PhysicalPrinterInteractor::create_or_save_physical_printer(
+bool PhysicalPrinterInteractor::create_or_save_physical_printer(
     const PhysicalPrinterConfig& printer
 )
 {
-    select_uuid(save_physical_printer(printer));
+    // checked before the printer is stored, so the stored printer and the selected
+    // printer config are kept in sync on cancel
+    if (!can_apply_hw_config(printer)) {
+        return false;
+    }
+    select_uuid_internal(save_physical_printer(printer));
+    return true;
 }
 
 std::string PhysicalPrinterInteractor::save_physical_printer(const PhysicalPrinterConfig& printer)
