@@ -3,6 +3,7 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "PhysicalPrinterDialog.hpp"
+#include "CameraSettings.hpp"
 #include "PresetComboBoxes.hpp"
 
 #include <cstddef>
@@ -307,6 +308,10 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
     m_optgroup = new ConfigOptionsGroup(this, _L("Print Host upload"), m_config);
     build_printhost_settings(m_optgroup);
 
+    auto* camera_group = new wxStaticBoxSizer(wxVERTICAL, this, _L("Camera"));
+    m_camera_settings = new CameraSettings(camera_group->GetStaticBox(), *m_config);
+    camera_group->Add(m_camera_settings, 1, wxEXPAND | wxALL, BORDER_W);
+
     wxStdDialogButtonSizer* btns = this->CreateStdDialogButtonSizer(wxOK | wxCANCEL);
     wxButton* btnOK = static_cast<wxButton*>(this->FindWindowById(wxID_OK, this));
     wxGetApp().UpdateDarkUI(btnOK);
@@ -328,6 +333,7 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
     topSizer->Add(nameSizer           , 0, wxEXPAND | wxLEFT | wxRIGHT, BORDER_W);
     topSizer->Add(m_presets_sizer     , 0, wxEXPAND | wxLEFT | wxRIGHT, BORDER_W);
     topSizer->Add(m_optgroup->sizer   , 1, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, BORDER_W);
+    topSizer->Add(camera_group, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, BORDER_W);
     topSizer->Add(btns                , 0, wxEXPAND | wxALL, BORDER_W); 
 
     SetSizer(topSizer);
@@ -879,6 +885,7 @@ void PhysicalPrinterDialog::on_dpi_changed(const wxRect& suggested_rect)
 
 void PhysicalPrinterDialog::on_sys_color_changed()
 {
+    if (m_camera_settings) m_camera_settings->sys_color_changed();
     m_add_preset_btn->sys_color_changed();
     m_printhost_browse_btn->sys_color_changed();
     m_printhost_test_btn->sys_color_changed();
@@ -896,6 +903,9 @@ void PhysicalPrinterDialog::OnOK(wxEvent& event)
         warning_catcher(this, _L("You have to enter a printer name."));
         return;
     }
+
+    if (!m_camera_settings->apply(*m_config))
+        return;
 
     Field* printhost_field = m_optgroup->get_field("print_host");
     text_ctrl* printhost_win = printhost_field ? dynamic_cast<text_ctrl*>(printhost_field->getWindow()) : nullptr;

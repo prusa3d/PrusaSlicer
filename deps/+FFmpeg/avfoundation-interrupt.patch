@@ -1,0 +1,12 @@
+--- a/libavdevice/avfoundation.m
++++ b/libavdevice/avfoundation.m
+@@ -641,6 +641,9 @@
+ 
+     // Take stream info from the first frame.
+     while (ctx->frames_captured < 1) {
++        if (s->interrupt_callback.callback &&
++            s->interrupt_callback.callback(s->interrupt_callback.opaque))
++            return 1;
+         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, YES);
+     }
+ 

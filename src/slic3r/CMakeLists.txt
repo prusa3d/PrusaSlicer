@@ -31,6 +31,12 @@ set(SLIC3R_GUI_SOURCES
     GUI/WebViewDialog.hpp
     GUI/WebViewPanel.cpp
     GUI/WebViewPanel.hpp
+    GUI/CameraPanel.cpp
+    GUI/CameraPanel.hpp
+    GUI/CameraSettings.cpp
+    GUI/CameraSettings.hpp
+    Utils/VideoStreamDecoder.cpp
+    Utils/VideoStreamDecoder.hpp
     GUI/ConnectRequestHandler.cpp
     GUI/ConnectRequestHandler.hpp
     GUI/WebView.cpp
@@ -413,8 +419,13 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(OpenSSL REQUIRED)
 endif()
 
+if (NOT APPLE)
+    list(APPEND SLIC3R_GUI_SOURCES Utils/CameraDevices.cpp)
+endif()
+
 if (APPLE)
     list(APPEND SLIC3R_GUI_SOURCES
+            Utils/CameraDevicesMac.mm
             Utils/RetinaHelperImpl.mm
             Utils/MacDarkMode.mm
             Utils/MacUtils.mm
@@ -450,6 +461,8 @@ endforeach()
 
 encoding_check(libslic3r_gui)
 
+find_package(FFmpeg REQUIRED)
+
 target_link_libraries(
     libslic3r_gui
     PUBLIC
@@ -464,6 +477,7 @@ target_link_libraries(
     hidapi
     libcurl
     ${wxWidgets_LIBRARIES}
+    FFmpeg::FFmpeg
     NanoSVG::nanosvg
     NanoSVG::nanosvgrast
     stb_dxt

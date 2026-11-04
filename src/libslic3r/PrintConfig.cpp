@@ -2498,6 +2498,22 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm");
     def->set_default_value(new ConfigOptionFloats { 0.4 });
 
+    // Camera source belongs to a physical printer, not a slicing preset.
+    def = this->add("camera_type", coString);
+    def->label = L("Camera type");
+    def->cli = ConfigOptionDef::nocli;
+    def->set_default_value(new ConfigOptionString("none"));
+
+    def = this->add("camera_url", coString);
+    def->label = L("Camera address");
+    def->cli = ConfigOptionDef::nocli;
+    def->set_default_value(new ConfigOptionString(""));
+
+    def = this->add("camera_device", coString);
+    def->label = L("Local camera");
+    def->cli = ConfigOptionDef::nocli;
+    def->set_default_value(new ConfigOptionString(""));
+
     def = this->add("host_type", coEnum);
     def->label = L("Host Type");
     def->tooltip = L("Slic3r can upload G-code files to a printer host. This field must contain "

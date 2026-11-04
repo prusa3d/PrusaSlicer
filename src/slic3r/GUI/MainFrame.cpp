@@ -65,6 +65,7 @@
 #include "NotificationManager.hpp"
 #include "Preferences.hpp"
 #include "WebViewPanel.hpp"
+#include "CameraPanel.hpp"
 #include "UserAccount.hpp"
 
 #ifdef _WIN32
@@ -493,6 +494,8 @@ void MainFrame::update_layout()
 // Called when closing the application and when switching the application language.
 void MainFrame::shutdown()
 {
+    if (m_camera_panel)
+        m_camera_panel->stop_camera();
 #ifdef _WIN32
 	if (m_hDeviceNotify) {
 		::UnregisterDeviceNotification(HDEVNOTIFY(m_hDeviceNotify));
@@ -815,6 +818,9 @@ void MainFrame::create_preset_tabs()
     m_connect_webview->Hide();
     m_printer_webview->Hide();
 
+    m_camera_panel = new CameraPanel(m_tabpanel);
+    m_tabpanel->AddNewPage(m_camera_panel, _L("Camera"), "");
+
 }
 
 void MainFrame::on_account_login(const std::string& token)
@@ -932,6 +938,7 @@ void MainFrame::remove_printables_webview_tab()
 
 void MainFrame::show_printer_webview_tab(DynamicPrintConfig* dpc)
 {
+    if (m_camera_panel) m_camera_panel->refresh_printer();
     
     remove_printer_webview_tab();
     // if physical printer is selected
@@ -958,8 +965,9 @@ void MainFrame::add_printer_webview_tab(const wxString& url)
         return;
     }
     m_printer_webview_added = true;
-    // add as the last (rightmost) panel
-    m_tabpanel->AddNewPage(m_printer_webview, _L("Physical Printer"), "");
+    // Keep Camera immediately to the right of Physical Printer.
+    m_tabpanel->InsertNewPage(m_tabpanel->FindPage(m_camera_panel),
+        m_printer_webview, _L("Physical Printer"), "", false);
     m_printer_webview->set_default_url(url);
     m_printer_webview->set_create_browser();
 }
@@ -1306,6 +1314,8 @@ void MainFrame::on_sys_color_changed()
         m_connect_webview->sys_color_changed();
     if (m_printer_webview)
         m_printer_webview->sys_color_changed();
+    if (m_camera_panel)
+        m_camera_panel->sys_color_changed();
 
     MenuFactory::sys_color_changed(m_menubar);
 

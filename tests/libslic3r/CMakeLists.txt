@@ -63,3 +63,7 @@ endif()
 
 # catch_discover_tests(${_TEST_NAME}_tests TEST_PREFIX "${_TEST_NAME}: ")
 add_test(${_TEST_NAME}_tests ${_TEST_NAME}_tests ${CATCH_EXTRA_ARGS})
+
+# A small target for iterating on physical-printer camera persistence.
+add_executable(camera_config_tests EXCLUDE_FROM_ALL test_camera_config.cpp)
+target_link_libraries(camera_config_tests test_common libslic3r)

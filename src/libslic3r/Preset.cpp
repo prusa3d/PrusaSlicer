@@ -1757,6 +1757,9 @@ std::string PhysicalPrinter::separator()
 }
 
 static std::vector<std::string> s_PhysicalPrinter_opts {
+    "camera_type",
+    "camera_url",
+    "camera_device",
     "preset_name", // temporary option to compatibility with older Slicer
     "preset_names",
     "printer_technology",
