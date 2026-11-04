@@ -732,6 +732,8 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         m_extra_loading_move = float(config.extra_loading_move);
     }
 
+    m_used_filament_compensation = config.used_filament_compensation.value;
+
     for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
         float max_acceleration = get_option_value(m_time_processor.machine_limits.machine_max_acceleration_extruding, i);
         m_time_processor.machines[i].max_acceleration = max_acceleration;
@@ -918,6 +920,10 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
         }
     }
 
+    if (const ConfigOptionFloat* used_filament_compensation = config.option<ConfigOptionFloat>("used_filament_compensation");
+        used_filament_compensation != nullptr)
+        m_used_filament_compensation = used_filament_compensation->value;
+
     bool use_machine_limits = false;
     const ConfigOptionEnum<MachineLimitsUsage>* machine_limits_usage = config.option<ConfigOptionEnum<MachineLimitsUsage>>("machine_limits_usage");
     if (machine_limits_usage != nullptr)
@@ -1101,6 +1107,7 @@ void GCodeProcessor::reset()
 
     m_parking_position = 0.f;
     m_extra_loading_move = 0.f;
+    m_used_filament_compensation = 1.;
     m_extruded_last_z = 0.0f;
     m_first_layer_height = 0.0f;
     m_g1_line_id = 0;
@@ -4968,6 +4975,20 @@ void GCodeProcessor::update_estimated_statistics()
     m_result.print_statistics.used_filaments_per_role   = m_used_filaments.filaments_per_role;
     m_result.print_statistics.wipe_tower_per_extruder   = m_used_filaments.wipe_tower_per_extruder;
     m_result.print_statistics.flush_per_extruder        = m_used_filaments.flush_per_extruder;
+
+    // Compensate for printers extruding more or less than commanded.
+    if (m_used_filament_compensation != 1.) {
+        PrintEstimatedStatistics& ps = m_result.print_statistics;
+        for (double& v : ps.volumes_per_color_change)
+            v *= m_used_filament_compensation;
+        for (auto* volumes : { &ps.volumes_per_extruder, &ps.wipe_tower_per_extruder, &ps.flush_per_extruder })
+            for (auto& [id, v] : *volumes)
+                v *= m_used_filament_compensation;
+        for (auto& [role, filament] : ps.used_filaments_per_role) {
+            filament.first  *= m_used_filament_compensation;
+            filament.second *= m_used_filament_compensation;
+        }
+    }
 
     // THE FOLLOWING LOGGING IS USED BY EasyPrint !!!
     log_feature_statistics(m_result);

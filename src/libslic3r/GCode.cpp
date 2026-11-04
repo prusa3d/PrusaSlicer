@@ -237,7 +237,7 @@ void GCodeGenerator::PlaceholderParserIntegration::init(const GCodeWriter &write
     this->parser.set("zhop", this->opt_zhop);
 }
 
-void GCodeGenerator::PlaceholderParserIntegration::update_from_gcodewriter(const GCodeWriter &writer, const WipeTowerData& wipe_tower_data)
+void GCodeGenerator::PlaceholderParserIntegration::update_from_gcodewriter(const GCodeWriter &writer, const WipeTowerData& wipe_tower_data, double used_filament_compensation)
 {
     memcpy(this->position.data(), writer.get_position().data(), sizeof(double) * 3);
     this->opt_position->values = this->position;
@@ -266,7 +266,7 @@ void GCodeGenerator::PlaceholderParserIntegration::update_from_gcodewriter(const
                 wt_vol = it->second[e.id()] * e.filament_crossection();
             }            
 
-            double v = e.extruded_volume() + wt_vol;
+            double v = (e.extruded_volume() + wt_vol) * used_filament_compensation;
             double w = v * e.filament_density() * 0.001;
             this->opt_extruded_volume->values[e.id()] = v;
             this->opt_extruded_weight->values[e.id()] = w;
@@ -837,9 +837,11 @@ namespace DoExport {
                 }
                 print_statistics.total_used_filament += used_filament;
                 print_statistics.total_extruded_volume += extruded_volume;
-                print_statistics.total_wipe_tower_filament += has_wipe_tower ? used_filament - extruder.used_filament() : 0.;
-                print_statistics.total_wipe_tower_filament_weight += has_wipe_tower ? (extruded_volume - extruder.extruded_volume()) * extruder.filament_density() * 0.001 : 0.;
-                print_statistics.total_wipe_tower_cost += has_wipe_tower ? (extruded_volume - extruder.extruded_volume())* extruder.filament_density() * 0.001 * extruder.filament_cost() * 0.001 : 0.;
+                // Wipe tower statistics are not recalculated by GCodeProcessor, apply the compensation here.
+                const double compensation = config.used_filament_compensation.value;
+                print_statistics.total_wipe_tower_filament += has_wipe_tower ? (used_filament - extruder.used_filament()) * compensation : 0.;
+                print_statistics.total_wipe_tower_filament_weight += has_wipe_tower ? (extruded_volume - extruder.extruded_volume()) * extruder.filament_density() * 0.001 * compensation : 0.;
+                print_statistics.total_wipe_tower_cost += has_wipe_tower ? (extruded_volume - extruder.extruded_volume())* extruder.filament_density() * 0.001 * extruder.filament_cost() * 0.001 * compensation : 0.;
             }
 
             if (!export_binary_data) {
@@ -1770,7 +1772,7 @@ std::string GCodeGenerator::placeholder_parser_process(
 
     PlaceholderParserIntegration &ppi = m_placeholder_parser_integration;
     try {
-        ppi.update_from_gcodewriter(m_writer, m_print->wipe_tower_data());
+        ppi.update_from_gcodewriter(m_writer, m_print->wipe_tower_data(), m_print->config().used_filament_compensation.value);
         std::string output = ppi.parser.process(templ, current_extruder_id, config_override, &ppi.output_config, &ppi.context);
         ppi.validate_output_vector_variables();
 

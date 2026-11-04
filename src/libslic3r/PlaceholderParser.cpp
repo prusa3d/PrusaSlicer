@@ -652,15 +652,16 @@ namespace client
             if (has_decimals && param3.type() != TYPE_INT)
                 param3.throw_exception("digits: third parameter must be integer");
 
-            char buf[256];
+            // Worst case: sign + 309 integer digits of DBL_MAX + '.' + 64 decimals + '\0' = 376 chars.
+            char buf[512];
             int  ndigits = std::clamp(param2.as_i(), 0, 64);
             if (has_decimals) {
                 // Format as double.
                 int decimals = std::clamp(param3.as_i(), 0, 64);
-                sprintf(buf, leading_zeros ? "%0*.*lf" : "%*.*lf", ndigits, decimals, param1.as_d());
+                snprintf(buf, sizeof(buf), leading_zeros ? "%0*.*lf" : "%*.*lf", ndigits, decimals, param1.as_d());
             } else
                 // Format as int.
-                sprintf(buf, leading_zeros ? "%0*d" : "%*d", ndigits, param1.as_i_rounded());
+                snprintf(buf, sizeof(buf), leading_zeros ? "%0*d" : "%*d", ndigits, param1.as_i_rounded());
             param1.set_s(buf);
         }
 

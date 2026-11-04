@@ -1042,6 +1042,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionEnum<ToolChangeOrderingType>, toolchange_ordering))
     ((ConfigOptionFloat,              travel_acceleration))
     ((ConfigOptionFloat,              travel_short_distance_acceleration))
+    ((ConfigOptionFloat,              used_filament_compensation))
     ((ConfigOptionBools,              wipe))
     ((ConfigOptionBool,               wipe_tower))
     ((ConfigOptionFloat,              wipe_tower_acceleration))

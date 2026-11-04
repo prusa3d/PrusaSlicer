@@ -93,6 +93,8 @@ public:
 	Http& size_limit(size_t sizeLimit);
 	// range  of donloaded bytes. example: curl_easy_setopt(curl, CURLOPT_RANGE, "0-199");
 	Http& set_range(const std::string& range);
+	// Follow at most max_redirects redirects and only to https:// URLs.
+	Http& restrict_redirects(long max_redirects);
 	// Sets a HTTP header field.
 	Http& header(std::string name, const std::string &value);
 	// Removes a header field.
