@@ -898,12 +898,16 @@ void ViewerImpl::reset()
 // On some graphic cards texture buffers using GL_RGB32F format do not work, see:
 // https://dev.prusa3d.com/browse/SPE-2411
 // https://github.com/prusa3d/PrusaSlicer/issues/12908
-// To let all drivers be happy, we use GL_RGBA32F format, so we need to add an extra (currently unused) float
-// to position and heights_widths_angles vectors
-using Vec4 = std::array<float, 4>;
+// Desktop texture buffers use GL_RGBA32F with an unused fourth component.
+// The OpenGL ES path keeps its existing GL_RGB32F 2D textures and three components.
+#ifdef ENABLE_OPENGL_ES
+using TextureVertex = Vec3;
+#else
+using TextureVertex = std::array<float, 4>;
+#endif
 
 static void extract_pos_and_or_hwa(const std::vector<PathVertex>& vertices, float travels_radius, float wipes_radius, BitSet<>& valid_lines_bitset,
-    std::vector<Vec4>* positions = nullptr, std::vector<Vec4>* heights_widths_angles = nullptr, bool update_bitset = false) {
+    std::vector<TextureVertex>* positions = nullptr, std::vector<TextureVertex>* heights_widths_angles = nullptr, bool update_bitset = false) {
   static constexpr const Vec3 ZERO = { 0.0f, 0.0f, 0.0f };
     if (positions == nullptr && heights_widths_angles == nullptr)
         return;
@@ -937,8 +941,8 @@ static void extract_pos_and_or_hwa(const std::vector<PathVertex>& vertices, floa
         }
         
         if (positions != nullptr) {
-            // the last component is a dummy float to comply with GL_RGBA32F format
-            Vec4 position = { v.position[0], v.position[1], v.position[2], 0.0f };
+            // Aggregate initialization zeroes the desktop-only fourth component.
+            TextureVertex position = { v.position[0], v.position[1], v.position[2] };
             if (move_type == EMoveType::Extrude)
                 // push down extrusion vertices by half height to render them at the right z
                 position[2] -= 0.5f * v.height;
@@ -960,9 +964,9 @@ static void extract_pos_and_or_hwa(const std::vector<PathVertex>& vertices, floa
                 height = v.height;
                 width = v.width;
             }
-            // the last component is a dummy float to comply with GL_RGBA32F format
+            // Aggregate initialization zeroes the desktop-only fourth component.
             heights_widths_angles->push_back({ height, width,
-                std::atan2(prev_line[0] * this_line[1] - prev_line[1] * this_line[0], dot(prev_line, this_line)), 0.0f });
+                std::atan2(prev_line[0] * this_line[1] - prev_line[1] * this_line[0], dot(prev_line, this_line)) });
         }
     }
 }
@@ -1041,9 +1045,9 @@ void ViewerImpl::load(GCodeInputData&& gcode_data)
         m_settings.time_mode = ETimeMode::Normal;
 
     // buffers to send to gpu
-    // the last component is a dummy float to comply with GL_RGBA32F format
-    std::vector<Vec4> positions;
-    std::vector<Vec4> heights_widths_angles;
+    // Aggregate initialization zeroes the desktop-only fourth component.
+    std::vector<TextureVertex> positions;
+    std::vector<TextureVertex> heights_widths_angles;
     positions.reserve(m_vertices.size());
     heights_widths_angles.reserve(m_vertices.size());
     extract_pos_and_or_hwa(m_vertices, m_travels_radius, m_wipes_radius, m_valid_lines_bitset, &positions, &heights_widths_angles, true);
@@ -1056,8 +1060,8 @@ void ViewerImpl::load(GCodeInputData&& gcode_data)
         // create and fill height, width and angle textures
         m_texture_data.set_heights_widths_angles(heights_widths_angles);
 #else
-        m_positions_tex_size = positions.size() * sizeof(Vec3);
-        m_height_width_angle_tex_size = heights_widths_angles.size() * sizeof(Vec3);
+        m_positions_tex_size = positions.size() * sizeof(TextureVertex);
+        m_height_width_angle_tex_size = heights_widths_angles.size() * sizeof(TextureVertex);
 
         int old_bound_texture = 0;
         glsafe(glGetIntegerv(GL_TEXTURE_BINDING_BUFFER, &old_bound_texture));
@@ -1065,14 +1069,14 @@ void ViewerImpl::load(GCodeInputData&& gcode_data)
         // create and fill positions buffer
         glsafe(glGenBuffers(1, &m_positions_buf_id));
         glsafe(glBindBuffer(GL_TEXTURE_BUFFER, m_positions_buf_id));
-        glsafe(glBufferData(GL_TEXTURE_BUFFER, positions.size() * sizeof(Vec4), positions.data(), GL_STATIC_DRAW));
+        glsafe(glBufferData(GL_TEXTURE_BUFFER, positions.size() * sizeof(TextureVertex), positions.data(), GL_STATIC_DRAW));
         glsafe(glGenTextures(1, &m_positions_tex_id));
         glsafe(glBindTexture(GL_TEXTURE_BUFFER, m_positions_tex_id));
 
         // create and fill height, width and angles buffer
         glsafe(glGenBuffers(1, &m_heights_widths_angles_buf_id));
         glsafe(glBindBuffer(GL_TEXTURE_BUFFER, m_heights_widths_angles_buf_id));
-        glsafe(glBufferData(GL_TEXTURE_BUFFER, heights_widths_angles.size() * sizeof(Vec4), heights_widths_angles.data(), GL_DYNAMIC_DRAW));
+        glsafe(glBufferData(GL_TEXTURE_BUFFER, heights_widths_angles.size() * sizeof(TextureVertex), heights_widths_angles.data(), GL_DYNAMIC_DRAW));
         glsafe(glGenTextures(1, &m_heights_widths_angles_tex_id));
         glsafe(glBindTexture(GL_TEXTURE_BUFFER, m_heights_widths_angles_tex_id));
 
@@ -1807,7 +1811,7 @@ void ViewerImpl::update_color_ranges()
 void ViewerImpl::update_heights_widths()
 {
 #ifdef ENABLE_OPENGL_ES
-    std::vector<Vec3> heights_widths_angles;
+    std::vector<TextureVertex> heights_widths_angles;
     heights_widths_angles.reserve(m_vertices.size());
     extract_pos_and_or_hwa(m_vertices, m_travels_radius, m_wipes_radius, m_valid_lines_bitset, nullptr, &heights_widths_angles);
     m_texture_data.set_heights_widths_angles(heights_widths_angles);
@@ -1817,7 +1821,7 @@ void ViewerImpl::update_heights_widths()
 
     glsafe(glBindBuffer(GL_TEXTURE_BUFFER, m_heights_widths_angles_buf_id));
 
-    Vec3* buffer = static_cast<Vec3*>(glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY));
+    TextureVertex* buffer = static_cast<TextureVertex*>(glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY));
     glcheck();
 
     for (size_t i = 0; i < m_vertices.size(); ++i) {
