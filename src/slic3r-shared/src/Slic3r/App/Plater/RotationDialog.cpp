@@ -200,13 +200,12 @@ Domain::SquareMatrix4d remove_rotation(
     const Domain::Vec3d& center
 )
 {
-    Domain::SquareMatrix3d linear_part{volume_trafo.rotation().transpose()};
+    const Domain::SquareMatrix3d inverse_rotation{volume_trafo.rotation().transpose()};
+    const Domain::Vec3d local_center{instance_trafo.inverse() * center};
 
     Domain::SquareMatrix4d local{Domain::SquareMatrix4d::Identity()};
-    local.block<3, 3>(0, 0) = linear_part;
-    local.block<3, 1>(0, 3) = center - linear_part * center;
-
-    local = (instance_trafo.inverse() * local * instance_trafo).matrix();
+    local.block<3, 3>(0, 0) = inverse_rotation;
+    local.block<3, 1>(0, 3) = local_center - inverse_rotation * local_center;
 
     return (local * volume_trafo).matrix();
 }
