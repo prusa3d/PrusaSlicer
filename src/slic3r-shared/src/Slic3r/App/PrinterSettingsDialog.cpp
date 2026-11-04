@@ -80,7 +80,7 @@ void PrinterSettingsDialog::on_config_container_selection_changed(
     this->update_warning();
 }
 
-void PrinterSettingsDialog::on_preset_bundles_loaded()
+void PrinterSettingsDialog::on_preset_bundles_reloaded()
 {
     update_warning();
 }

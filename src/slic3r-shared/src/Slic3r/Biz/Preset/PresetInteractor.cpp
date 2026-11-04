@@ -194,7 +194,7 @@ void PresetInteractor::update_vendor_presets(std::mutex& mut, Domain::Preset::Bu
         [&preset_bundle, &vendor_id, this](Domain::Preset::HwPrinterConfig& hw_config)
     {
         if (hw_config.vendor_id == vendor_id) {
-            auto result = update_hw_config_features(preset_bundle, hw_config);
+            auto result = migrate_hw_config(preset_bundle, hw_config);
             if (!result.has_value()) {
                 SPDLOG_WARN(
                     "Error updating hw_config (name: {}, id: {}) features upgrade failed with error: {}",
@@ -376,8 +376,8 @@ void PresetInteractor::load_preset_bundle(const IO::BundlePaths& bundle_paths)
     // IO::save_bundle_configs(preset_bundle, config_path);
 
     m_workbench.set_preset_bundle(std::move(*preset_bundle_opt));
-    ListenerInvokeLaterBag bag;
     if (m_selected_project_id != Domain::INVALID_ID) {
+        ListenerInvokeLaterBag bag;
         fill_printer_configs(false, bag);
         auto& selected_preset = mutable_selected_printer_preset();
         fill_printer_presets(false, bag);
@@ -392,10 +392,17 @@ void PresetInteractor::load_preset_bundle(const IO::BundlePaths& bundle_paths)
             invoke_listeners<IPresetChangedListener>(
                 [](IPresetChangedListener* listener)
                 {
-                    listener->on_preset_bundles_loaded();
+                    listener->on_preset_bundles_reloaded();
                 }
             );
         });
+    } else {
+        invoke_listeners<IPresetChangedListener>(
+            [](IPresetChangedListener* listener)
+            {
+                listener->on_preset_bundles_initialized();
+            }
+        );
     }
 }
 
@@ -1160,6 +1167,12 @@ bool PresetInteractor::update_changed_printer_configs(
     }
 
     return true;
+}
+
+tl::expected<bool, std::string>
+PresetInteractor::migrate_hw_config(Domain::Preset::HwPrinterConfig& hw_config)
+{
+    return migrate_hw_config(m_workbench.preset_bundle(), hw_config);
 }
 
 std::vector<Domain::Preset::EvaluatedPrinterPreset>
@@ -3599,18 +3612,21 @@ const T* find_by_id(const std::vector<T>& data, const std::string& id)
     return it != data.end() ? &*it : nullptr;
 }
 
-void update_features(const Domain::Preset::FeatureDefs& defs, Domain::Preset::FeatureValueMap& features)
+bool update_features(const Domain::Preset::FeatureDefs& defs, Domain::Preset::FeatureValueMap& features)
 {
+    bool modified = false;
     for (const auto& [name, def] : defs) {
         if (features.find(name) == features.end()) {
             features[name] = def.default_value;
+            modified = true;
         }
     }
+    return modified;
 }
 
 } // namespace
 
-tl::expected<void, std::string> PresetInteractor::update_hw_config_features(
+tl::expected<bool, std::string> PresetInteractor::migrate_hw_config(
     const Domain::Preset::Bundle& preset_bundle,
     HwPrinterConfig& hw_config
 )
@@ -3623,6 +3639,12 @@ tl::expected<void, std::string> PresetInteractor::update_hw_config_features(
         );
     }
     const auto& vendor_bundle = vendor_it->second;
+
+    bool modified = false;
+    auto m = [&modified](bool m) { modified = m || modified; };
+
+    m(update_deprecated_ids(vendor_bundle.vendor_data.info.deprecated_ids, hw_config));
+
     auto vendor_def_it        = vendor_bundle.vendor_data.defs.find(hw_config.technology);
     if (vendor_def_it == vendor_bundle.vendor_data.defs.end()) {
         return tl::unexpected(
@@ -3650,8 +3672,8 @@ tl::expected<void, std::string> PresetInteractor::update_hw_config_features(
         );
     }
     const auto& printer_def = printer_it->second;
-    update_features(printer_def.features, hw_config.features);
-    update_features(vendor_bundle.vendor_data.info.features.printer, hw_config.features);
+    m(update_features(printer_def.features, hw_config.features));
+    m(update_features(vendor_bundle.vendor_data.info.features.printer, hw_config.features));
 
     for (auto& tool_cfg : hw_config.tools) {
         const auto tool_it = vendor_defs.tools.find(tool_cfg.id);
@@ -3667,8 +3689,8 @@ tl::expected<void, std::string> PresetInteractor::update_hw_config_features(
             );
         }
         const auto& tool_def = tool_it->second;
-        update_features(tool_def.features, tool_cfg.features);
-        update_features(vendor_bundle.vendor_data.info.features.tool, tool_cfg.features);
+        m(update_features(tool_def.features, tool_cfg.features));
+        m(update_features(vendor_bundle.vendor_data.info.features.tool, tool_cfg.features));
     }
 
     for (auto& feeder_cfg : hw_config.feeders | std::views::values) {
@@ -3685,10 +3707,10 @@ tl::expected<void, std::string> PresetInteractor::update_hw_config_features(
             );
         }
         const auto& feeder_def = feeder_it->second;
-        update_features(feeder_def.features, feeder_cfg.features);
-        update_features(vendor_bundle.vendor_data.info.features.feeder, feeder_cfg.features);
+        m(update_features(feeder_def.features, feeder_cfg.features));
+        m(update_features(vendor_bundle.vendor_data.info.features.feeder, feeder_cfg.features));
     }
-    return {};
+    return modified;
 }
 
 tl::expected<void, std::string>  PresetInteractor::load_selected_preset_from_3mf(
@@ -3717,9 +3739,9 @@ tl::expected<void, std::string>  PresetInteractor::load_selected_preset_from_3mf
     // 0. Update features according to up-to-date definitions
     auto& hw_config = selected_preset.hw_config;
     auto update_result =
-        update_hw_config_features(preset_bundle, hw_config);
+        migrate_hw_config(preset_bundle, hw_config);
     if (!update_result.has_value())
-        return update_result;
+        return tl::unexpected{update_result.error()};
 
     // 1. Reconcile HwPrinterConfig
     // deduplicate existing hw configuration (same_values())

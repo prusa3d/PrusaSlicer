@@ -90,7 +90,7 @@ public:
         Domain::SelectionId project_id,
         Domain::SelectionId config_container_id
     ) override;
-    void on_preset_bundles_loaded() override;
+    void on_preset_bundles_reloaded() override;
 
     void on_connect_favorite_materials_changed() override;
 

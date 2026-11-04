@@ -167,4 +167,10 @@ Domain::Preset::HwPrinterConfig new_scratch_config(
     const std::string& name,
     size_t tool_count
 );
-}
+
+bool update_deprecated_ids(
+    const Domain::Preset::DeprecatedIdMapping& deprecated_ids,
+    Domain::Preset::HwPrinterConfig& config
+);
+
+} // namespace Slic3r::Biz::Preset

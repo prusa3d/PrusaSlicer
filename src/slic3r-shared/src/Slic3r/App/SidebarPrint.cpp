@@ -338,7 +338,7 @@ void SidebarPrint::on_preset_value_changed(
     }
 }
 
-void SidebarPrint::on_preset_bundles_loaded()
+void SidebarPrint::on_preset_bundles_reloaded()
 {
     refresh_print_combobox_label_color();
     refresh_tools_comboboxes_label_colors();

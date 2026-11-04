@@ -329,7 +329,7 @@ void MaterialSettingsButton::on_preset_value_changed(
     refresh_label_color();
 }
 
-void MaterialSettingsButton::on_preset_bundles_loaded()
+void MaterialSettingsButton::on_preset_bundles_reloaded()
 {
     refresh_label_color();
 }

@@ -63,7 +63,7 @@ public:
         Domain::SelectionId config_container_id,
         const Domain::ConfigItem& item
     ) override;
-    void on_preset_bundles_loaded() override;
+    void on_preset_bundles_reloaded() override;
 
 protected:
     using PageListView = Yoga::ListView<

@@ -50,7 +50,7 @@ public:
         std::function<void(const Biz::PhysicalPrinter::PhysicalPrinterConfig&)> add_printer
     );
 
-    void on_preset_bundles_loaded() override
+    void on_preset_bundles_reloaded() override
     {
         reload();
     }

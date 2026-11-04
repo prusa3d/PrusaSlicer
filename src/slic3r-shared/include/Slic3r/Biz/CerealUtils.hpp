@@ -492,9 +492,27 @@ void serialize(Archive& archive, Slic3r::Domain::Preset::PrinterFamilyInfo& fami
 }
 
 template <class Archive>
+void serialize(Archive& archive, Slic3r::Domain::Preset::ModelIdMapping& model)
+{
+    archive(model.base_model, model.model);
+}
+
+template <class Archive>
+void serialize(Archive& archive, Slic3r::Domain::Preset::ComponentIdMapping& ids)
+{
+    archive(ids.id, ids.model);
+}
+
+template <class Archive>
+void serialize(Archive& archive, Slic3r::Domain::Preset::DeprecatedIdMapping& deprecated_ids)
+{
+    archive(deprecated_ids.printer, deprecated_ids.tool, deprecated_ids.feeder, deprecated_ids.sheet);
+}
+
+template <class Archive>
 void serialize(Archive& archive, Slic3r::Domain::Preset::VendorInfo& info)
 {
-    archive(info.id, info.repo_id, info.name, info.version, info.features, info.printer_families);
+    archive(info.id, info.repo_id, info.name, info.version, info.features, info.printer_families, info.deprecated_ids);
 }
 
 template <class Archive>

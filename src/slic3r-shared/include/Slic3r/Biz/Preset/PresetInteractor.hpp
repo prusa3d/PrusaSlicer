@@ -883,6 +883,11 @@ public:
 
     bool update_changed_printer_configs(const std::vector<Domain::Preset::HwPrinterConfig>& hw_configs);
 
+    tl::expected<bool, std::string> migrate_hw_config(
+        Domain::Preset::HwPrinterConfig& hw_config
+    );
+
+
 private:
     using ProjectContexts = std::unordered_map<Domain::SelectionId, PresetInteractorProjectContext>;
 
@@ -930,7 +935,7 @@ private:
         Domain::SelectionId project_id,
         Domain::SelectionId config_container_id
     );
-    tl::expected<void, std::string> update_hw_config_features(
+    tl::expected<bool, std::string> migrate_hw_config(
         const Domain::Preset::Bundle& preset_bundle,
         Domain::Preset::HwPrinterConfig& hw_config
     );

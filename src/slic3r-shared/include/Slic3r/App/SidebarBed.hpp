@@ -72,7 +72,7 @@ public:
         Domain::SelectionId config_container_id,
         Biz::Preset::PresetItemType type
     ) override;
-    void on_preset_bundles_loaded() override;
+    void on_preset_bundles_reloaded() override;
 
     void on_selected_physical_printer_changed() override;
     void on_selected_physical_printer_updated() override;

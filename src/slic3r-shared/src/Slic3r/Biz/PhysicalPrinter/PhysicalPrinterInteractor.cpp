@@ -69,6 +69,7 @@ PhysicalPrinterInteractor::PhysicalPrinterInteractor(
     m_preset_interactor(preset_interactor),
     m_user_account_interactor(user_account_interactor),
     m_connect_printer_service(dispatcher, user_account_interactor),
+    m_listener_scope_preset_interactor(m_preset_interactor, *this),
     m_listener_scope_connect_printer(m_connect_printer_service, *this),
     m_printer_preset_selector(preset_interactor)
 {
@@ -613,6 +614,55 @@ void PhysicalPrinterInteractor::on_selected_config_container_changed(
         sync_runtime_printers(project_id);
     }
     select_default();
+}
+
+void PhysicalPrinterInteractor::on_preset_bundles_initialized()
+{
+    migrate_hw_configs();
+}
+
+void PhysicalPrinterInteractor::on_preset_bundles_reloaded()
+{
+    migrate_hw_configs();
+}
+
+void PhysicalPrinterInteractor::migrate_hw_configs()
+{
+    // Update storage hw_configs
+    {
+        std::vector<PhysicalPrinterConfig> updated_printers;
+
+        for (const auto& printer : m_storage.all_printers() | std::views::values) {
+            if (printer.hw_config.has_value()) {
+                auto hw_config = printer.hw_config.value();
+                if (auto result = m_preset_interactor.migrate_hw_config(hw_config);
+                    result.has_value() && result.value())
+                {
+                    auto p = printer; // intentional copy
+                    p.hw_config = hw_config;
+                    updated_printers.emplace_back(std::move(p));
+                }
+            }
+        }
+        for (const auto& printer : updated_printers) {
+            m_storage.save_or_create(printer);
+        }
+    }
+
+    // update observable_list
+    for (size_t i = 0; i < m_observable_list.size(); ++i) {
+        auto& printer = m_observable_list.at(i);
+        if (printer.hw_config.has_value()) {
+            auto hw_config = printer.hw_config.value();
+            if (auto result = m_preset_interactor.migrate_hw_config(hw_config);
+                result.has_value() && result.value())
+            {
+                auto p = printer; // intentional copy
+                p.hw_config = hw_config;
+                m_observable_list.set(p, i);
+            };
+        }
+    }
 }
 
 bool PhysicalPrinterInteractor::is_connection_testable(const PhysicalPrinterConfig& printer) const

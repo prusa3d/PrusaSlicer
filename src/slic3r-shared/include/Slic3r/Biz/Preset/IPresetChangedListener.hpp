@@ -51,7 +51,15 @@ public:
     )
     {}
 
-    virtual void on_preset_bundles_loaded() {}
+    /**
+     * @brief Called whenever the preset bundle gets reloaded with one or more project loaded.
+     */
+    virtual void on_preset_bundles_reloaded() {}
+
+    /**
+     * @brief Called when preset bundle gets loaded initially (without any project loaded yet).
+     */
+    virtual void on_preset_bundles_initialized() {}
 
     virtual void on_preset_discarded_changes(
         Domain::SelectionId project_id,

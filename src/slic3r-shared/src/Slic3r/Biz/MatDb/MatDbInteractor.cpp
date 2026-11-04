@@ -162,7 +162,7 @@ void MatDbInteractor::on_config_container_selection_changed(
     run_query_if_active(project_id, config_container_id);
 }
 
-void MatDbInteractor::on_preset_bundles_loaded()
+void MatDbInteractor::on_preset_bundles_reloaded()
 {
     run_query(m_projects->selected_project_id());
 }

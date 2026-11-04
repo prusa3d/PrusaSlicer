@@ -136,6 +136,15 @@ printer_families:
     base_model: MK2
     printer_configs_order:
       - mk2s
+deprecated_ids:
+  feeder:
+    id:
+      mmu3_32b: mmu3
+      mmu3_8b: mmu3
+    model:
+      model:
+        MMU3_32bit: MMU3
+        MMU3_8bit: MMU3
 ---
 kind: printer
 technology: FFF

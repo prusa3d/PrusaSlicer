@@ -11,6 +11,8 @@
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp"
 #include "Slic3r/Biz/Preset/PrinterPresetSelector.hpp"
 #include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
+#include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
+#include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 #include "Slic3r/Domain/SelectionId.hpp"
 
 #include <string>
@@ -56,6 +58,7 @@ struct PrintHostTestResult
 class PhysicalPrinterInteractor :
     public WithListeners<IPhysicalPrinterChangedListener>,
     public ISelectedConfigContainerChangedListener,
+    public Preset::IPresetChangedListener,
     public IListObserver<ConnectPrinter::ConnectPrinter>
 {
 public:
@@ -140,6 +143,8 @@ public:
         Domain::SelectionId project_id,
         Domain::SelectionId container_id
     ) override;
+    void on_preset_bundles_initialized() override;
+    void on_preset_bundles_reloaded() override;
 
     void on_inserted(const ConnectPrinter::ConnectPrinter& printer, size_t index) override;
     void on_removed(const IndexRange& index_range) override;
@@ -147,6 +152,7 @@ public:
     void on_reset() override;
 
 private:
+    void migrate_hw_configs();
     /// Rebuilds the list from the synthetic entries plus the stored printers.
     void read_storage();
 
@@ -205,6 +211,8 @@ private:
     UserAccount::UserAccountInteractor& m_user_account_interactor;
     PhysicalPrinterStorage m_storage;
     ConnectPrinter::ConnectPrinterService m_connect_printer_service;
+    ListenerScope<IPresetChangedListener, Preset::PresetInteractor, PhysicalPrinterInteractor>
+        m_listener_scope_preset_interactor;
     Biz::ListenerScope<
         IListObserver<ConnectPrinter::ConnectPrinter>,
         ConnectPrinter::ConnectPrinterService,

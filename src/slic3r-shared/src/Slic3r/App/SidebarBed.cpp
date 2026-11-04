@@ -418,7 +418,7 @@ void SidebarBed::on_preset_value_changed(
     refresh_printer_label_color();
 }
 
-void SidebarBed::on_preset_bundles_loaded()
+void SidebarBed::on_preset_bundles_reloaded()
 {
     refresh_printer_label_color();
 }

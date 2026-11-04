@@ -397,7 +397,7 @@ void PrintSettingsDialog::on_preset_value_changed(
     }
 }
 
-void PrintSettingsDialog::on_preset_bundles_loaded()
+void PrintSettingsDialog::on_preset_bundles_reloaded()
 {
     update_dirty_state();
     update_extruders_visibility();

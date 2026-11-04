@@ -337,6 +337,28 @@ struct PrinterFamilyInfo
     std::vector<std::string> printer_configs_order;
 };
 
+using IdMap = std::map<std::string, std::string>;
+
+struct ModelIdMapping
+{
+    IdMap base_model;
+    IdMap model;
+};
+
+struct ComponentIdMapping
+{
+    IdMap id;
+    ModelIdMapping model;
+};
+
+struct DeprecatedIdMapping
+{
+    ComponentIdMapping printer;
+    ComponentIdMapping tool;
+    ComponentIdMapping feeder;
+    ComponentIdMapping sheet;
+};
+
 struct VendorInfo
 {
     std::string id;
@@ -345,6 +367,7 @@ struct VendorInfo
     std::string version;
     VendorFeatures features;
     std::vector<PrinterFamilyInfo> printer_families;
+    DeprecatedIdMapping deprecated_ids;
 };
 
 struct VendorData
