@@ -256,3 +256,23 @@ TEST_CASE_METHOD(Fixture, "A 404 on verify is reported and stops the install", "
     CHECK(listener.errors.front().find("404") != std::string::npos);
     CHECK(listener.downloaded.empty());
 }
+
+TEST_CASE_METHOD(Fixture, "Verify response naming another plugin aborts before download", "[marketplace]")
+{
+    // The public key from /verify is stored under "<plugin_id>@<version>" and the
+    // downloaded bundle is then checked against that name. A response that answers
+    // for a different id/version must not be trusted, let alone written to disk.
+    Responses responses;
+    responses.verify_body =
+        R"({"plugin_id":"../../escaped","version":"1.0.0","ok":true,"public_key":"-----BEGIN PUBLIC KEY-----\nstub\n-----END PUBLIC KEY-----\n"})";
+    arrange_http(responses);
+
+    client.download_bundle(test_config());
+    pump_until([&] { return !listener.errors.empty(); }, std::chrono::seconds(10));
+
+    REQUIRE(listener.errors.size() == 1);
+    CHECK(listener.verified.empty());
+    CHECK(listener.downloaded.empty());
+    CHECK(responses.seen->size() == 1);
+    CHECK(responses.seen->front() == VERIFY_URL);
+}

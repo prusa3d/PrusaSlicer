@@ -1,7 +1,13 @@
 #include "Slic3r/App/Browser/BrowserLogicPluginMarketplace.hpp"
 
+#include <algorithm>
+#include <cctype>
+
+#include <boost/filesystem/path.hpp>
 #include <nlohmann/json.hpp>
 
+#include "Slic3r/App/Lua/Plugin.hpp"
+#include "Slic3r/Directories.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Log.hpp"
 
@@ -12,6 +18,49 @@ namespace {
 // catalogue by it - see docs/slicer-webview.md in the marketplace repo.
 // Bump together with the Lua plugin API.
 constexpr const char* PLUGIN_API_VERSION = "1.0.0";
+
+/** Lower-cased scheme://host[:port] of `url`; empty when `url` has no scheme. */
+std::string origin_of(const std::string& url)
+{
+    const auto scheme_end = url.find("://");
+    if (scheme_end == std::string::npos) {
+        return {};
+    }
+    const auto path_start = url.find_first_of("/?#", scheme_end + 3);
+    std::string origin = url.substr(0, path_start);
+    std::ranges::transform(origin, origin.begin(), [](unsigned char c) { return std::tolower(c); });
+    return origin;
+}
+
+/** True if `url` has the same (non-empty) origin as `marketplace_url`. */
+bool is_marketplace_url(const std::string& url, const std::string& marketplace_url)
+{
+    const std::string origin = origin_of(marketplace_url);
+    return !origin.empty() && origin_of(url) == origin;
+}
+
+bool is_http_url(const std::string& url)
+{
+    const std::string origin = origin_of(url);
+    return origin.starts_with("http://") || origin.starts_with("https://");
+}
+
+/**
+ * The exact loading/error page URL the webview host builds (WebViewPanel / WebViewDialog):
+ * "file://" + generic(resources_dir()) + "/web/" + page + {"" | "_dark"} + ".html".
+ * Also accepts the "file:///C:/..." spelling WebView2 reports back for a "file://C:/..." load.
+ */
+bool is_local_web_page(const std::string& url, const std::string& page)
+{
+    const std::string path = boost::filesystem::path(resources_dir()).generic_string() + "/web/" + page;
+    for (const char* suffix : {".html", "_dark.html"}) {
+        const std::string file = path + suffix;
+        if (url == "file://" + file || url == "file:///" + file) {
+            return true;
+        }
+    }
+    return false;
+}
 } // namespace
 
 BrowserLogicPluginMarketplace::BrowserLogicPluginMarketplace(Biz::ProjectInteractor& project_interactor, Lua::PluginSystem& plugin_system) :
@@ -94,6 +143,7 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_messag
     // { action: 'REQUEST_ACCESS_TOKEN' }                        // session exchange failed
     // { action: 'REQUEST_INSTALLED_PLUGINS' }                    // which plugins are installed
     // { action: 'INSTALL_PLUGIN', pluginId, version, downloadUrl, verifyUrl, apiOrigin }
+    // { action: 'DOWNLOAD', id, version, url }                  // save a bundle to the download folder
 
     nlohmann::json msg;
     std::string action;
@@ -134,6 +184,12 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_messag
             SPDLOG_ERROR("Plugin Marketplace: cannot parse INSTALL_PLUGIN ({}): {}", result.error(), message);
             return {};
         }
+        // verifyUrl hands over the public key the bundle is checked against, so both it and
+        // downloadUrl must point at the configured marketplace, not wherever the page says.
+        if (!is_marketplace_url(result->verify_url, m_url) || !is_marketplace_url(result->download_url, m_url)) {
+            SPDLOG_ERROR("Plugin Marketplace: INSTALL_PLUGIN URLs are not on {}: {}", origin_of(m_url), message);
+            return {};
+        }
         SPDLOG_INFO("Plugin Marketplace: install {}@{}", result->plugin_id, result->version);
         m_plugin_system.install_marketplace_bundle(result.value());
         return {};
@@ -154,9 +210,21 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_messag
     }
 
     if (action == "DOWNLOAD") {
-        std::string url     = msg["url"].get<std::string>();
-        std::string id      = msg["id"].get<std::string>();
-        std::string version = msg["version"].get<std::string>();
+        std::string url, id, version;
+        try {
+            msg.at("url").get_to(url);
+            msg.at("id").get_to(id);
+            msg.at("version").get_to(version);
+        } catch (std::exception& e) {
+            SPDLOG_ERROR("Plugin Marketplace: cannot parse DOWNLOAD: {}", e.what());
+            return {};
+        }
+        // id and version name the saved file; the bundle must come from the marketplace.
+        if (!Lua::is_safe_path_component(id) || !Lua::is_safe_path_component(version)
+            || !is_marketplace_url(url, m_url)) {
+            SPDLOG_ERROR("Plugin Marketplace: rejected DOWNLOAD: {}", message);
+            return {};
+        }
         SPDLOG_DEBUG("Download message: URL: {}", url);
         m_plugin_system.download_file(id, version, url);
 
@@ -164,7 +232,18 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_messag
     }
 
     if (action == "OPEN_URL") {
-        std::string url = msg["url"].get<std::string>();
+        std::string url;
+        try {
+            msg.at("url").get_to(url);
+        } catch (std::exception& e) {
+            SPDLOG_ERROR("Plugin Marketplace: cannot parse OPEN_URL: {}", e.what());
+            return {};
+        }
+        // Only web links go to the system browser; file:, ms-*: etc. would reach other protocol handlers.
+        if (!is_http_url(url)) {
+            SPDLOG_ERROR("Plugin Marketplace: rejected OPEN_URL: {}", url);
+            return {};
+        }
         return {{BrowserLogicCommandType::OpenExternalBrowser, url}};
     }
 
@@ -208,7 +287,14 @@ bool BrowserLogicPluginMarketplace::requires_native_script_run() const
 std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::
     on_navigation_request_webview_event(const std::string& new_url, const std::string& current_url)
 {
-    return AbstractBrowserLogic::on_navigation_request_webview_event(new_url, current_url);
+    // Any page in this webview can post _prusaSlicer messages, so only the marketplace
+    // itself and the host's local loading/error pages may be shown here.
+    if (is_marketplace_url(new_url, m_url) || new_url == "about:blank"
+        || is_local_web_page(new_url, m_loading_html) || is_local_web_page(new_url, m_error_html)) {
+        return {};
+    }
+    SPDLOG_INFO("Plugin Marketplace: vetoing navigation to {}", new_url);
+    return {{BrowserLogicCommandType::Veto, {}}};
 }
 
 std::pair<int, int> BrowserLogicPluginMarketplace::size(int em_unit) const

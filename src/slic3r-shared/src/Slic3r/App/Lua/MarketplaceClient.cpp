@@ -1,4 +1,5 @@
 #include "Slic3r/App/Lua/MarketplaceClient.hpp"
+#include "Slic3r/App/Lua/Plugin.hpp"
 
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Log.hpp"
@@ -29,6 +30,13 @@ BundleRequestConfig::LoadResult BundleRequestConfig::load_from_json(const nlohma
         j.at("apiOrigin").get_to(ret.api_origin);
     } catch (nlohmann::json::exception& e) {
         return tl::unexpected{fmt::format("Error parsing JSON: {}", e.what())};
+    }
+
+    if (!is_safe_path_component(ret.plugin_id)) {
+        return tl::unexpected{fmt::format("Invalid pluginId: \"{}\"", ret.plugin_id)};
+    }
+    if (!is_safe_path_component(ret.version)) {
+        return tl::unexpected{fmt::format("Invalid version: \"{}\"", ret.version)};
     }
 
     return ret;
@@ -110,7 +118,7 @@ void MarketplaceClient::perform_verify_step(const BundleRequestConfig& config)
 
         VerifyResult result = tl::unexpected{std::string{"verify request did not complete"}};
 
-        http.on_complete([&result](const std::string& body, unsigned status)
+        http.on_complete([&result, &config](const std::string& body, unsigned status)
         {
             try {
                 nlohmann::json j = nlohmann::json::parse(body);
@@ -126,6 +134,13 @@ void MarketplaceClient::perform_verify_step(const BundleRequestConfig& config)
                 j.at("plugin_id").get_to(data.plugin_id);
                 j.at("version").get_to(data.version);
                 j.at("public_key").get_to(data.public_key);
+                if (data.plugin_id != config.plugin_id || data.version != config.version) {
+                    result = tl::unexpected{fmt::format(
+                        "verify response is for {}@{}, requested {}@{}",
+                        data.plugin_id, data.version, config.plugin_id, config.version
+                    )};
+                    return;
+                }
                 result = std::move(data);
             } catch (std::exception& e) {
                 result = tl::unexpected{fmt::format("cannot parse verify response: {}", e.what())};

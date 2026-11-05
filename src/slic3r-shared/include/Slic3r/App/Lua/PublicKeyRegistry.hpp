@@ -18,6 +18,9 @@ public:
     Biz::Crypto::KeyPair load_key(std::string_view key_id);
 
 private:
+    /** @brief Path of the key file; throws CryptoException if it leaves the key directory. */
+    boost::filesystem::path key_path(std::string_view key_id) const;
+
     boost::filesystem::path m_dir_path;
 };
 

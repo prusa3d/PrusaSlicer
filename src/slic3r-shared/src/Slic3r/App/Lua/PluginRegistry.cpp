@@ -215,6 +215,11 @@ PluginInstallResult PluginRegistry::install(PluginBundle& bundle, PublicKeyLooku
         );
     }
 
+    if (!is_safe_path_component(bundle.meta().id)) {
+        return tl::unexpected(
+            Biz::_u8L("Plugin installation failed: Invalid bundle id ") + bundle.meta().id
+        );
+    }
     auto dest_dir = get_bundle_base_path(bundle.meta().id);
     if (fs::exists(dest_dir)) {
         fs::remove_all(dest_dir);

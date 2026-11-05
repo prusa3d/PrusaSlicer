@@ -1,4 +1,5 @@
 #include "Slic3r/App/Lua/PublicKeyRegistry.hpp"
+#include "Slic3r/App/Lua/Plugin.hpp"
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
@@ -10,9 +11,21 @@ namespace Slic3r::App::Lua {
 
 namespace fs = boost::filesystem;
 
-void PublicKeyRegistry::store_key(std::string_view key_id, std::string_view public_key_pem)
+fs::path PublicKeyRegistry::key_path(std::string_view key_id) const
 {
     auto path = m_dir_path / (std::string{key_id} + ".pem");
+    if (!is_path_in_sandbox(m_dir_path, path)) {
+        throw Biz::Crypto::CryptoException(
+            // TRN {} is a public key identifier
+            fmt::format(fmt::runtime(Biz::_u8L("Invalid key id: {}")), key_id)
+        );
+    }
+    return path;
+}
+
+void PublicKeyRegistry::store_key(std::string_view key_id, std::string_view public_key_pem)
+{
+    auto path = key_path(key_id);
 
     std::string path_str = path.string();
     FILE* fp = boost::nowide::fopen(path_str.c_str(), "wb");
@@ -28,7 +41,7 @@ void PublicKeyRegistry::store_key(std::string_view key_id, std::string_view publ
 
 Biz::Crypto::KeyPair PublicKeyRegistry::load_key(std::string_view key_id)
 {
-    auto path = m_dir_path / (std::string{key_id} + ".pem");
+    auto path = key_path(key_id);
 
     auto bytes = Biz::Crypto::file_as_bytes(path.string());
     return Biz::Crypto::KeyPair::load_pub_pem(bytes);

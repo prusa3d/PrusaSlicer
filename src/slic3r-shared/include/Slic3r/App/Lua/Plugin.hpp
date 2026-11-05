@@ -77,4 +77,11 @@ bool is_path_in_sandbox(
     const boost::filesystem::path& tested_path
 );
 
+/**
+ * @brief True if `token` can be used as a single path component without changing the
+ * directory it is joined to: non-empty, starts with an alphanumeric character, does not
+ * end with a dot and consists only of `[A-Za-z0-9._+-]`.
+ */
+bool is_safe_path_component(std::string_view token);
+
 }

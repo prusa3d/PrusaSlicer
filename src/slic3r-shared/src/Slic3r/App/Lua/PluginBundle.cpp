@@ -134,6 +134,9 @@ return tl::unexpected{err.value()}; \
 #define SAFE_GET_OPT(field) SAFE_GET_(field, false)
 
         SAFE_GET(id)
+        if (!is_safe_path_component(meta.id)) {
+            return tl::unexpected{fmt::format("Field 'id' is not a valid bundle id: \"{}\"", meta.id)};
+        }
         SAFE_GET(name)
         SAFE_GET(version);
         SAFE_GET(author)

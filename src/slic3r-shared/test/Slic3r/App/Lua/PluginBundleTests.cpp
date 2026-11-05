@@ -1,7 +1,9 @@
 #include "Slic3r/App/Lua/PluginBundle.hpp"
 #include "Slic3r/App/Lua/MarketplaceClient.hpp"
 #include "Slic3r/App/Lua/PluginRegistry.hpp"
+#include "Slic3r/App/Lua/PublicKeyRegistry.hpp"
 #include "Slic3r/Biz/Crypto/Types.hpp"
+#include "Slic3r/Directories.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -166,6 +168,117 @@ TEST_CASE("Scanning records each bundle's id and version", "[plugin][marketplace
     CHECK(meta.id == "com.test.scan");
     CHECK(meta.version.to_string() == "1.2.3");
 
+    boost::system::error_code cleanup;
+    fs::remove_all(root, cleanup);
+}
+
+TEST_CASE("Bundle id must be a single path component", "[plugin][marketplace]")
+{
+    CHECK(is_safe_path_component("dev.leotrax3d.box-generator"));
+    CHECK(is_safe_path_component("com.prusa3d.slicer.calibration"));
+    CHECK(is_safe_path_component("1.0.0-beta.1+build.7"));
+
+    CHECK_FALSE(is_safe_path_component(""));
+    CHECK_FALSE(is_safe_path_component("."));
+    CHECK_FALSE(is_safe_path_component(".."));
+    CHECK_FALSE(is_safe_path_component("../../canary"));
+    CHECK_FALSE(is_safe_path_component("..\\..\\canary"));
+    CHECK_FALSE(is_safe_path_component("/tmp/evil"));
+    CHECK_FALSE(is_safe_path_component("C:\\evil"));
+    CHECK_FALSE(is_safe_path_component(".hidden"));
+    CHECK_FALSE(is_safe_path_component("foo."));
+    CHECK_FALSE(is_safe_path_component("a/b"));
+    CHECK_FALSE(is_safe_path_component("a b"));
+    CHECK_FALSE(is_safe_path_component(std::string(129, 'a')));
+}
+
+TEST_CASE("INSTALL_PLUGIN payload with a traversing id or version is rejected", "[plugin][marketplace]")
+{
+    const auto bad_id = GENERATE(
+        std::string{"../../canary"},
+        std::string{"/tmp/evil"},
+        std::string{".."},
+        std::string{"a/b"}
+    );
+    CAPTURE(bad_id);
+
+    SECTION("pluginId")
+    {
+        nlohmann::json msg = {
+            {"action", "INSTALL_PLUGIN"}, {"pluginId", bad_id}, {"version", "1.0.0"},
+            {"downloadUrl", "http://localhost:4455/d"}, {"verifyUrl", "http://localhost:4455/v"},
+            {"apiOrigin", "http://localhost:4455"}
+        };
+        CHECK_FALSE(BundleRequestConfig::load_from_json(msg).has_value());
+    }
+    SECTION("version")
+    {
+        nlohmann::json msg = {
+            {"action", "INSTALL_PLUGIN"}, {"pluginId", "com.test.plugin"}, {"version", bad_id},
+            {"downloadUrl", "http://localhost:4455/d"}, {"verifyUrl", "http://localhost:4455/v"},
+            {"apiOrigin", "http://localhost:4455"}
+        };
+        CHECK_FALSE(BundleRequestConfig::load_from_json(msg).has_value());
+    }
+}
+
+TEST_CASE("Public key registry keeps key files inside its directory", "[plugin][marketplace]")
+{
+    const fs::path root = fs::temp_directory_path() / fs::unique_path("slic3r-keys-%%%%-%%%%");
+    fs::create_directories(root / "keys");
+    PublicKeyRegistry registry{root / "keys"};
+
+    CHECK_THROWS_AS(registry.store_key("../escaped", "not a key"), Slic3r::Biz::Crypto::CryptoException);
+    CHECK_FALSE(fs::exists(root / "escaped.pem"));
+    CHECK_THROWS_AS(registry.load_key("../escaped"), Slic3r::Biz::Crypto::CryptoException);
+
+    boost::system::error_code cleanup;
+    fs::remove_all(root, cleanup);
+}
+
+TEST_CASE("Signed bundle whose id escapes lua/ is refused and touches nothing outside", "[plugin][marketplace]")
+{
+    // Repro of the manifest-id traversal: traversal-bundle.zip is correctly signed by
+    // traversal-author (see make_traversal_bundle.py) and its manifest.json id is
+    // "../../canary". Before the fix PluginRegistry::install() resolved
+    // <data_dir>/lua/../../canary, remove_all()'d it and unpacked the bundle there.
+    INFO("Missing fixture? Regenerate with: python3 test/data/plugin-bundle/make_traversal_bundle.py");
+    REQUIRE(fs::exists(bundle_dir() / "traversal-bundle.zip"));
+    REQUIRE(fs::exists(bundle_dir() / "traversal-author.pem"));
+
+    const fs::path root   = fs::temp_directory_path() / fs::unique_path("slic3r-trav-%%%%-%%%%");
+    const fs::path data   = root / "data";
+    const fs::path canary = root / "canary";
+    fs::create_directories(data / "authorized_authors");
+    fs::create_directories(canary);
+    {
+        boost::nowide::ofstream keep{canary / "keep.txt"};
+        keep << "must survive";
+    }
+    fs::copy_file(bundle_dir() / "traversal-author.pem", data / "authorized_authors" / "traversal-author.pem");
+
+    const std::string prev_data_dir = Slic3r::data_dir();
+    Slic3r::set_data_dir(data.string());
+
+    {
+        // Same steps as PluginSystem::install_file() for a ZIP imported from the menu.
+        auto bundle = open_bundle("traversal-bundle.zip");
+        PluginRegistry registry;
+        bool refused = false;
+        if (auto meta = bundle.load_meta(); !meta.has_value()) {
+            refused = true;
+        } else if (auto install = registry.install(bundle, PublicKeyLookupStrategy::Author); !install.has_value()) {
+            refused = true;
+        }
+        CHECK(refused);
+    }
+
+    CHECK(fs::exists(canary / "keep.txt"));
+    CHECK_FALSE(fs::exists(canary / "canary.txt"));
+    CHECK_FALSE(fs::exists(canary / "manifest.json"));
+    CHECK_FALSE(fs::exists(data / "lua"));
+
+    Slic3r::set_data_dir(prev_data_dir);
     boost::system::error_code cleanup;
     fs::remove_all(root, cleanup);
 }

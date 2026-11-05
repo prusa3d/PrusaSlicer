@@ -6,6 +6,8 @@
 #include "Slic3r/Log.hpp"
 
 #include <fmt/format.h>
+#include <algorithm>
+#include <cctype>
 #include <ranges>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -62,6 +64,22 @@ bool is_path_in_sandbox(
     }
 
     return true;
+}
+
+bool is_safe_path_component(std::string_view token)
+{
+    constexpr std::size_t max_len = 128;
+    if (token.empty() || token.size() > max_len) {
+        return false;
+    }
+    const auto is_alnum = [](unsigned char c) { return std::isalnum(c) != 0; };
+    // Windows strips a trailing dot, so "foo." and "foo" would share one folder.
+    if (!is_alnum(token.front()) || token.back() == '.') {
+        return false;
+    }
+    return std::ranges::all_of(token, [&](unsigned char c) {
+        return is_alnum(c) || c == '.' || c == '_' || c == '-' || c == '+';
+    });
 }
 
 struct SafeFileResolver
