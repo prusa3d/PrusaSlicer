@@ -542,6 +542,7 @@ std::vector<Vec2f> double_to_float(const std::vector<Vec2d>& src)
 PreviewConfig::PreviewConfig(const Slic3r::Print& print)
 {
     spiral_vase_enabled = print.config().get<bool>("spiral_vase");
+    sequential_print    = print.config().get<bool>("complete_objects");
     z_offset            = print.config().get<double>("z_offset");
     max_print_height    = print.config().get<double>("max_print_height");
     bed_shape           = double_to_float(print.config().get<std::vector<Vec2d>>("bed_shape"));
@@ -655,6 +656,7 @@ libpgcode::ProcessorResult PrePreview::generate_result() const {
     libpgcode::ProcessorResult result;
     result.producer = libpgcode::GCodeProducer::PrusaSlicer;
     result.spiral_vase_enabled = m_prepreview_config.spiral_vase_enabled;
+    result.sequential_print = m_prepreview_config.sequential_print;
     result.z_offset = m_prepreview_config.z_offset;
     result.max_print_height = m_prepreview_config.max_print_height;
     result.bed_shape = m_prepreview_config.bed_shape;

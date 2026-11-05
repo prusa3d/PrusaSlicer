@@ -36,6 +36,7 @@ struct PreviewConfig {
     PreviewConfig(const Slic3r::Print& print);
 
     bool spiral_vase_enabled{};
+    bool sequential_print{};
     double z_offset{};
     double max_print_height{};
     std::vector<Domain::Vec2f> bed_shape;

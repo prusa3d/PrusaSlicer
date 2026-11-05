@@ -142,6 +142,7 @@ private:
     void draw_ruler(const ImRect& slideable_region);
     void render_active_ctrl_menu();
     void render_edit_menu();
+    void render_sequential_print_info();
     bool render_button(
         Render::Icon icon,
         Render::Icon icon_hovered,

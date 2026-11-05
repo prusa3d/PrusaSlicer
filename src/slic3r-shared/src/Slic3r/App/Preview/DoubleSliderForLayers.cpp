@@ -524,16 +524,10 @@ ImU32 DoubleSliderForLayers::tick_clr() const
 
 void DoubleSliderForLayers::extra_render()
 {
-    if (m_draw_mode == DrawMode::SequentialFffPrint && m_ctrl->is_lclick_on_thumb()) {
-        std::string tip = _u8L(
-            "The sequential print is on.\n"
-            "It's impossible to apply any custom G-code for objects printing sequentually."
-        );
-        Imgui::tooltip(tip);
-    } else
-        render_active_ctrl_menu();
+    render_active_ctrl_menu();
 
     if (m_ctrl->is_rclick_on_thumb()
+        && m_draw_mode != DrawMode::SequentialFffPrint
         && m_mode == CustomGCode::Mode::SingleExtruder // ysFIXME-spe3494
         && can_edit()
         && !m_ticks.has_tick(m_ctrl->active_pos()))
@@ -1364,7 +1358,11 @@ void DoubleSliderForLayers::render_active_ctrl_menu()
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 4.0f * m_scale);
 
     if (m_ctrl->is_lclick_on_thumb())
-        ImGui::OpenPopup("slider_full_menu_popup");
+        // Custom G-codes can't be added in sequential print, so just explain it instead of the menu.
+        ImGui::OpenPopup(
+            m_draw_mode == DrawMode::SequentialFffPrint ? "sequential_print_info_popup" :
+                                                          "slider_full_menu_popup"
+        );
     else if (m_show_just_color_change_menu)
         ImGui::OpenPopup("slider_add_tick_menu_popup");
     else if (m_show_edit_menu)
@@ -1373,6 +1371,7 @@ void DoubleSliderForLayers::render_active_ctrl_menu()
     if (can_edit())
         render_add_tick_menu();
     render_edit_menu();
+    render_sequential_print_info();
 
     ImGui::PopStyleVar(4);
 
@@ -1424,6 +1423,17 @@ void DoubleSliderForLayers::render_edit_menu()
         if (Imgui::menu_item_with_icon(delete_item_name.c_str(), ""))
             delete_current_tick();
 
+        ImGui::EndPopup();
+    }
+}
+
+void DoubleSliderForLayers::render_sequential_print_info()
+{
+    if (ImGui::BeginPopup("sequential_print_info_popup")) {
+        ImGui::TextUnformatted(_u8L(
+            "The sequential print is on.\n"
+            "It's impossible to apply any custom G-code for objects printing sequentually."
+        ).c_str());
         ImGui::EndPopup();
     }
 }

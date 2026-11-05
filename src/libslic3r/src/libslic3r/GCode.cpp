@@ -572,6 +572,7 @@ namespace DoExport {
         processor_config.use_volumetric_e = config.get<bool>("use_volumetric_e");
         processor_config.export_remaining_time_enabled = config.get<bool>("remaining_times");
         processor_config.spiral_vase_enabled = config.get<bool>("spiral_vase");
+        processor_config.sequential_print = config.get<bool>("complete_objects");
 
         const std::optional<bool> supports_tool_preheating{Domain::Preset::get_feature<bool>(
             hw_printer_config.features,
