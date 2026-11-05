@@ -60,6 +60,7 @@ public:
 //          PhysicalPrinterDialog
 //------------------------------------------
 
+class CameraSettings;
 class ConfigOptionsGroup;
 class PhysicalPrinterDialog : public DPIDialog
 {
@@ -69,6 +70,7 @@ class PhysicalPrinterDialog : public DPIDialog
     ::TextInput*        m_printer_name      { nullptr };
     std::vector<PresetForPrinter*> m_presets;
 
+    CameraSettings* m_camera_settings {nullptr};
     ConfigOptionsGroup* m_optgroup          { nullptr };
 
     ScalableButton*     m_add_preset_btn                {nullptr};

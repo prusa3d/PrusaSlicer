@@ -47,6 +47,7 @@ class PreferencesDialog;
 class GalleryDialog;
 class ConnectWebViewPanel; 
 class PrinterWebViewPanel;
+class CameraPanel;
 class PrintablesWebViewPanel;
 
 enum QuickSlice
@@ -106,6 +107,7 @@ class MainFrame : public DPIFrame
     bool                    m_printables_webview_added{ false };
     PrinterWebViewPanel*    m_printer_webview{ nullptr };
     bool                    m_printer_webview_added{ false };
+    CameraPanel*            m_camera_panel{ nullptr };
 
     std::string     get_base_name(const wxString &full_name, const char *extension = nullptr) const;
     std::string     get_dir_name(const wxString &full_name) const;
