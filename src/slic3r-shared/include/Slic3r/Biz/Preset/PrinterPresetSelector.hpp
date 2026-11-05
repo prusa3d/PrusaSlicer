@@ -2,6 +2,7 @@
 
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
 #include "Slic3r/Biz/Preset/IPrinterPresetSelectorListener.hpp"
+#include "Slic3r/Biz/Preset/PreferredMaterialTypes.hpp"
 
 #include <string>
 #include <vector>
@@ -16,14 +17,18 @@ class PrinterPresetSelector : public WithListeners<IPrinterPresetSelectorListene
 public:
     explicit PrinterPresetSelector(PresetInteractor& preset_interactor);
 
-    /// Selects material presets matching the filaments loaded in the Connect printer.
-    void select_connect_materials(const nlohmann::json& printer_json);
+    /// Returns types of the materials loaded in the Connect printer for the first @p slot_count
+    /// material slots.
+    static PreferredMaterialTypes
+    connect_material_types(const nlohmann::json& printer_json, size_t slot_count);
+
+    /// Warns about material slots whose selected material preset doesn't have the type from
+    /// @p material_types.
+    void warn_material_mismatches(const PreferredMaterialTypes& material_types);
 
     void warn(const std::string& msg);
 
 private:
-    void select_materials(const nlohmann::json& printer_json, std::vector<std::string>& mismatches);
-
     void warn_mismatches(const std::vector<std::string>& mismatches);
 
 private:

@@ -469,7 +469,8 @@ static bool resolve_printer_switch(
 static bool resolve_printer_preset_switch(
     PresetInteractor& preset_interactor,
     const std::string& printer_hw_config_id,
-    const std::string& printer_preset_id
+    const std::string& printer_preset_id,
+    const PreferredMaterialTypes& material_types = {}
 )
 {
     return resolve_printer_switch(
@@ -481,7 +482,9 @@ static bool resolve_printer_preset_switch(
                 preset_interactor,
                 preset_interactor.get_preset_ids_after_selection(
                     printer_hw_config_id,
-                    printer_preset_id
+                    printer_preset_id,
+                    {},
+                    material_types
                 )
             );
         }
@@ -505,29 +508,38 @@ bool can_select_printer_preset(
 }
 
 /** @brief Same as can_select_printer_config(), but without the check of the dirty state. */
-static bool
-resolve_printer_config_switch(PresetInteractor& preset_interactor, const std::string& hw_config_id)
+static bool resolve_printer_config_switch(
+    PresetInteractor& preset_interactor,
+    const std::string& hw_config_id,
+    const PreferredMaterialTypes& material_types
+)
 {
     // Presets are refilled even when the same hw config is selected,
     // so the unsaved changes have to be resolved too.
     return resolve_printer_preset_switch(
         preset_interactor,
         hw_config_id,
-        preset_interactor.printer_preset_id_for_hw_config(hw_config_id)
+        preset_interactor.printer_preset_id_for_hw_config(hw_config_id),
+        material_types
     );
 }
 
-bool can_select_printer_config(PresetInteractor& preset_interactor, const std::string& hw_config_id)
+bool can_select_printer_config(
+    PresetInteractor& preset_interactor,
+    const std::string& hw_config_id,
+    const PreferredMaterialTypes& material_types
+)
 {
     if (!is_dirty_selected_preset(preset_interactor))
         return true;
 
-    return resolve_printer_config_switch(preset_interactor, hw_config_id);
+    return resolve_printer_config_switch(preset_interactor, hw_config_id, material_types);
 }
 
 bool can_select_external_printer_config(
     PresetInteractor& preset_interactor,
-    const Domain::Preset::HwPrinterConfig& printer
+    const Domain::Preset::HwPrinterConfig& printer,
+    const PreferredMaterialTypes& material_types
 )
 {
     if (!is_dirty_selected_preset(preset_interactor))
@@ -536,7 +548,7 @@ bool can_select_external_printer_config(
     if (const std::optional<std::string> hw_config_id =
             preset_interactor.find_external_printer_config(printer))
     {
-        return resolve_printer_config_switch(preset_interactor, *hw_config_id);
+        return resolve_printer_config_switch(preset_interactor, *hw_config_id, material_types);
     }
 
     // A new hw config is created on selection. Its presets are evaluated into a separate bundle
@@ -569,7 +581,9 @@ bool can_select_external_printer_config(
                     *new_bundle,
                     no_runtime_presets,
                     *hw_config,
-                    printer_preset_id
+                    printer_preset_id,
+                    {},
+                    material_types
                 )
             );
         }

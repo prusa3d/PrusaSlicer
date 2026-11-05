@@ -10,6 +10,7 @@
 #include "Slic3r/Biz/IListObserver.hpp"
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp"
 #include "Slic3r/Biz/Preset/PrinterPresetSelector.hpp"
+#include "Slic3r/Biz/Preset/PreferredMaterialTypes.hpp"
 #include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
@@ -175,7 +176,9 @@ private:
      * @return False if the user canceled the switch.
      */
     bool can_apply_hw_config(const PhysicalPrinterConfig& printer);
-    void select_connect_materials(const std::string& printer_uuid);
+    /// Types of the materials loaded in the Connect printer, empty for other printers.
+    Preset::PreferredMaterialTypes
+    connect_material_types(const PhysicalPrinterConfig& printer) const;
     void clear_selection();
     void set_last_used(const std::string& uuid);
 

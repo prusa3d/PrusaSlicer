@@ -12,6 +12,7 @@
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractorProjectContext.hpp"
 #include "Slic3r/Biz/Preset/PresetDiffOperation.hpp"
+#include "Slic3r/Biz/Preset/PreferredMaterialTypes.hpp"
 #include "Slic3r/Biz/Preset/IPresetDialogManager.hpp"
 #include "Slic3r/Biz/Preset/IMacroOverridesChangedListener.hpp"
 #include "Slic3r/Biz/Preset/IO/BundlePaths.hpp"
@@ -164,11 +165,13 @@ public:
      * are refilled: keep the old one (by id, or by name and origin), otherwise the default one
      * from the parent preset, otherwise the first one.
      * @param print_id  Explicitly selected print preset; chosen by the rule above when empty.
+     * @param material_types  Material types preferred over the rule above.
      */
     SelectedPresetIds get_preset_ids_after_selection(
         const std::string& hw_config_id,
         const std::string& printer_preset_id,
-        const std::string& print_id = {}
+        const std::string& print_id                 = {},
+        const PreferredMaterialTypes& material_types = {}
     ) const;
     /**
      * @brief Same as above, but presets of @p hw_config are taken from @p bundle and @p runtime
@@ -179,7 +182,8 @@ public:
         const RuntimePresets& runtime,
         const Domain::Preset::HwPrinterConfig& hw_config,
         const std::string& printer_preset_id,
-        const std::string& print_id = {}
+        const std::string& print_id                 = {},
+        const PreferredMaterialTypes& material_types = {}
     ) const;
 
     const Domain::Preset::Bundle& preset_bundle() const;
@@ -259,8 +263,10 @@ public:
         return m_object_settings_interactor;
     }
 
+    /** @param material_types  Material types preferred when material presets are selected. */
     void select_printer_config(
-        const std::string& printer_hw_config_id
+        const std::string& printer_hw_config_id,
+        const PreferredMaterialTypes& material_types = {}
     );
     /**
      * @brief Returns id of the printer preset which select_printer_config() selects
@@ -339,10 +345,12 @@ public:
     /**
      * @brief Find or create appropriate full hw config for given external one and select it
      * @param printer External hw config
+     * @param material_types  Material types preferred when material presets are selected.
      * @return void or error message why full hw config creation failed.
      */
     tl::expected<void, std::string> select_external_printer_config(
-        const Domain::Preset::HwPrinterConfig& printer
+        const Domain::Preset::HwPrinterConfig& printer,
+        const PreferredMaterialTypes& material_types = {}
     );
     /**
      * @brief Returns id of an existing hw config which select_external_printer_config() selects
@@ -1042,13 +1050,15 @@ private:
     void select_printer_config_internal(
         const std::string& printer_hw_config_id,
         bool no_data_update,
-        ListenerInvokeLaterBag& bag
+        ListenerInvokeLaterBag& bag,
+        const PreferredMaterialTypes& material_types = {}
     );
     void select_printer_preset_internal(
         const std::string& printer_hw_config_id,
         const std::string printer_preset_id,
         bool no_data_update,
-        ListenerInvokeLaterBag& bag
+        ListenerInvokeLaterBag& bag,
+        const PreferredMaterialTypes& material_types = {}
     );
     void select_print_preset_internal(
         const std::string id,
@@ -1088,7 +1098,8 @@ private:
     void fill_materials_presets(
         Domain::Preset::SelectedPreset& selected_preset,
         bool no_data_update,
-        ListenerInvokeLaterBag& bag
+        ListenerInvokeLaterBag& bag,
+        const PreferredMaterialTypes& material_types = {}
     );
     void fill_tool_items(const Domain::Preset::HwPrinterConfig& hw_config);
 
