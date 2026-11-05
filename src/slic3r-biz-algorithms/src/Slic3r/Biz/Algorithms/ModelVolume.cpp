@@ -141,6 +141,32 @@ void remap_facets_annotations(
     }
 }
 
+void merge_facets_annotations(
+    const std::vector<const Domain::ModelVolume*>& merged_volumes,
+    Domain::ModelVolume& merged_volume
+)
+{
+    for (const Domain::FacetsAnnotationKind kind : Domain::ModelVolume::facets_annotation_kinds) {
+        if (std::ranges::all_of(
+                merged_volumes,
+                [kind](const Domain::ModelVolume* volume)
+                { return volume->facets_annotation(kind).empty(); }
+            ))
+        {
+            continue;
+        }
+
+        TriangleSplittingData merged_data;
+        int facet_offset = 0;
+        for (const Domain::ModelVolume* volume : merged_volumes) {
+            merged_data.append(volume->facets_annotation(kind).get_data(), facet_offset);
+            facet_offset += static_cast<int>(volume->mesh().facets_count());
+        }
+
+        merged_volume.facets_annotation(kind).set_data(std::move(merged_data));
+    }
+}
+
 // Split this volume, append the result to the object owning this volume.
 // Return the number of volumes created from this one.
 // This is useful to assign different materials to different volumes of an object.

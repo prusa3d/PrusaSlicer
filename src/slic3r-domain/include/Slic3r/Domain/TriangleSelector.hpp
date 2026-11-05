@@ -82,6 +82,11 @@ struct TriangleSplittingData
     void update_used_states(std::size_t bitstream_start_idx);
 
     /**
+     * @brief Appends the painting of a mesh whose facets were appended to the painted mesh starting at facet_offset.
+     */
+    void append(const TriangleSplittingData& appended, int facet_offset);
+
+    /**
      * Returns the minimum painting version required to represent this data.
      * Version 1: Only states 0-16 are used (compatible with PrusaSlicer 2.9.4 and older).
      * Version 2: States 17-255 are used (requires the extended serialization format).

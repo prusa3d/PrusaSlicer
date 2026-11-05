@@ -54,6 +54,16 @@ void remap_facets_annotations(
     Domain::ModelVolume& derived_volume
 );
 
+/**
+ * @brief Joins the paintings of merged_volumes into the painting of merged_volume.
+ *
+ * @param merged_volumes Volumes, whose meshes were merged in this order into the mesh of merged_volume.
+ */
+void merge_facets_annotations(
+    const std::vector<const Domain::ModelVolume*>& merged_volumes,
+    Domain::ModelVolume& merged_volume
+);
+
 void calculate_convex_hull(Domain::ModelVolume& model_volume);
 
 // Returns the bbox of the given ModelVolume transformed by the given transformation
