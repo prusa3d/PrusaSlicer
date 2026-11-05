@@ -23,6 +23,7 @@
 #include "libslic3r/Flow.hpp"
 #include "libslic3r/LayerRegion.hpp"
 #include "libslic3r/Model.hpp"
+#include "Slic3r/Domain/LayerHeightProfile.hpp"
 #include "Slic3r/Domain/ObjectID.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Polygon.hpp"
@@ -33,13 +34,6 @@
 #include "libslic3r/TriangleMeshSlicer.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/libslic3r.h"
-
-// DEBUGGING ONLY:
-#include <chrono>
-#include <fstream>
-#include "Slic3r/Log.hpp"
-#include "Slic3r/Biz/Algorithms/SVG.hpp"
-#include "Slic3r/Domain/LayerHeightProfile.hpp"
 
 using namespace Slic3r::Biz;
 
@@ -321,7 +315,13 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
                     else {
                         for (int region_idx : part_regions_idxs) {
                             const PrintObjectRegions::VolumeRegion &region = layer_range.volume_regions[region_idx];
-                            slices_by_region[region.region->print_object_region_id()][z_idx] = std::move(volume_slices_find_by_id(volume_slices, region.model_volume->id()).slices[z_idx]);
+                            // Several non-overlapping volumes may share the same region, append their slices.
+                            ExPolygons &dst = slices_by_region[region.region->print_object_region_id()][z_idx];
+                            ExPolygons &src = volume_slices_find_by_id(volume_slices, region.model_volume->id()).slices[z_idx];
+                            if (dst.empty())
+                                dst = std::move(src);
+                            else
+                                append(dst, std::move(src));
                         }
                     }
                 }
