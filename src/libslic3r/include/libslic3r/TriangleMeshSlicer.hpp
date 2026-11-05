@@ -14,6 +14,10 @@
 
 struct indexed_triangle_set;
 
+namespace Slic3r::Biz::Algorithms::TriangleMesh {
+struct IndexedTriangleSetCut;
+} // namespace Slic3r::Biz::Algorithms::TriangleMesh
+
 namespace Slic3r {
 
 class ColorPolygon;
@@ -147,6 +151,16 @@ Domain::Polygons project_mesh(
     float slab_max = 1e10
 );
 
+/**
+ * @brief Cuts the mesh by the plane z = z into upper (the part above the plane) and lower (the part below it),
+ *        with the SourceFacet of every facet of both parts, so that it is known which facet of mesh it comes from.
+ */
+Biz::Algorithms::TriangleMesh::IndexedTriangleSetCut
+cut_mesh(const indexed_triangle_set& mesh, float z, bool triangulate_caps = true);
+
+/**
+ * @brief Cuts the mesh by the plane z = z into upper (the part above the plane) and lower (the part below it), a null output is skipped.
+ */
 void cut_mesh(
     const indexed_triangle_set      &mesh,
     float                            z,

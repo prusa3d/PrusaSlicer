@@ -28,6 +28,45 @@
 
 namespace Slic3r::Biz::Algorithms::TriangleMesh {
 
+/**
+ * @brief Origin of a facet of a mesh derived from a source mesh.
+ */
+struct SourceFacet
+{
+    /// Index of the source facet, -1 for a facet without a source facet (a cap of a planar cut).
+    int index{-1};
+
+    /// The facet has the vertices of the source facet in their order, so the split tree of the source facet applies to it.
+    bool is_unchanged{false};
+};
+
+/**
+ * @brief Indexed triangle set derived from a source mesh (its connected component, one side of its planar cut) with the origin of its facets.
+ */
+struct IndexedTriangleSetWithSourceFacets
+{
+    indexed_triangle_set its;
+    std::vector<SourceFacet> source_facets;
+};
+
+/**
+ * @brief Mesh derived from a source mesh (its connected component, one side of its planar cut) with the origin of its facets.
+ */
+struct TriangleMeshWithSourceFacets
+{
+    Domain::TriangleMesh mesh;
+    std::vector<SourceFacet> source_facets;
+};
+
+/**
+ * @brief Parts of a mesh cut by a plane.
+ */
+struct IndexedTriangleSetCut
+{
+    IndexedTriangleSetWithSourceFacets upper;
+    IndexedTriangleSetWithSourceFacets lower;
+};
+
 Domain::TriangleMeshStats calculate_stats(const indexed_triangle_set& its);
 
 Domain::TriangleMesh construct(
@@ -63,6 +102,13 @@ bool is_front_up_left(
     const Domain::TriangleMesh& triangle_mesh2
 );
 std::vector<Domain::TriangleMesh> split(const Domain::TriangleMesh& mesh);
+
+/**
+ * @brief Splits the mesh into its connected components, each with the SourceFacet of every facet, so that it is known
+ *        which facet of mesh it comes from. The components with inward normals are flipped.
+ */
+std::vector<TriangleMeshWithSourceFacets> split_to_components(const Domain::TriangleMesh& mesh);
+
 // Returns the bbox of the given TriangleMesh transformed by the given transformation
 Domain::BoundingBox3d transformed_bounding_box(
     const Domain::TriangleMesh& mesh,
