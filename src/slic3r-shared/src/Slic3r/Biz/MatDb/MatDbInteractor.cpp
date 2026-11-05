@@ -192,6 +192,13 @@ bool MatDbInteractor::is_favorite(const Domain::MatDb::Material& mat) const
 void MatDbInteractor::run_query(Domain::SelectionId project_id)
 {
     auto& project_query = m_projects->project(project_id).query_state;
+    // The slot of the query doesn't exist anymore, e.g. after switching to a printer with fewer
+    // material slots, so the query is no longer valid.
+    if (project_query.has_value()
+        && project_query->slot_index >= selected_preset().materials.size())
+    {
+        project_query.reset();
+    }
     if (!project_query.has_value()) {
         m_result.reset({});
         return;
