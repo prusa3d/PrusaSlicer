@@ -1,13 +1,103 @@
 #include "Slic3r/App/Yoga/Window.hpp"
 
+#include "Slic3r/App/Yoga/Icon.hpp"
 #include "Slic3r/Utils.hpp"
 
+#include <imgui_internal.h>
+
+#include <cfloat>
+#include <cmath>
+
 namespace Slic3r::App::Yoga {
+
+namespace {
+
+float size_limit(const YGValue& value, float fallback)
+{
+    return value.unit == YGUnitPoint && !std::isnan(value.value) ? value.value : fallback;
+}
+
+bool is_resize_handle(ImGuiWindow* window, ImGuiID id)
+{
+    if (id == 0) {
+        return false;
+    }
+    if (id == ImGui::GetWindowResizeCornerID(window, 0)
+        || id == ImGui::GetWindowResizeCornerID(window, 1))
+    {
+        return true;
+    }
+    for (int dir = 0; dir < ImGuiDir_COUNT; ++dir) {
+        if (id == ImGui::GetWindowResizeBorderID(window, static_cast<ImGuiDir>(dir))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+ImVec2 viewport_size_limit(
+    ImGuiWindow* window,
+    const ImVec2& pos,
+    const ImVec2& size,
+    const ImVec2& min_size,
+    const ImVec2& max_size
+)
+{
+    const ImVec2 viewport   = ImGui::GetMainViewport()->Size;
+    const ImGuiID active_id = ImGui::GetActiveID();
+    const bool left_held    = window
+        && (window->ResizeBorderHeld == ImGuiDir_Left
+            || active_id == ImGui::GetWindowResizeCornerID(window, 1));
+    const bool top_held = window && window->ResizeBorderHeld == ImGuiDir_Up;
+    const ImVec2 limit{
+        left_held ? pos.x + size.x : viewport.x - pos.x,
+        top_held ? pos.y + size.y : viewport.y - pos.y
+    };
+    return {
+        std::max(min_size.x, std::min(max_size.x, limit.x)),
+        std::max(min_size.y, std::min(max_size.y, limit.y))
+    };
+}
+
+bool is_user_resizing(ImGuiWindow* window)
+{
+    return window->ResizeBorderHeld != -1 || is_resize_handle(window, ImGui::GetActiveID());
+}
+
+bool is_resize_handle_pressed(ImGuiWindow* window)
+{
+    const ImGuiContext* context = ImGui::GetCurrentContext();
+    return is_resize_handle(window, context->ActiveId)
+        || is_resize_handle(window, context->HoveredIdPreviousFrame);
+}
+
+Platform::ColorGroup resize_grip_color_group(ImGuiWindow* window)
+{
+    const ImGuiID grip_id = ImGui::GetWindowResizeCornerID(window, 0);
+    if (ImGui::GetActiveID() == grip_id) {
+        return Platform::ColorGroup::Active;
+    }
+    if (ImGui::GetHoveredID() == grip_id) {
+        return Platform::ColorGroup::Hovered;
+    }
+    return Platform::ColorGroup::Default;
+}
+
+} // namespace
 
 Window::Window(const std::string& window_name) : Item()
 {
     set_object_name(window_name.empty() ? "Window" : window_name);
     set_padding(20_fpx);
+
+    m_resize_grip = emplace_back<Icon>(Render::Icon::DotsTriangle);
+    m_resize_grip->set_position_type(YGPositionTypeAbsolute);
+    m_resize_grip->set_right(2_fpx);
+    m_resize_grip->set_bottom(2_fpx);
+    m_resize_grip->set_width(10_fpx);
+    m_resize_grip->set_height(10_fpx);
+    m_resize_grip->set_z(-1);
+    m_resize_grip->set_visible(false);
 }
 
 float Window::rounding() const
@@ -89,6 +179,22 @@ void Window::render(const Vec2f& pos, const Vec2f& size)
         next_pos.y = std::clamp(next_pos.y, 0.f, std::max(0.f, max.y));
     }
 
+    ImGuiWindow* existing_window = ImGui::FindWindowByName(object_name().c_str());
+    const bool resizable = !(m_flags & ImGuiWindowFlags_NoResize) && m_callbacks.geometry_changed;
+    m_resize_grip->set_visible(resizable);
+    if (resizable) {
+        ImGui::SetNextWindowSizeConstraints(
+            m_min_size_constraint,
+            viewport_size_limit(
+                existing_window,
+                next_pos,
+                sz,
+                m_min_size_constraint,
+                m_max_size_constraint
+            )
+        );
+    }
+
     ImGui::SetNextWindowSize(sz);
     ImGui::SetNextWindowBgAlpha(alpha());
     ImGui::SetNextWindowPos(next_pos);
@@ -115,6 +221,22 @@ void Window::render(const Vec2f& pos, const Vec2f& size)
         }
     );
 
+    if (resizable) {
+        constexpr ImVec4 transparent{0.f, 0.f, 0.f, 0.f};
+        ImGui::PushStyleColor(ImGuiCol_ResizeGrip, transparent);
+        ImGui::PushStyleColor(ImGuiCol_ResizeGripHovered, transparent);
+        ImGui::PushStyleColor(ImGuiCol_ResizeGripActive, transparent);
+    }
+
+    // ImGui auto-fits the window to its content on a resize handle double click,
+    // which fights the Yoga layout, so the double click is hidden from Begin()
+    ImGuiIO& io = ImGui::GetIO();
+    const bool suppress_double_click = resizable && io.MouseDoubleClicked[0] && existing_window
+        && is_resize_handle_pressed(existing_window);
+    if (suppress_double_click) {
+        io.MouseDoubleClicked[0] = false;
+    }
+
     bool window_begun{false};
     if (m_is_modal) {
         bool popup_modal_open{true};
@@ -128,12 +250,25 @@ void Window::render(const Vec2f& pos, const Vec2f& size)
     } else {
         window_begun = ImGui::Begin(object_name().c_str(), nullptr, m_flags);
     }
+    if (resizable) {
+        ImGui::PopStyleColor(3);
+    }
+    if (suppress_double_click) {
+        io.MouseDoubleClicked[0] = true;
+    }
     if (!window_begun) {
         render_item_end(pos, size);
         return;
     }
 
     ImVec2 pos_to_render = ImGui::GetWindowPos();
+
+    if (resizable && is_user_resizing(ImGui::GetCurrentWindow())) {
+        const ImVec2 actual_size = ImGui::GetWindowSize();
+        if (pos_to_render != ImTrunc(next_pos) || actual_size != ImTrunc(sz)) {
+            m_callbacks.geometry_changed(from_im(pos_to_render), from_im(actual_size));
+        }
+    }
 
     if (!m_position_by_yoga) {
         ImVec2 xy  = pos_to_render;
@@ -145,6 +280,13 @@ void Window::render(const Vec2f& pos, const Vec2f& size)
     }
 
     Vec2f window_pos = from_im(pos_to_render);
+
+    if (resizable) {
+        m_resize_grip->set_tint(m_theme->color_imgui(
+            Platform::Color::ResizeGrip,
+            resize_grip_color_group(ImGui::GetCurrentWindow())
+        ));
+    }
 
     render_body(window_pos, size);
 
@@ -171,6 +313,21 @@ void Window::render(const Vec2f& pos, const Vec2f& size)
 }
 
 void Window::render_body(const Vec2f& pos, const Vec2f& size) {}
+
+void Window::size_limits_changed()
+{
+    m_max_size_constraint = {
+        size_limit(YGNodeStyleGetMaxWidth(node()), FLT_MAX),
+        size_limit(YGNodeStyleGetMaxHeight(node()), FLT_MAX)
+    };
+    const Vec2f min_size = evaluated_min_size();
+    m_min_size_constraint = {
+        std::clamp(std::isnan(min_size.x()) ? 0.f : min_size.x(), 0.f, m_max_size_constraint.x),
+        std::clamp(std::isnan(min_size.y()) ? 0.f : min_size.y(), 0.f, m_max_size_constraint.y)
+    };
+    YGNodeStyleSetMinWidth(node(), m_min_size_constraint.x);
+    YGNodeStyleSetMinHeight(node(), m_min_size_constraint.y);
+}
 
 bool Window::is_in_window() const
 {

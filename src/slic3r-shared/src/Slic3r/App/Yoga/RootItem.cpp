@@ -27,6 +27,16 @@ RootItem::~RootItem()
 
 void RootItem::render(const Vec2f& pos, const Vec2f& size) {}
 
+IDialogGeometryStore* RootItem::dialog_geometry_store() const
+{
+    return m_dialog_geometry_store;
+}
+
+void RootItem::set_dialog_geometry_store(IDialogGeometryStore* store)
+{
+    m_dialog_geometry_store = store;
+}
+
 template <class F>
 void RootItem::for_each_popup_reconcile(F&& fn)
 {

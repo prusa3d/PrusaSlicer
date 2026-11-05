@@ -102,6 +102,8 @@ ToolToFeatureDialog::ToolToFeatureDialog(
     m_project_interactor(project_interactor),
     m_navigator(navigator)
 {
+    set_movable(true);
+
     content()->set_min_width(350_fpx);
     content()->set_padding(20_fpx);
     content()->set_orientation(Orientation::Vertical);

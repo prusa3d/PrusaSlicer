@@ -14,8 +14,7 @@ AbstractSettingsDialog::AbstractSettingsDialog(
 ) :
     Dialog(name.empty() ? "AbstractSettingsDialog" : name)
 {
-    content_item()->set_width(700);
-    content_item()->set_height(700);
+    set_implicit_size(700, 700);
 
     content()->set_orientation(Orientation::Vertical);
     content()->set_gap(0);

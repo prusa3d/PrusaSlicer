@@ -37,8 +37,12 @@ PrintSettingsDialog::PrintSettingsDialog(
     m_extruder_menu_transformer(std::make_shared<ExtruderMenuTransformer>()),
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this)
 {
-    content_item()->set_width(700);
-    content_item()->set_height(700);
+    set_resizable(true);
+    set_pinnable(true);
+
+    set_implicit_size(700, 700);
+    content_item()->set_min_width(700);
+    content_item()->set_min_height(500);
 
     content()->set_orientation(Orientation::Vertical);
     content()->set_gap(0);

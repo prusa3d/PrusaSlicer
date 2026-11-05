@@ -28,6 +28,11 @@ public:
     Callbacks& callbacks();
 
     /**
+     * @return true when the user moved/resized the popup and it no longer follows the attachment
+     */
+    bool detached() const;
+
+    /**
      * @param item that the Popup is attached to
      */
     void attach_to_item(
@@ -67,12 +72,24 @@ public:
 
 protected:
     void set_content_item(WindowPtr content_item);
+    /**
+     * @brief Breaks the attachment until the popup is closed, keeping the current geometry
+     */
+    void detach();
 
     void root_item_about_to_update() override;
 
 private:
     virtual void on_about_to_show();
     virtual void on_about_to_close();
+    /**
+     * @brief Called right before the popup is shown, before on_about_to_show
+     */
+    virtual void load_geometry();
+    /**
+     * @brief Called once the popup is closed
+     */
+    virtual void reset_geometry();
 
     // ------------ intentionally hidden ---------------
     void prepend(ObjectPtr child) override;
@@ -95,6 +112,7 @@ private:
     };
 
     AttachedType m_attached_type = AttachedType::FreeStanding;
+    bool m_detached              = false;
     ////////////////////AttachedType::Item/////////////////////
     Item* m_attached_to            = nullptr;
     Position m_preferred_position  = Position::Right;

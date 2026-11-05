@@ -73,6 +73,12 @@ void Theme::initialize_dark_colors()
         std::make_unique<ImColor>(0.41f, 0.41f, 0.41f, 1.00f),
         std::make_unique<ImColor>(0.51f, 0.51f, 0.51f, 1.00f)
     };
+    m_colors[Platform::Color::ResizeGrip] = ColorEntry{
+        {1.00f, 1.00f, 1.00f, 0.50f},
+        nullptr,
+        std::make_unique<ImColor>(1.00f, 1.00f, 1.00f, 0.80f),
+        std::make_unique<ImColor>(1.00f, 1.00f, 1.00f, 1.00f)
+    };
 
     m_colors[Platform::Color::NavCursor] = ColorEntry{{0.26f, 0.59f, 0.98f, 1.00f}};
 
@@ -166,6 +172,12 @@ void Theme::initialize_light_colors()
         nullptr,
         std::make_unique<ImColor>(0.45f, 0.45f, 0.45f, 1.00f), // hovered - darker
         std::make_unique<ImColor>(0.33f, 0.33f, 0.33f, 1.00f) // active - darkest
+    };
+    m_colors[Platform::Color::ResizeGrip] = ColorEntry{
+        {0.25f, 0.25f, 0.25f, 0.50f},
+        nullptr,
+        std::make_unique<ImColor>(0.25f, 0.25f, 0.25f, 0.80f),
+        std::make_unique<ImColor>(0.25f, 0.25f, 0.25f, 1.00f)
     };
 
     m_colors[Platform::Color::NavCursor] = ColorEntry{{0.26f, 0.59f, 0.98f, 1.00f}};
@@ -290,9 +302,11 @@ void Theme::initialize_imgui_dark_style()
     colors[ImGuiCol_Separator]         = colors[ImGuiCol_Border];
     colors[ImGuiCol_SeparatorHovered]  = ImVec4(0.10f, 0.40f, 0.75f, 0.78f);
     colors[ImGuiCol_SeparatorActive]   = ImVec4(0.10f, 0.40f, 0.75f, 1.00f);
-    colors[ImGuiCol_ResizeGrip]        = ImVec4(0.26f, 0.59f, 0.98f, 0.20f);
-    colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.67f);
-    colors[ImGuiCol_ResizeGripActive]  = ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
+    colors[ImGuiCol_ResizeGrip] = color_imgui(Platform::Color::ResizeGrip);
+    colors[ImGuiCol_ResizeGripHovered] =
+        color_imgui(Platform::Color::ResizeGrip, Platform::ColorGroup::Hovered);
+    colors[ImGuiCol_ResizeGripActive] =
+        color_imgui(Platform::Color::ResizeGrip, Platform::ColorGroup::Active);
     colors[ImGuiCol_TabHovered]        = colors[ImGuiCol_HeaderHovered];
     colors[ImGuiCol_Tab] = ImLerp(colors[ImGuiCol_Header], colors[ImGuiCol_TitleBgActive], 0.80f);
     colors[ImGuiCol_TabSelected] =
@@ -371,10 +385,11 @@ void Theme::initialize_imgui_light_style()
     colors[ImGuiCol_SeparatorHovered] =
         ImVec4(active.Value.x, active.Value.y, active.Value.z, 0.78f);
     colors[ImGuiCol_SeparatorActive] = k_prusa_orange;
-    colors[ImGuiCol_ResizeGrip] = ImVec4(active.Value.x, active.Value.y, active.Value.z, 0.20f);
+    colors[ImGuiCol_ResizeGrip] = color_imgui(Platform::Color::ResizeGrip);
     colors[ImGuiCol_ResizeGripHovered] =
-        ImVec4(active.Value.x, active.Value.y, active.Value.z, 0.67f);
-    colors[ImGuiCol_ResizeGripActive] = k_prusa_orange;
+        color_imgui(Platform::Color::ResizeGrip, Platform::ColorGroup::Hovered);
+    colors[ImGuiCol_ResizeGripActive] =
+        color_imgui(Platform::Color::ResizeGrip, Platform::ColorGroup::Active);
     colors[ImGuiCol_TabHovered]       = colors[ImGuiCol_HeaderHovered];
     colors[ImGuiCol_Tab] = ImLerp(colors[ImGuiCol_Header], colors[ImGuiCol_TitleBgActive], 0.80f);
     colors[ImGuiCol_TabSelected] =

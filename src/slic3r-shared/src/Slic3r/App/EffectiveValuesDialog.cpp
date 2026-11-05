@@ -445,45 +445,25 @@ EffectiveValuesDialog::EffectiveValuesDialog(
     content_item()->set_width(380_fpx);
     content_item()->set_height(200_fpx);
 
-    while(!content_item()->items().empty()) {
-        content_item()->remove(content_item()->items().back());
-    }
+    const ImColor bg_alternate = m_theme->color_imgui(Platform::Color::WindowBgAlternate);
 
-    auto area{content_item()->emplace_back<Yoga::Rectangle>()};
+    set_tab_flex_grow(1);
+    m_title = append_tab(std::string{});
+    m_title->set_label_font_type(Render::ImguiFontType::Bold);
+    m_title->label_object()->set_font_size(15_fpx);
+    m_title->set_background_color_checked(bg_alternate, bg_alternate);
+
+    this->content()->set_padding(0);
+    this->content()->set_flex_grow(1);
+
+    auto area{this->content()->emplace_back<Yoga::Rectangle>()};
     area->set_orientation(Yoga::Orientation::Vertical);
     area->set_fill(m_theme->color_imgui(Platform::Color::WindowBg));
-    area->set_border_color(m_theme->color_imgui(Platform::Color::WindowBgAlternate));
+    area->set_border_color(bg_alternate);
     area->set_flex_grow(1);
     area->set_border_width(1);
     area->set_rounding(0);
     area->set_align_items(YGAlignStretch);
-
-    const auto title_row_height{40_fpx};
-
-    auto title_row{area->emplace_back<Yoga::Rectangle>()};
-    title_row->set_height(title_row_height);
-    title_row->set_align_items(YGAlignStretch);
-    title_row->set_fill(m_theme->color_imgui(Platform::Color::WindowBgAlternate));
-
-    auto spacer{title_row->emplace_back<Yoga::Item>()};
-    spacer->set_width(title_row_height);
-
-    m_title = title_row->emplace_back<Yoga::Text>("");
-    m_title->set_flex_grow(1);
-    m_title->set_align({Yoga::AlignH::Center, Yoga::AlignV::Center});
-    m_title->set_font_size(15_fpx);
-    m_title->set_font_type(Render::ImguiFontType::Bold);
-
-    auto close_button_area{title_row->emplace_back<Yoga::Item>()};
-    close_button_area->set_width(title_row_height);
-    close_button_area->set_align_items(YGAlignCenter);
-    close_button_area->set_justify_content(YGJustifyCenter);
-
-    auto close_button{
-        close_button_area->emplace_back<Yoga::LayoutButton>(std::string{}, Render::Icon::PrintIdle)};
-    close_button->set_width(20_fpx);
-    close_button->set_height(20_fpx);
-    close_button->callbacks().action = [this] { close_action(); };
 
     auto content{area->emplace_back<Yoga::ScrollArea>()};
     content->set_orientation(Yoga::Orientation::Vertical);
@@ -562,7 +542,7 @@ void EffectiveValuesDialog::set_key(const std::optional<std::string>& key)
         return;
     }
 
-    m_title->set_text(Biz::_u8(def->label));
+    m_title->set_label(Biz::_u8(def->label));
     m_description->set_text(Biz::_u8(def->tooltip));
     update_effective_value_table(*key);
 }
@@ -694,7 +674,7 @@ void EffectiveValuesDialog::update_effective_value_table(const std::string& key)
 
 void EffectiveValuesDialog::clear()
 {
-    m_title->set_text(Biz::_u8L("Settings"));
+    m_title->set_label(Biz::_u8L("Settings"));
     m_description->set_text("");
     m_table->clear();
     content_item()->set_width(380_fpx);

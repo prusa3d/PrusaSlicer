@@ -37,6 +37,11 @@ MaterialSettingsDialog::MaterialSettingsDialog(
     m_material_cbi_list(m_project_interactor.preset_interactor().material_cbi_list()),
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this)
 {
+    set_resizable(true);
+    set_pinnable(true);
+    content_item()->set_min_width(700);
+    content_item()->set_min_height(500);
+
     m_material_cbi_list.add_listener<Biz::IListObserver<Biz::OverridableConfigBoxInteractor>>(this);
 
     m_footer->set_gap(5.f);

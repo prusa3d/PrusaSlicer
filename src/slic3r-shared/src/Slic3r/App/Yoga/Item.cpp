@@ -80,6 +80,7 @@ void Item::resize(const SizeInfo& size_info)
         YGNodeStyleSetMinHeight(m_node, m_min_height.result);
         m_max_height.evaluate(size_info);
         YGNodeStyleSetMaxHeight(m_node, m_max_height.result);
+        size_limits_changed();
 
         m_flex_grow.evaluate(size_info);
         YGNodeStyleSetFlexGrow(m_node, m_flex_grow.result);
@@ -326,6 +327,24 @@ void Item::set_height(const Unit& height)
     }
 }
 
+void Item::reset_width()
+{
+    if (m_width.has_value()) {
+        m_width.reset();
+        YGNodeStyleSetWidthAuto(m_node);
+        set_style_dirty();
+    }
+}
+
+void Item::reset_height()
+{
+    if (m_height.has_value()) {
+        m_height.reset();
+        YGNodeStyleSetHeightAuto(m_node);
+        set_style_dirty();
+    }
+}
+
 void Item::set_width_percent(float width_percent)
 {
     if (!m_width.has_value()
@@ -485,6 +504,13 @@ void Item::enabled_updated_internal() {}
 
 void Item::visible_updated_internal() {}
 
+void Item::size_limits_changed() {}
+
+Vec2f Item::evaluated_min_size() const
+{
+    return {m_min_width.result, m_min_height.result};
+}
+
 void Item::on_resized()
 {
     if (m_callbacks.size_changed) {
@@ -620,6 +646,7 @@ void Item::set_min_width(const Unit& min_width)
         m_min_width.source = min_width;
         m_min_width.evaluate(m_size_info);
         YGNodeStyleSetMinWidth(m_node, m_min_width.result);
+        size_limits_changed();
         set_style_dirty();
     }
 }
@@ -630,6 +657,7 @@ void Item::set_max_width(const Unit& max_width)
         m_max_width.source = max_width;
         m_max_width.evaluate(m_size_info);
         YGNodeStyleSetMaxWidth(m_node, m_max_width.result);
+        size_limits_changed();
         set_style_dirty();
     }
 }
@@ -640,6 +668,7 @@ void Item::set_min_height(const Unit& min_height)
         m_min_height.source = min_height;
         m_min_height.evaluate(m_size_info);
         YGNodeStyleSetMinHeight(m_node, m_min_height.result);
+        size_limits_changed();
         set_style_dirty();
     }
 }
@@ -650,6 +679,7 @@ void Item::set_max_height(const Unit& max_height)
         m_max_height.source = max_height;
         m_max_height.evaluate(m_size_info);
         YGNodeStyleSetMaxHeight(m_node, m_max_height.result);
+        size_limits_changed();
         set_style_dirty();
     }
 }

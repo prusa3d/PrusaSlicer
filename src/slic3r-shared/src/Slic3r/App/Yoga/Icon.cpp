@@ -42,7 +42,6 @@ void Icon::render(const Vec2f& pos, const Vec2f& size)
         update_draw_sizes();
     }
 
-    ImGui::SetCursorScreenPos(pixel_round(to_im(pos)));
     if (m_texture) {
         constexpr ImVec2 uv0{0, 0};
         constexpr ImVec2 uv1{1, 1};

@@ -15,14 +15,21 @@ OverrideSettingsDialog::OverrideSettingsDialog(Biz::ProjectInteractor& project_i
     Dialog({Biz::_u8L("Settings")}, "OverrideSettingsDialog"),
     m_project_interactor(project_interactor)
 {
-    content()->set_width(350_fpx);
+    set_resizable(true);
+    set_pinnable(true);
+
+    set_implicit_size(350_fpx, 455_fpx);
+    content_item()->set_min_width(350_fpx);
+    content_item()->set_min_height(455_fpx);
     content()->set_padding(20_fpx);
+    content()->set_flex_grow(1);
 
     Biz::Preset::PresetInteractor& preset_interactor = project_interactor.preset_interactor();
 
     content()->set_orientation(Orientation::Vertical);
     m_stack_layout = content()->emplace_back<StackLayout>();
     m_stack_layout->set_orientation(Orientation::Vertical);
+    m_stack_layout->set_flex_grow(1);
 
     m_categorizer = std::make_shared<ObservableOverrideCategorizer>();
     m_categorizer->set_ignored_categories({Domain::ConfigItemDef::Category::Object_Extruders});
@@ -58,6 +65,7 @@ OverrideSettingsDialog::OverrideSettingsDialog(Biz::ProjectInteractor& project_i
 
     Item* options_page = m_stack_layout->emplace_back<Item>();
     options_page->set_orientation(Orientation::Vertical);
+    options_page->set_flex_grow(1);
     options_page->set_gap(5_fpx);
 
     Item* back_row = options_page->emplace_back<Item>();
@@ -75,7 +83,9 @@ OverrideSettingsDialog::OverrideSettingsDialog(Biz::ProjectInteractor& project_i
     m_options_category_text->set_self_align(YGAlignCenter);
     m_options_category_text->set_font_type(Render::ImguiFontType::Bold);
 
-    options_page->emplace_back<Separator>(Orientation::Horizontal)->set_margin(Margins(-20_fpx, 0));
+    Separator* separator = options_page->emplace_back<Separator>(Orientation::Horizontal);
+    separator->set_margin(Margins(-20_fpx, 0));
+    separator->set_flex_shrink(0);
 
     m_category_filter = std::make_shared<OverrideConfigFilter>();
     m_category_filter->set_filter_fn(
@@ -119,7 +129,8 @@ OverrideSettingsDialog::OverrideSettingsDialog(Biz::ProjectInteractor& project_i
     m_override_config_list_view->set_margin(Margins(0, 0, -20_fpx, 0));
     m_override_config_list_view->set_padding(Paddings(0, 0, 10_fpx, 0));
     m_override_config_list_view->set_source_list(m_category_filter.get());
-    m_override_config_list_view->set_max_height(350_fpx);
+    m_override_config_list_view->set_flex_grow(1);
+    m_override_config_list_view->set_min_height(0);
 
     m_category_filter->set_source_model(
         preset_interactor.object_settings_interactor().object_observable_list()

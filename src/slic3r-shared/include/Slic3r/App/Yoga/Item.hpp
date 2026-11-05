@@ -137,6 +137,14 @@ public:
     void set_height(const Unit& height);
     void set_width_percent(float width_percent);
     void set_height_percent(float height_percent);
+    /**
+     * @brief Width is computed by the layout from the content
+     */
+    void reset_width();
+    /**
+     * @brief Height is computed by the layout from the content
+     */
+    void reset_height();
     void set_left(const Unit& left);
     void set_right(const Unit& right);
     void set_top(const Unit& top);
@@ -204,6 +212,11 @@ protected:
     virtual void visible_updated_internal();
 
     virtual void on_resized();
+    /**
+     * @brief Called when evaluated min/max width/height changed, either by setter or by size info
+     */
+    virtual void size_limits_changed();
+    Vec2f evaluated_min_size() const;
 
     void update_children_render_order();
 

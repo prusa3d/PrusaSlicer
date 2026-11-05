@@ -435,7 +435,11 @@ AbstractRenderLayout::AbstractRenderLayout(
     m_preferences_dialog(std::move(preferences_dialog)),
     m_crashed_projects_dialog(std::move(crashed_projects_dialog)),
     m_preset_updater_dialog(std::move(preset_updater_dialog))
-{}
+{
+    m_layout_main.set_dialog_geometry_store(
+        &AppServices::instance().app_config().app_settings_advanced()
+    );
+}
 
 AbstractRenderLayout::~AbstractRenderLayout()
 {

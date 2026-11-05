@@ -114,6 +114,9 @@ static const std::unordered_map<Icon, const char*> ICON_FILENAMES = {
     {Icon::TobBarShowUI, "tb_show_ui"},
     {Icon::TobBarPlus, "plus_new"},
     {Icon::TopBarCross, "cross_new"},
+    {Icon::Pin, "pin"},
+    {Icon::ArrowsDiagonal, "arrows_diagonal"},
+    {Icon::DotsTriangle, "dots_triangle"},
 
     // Gizmo Paint-On-Supports
     {Icon::Circle, "circle"},

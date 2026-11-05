@@ -43,7 +43,7 @@ private:
     Navigator& m_navigator;
     std::optional<std::string> m_key;
 
-    Yoga::Text* m_title{nullptr};
+    Yoga::LayoutButton* m_title{nullptr};
     Yoga::Text* m_description{nullptr};
     ValueTable* m_table{nullptr};
 };

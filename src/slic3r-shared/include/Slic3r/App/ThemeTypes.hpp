@@ -20,6 +20,7 @@ enum class Color
     RadioButtonBackground,
     RadioButton,
     Scrollbar,
+    ResizeGrip,
     NavCursor,
     ModalWindowDimBg,
     Success,

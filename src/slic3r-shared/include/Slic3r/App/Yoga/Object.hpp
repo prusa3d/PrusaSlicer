@@ -26,6 +26,10 @@ public:
     Object& operator=(Object& rhs) = delete;
 
     const std::string& object_name() const;
+    /**
+     * @return object name without the uniqueness suffix, as passed to set_object_name
+     */
+    std::string base_object_name() const;
     void set_object_name(const std::string& object_name);
 
     virtual void resize(const SizeInfo& size_info);

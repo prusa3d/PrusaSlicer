@@ -2,7 +2,11 @@
 
 #include "Slic3r/App/Yoga/Item.hpp"
 
+#include <cfloat>
+
 namespace Slic3r::App::Yoga {
+
+class Icon;
 
 class Window : public Item
 {
@@ -10,6 +14,10 @@ public:
     struct Callbacks
     {
         std::function<void(bool hovered)> hovered_changed{nullptr};
+        /**
+         * @brief Window was resized by the user through ImGui resize borders/grips
+         */
+        std::function<void(const Vec2f& pos, const Vec2f& size)> geometry_changed{nullptr};
     };
 
     explicit Window(const std::string& name);
@@ -51,8 +59,14 @@ public:
     bool is_transparent() const;
     void set_transparent(bool is_transparent);
 
+protected:
+    void size_limits_changed() override;
+
 private:
     Callbacks m_callbacks;
+    Icon* m_resize_grip = nullptr;
+    ImVec2 m_min_size_constraint{0.f, 0.f};
+    ImVec2 m_max_size_constraint{FLT_MAX, FLT_MAX};
 
     int m_flags = ImGuiWindowFlags_NoDecoration
         | ImGuiWindowFlags_NoMove

@@ -95,6 +95,9 @@ MaterialSelectionDialog::MaterialSelectionDialog(
         std::make_shared<Biz::ObservableListSearcher<Biz::Preset::PresetItem>>(score_preset_item)
     )
 {
+    set_resizable(true);
+    set_pinnable(true);
+
     m_material_searcher->set_max_found_items(64);
     m_project_contexts = std::make_unique<Biz::ProjectScoped<ProjectContext>>(project_interactor);
 
@@ -104,9 +107,12 @@ MaterialSelectionDialog::MaterialSelectionDialog(
         this
     );
 
-    content_item()->set_width(350_fpx);
+    set_implicit_size(350_fpx, 430_fpx);
+    content_item()->set_min_width(350_fpx);
+    content_item()->set_min_height(300_fpx);
 
     content()->set_orientation(Orientation::Vertical);
+    content()->set_flex_grow(1);
     content()->set_gap(5_fpx);
 
     m_stack_layout = content()->emplace_back<StackLayout>();
@@ -115,12 +121,14 @@ MaterialSelectionDialog::MaterialSelectionDialog(
 
     m_page_presets = m_stack_layout->emplace_back<Item>();
     m_page_presets->set_orientation(Orientation::Vertical);
+    m_page_presets->set_flex_grow(1);
     m_page_presets->set_gap(5_fpx);
 
     create_page_presets();
 
     m_page_materials = m_stack_layout->emplace_back<Item>();
     m_page_materials->set_orientation(Orientation::Vertical);
+    m_page_materials->set_flex_grow(1);
     m_page_materials->set_gap(5_fpx);
 
     create_page_materials();
@@ -287,7 +295,7 @@ void MaterialSelectionDialog::create_page_presets()
     m_type_filters = m_page_presets->emplace_back<Item>();
     m_type_filters->set_orientation(Orientation::Horizontal);
     m_type_filters->set_gap(5_fpx);
-    m_type_filters->set_flex_grow(1.f);
+    m_type_filters->set_flex_shrink(0);
 
     for (const std::string& filter_btn_name :
          std::initializer_list<std::string>{_u8L("All"), "PLA", "PETG", "ASA"})
@@ -336,9 +344,10 @@ void MaterialSelectionDialog::create_page_presets()
         }
     );
 
-    m_page_presets->emplace_back<Separator>(Orientation::Horizontal);
+    m_page_presets->emplace_back<Separator>(Orientation::Horizontal)->set_flex_shrink(0);
 
     Item* search_row = m_page_presets->emplace_back<Item>();
+    search_row->set_flex_shrink(0);
     search_row->set_gap(5_fpx);
     Icon* icon = search_row->emplace_back<Icon>(Render::Icon::Search);
     icon->set_width(16_fpx);
@@ -373,12 +382,12 @@ void MaterialSelectionDialog::create_page_presets()
     };
     on_app_config_changed("materials_only_favorites");
 
-    m_page_presets->emplace_back<Separator>(Orientation::Horizontal);
+    m_page_presets->emplace_back<Separator>(Orientation::Horizontal)->set_flex_shrink(0);
 
     Item* scroll_area = m_page_presets->emplace_back<Item>();
     scroll_area->set_orientation(Orientation::Vertical);
-    scroll_area->set_min_height(200_fpx);
-    scroll_area->set_max_height(300_fpx);
+    scroll_area->set_flex_grow(1);
+    scroll_area->set_min_height(0);
 
     m_selection_row_list_view =
         scroll_area->emplace_back<SelectionRowListView>(SelectionRowListViewFactory{
@@ -434,7 +443,7 @@ void MaterialSelectionDialog::create_page_materials()
     Item* filters_wrap = m_page_materials->emplace_back<Item>();
     filters_wrap->set_orientation(Orientation::Horizontal);
     filters_wrap->set_gap(5_fpx);
-    filters_wrap->set_flex_grow(1.f);
+    filters_wrap->set_flex_shrink(0);
 
     m_combobox_material_type = filters_wrap->emplace_back<ComboBox>("ComboBoxMaterialType");
     m_combobox_material_type->set_width(140_fpx);
@@ -445,9 +454,10 @@ void MaterialSelectionDialog::create_page_materials()
     m_combobox_material_type->callbacks().selection_changed = [this](int)
     { update_material_filter(); };
 
-    m_page_materials->emplace_back<Separator>(Orientation::Horizontal);
+    m_page_materials->emplace_back<Separator>(Orientation::Horizontal)->set_flex_shrink(0);
 
     Item* search_row = m_page_materials->emplace_back<Item>();
+    search_row->set_flex_shrink(0);
     search_row->set_gap(5_fpx);
     Icon* icon = search_row->emplace_back<Icon>(Render::Icon::Search);
     icon->set_width(16_fpx);
@@ -484,12 +494,12 @@ void MaterialSelectionDialog::create_page_materials()
 
     on_app_config_changed("matdb_materials_only_favorites");
 
-    m_page_materials->emplace_back<Separator>(Orientation::Horizontal);
+    m_page_materials->emplace_back<Separator>(Orientation::Horizontal)->set_flex_shrink(0);
 
     Item* scroll_area = m_page_materials->emplace_back<Item>();
     scroll_area->set_orientation(Orientation::Vertical);
-    scroll_area->set_min_height(200_fpx);
-    scroll_area->set_max_height(300_fpx);
+    scroll_area->set_flex_grow(1);
+    scroll_area->set_min_height(0);
 
     m_spool_selection_row_list_view =
         scroll_area->emplace_back<SpoolSelectionRowListView>(SpoolSelectionRowListViewFactory{

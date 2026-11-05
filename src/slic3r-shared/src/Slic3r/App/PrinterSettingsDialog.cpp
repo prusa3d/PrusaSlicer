@@ -57,13 +57,20 @@ PrinterSettingsDialog::PrinterSettingsDialog(
     ),
     m_printer_add_dialog(printer_add_dialog)
 {
-    content_item()->set_width(350_fpx);
+    set_resizable(true);
+    set_pinnable(true);
+
+    set_implicit_size(350_fpx, 470_fpx);
+    content_item()->set_min_width(350_fpx);
+    content_item()->set_min_height(470_fpx);
 
     content()->set_padding(0);
     content()->set_orientation(Orientation::Vertical);
+    content()->set_flex_grow(1);
 
     m_stack_layout = content()->emplace_back<StackLayout>();
     m_stack_layout->set_orientation(Orientation::Vertical);
+    m_stack_layout->set_flex_grow(1);
 
     create_page_list();
 
@@ -122,6 +129,7 @@ void PrinterSettingsDialog::create_page_list()
 
     m_page_list = m_stack_layout->emplace_back<Item>();
     m_page_list->set_orientation(Orientation::Vertical);
+    m_page_list->set_flex_grow(1);
     m_page_list->set_gap(10_fpx);
     m_page_list->set_padding(Paddings{Padding, 10_fpx, Padding, Padding});
 
@@ -130,6 +138,7 @@ void PrinterSettingsDialog::create_page_list()
     );
 
     Item* filters_row = m_page_list->emplace_back<Item>();
+    filters_row->set_flex_shrink(0);
     filters_row->set_gap(5_fpx);
     for (const std::string& filter_btn_name :
          std::initializer_list<std::string>{_u8L("All"), _u8L("Local"), _u8L("Connect")})
@@ -173,6 +182,7 @@ void PrinterSettingsDialog::create_page_list()
     );
 
     Item* search_row = m_page_list->emplace_back<Item>();
+    search_row->set_flex_shrink(0);
     search_row->set_gap(5_fpx);
     Icon* icon = search_row->emplace_back<Icon>(Render::Icon::Search);
     icon->set_width(16_fpx);
@@ -186,6 +196,7 @@ void PrinterSettingsDialog::create_page_list()
     { m_preset_searcher->set_search_text(m_input_text_search->text()); };
 
     Item* content_area = m_page_list->emplace_back<Item>();
+    content_area->set_flex_shrink(0);
     content_area->set_gap(5_fpx);
     content_area->set_orientation(Orientation::Vertical);
 
@@ -226,7 +237,7 @@ void PrinterSettingsDialog::create_page_list()
     m_printer_list_view->set_padding(Paddings(0, 0, 15_fpx, 0));
     m_printer_list_view->set_margin(Margins(0, -10_fpx, -20_fpx, 0));
     m_printer_list_view->set_gap(8_fpx);
-    m_printer_list_view->set_max_height(275);
+    m_printer_list_view->set_min_height(0);
     m_printer_list_view->set_orientation(Orientation::Vertical);
     m_printer_list_view->set_source_list(m_preset_searcher.get());
 
@@ -236,6 +247,7 @@ void PrinterSettingsDialog::create_page_list()
     m_preset_searcher->set_source_model(m_printer_filter.get());
 
     Item* row = m_page_list->emplace_back<Item>();
+    row->set_flex_shrink(0);
     row->set_justify_content(YGJustifySpaceBetween);
 
     LayoutButton* show_diff_dialog_button =
@@ -262,6 +274,7 @@ void PrinterSettingsDialog::create_page_settings()
     ASSERT(!m_page_settings);
     m_page_settings = m_stack_layout->emplace_back<ScrollArea>();
     m_page_settings->set_orientation(Orientation::Vertical);
+    m_page_settings->set_flex_grow(1);
     m_page_settings->set_gap(5_fpx);
     m_page_settings->set_padding(Paddings{20_fpx, 10_fpx, 20_fpx, 20_fpx});
 

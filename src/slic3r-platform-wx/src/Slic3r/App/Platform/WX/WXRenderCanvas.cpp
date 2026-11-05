@@ -7,6 +7,9 @@
 #include <wx/dcclient.h>
 #include <wx/clipbrd.h>
 #include <wx/toplevel.h>
+#if defined(__WXGTK__)
+#include <gtk/gtk.h>
+#endif
 #include <imgui/imgui.h>
 #include <imgui/backends/imgui_impl_opengl3.h>
 
@@ -291,6 +294,23 @@ static ImGui_ImplWX_Data* ImGui_ImplWX_GetBackendData()
         nullptr;
 }
 
+static wxCursor themed_cursor(const char* name, wxStockCursor fallback)
+{
+#if defined(__WXGTK__)
+    GdkCursor* cursor = gdk_cursor_new_from_name(gdk_display_get_default(), name);
+    GdkPixbuf* pixbuf = cursor ? gdk_cursor_get_image(cursor) : nullptr;
+    if (cursor) {
+        g_object_unref(cursor);
+    }
+    if (pixbuf) {
+        const gchar* x_hot = gdk_pixbuf_get_option(pixbuf, "x_hot");
+        const gchar* y_hot = gdk_pixbuf_get_option(pixbuf, "y_hot");
+        return wxCursor(wxBitmap(pixbuf), x_hot ? atoi(x_hot) : 0, y_hot ? atoi(y_hot) : 0);
+    }
+#endif
+    return wxCursor(fallback);
+}
+
 static void ImGui_ImplWX_InitMouseCursor()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -311,8 +331,8 @@ static void ImGui_ImplWX_InitMouseCursor()
     ); // Used for corner resizing, so need NWSE, not SIZING, which is moving
     bd->MouseCursors[ImGuiMouseCursor_ResizeNS]   = wxCursor(wxCURSOR_SIZENS);
     bd->MouseCursors[ImGuiMouseCursor_ResizeEW]   = wxCursor(wxCURSOR_SIZEWE);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeNESW] = wxCursor(wxCURSOR_SIZENESW);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeNWSE] = wxCursor(wxCURSOR_SIZENWSE);
+    bd->MouseCursors[ImGuiMouseCursor_ResizeNESW] = themed_cursor("nesw-resize", wxCURSOR_SIZENESW);
+    bd->MouseCursors[ImGuiMouseCursor_ResizeNWSE] = themed_cursor("nwse-resize", wxCURSOR_SIZENWSE);
     bd->MouseCursors[ImGuiMouseCursor_Hand]       = wxCursor(wxCURSOR_HAND);
     bd->MouseCursors[ImGuiMouseCursor_NotAllowed] = wxCursor(wxCURSOR_NO_ENTRY);
 }

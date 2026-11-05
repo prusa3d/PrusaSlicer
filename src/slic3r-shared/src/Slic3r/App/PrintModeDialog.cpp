@@ -349,9 +349,14 @@ PrintModeDialog::PrintModeDialog(Biz::ProjectInteractor& project_interactor, Nav
     m_config_container_list_listener_scope(project_interactor, *this),
     m_projects_listener_scope(project_interactor, *this)
 {
-    content_item()->set_width(620_fpx);
-    content_item()->set_height(640_fpx);
+    set_resizable(true);
+    set_pinnable(true);
+
+    set_implicit_size(620_fpx, 640_fpx);
+    content_item()->set_min_width(620_fpx);
+    content_item()->set_min_height(400_fpx);
     content()->set_align_items(YGAlignStretch);
+    content()->set_flex_grow(1);
 
     m_list = content()->emplace_back<ScrollArea>();
     m_list->set_orientation(Orientation::Vertical);

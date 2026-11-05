@@ -110,6 +110,10 @@ void Popup::on_about_to_show() {}
 
 void Popup::on_about_to_close() {}
 
+void Popup::load_geometry() {}
+
+void Popup::reset_geometry() {}
+
 void Popup::prepend(ObjectPtr child)
 {
     Object::prepend(std::move(child));
@@ -155,6 +159,16 @@ Popup::Callbacks& Popup::callbacks()
     return m_callbacks;
 }
 
+bool Popup::detached() const
+{
+    return m_detached;
+}
+
+void Popup::detach()
+{
+    m_detached = true;
+}
+
 void Popup::attach_to_item(
     Item* item,
     Position prefered_position,
@@ -193,6 +207,7 @@ void Popup::open()
     ASSERT(root_item(), "Cannot open popup which is not inserted into complete tree");
 
     if (!m_opened) {
+        load_geometry();
         on_about_to_show();
 
         RootItem* root = dynamic_cast<RootItem*>(root_item());
@@ -220,13 +235,15 @@ void Popup::close()
         on_about_to_close();
 
         root->close_popup(this);
-        m_opened = false;
+        m_opened   = false;
+        m_detached = false;
         YGNodeStyleSetDisplay(m_popup_node, YGDisplayNone);
         m_content_item->set_visible(false);
 
         if (m_callbacks.closed) {
             m_callbacks.closed();
         }
+        reset_geometry();
     }
 }
 
@@ -293,8 +310,14 @@ void Popup::resize(const SizeInfo& size_info)
 
     ImRect popup_rect;
     if (m_attached_type == AttachedType::Item) {
-        const Vec2f attachee_global_pos = m_attached_to->get_global_pos();
-        m_last_attached_pos             = attachee_global_pos;
+        m_last_attached_pos = m_attached_to->get_global_pos();
+    }
+
+    if (m_detached) {
+        popup_rect.Min = ImVec2(m_content_item->left(), m_content_item->top());
+        popup_rect.Max = popup_rect.Min + ImVec2(m_content_item->width(), m_content_item->height());
+    } else if (m_attached_type == AttachedType::Item) {
+        const Vec2f attachee_global_pos = m_last_attached_pos;
         const ImRect size_rect(0, 0, size_info.viewport_size_x, size_info.viewport_size_y);
         const ImVec2 target_pos{attachee_global_pos.x(), attachee_global_pos.y()};
         const ImRect target_rect{

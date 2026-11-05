@@ -258,6 +258,9 @@ ColorMixDialog::ColorMixDialog(
     m_three_color_presets(std::make_shared<ObservableListSortFilter<BlendTileData>>()),
     m_recipe_rows(std::make_shared<ObservableList<RecipeRowData>>())
 {
+    set_resizable(true);
+    set_pinnable(true);
+
     m_two_color_presets->set_filter_fn(
         [](const BlendTileData& tile) -> bool
         { return tile.preset.extruder_ids_1based.size() == 2; }
@@ -267,8 +270,9 @@ ColorMixDialog::ColorMixDialog(
         { return tile.preset.extruder_ids_1based.size() == 3; }
     );
 
-    this->content_item()->set_width(980_fpx);
-    this->content_item()->set_height(660_fpx);
+    set_implicit_size(980_fpx, 660_fpx);
+    this->content_item()->set_min_width(980_fpx);
+    this->content_item()->set_min_height(660_fpx);
 
     this->content()->set_orientation(Orientation::Vertical);
     this->content()->set_padding(0);

@@ -38,7 +38,7 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
 
     m_advanced_dialog =
         emplace_back<PrinterAdvancedSettingsDialog>(project_interactor, m_navigator);
-    m_advanced_dialog->attach_to_item(this, Position::Left);
+    m_advanced_dialog->attach_to_item(this, Position::Left, 10_fpx, AlignU::Start);
 
     m_color_mix_dialog = emplace_back<ColorMix::ColorMixDialog>(project_interactor, m_navigator);
 
@@ -116,7 +116,7 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
     m_advanced_dialog->callbacks().closed = [button_advanced_setting]
     { button_advanced_setting->set_checked(false); };
 
-    m_color_mix_dialog->attach_to_center();
+    m_color_mix_dialog->attach_to_item(this, Position::Left, 10_fpx, AlignU::Start);
 
     m_color_mix_button = preset_row->emplace_back<LayoutButton>(std::string{},
         Render::Icon::Palette,

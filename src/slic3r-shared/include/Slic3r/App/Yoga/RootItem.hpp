@@ -8,6 +8,7 @@
 namespace Slic3r::App::Yoga {
 
 class Popup;
+class IDialogGeometryStore;
 
 class RootItem : public Item
 {
@@ -25,6 +26,12 @@ public:
 
     void open_popup(Popup* popup);
     void close_popup(Popup* popup);
+
+    IDialogGeometryStore* dialog_geometry_store() const;
+    /**
+     * @brief Store used by pinnable dialogs in this tree, nullptr disables persistence
+     */
+    void set_dialog_geometry_store(IDialogGeometryStore* store);
 
     void push_event(EventPtr event) override;
 
@@ -56,6 +63,8 @@ protected:
     Popups m_popups;
     Popups m_popups_to_be_added;
     Popups m_popups_to_be_deleted;
+
+    IDialogGeometryStore* m_dialog_geometry_store = nullptr;
 
 private:
     int m_last_rendered_frame = -1;

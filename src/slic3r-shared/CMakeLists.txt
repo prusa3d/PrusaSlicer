@@ -649,6 +649,7 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/App/Yoga/Icon.hpp
         src/Slic3r/App/Yoga/Icon.cpp
         src/Slic3r/App/Yoga/Text.cpp
+        include/Slic3r/App/Yoga/DialogGeometry.hpp
         include/Slic3r/App/Yoga/Dialog.hpp
         src/Slic3r/App/Yoga/Dialog.cpp
         src/Slic3r/App/Yoga/Separator.cpp
@@ -1679,6 +1680,7 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/App/DialogNavigationTests.cpp
             test/Slic3r/App/LoadingProgressDialogTests.cpp
+            test/Slic3r/App/AppSettingsAdvancedTests.cpp
             test/Slic3r/App/OpenFiles/OpenFilesDialogModelTests.cpp
 
             test/Slic3r/App/Lua/PluginBundleTests.cpp
@@ -1716,6 +1718,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/App/Yoga/SplitLayoutTests.cpp
             test/Slic3r/App/Yoga/ScrollAreaTests.cpp
             test/Slic3r/App/Yoga/PopupTests.cpp
+            test/Slic3r/App/Yoga/DialogTests.cpp
             test/Slic3r/App/Yoga/ObjectTests.cpp
             test/Slic3r/App/Yoga/EventTests.cpp
             test/Slic3r/App/Yoga/ComboBoxTests.cpp

@@ -27,6 +27,11 @@ PrinterAdvancedSettingsDialog::PrinterAdvancedSettingsDialog(
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
     m_dirty_categorizer(std::make_shared<DirtyCategorizer>())
 {
+    set_resizable(true);
+    set_pinnable(true);
+    content_item()->set_min_width(700);
+    content_item()->set_min_height(500);
+
     Tab* tab = append_tab(_u8L("Printer"));
     m_config_tabs.emplace_back(
         std::make_unique<ConfigTab>(
