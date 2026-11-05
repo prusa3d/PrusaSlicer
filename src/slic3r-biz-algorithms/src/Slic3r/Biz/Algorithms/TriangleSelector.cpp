@@ -4,6 +4,8 @@
 #include <boost/container/vector.hpp>
 #include <cmath>
 #include <functional>
+#include <iterator>
+#include <limits>
 #include <queue>
 #include <cstring>
 
@@ -13,6 +15,7 @@
 #include "Slic3r/Domain/TriangleSelector.hpp"
 #include "Slic3r/Math.hpp"
 #include "Slic3r/Utils.hpp"
+#include "Slic3r/Assert.hpp"
 
 using Slic3r::Domain::AdditionalMeshInfo;
 using Slic3r::Domain::EPSILON;
@@ -186,25 +189,92 @@ void TriangleSelector::Triangle::set_division(int sides_to_split, int special_si
     this->special_side_idx = char(special_side_idx);
 }
 
-inline bool is_point_inside_triangle(const Vec3f &pt, const Vec3f &p1, const Vec3f &p2, const Vec3f &p3)
+static Vec3f
+barycentric_coordinates(const Vec3f& pt, const Vec3f& p1, const Vec3f& p2, const Vec3f& p3)
 {
     // Real-time collision detection, Ericson, Chapter 3.4
-    auto barycentric = [&pt, &p1, &p2, &p3]() -> Vec3f {
-        std::array<Vec3f, 3> v     = {p2 - p1, p3 - p1, pt - p1};
-        float                d00   = v[0].dot(v[0]);
-        float                d01   = v[0].dot(v[1]);
-        float                d11   = v[1].dot(v[1]);
-        float                d20   = v[2].dot(v[0]);
-        float                d21   = v[2].dot(v[1]);
-        float                denom = d00 * d11 - d01 * d01;
+    std::array<Vec3f, 3> v = {p2 - p1, p3 - p1, pt - p1};
+    float d00              = v[0].dot(v[0]);
+    float d01              = v[0].dot(v[1]);
+    float d11              = v[1].dot(v[1]);
+    float d20              = v[2].dot(v[0]);
+    float d21              = v[2].dot(v[1]);
+    float denom            = d00 * d11 - d01 * d01;
 
-        Vec3f barycentric_cords(1.f, (d11 * d20 - d01 * d21) / denom, (d00 * d21 - d01 * d20) / denom);
-        barycentric_cords.x() = barycentric_cords.x() - barycentric_cords.y() - barycentric_cords.z();
-        return barycentric_cords;
+    Vec3f barycentric_cords(1.f, (d11 * d20 - d01 * d21) / denom, (d00 * d21 - d01 * d20) / denom);
+    barycentric_cords.x() = barycentric_cords.x() - barycentric_cords.y() - barycentric_cords.z();
+    return barycentric_cords;
+}
+
+inline bool
+is_point_inside_triangle(const Vec3f& pt, const Vec3f& p1, const Vec3f& p2, const Vec3f& p3)
+{
+    Vec3f barycentric_cords = barycentric_coordinates(pt, p1, p2, p3);
+    return std::all_of(
+        std::begin(barycentric_cords),
+        std::end(barycentric_cords),
+        [](float cord) { return 0.f <= cord && cord <= 1.f; }
+    );
+}
+
+/**
+ * @brief Whether two triangles lying in the same plane overlap by more than EPSILON, so that touching ones do not count (separating axis test).
+ *
+ * @param normal Normal of the plane, the normals of the edges of the triangles used as the separating axes lie in the plane perpendicular to it.
+ */
+static bool coplanar_triangles_overlap(
+    const std::array<Vec3f, 3>& first_triangle,
+    const std::array<Vec3f, 3>& second_triangle,
+    const Vec3f& normal
+)
+{
+    assert(
+        std::ranges::all_of(
+            first_triangle,
+            [&](const Vec3f& point)
+            {
+                return std::abs(normal.dot(point - first_triangle[0]))
+                    <= static_cast<float>(EPSILON);
+            }
+        )
+    );
+    assert(
+        std::ranges::all_of(
+            second_triangle,
+            [&](const Vec3f& point)
+            {
+                return std::abs(normal.dot(point - first_triangle[0]))
+                    <= static_cast<float>(EPSILON);
+            }
+        )
+    );
+
+    const auto is_separated_by_edge_of =
+        [&normal](const std::array<Vec3f, 3>& triangle, const std::array<Vec3f, 3>& other_triangle)
+    {
+        for (int edge_idx = 0; edge_idx < 3; ++edge_idx) {
+            const Vec3f& edge_start = triangle[edge_idx];
+            Vec3f inner_normal =
+                (triangle[next_idx_modulo(edge_idx, 3)] - edge_start).cross(normal).normalized();
+            if (inner_normal.dot(triangle[prev_idx_modulo(edge_idx, 3)] - edge_start) < 0.f) {
+                inner_normal = -inner_normal;
+            }
+
+            if (std::ranges::all_of(
+                    other_triangle,
+                    [&](const Vec3f& point)
+                    { return inner_normal.dot(point - edge_start) <= float(EPSILON); }
+                ))
+            {
+                return true;
+            }
+        }
+
+        return false;
     };
 
-    Vec3f barycentric_cords = barycentric();
-    return std::all_of(std::begin(barycentric_cords), std::end(barycentric_cords), [](float cord) { return 0.f <= cord && cord <= 1.0; });
+    return !is_separated_by_edge_of(first_triangle, second_triangle)
+        && !is_separated_by_edge_of(second_triangle, first_triangle);
 }
 
 int TriangleSelector::select_unsplit_triangle(const Vec3f &hit, int facet_idx, const Index3 &neighbors) const
@@ -249,6 +319,165 @@ int TriangleSelector::select_unsplit_triangle(const Vec3f &hit, int facet_idx) c
     Index3 neighbors = m_neighbors[facet_idx];
     assert(this->verify_triangle_neighbors(m_triangles[facet_idx], neighbors));
     return this->select_unsplit_triangle(hit, facet_idx, neighbors);
+}
+
+int TriangleSelector::closest_unsplit_triangle_at_point(const int facet_idx, const Vec3f& point) const
+{
+    assert(this->is_original_triangle(facet_idx));
+    assert(
+        barycentric_coordinates(
+            point,
+            m_vertices[m_triangles[facet_idx].verts_idxs[0]].v,
+            m_vertices[m_triangles[facet_idx].verts_idxs[1]].v,
+            m_vertices[m_triangles[facet_idx].verts_idxs[2]].v
+        )
+            .minCoeff()
+        >= -static_cast<float>(EPSILON)
+    );
+
+    int triangle_idx = facet_idx;
+    while (m_triangles[triangle_idx].is_split()) {
+        const Triangle& triangle = m_triangles[triangle_idx];
+        // Rounding may put the point slightly outside all the children, so the one it is the least outside of is taken.
+        int closest_child_idx                   = triangle.children[0];
+        float closest_child_smallest_coordinate = -std::numeric_limits<float>::max();
+        for (int child_idx = 0; child_idx <= triangle.number_of_split_sides(); ++child_idx) {
+            const std::array<int, 3>& child_vertices =
+                m_triangles[triangle.children[child_idx]].verts_idxs;
+            const float smallest_coordinate =
+                barycentric_coordinates(
+                    point,
+                    m_vertices[child_vertices[0]].v,
+                    m_vertices[child_vertices[1]].v,
+                    m_vertices[child_vertices[2]].v
+                )
+                    .minCoeff();
+
+            if (smallest_coordinate > closest_child_smallest_coordinate) {
+                closest_child_smallest_coordinate = smallest_coordinate;
+                closest_child_idx                 = triangle.children[child_idx];
+            }
+        }
+
+        triangle_idx = closest_child_idx;
+    }
+
+    return triangle_idx;
+}
+
+float TriangleSelector::finest_leaf_edge_length(const int facet_idx) const
+{
+    float finest_edge_length = std::numeric_limits<float>::max();
+    std::vector<int> triangles_to_visit{facet_idx};
+    while (!triangles_to_visit.empty()) {
+        const Triangle& triangle = m_triangles[triangles_to_visit.back()];
+        triangles_to_visit.pop_back();
+        if (triangle.is_split()) {
+            for (int child_idx = 0; child_idx <= triangle.number_of_split_sides(); ++child_idx) {
+                triangles_to_visit.push_back(triangle.children[child_idx]);
+            }
+
+            continue;
+        }
+
+        float longest_edge_length = 0.f;
+        for (int vertex_idx = 0; vertex_idx < 3; ++vertex_idx) {
+            const Vec3f& edge_start = m_vertices[triangle.verts_idxs[vertex_idx]].v;
+            const Vec3f& edge_end =
+                m_vertices[triangle.verts_idxs[next_idx_modulo(vertex_idx, 3)]].v;
+            longest_edge_length = std::max(longest_edge_length, (edge_end - edge_start).norm());
+        }
+
+        finest_edge_length = std::min(finest_edge_length, longest_edge_length);
+    }
+
+    // A positive edge limit guarantees that the repainting stops splitting.
+    return std::max(finest_edge_length, static_cast<float>(EPSILON));
+}
+
+bool TriangleSelector::is_painted_in_other_state_under(
+    int triangle_idx,
+    const std::array<Vec3f, 3>& tested_triangle,
+    TriangleStateType expected_state
+) const
+{
+    const Triangle& triangle = m_triangles[triangle_idx];
+    const std::array<Vec3f, 3> triangle_vertices{
+        m_vertices[triangle.verts_idxs[0]].v,
+        m_vertices[triangle.verts_idxs[1]].v,
+        m_vertices[triangle.verts_idxs[2]].v
+    };
+
+    if (!coplanar_triangles_overlap(
+            triangle_vertices,
+            tested_triangle,
+            m_face_normals[triangle.source_triangle]
+        ))
+    {
+        return false;
+    }
+
+    if (!triangle.is_split()) {
+        return triangle.get_state() != expected_state;
+    }
+
+    for (int child_idx = 0; child_idx <= triangle.number_of_split_sides(); ++child_idx) {
+        if (this->is_painted_in_other_state_under(
+                triangle.children[child_idx],
+                tested_triangle,
+                expected_state
+            ))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void TriangleSelector::repaint_by_source_facet(
+    const int facet_idx,
+    const Index3& neighbors,
+    const TriangleSelector& source_selector,
+    const int source_facet_idx
+)
+{
+    const std::array<int, 3>& facet_vertices = m_triangles[facet_idx].verts_idxs;
+    const std::array<Vec3f, 3> facet_triangle{
+        m_vertices[facet_vertices[0]].v,
+        m_vertices[facet_vertices[1]].v,
+        m_vertices[facet_vertices[2]].v
+    };
+    const Vec3f centroid = (facet_triangle[0] + facet_triangle[1] + facet_triangle[2]) / 3.f;
+    const TriangleStateType centroid_state =
+        source_selector
+            .m_triangles
+                [source_selector.closest_unsplit_triangle_at_point(source_facet_idx, centroid)]
+            .get_state();
+
+    if (source_selector
+            .is_painted_in_other_state_under(source_facet_idx, facet_triangle, centroid_state))
+    {
+        this->split_triangle(facet_idx, neighbors);
+    }
+
+    if (!m_triangles[facet_idx].is_split()) {
+        this->set_triangle_state(facet_idx, centroid_state);
+        return;
+    }
+
+    // m_triangles may be reallocated by the recursion, so the parent is looked up again for every child.
+    for (int child_idx = 0; child_idx <= m_triangles[facet_idx].number_of_split_sides();
+         ++child_idx)
+    {
+        const Triangle& parent = m_triangles[facet_idx];
+        this->repaint_by_source_facet(
+            parent.children[child_idx],
+            this->child_neighbors(parent, neighbors, child_idx),
+            source_selector,
+            source_facet_idx
+        );
+    }
 }
 
 void TriangleSelector::select_patch(int facet_start, std::unique_ptr<Cursor> &&cursor, TriangleStateType new_state, const Transform3d& trafo_no_translate, bool triangle_splitting, float highlight_by_angle_deg)
@@ -1310,11 +1539,11 @@ void TriangleSelector::split_triangle(int facet_idx, const Index3 &neighbors)
     std::array<stl_vertex, 3> pts_transformed; // must stay in scope of pts !!!
 
     // In case the object is non-uniformly scaled, transform the
-    // points to world coords.
-    if (m_cursor->use_world_coordinates) {
+    // points to world coords. Without a cursor (repainting), the mesh coords are used.
+    if (m_cursor != nullptr && m_cursor->use_world_coordinates) {
         for (size_t i = 0; i < pts.size(); ++i) {
             pts_transformed[i] = m_cursor->trafo * (*pts[i]);
-            pts[i] = &pts_transformed[i];
+            pts[i]             = &pts_transformed[i];
         }
     }
 
@@ -2213,6 +2442,106 @@ std::vector<int> TriangleSelector::take_changed_triangle_slot_chunks()
 std::vector<int> TriangleSelector::take_changed_vertex_slot_chunks()
 {
     return take_set_flag_indices(m_changed_vertex_slot_chunks);
+}
+
+/**
+ * An unchanged facet gets a copy of the split tree of its source facet. Any other facet gets only the state of its source facet,
+ * and when the source facet is split, the facet is repainted by splitting it along the borders of the source painting.
+ */
+TriangleSplittingData TriangleSelector::remap_to_derived_mesh(
+    const TriangleSplittingData& source_data,
+    const Domain::TriangleMesh& source_mesh,
+    const Domain::TriangleMesh& derived_mesh,
+    const std::vector<TriMesh::SourceFacet>& source_facets
+)
+{
+    ASSERT(source_facets.size() == derived_mesh.facets_count());
+
+    struct FacetToRepaint
+    {
+        int derived_facet_idx;
+        int source_facet_idx;
+    };
+
+    const std::vector<TriangleBitStreamMapping>& source_mappings = source_data.triangles_to_split;
+
+    // The derived facets, which are not unchanged copies of their split source facets, so their trees cannot be taken over.
+    std::vector<FacetToRepaint> facets_to_repaint;
+    TriangleSplittingData derived_data;
+    for (int derived_facet_idx = 0; derived_facet_idx < static_cast<int>(source_facets.size());
+         ++derived_facet_idx)
+    {
+        const TriMesh::SourceFacet& source_facet = source_facets[derived_facet_idx];
+        // The painting of the source facet is the bit range starting at its mapping, the mappings are sorted by the facet index
+        // and a facet without one is unpainted.
+        const auto mapping_it = std::ranges::lower_bound(
+            source_mappings,
+            source_facet.index,
+            {},
+            &TriangleBitStreamMapping::triangle_idx
+        );
+        if (source_facet.index < 0
+            || mapping_it == source_mappings.end()
+            || mapping_it->triangle_idx != source_facet.index)
+        {
+            continue;
+        }
+
+        const int bitstream_begin = mapping_it->bitstream_start_idx;
+        const int bitstream_end   = std::next(mapping_it) == source_mappings.end() ?
+              static_cast<int>(source_data.bitstream.size()) :
+              std::next(mapping_it)->bitstream_start_idx;
+
+        // The first two bits are the number of the split sides.
+        const bool is_source_facet_split =
+            source_data.bitstream[bitstream_begin] || source_data.bitstream[bitstream_begin + 1];
+        if (is_source_facet_split && !source_facet.is_unchanged) {
+            facets_to_repaint.push_back(
+                {.derived_facet_idx = derived_facet_idx, .source_facet_idx = source_facet.index}
+            );
+            continue;
+        }
+
+        derived_data.triangles_to_split
+            .emplace_back(derived_facet_idx, static_cast<int>(derived_data.bitstream.size()));
+        derived_data.bitstream.insert(
+            derived_data.bitstream.end(),
+            source_data.bitstream.begin() + bitstream_begin,
+            source_data.bitstream.begin() + bitstream_end
+        );
+    }
+
+    if (facets_to_repaint.empty()) {
+        if (!derived_data.bitstream.empty()) {
+            derived_data.update_used_states(0);
+        }
+
+        if (derived_data.triangles_to_split.size() < derived_mesh.facets_count()) {
+            derived_data.used_states[static_cast<int>(TriangleStateType::NONE)] = true;
+        }
+
+        return derived_data;
+    }
+
+    TriangleSelector source_selector(source_mesh);
+    source_selector.deserialize(source_data, false);
+
+    TriangleSelector derived_selector(derived_mesh);
+    derived_selector.deserialize(derived_data, false);
+    for (const FacetToRepaint& facet_to_repaint : facets_to_repaint) {
+        derived_selector.set_edge_limit(
+            source_selector.finest_leaf_edge_length(facet_to_repaint.source_facet_idx)
+        );
+        derived_selector.repaint_by_source_facet(
+            facet_to_repaint.derived_facet_idx,
+            derived_selector.m_neighbors[facet_to_repaint.derived_facet_idx],
+            source_selector,
+            facet_to_repaint.source_facet_idx
+        );
+        derived_selector.remove_useless_children(facet_to_repaint.derived_facet_idx);
+    }
+
+    return derived_selector.serialize();
 }
 
 // Lightweight variant of deserialization, which only tests whether a face of test_state exists.
