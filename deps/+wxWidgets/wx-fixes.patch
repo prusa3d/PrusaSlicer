@@ -43,3 +43,70 @@ diff --color -urN wxWidgets-323a465e577e03f330e2e6a4c78e564d125340cb/build/cmake
  
      CGContextRestoreGState(context);
  #else
+--- wxWidgets-5462e7d7cfac645926188443e842171e107b312c/src/osx/cocoa/msgdlg.mm
++++ dep_wxWidgets/src/osx/cocoa/msgdlg.mm
+@@ -23,12 +23,43 @@
+ #include "wx/modalhook.h"
+ #include "wx/osx/private.h"
+ 
++#include <locale.h>
++#include <xlocale.h>
+ 
+ wxIMPLEMENT_CLASS(wxMessageDialog, wxDialog);
+ 
+ 
+ namespace 
+ {
++    // macOS 27 (CoreUI/SwiftUI) draws the symbols inside NSAlert with the C
++    // library's numeric locale in effect. With a decimal comma (e.g. de_DE,
++    // fr_FR, as set by wxLocale) a symbol size is read as 0 and CoreUI throws
++    // NSInternalInconsistencyException ("targetSizeInPoints.width>0 &&
++    // targetSizeInPoints.height>0") from inside -[NSAlert runModal]. The
++    // exception ends the main loop and the application goes down.
++    // Use the "C" numeric locale on this thread while the alert is shown;
++    // other threads and the other locale categories are left alone.
++    class wxCNumericLocaleForAlert
++    {
++    public:
++        wxCNumericLocaleForAlert()
++            : m_new(newlocale(LC_NUMERIC_MASK, "C", duplocale(LC_GLOBAL_LOCALE)))
++            , m_old(m_new ? uselocale(m_new) : (locale_t)0)
++        {
++        }
++        ~wxCNumericLocaleForAlert()
++        {
++            if ( m_new )
++            {
++                uselocale(m_old);
++                freelocale(m_new);
++            }
++        }
++    private:
++        locale_t m_new;
++        locale_t m_old;
++    };
++
+     NSAlertStyle GetAlertStyleFromWXStyle( long style )
+     {
+         if (style & (wxICON_WARNING | wxICON_ERROR))
+@@ -162,7 +193,10 @@
+         OSXBeginModalDialog();
+ 
+         int button = -1;
+-        button = [alert runModal];
++        {
++            wxCNumericLocaleForAlert numericLocale;
++            button = [alert runModal];
++        }
+         
+         OSXEndModalDialog();
+ 
+@@ -189,6 +223,8 @@
+         NSAlert* alert = (NSAlert*)ConstructNSAlert();
+         
+         NSWindow* nativeParent = parentWindow->GetWXWindow();
++        // Only the initial layout is covered here, see wxCNumericLocaleForAlert.
++        wxCNumericLocaleForAlert numericLocale;
+         [alert beginSheetModalForWindow:nativeParent  completionHandler:
+          ^(NSModalResponse returnCode)
+         {
