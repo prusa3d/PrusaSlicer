@@ -5,6 +5,12 @@
 #include "Slic3r/Domain/ModelVolume.hpp"
 #include "Slic3r/Domain/Types.hpp"
 
+#include <vector>
+
+namespace Slic3r::Biz::Algorithms::TriangleMesh {
+struct SourceFacet;
+} // namespace Slic3r::Biz::Algorithms::TriangleMesh
+
 namespace Slic3r::Biz::Algorithms::ModelVolume {
 
 Domain::ModelVolume* construct_ptr(Domain::ModelObject* object, const Domain::TriangleMesh& mesh, Domain::ModelVolumeType type = Domain::ModelVolumeType::MODEL_PART);
@@ -35,6 +41,18 @@ void mirror(Domain::ModelVolume& model_volume, Domain::Axis axis);
 size_t split(Domain::ModelVolume* volume, unsigned int max_extruders);
 
 bool is_splittable(const Domain::ModelVolume& model_volume);
+
+/**
+ * @brief Remaps the painting of source_volume onto derived_volume, whose mesh was derived from source_mesh. The derived_volume may be the source_volume itself.
+ *
+ * @param source_mesh Mesh painted by source_volume, in the coordinate system of the mesh of derived_volume. It may differ from the current mesh of source_volume.
+ */
+void remap_facets_annotations(
+    const Domain::ModelVolume& source_volume,
+    const Domain::TriangleMesh& source_mesh,
+    const std::vector<TriangleMesh::SourceFacet>& source_facets,
+    Domain::ModelVolume& derived_volume
+);
 
 void calculate_convex_hull(Domain::ModelVolume& model_volume);
 

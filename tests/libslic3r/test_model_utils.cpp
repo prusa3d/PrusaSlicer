@@ -74,7 +74,7 @@ TEST_CASE("With limited instances temporarily removes instances and objects", "[
     });
 }
 
-TEST_CASE("Splitting a painted volume clears facet annotations", "[model-volume][split]")
+TEST_CASE("Splitting a painted volume keeps the painting of its parts", "[model-volume][split]")
 {
     TriangleMesh disconnected_mesh = make_cube(10, 10, 10);
     TriangleMesh second_cube       = make_cube(10, 10, 10);
@@ -102,11 +102,21 @@ TEST_CASE("Splitting a painted volume clears facet annotations", "[model-volume]
     REQUIRE(Algorithms::ModelVolume::split(painted_volume, 2) == 2);
     REQUIRE(model_object->volumes.size() == 2);
 
-    for (const ModelVolume* split_volume : model_object->volumes) {
-        CHECK(split_volume->mesh().facets_count() == 12);
-        CHECK(split_volume->supported_facets.empty());
-        CHECK(split_volume->seam_facets.empty());
-        CHECK(split_volume->mm_segmentation_facets.empty());
-        CHECK(split_volume->fuzzy_skin_facets.empty());
+    // The painted facet is the last one of the second cube, which becomes the second part.
+    const ModelVolume& first_part  = *model_object->volumes.front();
+    const ModelVolume& second_part = *model_object->volumes.back();
+    CHECK(first_part.mesh().facets_count() == 12);
+    CHECK(second_part.mesh().facets_count() == 12);
+    CHECK_FALSE(first_part.is_painted());
+
+    const Slic3r::Domain::its_triangle painted_facet_vertices =
+        Slic3r::Domain::its_triangle_vertices(disconnected_mesh.its, painted_facet_index);
+    for (const Slic3r::Domain::FacetsAnnotationKind kind : ModelVolume::facets_annotation_kinds) {
+        TriangleSelector part_selector{second_part.mesh()};
+        part_selector.deserialize(second_part.facets_annotation(kind).get_data());
+        const indexed_triangle_set painted_facets =
+            part_selector.get_facets(TriangleStateType::ENFORCER);
+        REQUIRE(painted_facets.indices.size() == 1);
+        CHECK((Slic3r::Domain::its_triangle_vertices(painted_facets, 0) == painted_facet_vertices));
     }
 }
