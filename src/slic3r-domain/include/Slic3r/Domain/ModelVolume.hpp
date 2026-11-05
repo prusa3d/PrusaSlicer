@@ -156,6 +156,22 @@ public:
     // List of mesh facets painted for fuzzy skin.
     FacetsAnnotation                    fuzzy_skin_facets;
 
+    /**
+     * @brief Kinds of all the facets annotations above.
+     */
+    static constexpr std::array<FacetsAnnotationKind, 4> facets_annotation_kinds{
+        FacetsAnnotationKind::FdmSupports,
+        FacetsAnnotationKind::Seam,
+        FacetsAnnotationKind::MultiMaterial,
+        FacetsAnnotationKind::FuzzySkin
+    };
+
+    /**
+     * @brief The facets annotation of the given kind.
+     */
+    FacetsAnnotation& facets_annotation(FacetsAnnotationKind kind);
+    const FacetsAnnotation& facets_annotation(FacetsAnnotationKind kind) const;
+
     // SLA support points placed by the user on this volume, in its mesh coordinates, so they follow
     // every transformation of the volume. Whether they are used is decided by
     // ModelObject::sla_points_status.
