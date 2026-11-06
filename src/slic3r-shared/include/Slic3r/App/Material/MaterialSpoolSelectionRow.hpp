@@ -37,7 +37,7 @@ protected:
     void action_internal() override;
 
 private:
-    void update_generic_warning();
+    void update_warning();
 
 private:
     Biz::MatDb::MatDbInteractor& m_matdb_interactor;
@@ -51,7 +51,8 @@ private:
     Yoga::ComboBox* m_preset_combobox{nullptr};
     Yoga::Item* m_bottom_row{nullptr};
     Yoga::LayoutButton* m_confirm_button{nullptr};
-    Yoga::Text* m_generic_warning{nullptr};
+    Yoga::Item* m_warning{nullptr};
+    Yoga::Text* m_warning_text{nullptr};
 };
 
 } // namespace Slic3r::App

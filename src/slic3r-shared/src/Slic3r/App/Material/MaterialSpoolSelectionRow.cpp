@@ -52,9 +52,23 @@ MaterialSpoolSelectionRow::MaterialSpoolSelectionRow(
     m_spool_icon->set_height(32_fpx);
     m_spool_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
 
-    m_generic_warning = emplace_back<Text>(Biz::_u8L("Generic profile is used"));
-    m_generic_warning->set_text_color(m_theme->color_imgui(Platform::Color::Warning));
-    m_generic_warning->set_visible(false);
+    const ImColor warning_color = m_theme->color_imgui(Platform::Color::Warning);
+    m_warning = emplace_back<Item>();
+    m_warning->set_gap(5_fpx);
+    m_warning->set_align_items(YGAlignCenter);
+    m_warning->set_visible(false);
+
+    Icon* warning_icon = m_warning->emplace_back<Icon>(Render::Icon::ExclamationTriangle);
+    warning_icon->set_width(16_fpx);
+    warning_icon->set_height(16_fpx);
+    warning_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
+    warning_icon->set_tint(warning_color);
+
+    m_warning_text = m_warning->emplace_back<Text>(std::string{});
+    m_warning_text->set_flex_grow(1);
+    m_warning_text->set_flex_shrink(1);
+    m_warning_text->set_wrap_mode(Text::WrapMode::Wrap);
+    m_warning_text->set_text_color(warning_color);
 
     m_bottom_row = emplace_back<Item>();
     m_bottom_row->set_gap(5_fpx);
@@ -66,7 +80,7 @@ MaterialSpoolSelectionRow::MaterialSpoolSelectionRow(
 
     m_preset_combobox = m_bottom_row->emplace_back<ComboBox>("MaterialPresetCombobox");
     m_preset_combobox->set_flex_grow(1);
-    m_preset_combobox->callbacks().selection_changed = [this](int) { update_generic_warning(); };
+    m_preset_combobox->callbacks().selection_changed = [this](int) { update_warning(); };
 
     m_confirm_button = m_bottom_row->emplace_back<LayoutButton>(
         std::string{},
@@ -128,24 +142,30 @@ void MaterialSpoolSelectionRow::on_data_update()
     );
     m_preset_combobox->set_items(presets);
     m_preset_combobox->set_current_index(0);
-    update_generic_warning();
+    update_warning();
 }
 
 void MaterialSpoolSelectionRow::checked_updated_internal()
 {
     RectangleButton::checked_updated_internal();
-    m_bottom_row->set_visible(checked());
     set_background_border_width(checked() ? 2 : 0);
-    update_generic_warning();
+    update_warning();
 }
 
-void MaterialSpoolSelectionRow::update_generic_warning()
+void MaterialSpoolSelectionRow::update_warning()
 {
+    const bool has_presets = !m_state->preset_matches.empty();
     const int index = m_preset_combobox->current_index();
     const bool is_generic = index >= 0
         && static_cast<size_t>(index) < m_state->preset_matches.size()
         && m_state->preset_matches.at(index).is_generic;
-    m_generic_warning->set_visible(checked() && is_generic);
+
+    m_bottom_row->set_visible(checked() && has_presets);
+    m_warning->set_visible(checked() && (!has_presets || is_generic));
+    m_warning_text->set_text(
+        has_presets ? Biz::_u8L("Generic profile is used")
+                    : Biz::_u8L("There is no compatible preset with this material")
+    );
 }
 
 void MaterialSpoolSelectionRow::action_internal()

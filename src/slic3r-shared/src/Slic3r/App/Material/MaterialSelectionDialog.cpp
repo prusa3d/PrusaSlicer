@@ -504,7 +504,19 @@ void MaterialSelectionDialog::create_page_materials()
                     m_spool_selection_row_list_view->item_at(i)->set_checked(false);
                 }
             },
-            [this] { close_action(); }
+            [this]
+            {
+                const size_t count = m_spool_selection_row_list_view->list_item_count();
+                for (size_t i = 0; i < count; ++i) {
+                    m_spool_selection_row_list_view->item_at(i)->set_checked(false);
+                }
+                if (count > 0) {
+                    m_spool_selection_row_list_view->scroll_at_item(
+                        m_spool_selection_row_list_view->item_at(0)
+                    );
+                }
+                close_action();
+            }
         });
     m_spool_selection_row_list_view->set_orientation(Orientation::Vertical);
     m_spool_selection_row_list_view->set_gap(5_fpx);
