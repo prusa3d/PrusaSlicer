@@ -1117,6 +1117,15 @@ private:
     /** @brief Returns count of config containers (in all projects) using hw config @p hw_config_id. */
     size_t hw_config_use_count(const std::string& hw_config_id) const;
     bool duplicate_hw_config_if_needed_and_update(Domain::Preset::HwPrinterConfig& hw_config, ListenerInvokeLaterBag& bag);
+    /**
+     * @brief Same as update_changed_printer_configs(), but listeners and other deferred work
+     * run with @p bag, i.e. at the end of the caller's operation.
+     */
+    bool update_changed_printer_configs_internal(
+        const std::vector<Domain::Preset::HwPrinterConfig>& hw_configs,
+        bool select_same_root_printer_preset,
+        ListenerInvokeLaterBag& bag
+    );
 
     void invoke_slicing_input_changed();
     void invoke_on_preset_value_changed(const Domain::ConfigItem& config_item);

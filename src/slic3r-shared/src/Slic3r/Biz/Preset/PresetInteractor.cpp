@@ -1050,7 +1050,7 @@ tl::expected<void, std::string> PresetInteractor::select_external_printer_config
     if (const std::optional<std::string> hw_config_id = find_external_printer_config(printer)) {
         auto hw_config = get_printer_config(*hw_config_id).first.get();
         if (duplicate_hw_config_if_needed_and_update(hw_config, bag)) {
-            update_changed_printer_configs({hw_config}, false);
+            update_changed_printer_configs_internal({hw_config}, false, bag);
         }
         select_printer_config_internal(hw_config.id, false, bag, material_types);
     } else {
@@ -1061,7 +1061,7 @@ tl::expected<void, std::string> PresetInteractor::select_external_printer_config
             return tl::unexpected{hw_config_result.error()};
         }
         auto hw_config = hw_config_result.value();
-        update_changed_printer_configs({hw_config}, false);
+        update_changed_printer_configs_internal({hw_config}, false, bag);
         if (!m_workbench.preset_bundle().printer_configs.contains(hw_config.id)
             || !has_system_printer_preset(
                 get_printer_presets_view(m_selected_project_id, hw_config.id)
@@ -1149,11 +1149,19 @@ bool PresetInteractor::update_changed_printer_configs(
     bool select_same_root_printer_preset
 )
 {
+    ListenerInvokeLaterBag bag;
+    return update_changed_printer_configs_internal(hw_configs, select_same_root_printer_preset, bag);
+}
+
+bool PresetInteractor::update_changed_printer_configs_internal(
+    const std::vector<Domain::Preset::HwPrinterConfig>& hw_configs,
+    bool select_same_root_printer_preset,
+    ListenerInvokeLaterBag& bag
+)
+{
     auto& preset_bundle{m_workbench.preset_bundle()};
 
     const std::string& selected_printer_root_id{selected_printer_preset().printer.root_id};
-
-    ListenerInvokeLaterBag bag;
 
     std::vector<PresetEvaluator::EvaluatedPrinterPresets> evaluated_presets;
     evaluated_presets.resize(hw_configs.size());
