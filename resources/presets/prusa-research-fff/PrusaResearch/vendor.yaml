@@ -1,7 +1,7 @@
 kind: vendor
 id: PrusaResearch
 name: Prusa Research FFF
-version: 1.0.21
+version: 1.0.22
 features:
   printer:
     supports_high_flow_nozzle:
