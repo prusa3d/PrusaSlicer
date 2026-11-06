@@ -860,22 +860,6 @@ public:
         );
     }
 
-    bool is_printer_preset_selected_and_dirty(
-        const std::string& hw_config_id,
-        const std::string& printer_preset_id) const;
-
-    bool is_print_preset_selected_and_dirty(
-        const std::string& hw_config_id,
-        const std::string& printer_preset_id,
-        const std::string& print_preset_id) const;
-
-    bool is_tool_print_preset_selected_and_dirty(
-        const std::string& hw_config_id,
-        const std::string& printer_preset_id,
-        const std::string& print_preset_id,
-        const std::string& tool_print_preset_id,
-        size_t tool_index) const;
-
     bool is_tool_material_preset_selected_and_dirty(
         const std::string& hw_config_id,
         const std::string& printer_preset_id,
@@ -1083,7 +1067,12 @@ private:
     bool tool_print_has_unsaved_changes(size_t tool_index) const;
     bool material_has_unsaved_changes(size_t tool_index) const;
 
-    void fill_printer_configs(bool no_data_update, ListenerInvokeLaterBag& bag);
+    /**
+     * @brief Fills the printer config items. The printer config is selected again only if
+     * the selected hw config or its printer preset doesn't exist anymore.
+     * @return true if the selection was changed and propagated.
+     */
+    bool fill_printer_configs(bool no_data_update, ListenerInvokeLaterBag& bag);
     void fill_printer_presets(bool no_data_update, ListenerInvokeLaterBag& bag);
     void fill_print_presets(
         const Domain::Preset::SelectedPreset& selected_preset,
@@ -1120,6 +1109,8 @@ private:
     /**
      * @brief Same as update_changed_printer_configs(), but listeners and other deferred work
      * run with @p bag, i.e. at the end of the caller's operation.
+     * @note If the selected hw config is changed in place and @p select_same_root_printer_preset
+     * is false, the caller has to select the printer config itself to apply the changes.
      */
     bool update_changed_printer_configs_internal(
         const std::vector<Domain::Preset::HwPrinterConfig>& hw_configs,
