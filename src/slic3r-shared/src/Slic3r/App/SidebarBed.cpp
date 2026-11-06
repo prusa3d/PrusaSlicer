@@ -276,6 +276,7 @@ void SidebarBed::on_list_selection_changed(Domain::SelectionId new_selection)
     }
 
     update_printer_button();
+    refresh_preset_combobox_label_color();
 }
 
 void SidebarBed::on_selected_bed_instances_changed(
@@ -299,11 +300,13 @@ void SidebarBed::on_selected_bed_instances_changed(
     m_bed_name->set_text(bed_instance->name());
 }
 
-void SidebarBed::refresh_printer_label_color()
+void SidebarBed::refresh_preset_combobox_label_color()
 {
     bool is_modified_preset =
         m_project_interactor.preset_interactor().printer_cbi().config_box_list().lock()->is_dirty();
-    m_logical_printer_button->set_printer_name(m_selected_printer_preset_name, is_modified_preset);
+    m_preset_combo_box->set_label_color(m_theme->color_imgui(
+        is_modified_preset ? Platform::Color::AccentTertiary : Platform::Color::Text
+    ));
 }
 
 void SidebarBed::update_color_mix_visibility()
@@ -352,18 +355,13 @@ void SidebarBed::update_printer_button()
         preset_interactor.printer_presets().selected_index()
     );
 
-    const bool is_modified_preset = preset_interactor.is_printer_preset_selected_and_dirty(
-        preset_item.hw_printer_config_id,
-        preset_item.id
-    );
-
     const Biz::PhysicalPrinter::PhysicalPrinterConfig* physical_printer =
         m_project_interactor.physical_printer_interactor().selected_physical_printer_data();
 
-    m_selected_printer_preset_name = physical_printer
+    std::string selected_printer_name = physical_printer
         ? Biz::PhysicalPrinter::ui_name(*physical_printer)
         : preset_item.ui_preset_name();
-    m_logical_printer_button->set_printer_name(m_selected_printer_preset_name, is_modified_preset);
+    m_logical_printer_button->set_printer_name(selected_printer_name);
     m_logical_printer_button->set_visible_cog(
         !physical_printer
         || (!physical_printer->is_runtime && !Biz::PhysicalPrinter::is_connect_printer(*physical_printer))
@@ -378,7 +376,7 @@ void SidebarBed::update_printer_button()
     m_logical_printer_button->set_tooltip(
         fmt::format(
             "{}\n{}\n{}",
-            m_selected_printer_preset_name,
+            selected_printer_name,
             preset_item.ui_preset_name(),
             preset_item.ui_hw_config_name()
         )
@@ -418,12 +416,12 @@ void SidebarBed::on_preset_value_changed(
         }
     }
 
-    refresh_printer_label_color();
+    refresh_preset_combobox_label_color();
 }
 
 void SidebarBed::on_preset_bundles_reloaded()
 {
-    refresh_printer_label_color();
+    refresh_preset_combobox_label_color();
 }
 
 void SidebarBed::on_hw_item_selection_changed(
@@ -449,6 +447,12 @@ void SidebarBed::on_preset_selection_changed(
     update_color_mix_visibility();
     if (m_project_interactor.selected_project_id() == project_id) {
         update_purging_volumes_button_visibility();
+        // the same preset can be reselected, e.g. when its unsaved changes are discarded
+        if (m_project_interactor.selected_config_container_id() == config_container_id
+            && type == Biz::Preset::PresetItemType::PrinterPreset)
+        {
+            refresh_preset_combobox_label_color();
+        }
     }
 }
 
