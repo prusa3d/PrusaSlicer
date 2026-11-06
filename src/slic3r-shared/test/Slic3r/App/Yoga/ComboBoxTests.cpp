@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <Slic3r/App/Yoga/ComboBox.hpp>
+#include <Slic3r/App/Yoga/ScrollArea.hpp>
 
 #include "YogaComponentFixture.hpp"
 
@@ -154,6 +155,105 @@ TEST_CASE_METHOD(YogaComponentFixture, "ComboBox: selection_changed does not fir
     open_combo(*this, combo);
 
     REQUIRE(changed_index == -1);
+}
+
+TEST_CASE_METHOD(YogaComponentFixture, "ComboBox: mouse wheel changes selection while hovered")
+{
+    ComboBox* combo = make_combo(*this, {"alpha", "beta", "gamma"});
+    combo->set_current_index(1);
+
+    std::vector<int> changed_indices;
+    combo->callbacks().selection_changed = [&](int index) { changed_indices.push_back(index); };
+
+    render();
+    const Vec2f pos = combo->get_global_pos();
+    mouse_move(pos.x() + combo->width() * 0.5f, pos.y() + combo->height() * 0.5f);
+    render();
+    ImGui::GetIO().AddMouseWheelEvent(0.f, 1.f);
+    render();
+
+    REQUIRE(combo->current_index() == 0);
+    REQUIRE(changed_indices == std::vector<int>{0});
+
+    ImGui::GetIO().AddMouseWheelEvent(0.f, -1.f);
+    render();
+
+    REQUIRE(combo->current_index() == 1);
+    REQUIRE(changed_indices == std::vector<int>{0, 1});
+}
+
+TEST_CASE_METHOD(YogaComponentFixture, "ComboBox: mouse wheel changes editable selection")
+{
+    ComboBox* combo = make_combo(*this, {"0%", "5%", "10%"});
+    combo->set_editable(true);
+    combo->set_current_index(1);
+
+    int changed_index                    = -1;
+    combo->callbacks().selection_changed = [&](int index) { changed_index = index; };
+
+    render();
+    const Vec2f pos = combo->get_global_pos();
+    mouse_move(pos.x() + combo->width() * 0.25f, pos.y() + combo->height() * 0.5f);
+    render();
+    ImGui::GetIO().AddMouseWheelEvent(0.f, 1.f);
+    render();
+
+    REQUIRE(combo->current_index() == 0);
+    REQUIRE(changed_index == 0);
+}
+
+TEST_CASE_METHOD(YogaComponentFixture, "ComboBox: mouse wheel respects bounds")
+{
+    ComboBox* combo = make_combo(*this, {"alpha", "beta"});
+
+    int changed_count                    = 0;
+    combo->callbacks().selection_changed = [&](int) { ++changed_count; };
+
+    render();
+    const Vec2f pos = combo->get_global_pos();
+    mouse_move(pos.x() + combo->width() * 0.5f, pos.y() + combo->height() * 0.5f);
+    render();
+    ImGui::GetIO().AddMouseWheelEvent(0.f, 1.f);
+    render();
+
+    REQUIRE(combo->current_index() == 0);
+    REQUIRE(changed_count == 0);
+}
+
+TEST_CASE_METHOD(
+    YogaComponentFixture,
+    "ComboBox: mouse wheel does not scroll parent ScrollArea"
+)
+{
+    ScrollArea* scroll_area = window->emplace_back<ScrollArea>();
+    scroll_area->set_width(300.f);
+    scroll_area->set_height(100.f);
+    scroll_area->set_orientation(Orientation::Vertical);
+
+    ComboBox* combo = scroll_area->emplace_back<ComboBox>(
+        std::initializer_list<std::string>{"alpha", "beta"}
+    );
+    combo->set_editable(true);
+    combo->set_width(280.f);
+    combo->set_height(30.f);
+    combo->set_flex_shrink(0.f);
+
+    Item* overflow = scroll_area->emplace_back<Item>();
+    overflow->set_height(300.f);
+    overflow->set_flex_shrink(0.f);
+
+    render();
+    render();
+    REQUIRE(scroll_area->scroll_size().y() > 0.f);
+
+    const Vec2f pos = combo->get_global_pos();
+    mouse_move(pos.x() + combo->width() * 0.25f, pos.y() + combo->height() * 0.5f);
+    render();
+    ImGui::GetIO().AddMouseWheelEvent(0.f, -1.f);
+    render();
+
+    REQUIRE(combo->current_index() == 1);
+    REQUIRE(scroll_area->scroll_pos().y() == 0.f);
 }
 
 TEST_CASE_METHOD(

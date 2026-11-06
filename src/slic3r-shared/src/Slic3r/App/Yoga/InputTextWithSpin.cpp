@@ -34,6 +34,14 @@ InputTextWithSpin::InputTextWithSpin(
             m_callbacks.text_edited();
         }
     };
+    InputTextField::callbacks().mouse_wheel = [this](float wheel_delta)
+    {
+        if (wheel_delta > 0.f) {
+            increase_value();
+        } else {
+            decrease_value();
+        }
+    };
 
     set_padding(0);
     Item* spins = emplace_back<Item>();
