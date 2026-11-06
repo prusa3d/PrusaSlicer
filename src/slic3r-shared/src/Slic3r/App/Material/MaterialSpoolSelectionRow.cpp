@@ -89,14 +89,20 @@ MaterialSpoolSelectionRow::MaterialSpoolSelectionRow(
     );
     m_confirm_button->callbacks().action = [this]
     {
-        if (!m_state->preset_matches.empty()) {
-            m_matdb_interactor.select_material_preset(
+        if (m_state->preset_matches.empty()) {
+            m_close_fn();
+            return;
+        }
+        // Keep the dialog open when the switch was cancelled in the unsaved changes dialog,
+        // so another spool or preset can be picked.
+        if (m_matdb_interactor.select_material_preset(
                 m_material_index,
                 m_state->material,
                 m_state->preset_matches.at(m_preset_combobox->current_index()).preset_id
-            );
+            ))
+        {
+            m_close_fn();
         }
-        m_close_fn();
     };
     m_confirm_button->set_self_align(YGAlignStretch);
     m_confirm_button->set_checked(true);
