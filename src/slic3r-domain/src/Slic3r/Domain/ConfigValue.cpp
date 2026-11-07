@@ -6,8 +6,8 @@ void EnumVectorWrapper::set_strings(const std::vector<std::string>& values) {
     std::vector<int> payload(values.size());
 
     size_t i = 0;
-    bool ok = false;
     for (const std::string& value : values) {
+        bool ok = false;
         for (const EnumValueDef& evd : *m_def) {
             if (evd.str_serialized == value) {
                 payload[i] = evd.enum_value;
