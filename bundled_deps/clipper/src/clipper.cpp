@@ -253,45 +253,135 @@ int PointInPolygon(const IntPoint &pt, const Path &path)
 }
 //------------------------------------------------------------------------------
 
-// Called by Poly2ContainsPoly1()
+// Returns the contribution of one edge to a horizontal-ray containment test.
+// -1 means the point lies on the edge; otherwise the value is crossing parity.
+inline int PointInPolygonEdge(const IntPoint &pt, const OutPt *op)
+{
+  int result = 0;
+  if (op->Next->Pt.y() == pt.y())
+  {
+      if ((op->Next->Pt.x() == pt.x()) || (op->Pt.y() == pt.y() &&
+        ((op->Next->Pt.x() > pt.x()) == (op->Pt.x() < pt.x())))) return -1;
+  }
+  if ((op->Pt.y() < pt.y()) != (op->Next->Pt.y() < pt.y()))
+  {
+    if (op->Pt.x() >= pt.x())
+    {
+      if (op->Next->Pt.x() > pt.x()) result = 1 - result;
+      else
+      {
+        auto d = CrossProductType(op->Pt.x() - pt.x()) * CrossProductType(op->Next->Pt.y() - pt.y()) - CrossProductType(op->Next->Pt.x() - pt.x()) * CrossProductType(op->Pt.y() - pt.y());
+        if (!d) return -1;
+        if ((d > 0) == (op->Next->Pt.y() > op->Pt.y())) result = 1 - result;
+      }
+    } else
+    {
+      if (op->Next->Pt.x() > pt.x())
+      {
+        auto d = CrossProductType(op->Pt.x() - pt.x()) * CrossProductType(op->Next->Pt.y() - pt.y()) - CrossProductType(op->Next->Pt.x() - pt.x()) * CrossProductType(op->Pt.y() - pt.y());
+        if (!d) return -1;
+        if ((d > 0) == (op->Next->Pt.y() > op->Pt.y())) result = 1 - result;
+      }
+    }
+  }
+  return result;
+}
+
+// Called by Poly2ContainsPoly1().
 int PointInPolygon(const IntPoint &pt, OutPt *op)
 {
-  //returns 0 if false, +1 if true, -1 if pt ON polygon boundary
   int result = 0;
-  OutPt* startOp = op;
-  do
-  {
-    if (op->Next->Pt.y() == pt.y())
-    {
-        if ((op->Next->Pt.x() == pt.x()) || (op->Pt.y() == pt.y() && 
-          ((op->Next->Pt.x() > pt.x()) == (op->Pt.x() < pt.x())))) return -1;
-    }
-    if ((op->Pt.y() < pt.y()) != (op->Next->Pt.y() < pt.y()))
-    {
-      if (op->Pt.x() >= pt.x())
-      {
-        if (op->Next->Pt.x() > pt.x()) result = 1 - result;
-        else
-        {
-          auto d = CrossProductType(op->Pt.x() - pt.x()) * CrossProductType(op->Next->Pt.y() - pt.y()) - CrossProductType(op->Next->Pt.x() - pt.x()) * CrossProductType(op->Pt.y() - pt.y());
-          if (!d) return -1;
-          if ((d > 0) == (op->Next->Pt.y() > op->Pt.y())) result = 1 - result;
-        }
-      } else
-      {
-        if (op->Next->Pt.x() > pt.x())
-        {
-          auto d = CrossProductType(op->Pt.x() - pt.x()) * CrossProductType(op->Next->Pt.y() - pt.y()) - CrossProductType(op->Next->Pt.x() - pt.x()) * CrossProductType(op->Pt.y() - pt.y());
-          if (!d) return -1;
-          if ((d > 0) == (op->Next->Pt.y() > op->Pt.y())) result = 1 - result;
-        }
-      }
-    } 
+  OutPt *start = op;
+  do {
+    int edge_result = PointInPolygonEdge(pt, op);
+    if (edge_result < 0) return -1;
+    result ^= edge_result;
     op = op->Next;
-  } while (startOp != op);
+  } while (op != start);
   return result;
 }
 //------------------------------------------------------------------------------
+
+// FixupFirstLefts repeatedly tests many polygons against the same contour.
+// Index its edges so a containment query only visits edges that can meet the
+// horizontal ray, rather than walking the entire contour for every query.
+// The polygon must not be modified while this index is in use.
+class OutputPolygonIndex {
+  struct Node {
+    cInt min_x, min_y, max_x, max_y;
+    size_t begin, end;
+    int left = -1, right = -1;
+  };
+  OutPt *polygon;
+  std::vector<OutPt*> edges;
+  std::vector<Node> nodes;
+  int build(size_t begin, size_t end) {
+    const auto &p = edges[begin]->Pt;
+    Node n{p.x(), p.y(), p.x(), p.y(), begin, end};
+    for (size_t i = begin; i < end; ++i) {
+      for (const auto *q : {edges[i], edges[i]->Next}) {
+        n.min_x = std::min(n.min_x, q->Pt.x());
+        n.max_x = std::max(n.max_x, q->Pt.x());
+        n.min_y = std::min(n.min_y, q->Pt.y());
+        n.max_y = std::max(n.max_y, q->Pt.y());
+      }
+    }
+    int id = int(nodes.size());
+    nodes.push_back(n);
+    if (end - begin > 8) {
+      bool x = int64_t(n.max_x) - n.min_x > int64_t(n.max_y) - n.min_y;
+      size_t mid = begin + (end - begin) / 2;
+      std::nth_element(edges.begin() + begin, edges.begin() + mid, edges.begin() + end,
+        [x](const OutPt *a, const OutPt *b) {
+          return x ? int64_t(a->Pt.x()) + a->Next->Pt.x() < int64_t(b->Pt.x()) + b->Next->Pt.x()
+                   : int64_t(a->Pt.y()) + a->Next->Pt.y() < int64_t(b->Pt.y()) + b->Next->Pt.y();
+        });
+      int left = build(begin, mid), right = build(mid, end);
+      nodes[id].left = left;
+      nodes[id].right = right;
+    }
+    return id;
+  }
+  int query(int id, const IntPoint &pt) const {
+    const Node &n = nodes[id];
+    if (pt.y() < n.min_y || pt.y() > n.max_y || pt.x() > n.max_x) return 0;
+    if (n.left >= 0) {
+      int a = query(n.left, pt);
+      if (a < 0) return -1;
+      int b = query(n.right, pt);
+      return b < 0 ? -1 : a ^ b;
+    }
+    int result = 0;
+    for (size_t i = n.begin; i < n.end; ++i) {
+      int edge_result = PointInPolygonEdge(pt, edges[i]);
+      if (edge_result < 0) return -1;
+      result ^= edge_result;
+    }
+    return result;
+  }
+public:
+  explicit OutputPolygonIndex(OutPt *p) : polygon(p) {
+    OutPt *op = p;
+    do {
+      edges.push_back(op);
+      op = op->Next;
+    } while (op != p);
+    // Small contours are cheaper to scan directly.
+    if (edges.size() >= 32) {
+      nodes.reserve(edges.size() / 2);
+      build(0, edges.size());
+    }
+  }
+  bool contains(OutPt *p) const {
+    OutPt *op = p;
+    do {
+      int result = nodes.empty() ? PointInPolygon(op->Pt, polygon) : query(0, op->Pt);
+      if (result >= 0) return result > 0;
+      op = op->Next;
+    } while (op != p);
+    return true;
+  }
+};
 
 // This is potentially very expensive! O(n^2)!
 bool Poly2ContainsPoly1(OutPt *OutPt1, OutPt *OutPt2)
@@ -3205,11 +3295,12 @@ inline OutRec* ParseFirstLeft(OutRec* FirstLeft)
 // This is potentially very expensive! O(n^3)!
 void Clipper::FixupFirstLefts1(OutRec* OldOutRec, OutRec* NewOutRec)
 { 
+  OutputPolygonIndex index(NewOutRec->Pts);
   //tests if NewOutRec contains the polygon before reassigning FirstLeft
   for (OutRec &outRec : m_PolyOuts)
   {
     OutRec* firstLeft = ParseFirstLeft(outRec.FirstLeft);
-    if (outRec.Pts && firstLeft == OldOutRec && Poly2ContainsPoly1(outRec.Pts, NewOutRec->Pts))
+    if (outRec.Pts && firstLeft == OldOutRec && index.contains(outRec.Pts))
         outRec.FirstLeft = NewOutRec;
   }
 }
@@ -3221,6 +3312,7 @@ void Clipper::FixupFirstLefts2(OutRec* InnerOutRec, OutRec* OuterOutRec)
   //It's possible that these polygons now wrap around other polygons, so check
   //every polygon that's also contained by OuterOutRec's FirstLeft container
   //(including 0) to see if they've become inner to the new inner polygon ...
+  OutputPolygonIndex inner(InnerOutRec->Pts), outer(OuterOutRec->Pts);
   OutRec* orfl = OuterOutRec->FirstLeft;
   for (OutRec &outRec : m_PolyOuts)
   {
@@ -3229,9 +3321,9 @@ void Clipper::FixupFirstLefts2(OutRec* InnerOutRec, OutRec* OuterOutRec)
     OutRec* firstLeft = ParseFirstLeft(outRec.FirstLeft);
     if (firstLeft != orfl && firstLeft != InnerOutRec && firstLeft != OuterOutRec)
       continue;
-    if (Poly2ContainsPoly1(outRec.Pts, InnerOutRec->Pts))
+    if (inner.contains(outRec.Pts))
       outRec.FirstLeft = InnerOutRec;
-    else if (Poly2ContainsPoly1(outRec.Pts, OuterOutRec->Pts))
+    else if (outer.contains(outRec.Pts))
       outRec.FirstLeft = OuterOutRec;
     else if (outRec.FirstLeft == InnerOutRec || outRec.FirstLeft == OuterOutRec)
       outRec.FirstLeft = orfl;
