@@ -2,6 +2,7 @@
 
 #include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
 #include "libslic3r/Layer.hpp"
+#include "libslic3r/ClipperUtils.hpp"
 
 #include "test_data.hpp" // get access to init_print, etc
 
@@ -583,3 +584,68 @@ Old Perl tests, which were disabled by Vojtech at the time of first Support Gene
 }
 
 */
+
+SCENARIO("SupportMaterial: Build-plate-only grid support does not expand through object walls",
+         "[SupportMaterial][16033]")
+{
+    // Regression for GH #16033, using a synthetic model without a blocker.
+    GIVEN("An overhang beside an upright on the build plate") {
+        // XZ cross-section, extruded 40 mm along Y:
+        // # = solid model; a = region that must remain free of support.
+        //
+        //     ##
+        //      #a
+        //   -------
+        //
+        // The upper block overhangs to the left of the upright, so support
+        // is needed beneath it. The region marked `a` is empty space to the
+        // right of the upright, with no overhang above it. Grid expansion
+        // must not pass through the upright and create support there.
+        // Check the first support layer (Z = 0.2 mm), where the accumulated
+        // footprint of lower object layers is empty.
+        TriangleMesh mesh = make_cube(2., 40., 6.);
+        mesh.translate(Vec3f(4.f, 0.f, 0.f));
+        TriangleMesh top = make_cube(2., 40., 2.);
+        top.translate(Vec3f(2.f, 0.f, 4.f));
+        mesh.merge(top);
+        TestConfig config;
+        config.print.items.opt("support_material").set(SupportMode::Everywhere);
+        config.print.items.opt("support_material_buildplate_only").set(true);
+        config.print.items.opt("support_material_style").set(Domain::SupportMaterialStyle::smsGrid);
+        config.print.items.opt("dont_support_bridges").set(false);
+        config.print.items.opt("layer_height").set(0.2);
+        config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.2});
+        // A coarse diagonal grid makes expansion across the wall observable.
+        config.print.items.opt("support_material_spacing").set(8.);
+        config.print.items.opt("support_material_angle").set(45.);
+
+        WHEN("Build-plate-only grid supports are generated") {
+            Print print;
+            init_and_process_print({mesh}, print, config);
+            const PrintObject *object = print.objects().front();
+            REQUIRE(object->support_layers().size() > 0);
+            const SupportLayer *layer = object->support_layers().front();
+            CAPTURE(layer->print_z);
+            REQUIRE(std::abs(layer->print_z - 0.2) < EPSILON);
+
+            // The first slice contains only the right upright (model X = 4).
+            // Account for centering, and sample the middle of Y to exclude
+            // support paths that legitimately go around the ends of the wall.
+            const BoundingBox bounds = get_extents(object->layers().front()->lslices);
+            auto region = [&bounds](double left, double right) {
+                return Polygons{Polygon{{
+                    {bounds.min.x() + scale_(left), bounds.min.y() + scale_(15.)},
+                    {bounds.min.x() + scale_(right), bounds.min.y() + scale_(15.)},
+                    {bounds.min.x() + scale_(right), bounds.min.y() + scale_(25.)},
+                    {bounds.min.x() + scale_(left), bounds.min.y() + scale_(25.)}
+                }}};
+            };
+            Polylines paths;
+            layer->support_fills.collect_polylines(paths);
+            THEN("Required support is generated without expanding through the object") {
+                REQUIRE_FALSE(intersection_pl(paths, region(-1.9, -0.1)).empty());
+                CHECK(intersection_pl(paths, region(2.1, 6.)).empty());
+            }
+        }
+    }
+}
