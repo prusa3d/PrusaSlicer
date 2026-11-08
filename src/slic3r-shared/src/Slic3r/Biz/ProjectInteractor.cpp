@@ -922,6 +922,7 @@ void ProjectInteractor::remove_project(Domain::SelectionId project_id)
             m_slicing_interactor.remove_bed(bed_instance->id().id);
         }
     }
+    m_scene_interactor.remove_project(project_id);
 
     it = projects.erase(it);
 
