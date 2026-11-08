@@ -839,7 +839,7 @@ bool process_actions(
 
     if (action.model_info) {
         if (!perform_model_info(runtime, project_ids)) {
-            return true;
+            return false;
         }
     }
 
@@ -859,7 +859,7 @@ bool process_actions(
 
     if (action.export_stl || action.export_obj || action.export_3mf) {
         if (!perform_model_exports(runtime, init_params, project_ids)) {
-            return true;
+            return false;
         }
     }
 
@@ -913,7 +913,7 @@ bool process_actions(
         }
 
         if (!perform_slicing_exports(runtime, init_params, project_ids)) {
-            return true;
+            return false;
         }
     }
 

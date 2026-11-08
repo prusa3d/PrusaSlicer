@@ -87,9 +87,20 @@ TEST_CASE("CLI reports objects scaled outside the print volume instead of freezi
     slice_params.action.export_gcode = true;
     slice_params.misc.output         = gcode_path.string();
 
-    REQUIRE(App::CLI::run(slice_params) == EXIT_SUCCESS);
+    REQUIRE(App::CLI::run(slice_params) == EXIT_FAILURE);
     REQUIRE_FALSE(fs::exists(gcode_path));
     REQUIRE(count_gcode_files(temp_dir.path()) == 0);
+}
+
+TEST_CASE("CLI fails to export a model without input files", "[cli]")
+{
+    const ScopedTempDir temp_dir;
+
+    App::InitParams export_params   = make_params(resolved_profile_sets().front());
+    export_params.action.export_stl = true;
+    export_params.misc.output       = (temp_dir.path() / "empty.stl").string();
+
+    REQUIRE(App::CLI::run(export_params) == EXIT_FAILURE);
 }
 
 TEST_CASE("CLI centers a loaded STL on the bed", "[cli][timeout]")
