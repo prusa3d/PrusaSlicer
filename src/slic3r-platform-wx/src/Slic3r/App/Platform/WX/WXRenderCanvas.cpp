@@ -1032,6 +1032,25 @@ void WXRenderCanvas::on_idle(wxIdleEvent& event)
         return;
     }
 
+    // Queued work can block the main thread for a long time, loading the preset
+    // bundles being the obvious case, which would leave the window empty for
+    // its whole duration. Get a frame out first. Under Wayland presenting only
+    // succeeds once the compositor says the surface is ready, so give up after
+    // a deadline rather than postponing start up if no frame ever gets through.
+    if (!m_presented_once) {
+        const auto now = std::chrono::steady_clock::now();
+        if (!m_first_present_deadline) {
+            m_first_present_deadline = now + std::chrono::milliseconds(500);
+        }
+
+        repaint();
+
+        if (!m_presented_once && now < *m_first_present_deadline) {
+            wxWakeUpIdle();
+            return;
+        }
+    }
+
     m_main_thread_dispatcher.dispatch_enqueued();
     bool render_requested = get_and_reset_render_requested();
     // std::cout << "Idle: render requested: " << render_requested << "\n";
@@ -1166,8 +1185,23 @@ void WXRenderCanvas::end_frame_platform()
         FrameMark;
 
         ZoneScopedN("swap_buffers");
-        if (!wxGLCanvas::SwapBuffers()) {
-            SPDLOG_ERROR("Swapping buffers failed!");
+        if (wxGLCanvas::SwapBuffers()) {
+            m_presented_once = true;
+            m_surface_ready  = true;
+        } else {
+            // The canvas has no surface to present to while it is off screen,
+            // and gets a new one when it is mapped again, which is only ready
+            // once the compositor has signalled it. Both are ordinary states,
+            // and the same ones the canvas starts up in.
+            if (!IsShownOnScreen()) {
+                m_surface_ready = false;
+            }
+
+            if (m_surface_ready) {
+                SPDLOG_ERROR("Swapping buffers failed!");
+            } else {
+                SPDLOG_DEBUG("Swapping buffers before the surface is ready.");
+            }
         }
         m_frame_fence[m_current_frame_idx] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
         //assert_no_gl_error();

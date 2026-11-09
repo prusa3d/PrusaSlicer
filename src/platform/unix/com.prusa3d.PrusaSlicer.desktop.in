@@ -9,4 +9,4 @@ MimeType=model/stl;application/vnd.ms-3mfdocument;application/prs.wavefront-obj;
 Categories=Graphics;3DGraphics;Engineering;
 Keywords=3D;Printing;Slicer;slice;3D;printer;convert;gcode;stl;obj;amf;SLA
 StartupNotify=false
-StartupWMClass=prusa-slicer
+StartupWMClass=@SLIC3R_DESKTOP_FILE_NAME@
