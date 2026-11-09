@@ -11,7 +11,7 @@
 cmake_minimum_required(VERSION 3.13)
 project(PrusaSlicer)
 
-option(SLIC3R_STATIC "Compile PrusaSlicer with static libraries (Boost, TBB, glew)" ON)
+option(SLIC3R_STATIC "Compile PrusaSlicer with static libraries (Boost, TBB)" ON)
 option(SLIC3R_FHS "Assume PrusaSlicer is to be installed in a FHS directory structure" OFF)
 
 if (DEFINED SLIC3R_PCH AND SLIC3R_PCH AND MSVC)
