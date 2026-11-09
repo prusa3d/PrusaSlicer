@@ -35,6 +35,7 @@
 #include "Slic3r/Biz/Platform/JobManager/JobManager.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/Utils/SetDiff.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Domain/BedInstance.hpp"
 #include "Slic3r/Domain/Types.hpp"
@@ -1839,6 +1840,7 @@ void SceneInteractor::merge_selection_into_object()
     }
     ASSERT(!instances.empty());
     Domain::ModelObject* new_object = Biz::Algorithms::ModelObject::merge(instances);
+    new_object->name                      = _u8L("Merged");
 
     delete_selected_elements();
     notify_listener_on_objects({new_object});
