@@ -354,6 +354,17 @@ void SplitLayout::set_separator_enable(size_t index, bool enable)
     m_separators.at(index).item()->set_enabled(enable);
 }
 
+void SplitLayout::set_separator_max_extent(size_t index, std::optional<float> extent)
+{
+    const Unit max_extent{extent.has_value() ? std::max(*extent, 0.f) : YGUndefined};
+    Item* separator = m_separators.at(index).item();
+    if (orientation() == Orientation::Horizontal) {
+        separator->set_max_height(max_extent);
+    } else {
+        separator->set_max_width(max_extent);
+    }
+}
+
 void SplitLayout::invalidate()
 {
     m_last_height = 0;

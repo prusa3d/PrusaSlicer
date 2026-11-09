@@ -2,6 +2,7 @@
 
 #include "Slic3r/App/Yoga/Item.hpp"
 
+#include <optional>
 #include <set>
 
 namespace Slic3r::App::Yoga {
@@ -23,6 +24,12 @@ public:
     void set_flex_child(Item* child, bool flex);
     void set_visible_child(Item* child, bool visible);
     void set_separator_enable(size_t index, bool enable);
+    /**
+     * @brief Limits how far the separator extends along the cross axis (height for horizontal
+     * orientation, width for vertical), measured from the start of the content area.
+     * By default the separator spans the whole SplitLayout. Pass std::nullopt to reset.
+     */
+    void set_separator_max_extent(size_t index, std::optional<float> extent);
 
     void invalidate();
 

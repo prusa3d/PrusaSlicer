@@ -119,6 +119,14 @@ void AbstractRenderLayout::update_left_separator_enable()
     }
 
     m_layout_main_bottom->set_separator_enable(0, enabled);
+
+    // The left column is top-aligned and usually taller than its content, while the separator
+    // spans the full height of the SplitLayout. Limit the separator to the object list's extent,
+    // so it is not draggable (and does not block the 3D scene) below the object list.
+    m_layout_main_bottom->set_separator_max_extent(
+        0,
+        m_object_list->top() + m_object_list->height()
+    );
 }
 
 ToolBarButton*
