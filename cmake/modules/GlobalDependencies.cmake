@@ -36,20 +36,13 @@ if(SLIC3R_GUI)
     set(OpenGL_GL_PREFERENCE "LEGACY")
     find_package(OpenGL REQUIRED)
 
-    if (NOT EMSCRIPTEN)
-        # The GLEW is bundled with Emscripten SDK, but has no .cmake files
-        # So it can't be found
-        # Instead it is just part of OPENGL_LIBRARIES
-        find_package(GLEW REQUIRED)
-    endif()
-
     add_library(PlatformGL INTERFACE)
     if (EMSCRIPTEN)
-        # OpenGL::GL and GLEW::GLEW are part of OPENGL_LIBRARIES
+        # OpenGL::GL is part of OPENGL_LIBRARIES
         target_include_directories(PlatformGL INTERFACE ${OPENGL_INCLUDE_DIR})
-        target_link_libraries(PlatformGL INTERFACE ${OPENGL_LIBRARIES})
+        target_link_libraries(PlatformGL INTERFACE ${OPENGL_LIBRARIES} GLAD::GLES)
     else()
-        target_link_libraries(PlatformGL INTERFACE OpenGL::GL GLEW::GLEW)
+        target_link_libraries(PlatformGL INTERFACE OpenGL::GL GLAD::GL)
     endif()
 endif()
 
