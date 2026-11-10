@@ -3,6 +3,7 @@
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/Platform/JobManager/JobManager.hpp"
 #include "Slic3r/Biz/Platform/IAppConfigProvider.hpp"
+#include "Slic3r/Biz/AppInstance/AppInstanceUtils.hpp"
 #include "Slic3r/Biz/Network/IHttp.hpp"
 #include "Slic3r/Log.hpp"
 #include <fmt/format.h>
@@ -111,7 +112,7 @@ void FileDownloaderInteractor::download_files_prusaslicer_url(
         } else if (escaped_url.starts_with(prefix2)) {
             escaped_url = escaped_url.substr(prefix2.length());
         } else {
-            SPDLOG_ERROR("Could not start download due to wrong URL: {}", full_url);
+            SPDLOG_ERROR("Could not start download due to wrong URL: {}", AppInstance::redact_app_urls(full_url));
             return;
         }
         FileDownloaderJobInput input;

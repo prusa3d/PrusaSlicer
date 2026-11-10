@@ -102,7 +102,7 @@ std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::resend_config()
 
 std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_action_log(const std::string& message_data)
 {
-    SPDLOG_ERROR("WebView log: {}", message_data);
+    SPDLOG_INFO("WebView log: {}", message_data);
     return {};
 }
 

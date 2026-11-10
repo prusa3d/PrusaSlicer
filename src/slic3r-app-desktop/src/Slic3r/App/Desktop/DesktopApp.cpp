@@ -914,7 +914,7 @@ void DesktopApp::MacOpenURL(const wxString& url)
     } else if (boost::starts_with(narrow_url, "prusaslicer://open")) {
         m_project_interactor->on_download_models({std::move(narrow_url)});
     } else {
-        SPDLOG_ERROR("MacOpenURL recieved improper URL: {}", narrow_url);
+        SPDLOG_ERROR("MacOpenURL recieved improper URL: {}", Biz::AppInstance::redact_app_urls(narrow_url));
     }
 }
 #endif /* __APPLE__ */

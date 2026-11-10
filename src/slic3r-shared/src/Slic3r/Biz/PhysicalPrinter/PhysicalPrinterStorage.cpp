@@ -38,6 +38,10 @@ void PhysicalPrinterStorage::load_all()
     boost::system::error_code ec;
     fs::directory_iterator it(dir_path, ec);
 
+    if (ec == boost::system::errc::no_such_file_or_directory) {
+        SPDLOG_INFO("No Physical Printer Configurations stored yet.");
+        return;
+    }
     if (ec) {
         SPDLOG_ERROR("Failed to load Physical Printer Configurations: {}", ec.message());
         return;
