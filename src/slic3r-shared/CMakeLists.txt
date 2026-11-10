@@ -1522,7 +1522,6 @@ endif ()
 
 
 find_package(magic_enum REQUIRED)
-find_package(range-v3 REQUIRED)
 find_package(libdeflate CONFIG REQUIRED)
 
 slic3r_remap_configs("pugixml::static;yoga::yogacore;${YAML_LIB}" RelWithDebInfo Release)

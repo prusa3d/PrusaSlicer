@@ -71,3 +71,22 @@ find_package(fmt REQUIRED)
 slic3r_remap_configs(fmt::fmt RelWithDebInfo Release)
 
 find_package(Tracy REQUIRED)
+
+find_package(range-v3 REQUIRED)
+
+include(CheckCXXSourceCompiles)
+# range-v3's meta.hpp forward-declares std types using _LIBCPP_TEMPLATE_VIS,
+# which newer libc++ (Xcode 27 SDK) removed. See range-v3 PR #1870.
+check_cxx_source_compiles("
+    #include <cstddef>
+    #if defined(_LIBCPP_VERSION) && !defined(_LIBCPP_TEMPLATE_VIS)
+    #error libc++ without _LIBCPP_TEMPLATE_VIS
+    #endif
+    int main() {}"
+    SLIC3R_LIBCXX_HAS_TEMPLATE_VIS)
+
+if(NOT SLIC3R_LIBCXX_HAS_TEMPLATE_VIS)
+    message(STATUS "range-v3: added META_NO_STD_FORWARD_DECLARATIONS def")
+    target_compile_definitions(range-v3::range-v3 INTERFACE META_NO_STD_FORWARD_DECLARATIONS)
+endif()
+
