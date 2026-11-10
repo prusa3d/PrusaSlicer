@@ -70,4 +70,6 @@ endif()
 find_package(fmt REQUIRED)
 slic3r_remap_configs(fmt::fmt RelWithDebInfo Release)
 
-find_package(Tracy REQUIRED)
+if (SLIC3R_ENABLE_PROFILING)
+    find_package(Tracy REQUIRED)
+endif()
