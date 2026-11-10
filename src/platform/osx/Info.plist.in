@@ -22,6 +22,28 @@
   <string>????</string>
   <key>CFBundleVersion</key>
   <string>@SLIC3R_BUILD_ID@</string>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>com.prusa3d.gcode</string>
+      <key>UTTypeDescription</key>
+      <string>G-code File</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.plain-text</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>gcode</string>
+        </array>
+        <key>public.mime-type</key>
+        <string>text/x-gcode</string>
+      </dict>
+    </dict>
+  </array>
   <key>CFBundleDocumentTypes</key>
   <array>
     <dict>
@@ -93,21 +115,18 @@
       <string>Alternate</string>
     </dict>
     <dict>
-      <key>CFBundleTypeExtensions</key>
-      <array>
-        <string>gcode</string>
-        <string>GCODE</string>
-      </array>
       <key>CFBundleTypeIconFile</key>
       <string>gcode.icns</string>
       <key>CFBundleTypeName</key>
       <string>GCODE</string>
       <key>CFBundleTypeRole</key>
       <string>Viewer</string>
-      <key>LISsAppleDefaultForType</key>
-      <true/>
       <key>LSHandlerRank</key>
       <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+        <array>
+          <string>com.prusa3d.gcode</string>
+        </array>
     </dict>
     <dict>
       <key>CFBundleTypeExtensions</key>
