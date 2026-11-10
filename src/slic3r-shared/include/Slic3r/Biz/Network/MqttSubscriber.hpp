@@ -12,24 +12,29 @@ using MQTTCallback = std::function<void(const std::string&, const std::string&)>
 
 class Subscriber {
 public:
-    // Connect to a broker, subscribe to one topic and register a callback.
-    // The callback will be called  IN A WORKER THREAD !!!    
-    Subscriber(const std::string& address, 
-                       const std::string& username, 
-                       const std::string& password, 
-                       MQTTCallback cb);
+    /**
+     * @brief Starts a worker thread that connects to the broker and keeps the subscriptions.
+     * No method blocks on the network. Both callbacks are called IN A WORKER THREAD.
+     * on_reconnected is called after a lost connection is restored, not after the first connect.
+     */
+    Subscriber(const std::string& address,
+                       const std::string& username,
+                       const std::string& password,
+                       MQTTCallback cb,
+                       std::function<void()> on_reconnected = {});
 
-    // Subscribe to a given topic. Multiple topics can be subscribed to.
     void subscribe(const std::string& topic);
 
-    // Unsubscribe from a given topic.
     void unsubscribe(const std::string& topic);
 
-    // Reconnect with new credentials and restore all subscriptions. Returns false if reconnecting failed.
-    bool update_credentials(const std::string& username, const std::string& password);
+    /**
+     * @brief Stores credentials for the next connect. A live connection is kept.
+     * A pending retry uses the new credentials immediately.
+     */
+    void update_credentials(const std::string& username, const std::string& password);
 
     ~Subscriber();
-    
+
 
 private:
 

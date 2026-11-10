@@ -897,7 +897,7 @@ std::string HttpCurl::get_apex_domain(const std::string& url)
     CURLU* h = curl_url();
     if (!h) return {};
 
-    if (curl_url_set(h, CURLUPART_URL, url.c_str(), CURLU_DEFAULT_SCHEME) != CURLUE_OK) {
+    if (curl_url_set(h, CURLUPART_URL, url.c_str(), CURLU_DEFAULT_SCHEME | CURLU_NON_SUPPORT_SCHEME) != CURLUE_OK) {
         curl_url_cleanup(h);
         return {};
     }

@@ -207,21 +207,26 @@ void ConnectPrinterService::on_user_account_logged_out()
 void ConnectPrinterService::start_mqtt()
 {
     const std::string access_token = m_user_account_interactor.access_token();
-    try {
-        m_mqtt_subscriber = std::make_unique<Network::Mqtt::Subscriber>(
-            Network::ServiceConfig::instance().connect_mqtt_url(),
-            m_user_account_interactor.user_id(),
-            access_token,
-            [this,
-             generation =
-                 m_session_generation](const std::string& topic, const std::string& payload)
-            { on_mqtt_message(generation, topic, payload); }
-        );
-    } catch (...) {
-        SPDLOG_ERROR("Failed to connect to Connect MQTT broker.");
-        m_mqtt_subscriber.reset();
-        return;
-    }
+    m_mqtt_subscriber = std::make_unique<Network::Mqtt::Subscriber>(
+        Network::ServiceConfig::instance().connect_mqtt_url(),
+        m_user_account_interactor.user_id(),
+        access_token,
+        [this,
+         generation =
+             m_session_generation](const std::string& topic, const std::string& payload)
+        { on_mqtt_message(generation, topic, payload); },
+        [this, generation = m_session_generation]()
+        {
+            m_dispatcher.dispatch_on_main_thread(
+                [this, generation]()
+                {
+                    if (generation == m_session_generation) {
+                        request_printer_list_refresh();
+                    }
+                }
+            );
+        }
+    );
     m_mqtt_access_token = access_token;
 
     for (ConnectPrinter& printer : m_printers) {
@@ -232,11 +237,7 @@ void ConnectPrinterService::start_mqtt()
 void ConnectPrinterService::update_mqtt_access_token()
 {
     const std::string access_token = m_user_account_interactor.access_token();
-    if (!m_mqtt_subscriber->update_credentials(m_user_account_interactor.user_id(), access_token)) {
-        m_mqtt_subscriber.reset();
-        m_mqtt_access_token.clear();
-        return;
-    }
+    m_mqtt_subscriber->update_credentials(m_user_account_interactor.user_id(), access_token);
     m_mqtt_access_token = access_token;
 }
 

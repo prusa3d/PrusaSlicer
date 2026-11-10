@@ -81,6 +81,7 @@ ServiceConfig::ServiceConfig() :
     };
     update_url_from_env(m_connect_url, "PRUSA_CONNECT_URL", all_domains);
     update_url_from_env(m_connect_api_url, "PRUSA_CONNECT_API_URL", all_domains);
+    update_url_from_env(m_connect_mqtt_url, "PRUSA_CONNECT_MQTT_URL", all_domains);
     update_url_from_env(m_account_url, "PRUSA_ACCOUNT_URL", all_domains);
     update_url_from_env(m_media_url, "PRUSA_MEDIA_URL", all_domains);
     update_url_from_env(m_preset_repo_url, "PRUSA_PRESET_REPO_URL", all_domains);
