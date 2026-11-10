@@ -28,6 +28,10 @@
 #include <tracy/Tracy.hpp>
 #include <tracy/TracyOpenGL.hpp>
 
+#ifdef __APPLE__
+#include "MacScrollUtils.hpp"
+#endif // __APPLE__
+
 namespace Slic3r::App::Platform::WX {
 
 KeyCode get_key_code_from_event(const wxKeyEvent& event)
@@ -1015,6 +1019,13 @@ void WXRenderCanvas::on_mouse(wxMouseEvent& evt)
         // two ImGui::NewFrame() calls, and NewFrame() only zeroes MouseWheel(H) once
         // per frame, so overwriting drops earlier events in the same frame window.
         float wheel_ticks = static_cast<float>(evt.GetWheelRotation()) / wheel_delta;
+#ifdef __APPLE__
+        // wxOSX reports pixel-precise deltas (trackpad, Magic Mouse) as a rotation in pixels
+        // with a wheel delta of 10, i.e. 10 px per tick. ImGui expects 100 px per tick for
+        // such devices (see imgui_impl_osx.mm), otherwise scrolling is 10x too fast.
+        if (mac_current_scroll_event_is_precise())
+            wheel_ticks *= 0.1f;
+#endif // __APPLE__
         if (evt.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL) {
             io.MouseWheelH += wheel_ticks;
         } else {
