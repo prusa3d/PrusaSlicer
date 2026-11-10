@@ -19,9 +19,41 @@ public:
         return m_connect_url + "/slicer/status";
     }
 
+    const std::string& connect_api_url() const
+    {
+        return m_connect_api_url;
+    }
+
+    /** @brief GET here lists the user's Connect printers. */
     std::string connect_printer_list_url() const
     {
-        return m_connect_url + "/slicer/v2/printers";
+        return m_connect_api_url + "/printer/slicer/v1/printers";
+    }
+
+    /** @brief POST here creates a file record in the organization and returns the presigned upload URL. */
+    std::string connect_organization_files_url(const std::string& organization_id) const
+    {
+        return m_connect_api_url + "/file/slicer/v1/organizations/" + organization_id + "/files";
+    }
+
+    /** @brief PATCH here finishes the upload of one file record. */
+    std::string connect_organization_file_url(
+        const std::string& organization_id,
+        const std::string& file_id
+    ) const
+    {
+        return connect_organization_files_url(organization_id) + "/" + file_id;
+    }
+
+    /** @brief POST here sends an uploaded file to the printer or to its queue. */
+    std::string connect_printer_queue_url(const std::string& printer_uuid) const
+    {
+        return m_connect_api_url + "/printer/slicer/v1/printers/" + printer_uuid + "/queue";
+    }
+
+    const std::string& connect_mqtt_url() const
+    {
+        return m_connect_mqtt_url;
     }
 
     std::string connect_select_printer_url() const
@@ -32,11 +64,6 @@ public:
     std::string connect_printers_url() const
     {
         return m_connect_url + "/app/printers/";
-    }
-
-    std::string connect_teams_url() const
-    {
-        return m_connect_url + "/app/teams";
     }
 
     std::string connect_printables_print_url() const
@@ -124,6 +151,7 @@ public:
 private:
     std::string m_connect_url;
     std::string m_connect_api_url;
+    std::string m_connect_mqtt_url;
     std::string m_account_url;
     std::string m_account_client_id;
     std::string m_media_url;

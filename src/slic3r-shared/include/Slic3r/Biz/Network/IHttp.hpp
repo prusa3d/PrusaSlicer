@@ -30,7 +30,9 @@ public:
     {
         Get,
         Post,
-        Put
+        Put,
+        /** @brief Body is attached with set_post_body(); always send a non-empty body. */
+        Patch
     };
 
     struct Progress
@@ -135,6 +137,9 @@ public:
 	
 	/**
 	 * @brief Sets an HTTP header field.
+	 *
+	 * An empty value sends the field with an empty value. Use remove_header()
+	 * to drop a field.
 	 */
 	virtual IHttp& header(std::string name, const std::string& value) = 0;
 	

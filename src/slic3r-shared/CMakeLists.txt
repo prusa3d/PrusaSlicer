@@ -1720,6 +1720,9 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/Biz/ProjectInteractorTests.cpp
             test/Slic3r/Biz/ExportGcodeTests.cpp
+            test/Slic3r/Biz/PrintHost/PrintHostPrusaConnectTests.cpp
+            test/Slic3r/Biz/ConnectPrinter/ConnectPrinterTests.cpp
+            test/Slic3r/Biz/UserAccount/ConnectUtilsTests.cpp
             test/Slic3r/Biz/Scene/SceneInteractorTests.cpp
             test/Slic3r/Biz/SlaPointsOperationsTests.cpp
             test/Slic3r/Biz/Scene/VirtualBedPreviewTests.cpp

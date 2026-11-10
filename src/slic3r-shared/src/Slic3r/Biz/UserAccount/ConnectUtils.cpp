@@ -12,6 +12,7 @@ bool config_from_json(const std::string& json, PhysicalPrinter::PhysicalPrinterC
     PhysicalPrinter::ConnectUpload* auth = std::get_if<PhysicalPrinter::ConnectUpload>(&config.payload);
     ASSERT(auth);
 
+    SPDLOG_DEBUG("Connect message: {}", json);
     // {"action":"PRINT","set_ready":false,"team_id":12345,"printer_uuid":"12345-12345-12345-12345-12345","filename":"file.gcode","data":{"set_ready":false,"team_id":10533,"printer_uuid":"12345-12345-12345-12345-12345","filename":"file.gcode"}}
     try {
         nlohmann::json j = nlohmann::json::parse(json);
@@ -20,15 +21,6 @@ bool config_from_json(const std::string& json, PhysicalPrinter::PhysicalPrinterC
             filename = j["filename"].get<std::string>();
         } else {
             SPDLOG_ERROR("Could not find filename in Connect message.");
-            return false;
-        }
-
-        if (j.contains("team_id") && j["team_id"].is_string()) {
-            auth->team_id = j["team_id"].get<std::string>();
-        } else if (j.contains("team_id") && j["team_id"].is_number_integer()) {
-            auth->team_id = std::to_string(j["team_id"].get<int>());
-        } else {
-            SPDLOG_ERROR("Could not find team_id in Connect message.");
             return false;
         }
 
@@ -45,16 +37,22 @@ bool config_from_json(const std::string& json, PhysicalPrinter::PhysicalPrinterC
             SPDLOG_ERROR("Could not find data subtree in Connect message.");
             return false;
         }
+
+        if (j.contains("organization_id") && j["organization_id"].is_string()) {
+            auth->organization_id = j["organization_id"].get<std::string>();
+        } else {
+            SPDLOG_WARN("Could not find organization_id in Connect message.");
+        }
     } catch (const nlohmann::json::exception& e) {
         SPDLOG_ERROR("Could not parse Connect message: {}", e.what());
         return false;
     }
 
-    
+
     return true;
 }
 
-std::string filename_from_json(const std::string& json_str) 
+std::string filename_from_json(const std::string& json_str)
 {
     try {
         nlohmann::json j = nlohmann::json::parse(json_str);

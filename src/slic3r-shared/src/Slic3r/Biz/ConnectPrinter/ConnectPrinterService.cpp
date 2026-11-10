@@ -13,7 +13,6 @@
 namespace Slic3r::Biz::ConnectPrinter {
 
 namespace {
-const std::string MQTT_ADDRESS                = "wss://mqtt.prusa3d.com:8084/mqtt";
 constexpr std::string_view STATE_TOPIC_PREFIX = "v1/devices/printers/";
 constexpr std::string_view STATE_TOPIC_SUFFIX = "/data/state";
 
@@ -126,6 +125,7 @@ void ConnectPrinterService::fetch_printer_list(
                  generation,
                  success_fn = std::move(success_fn)](std::string body, unsigned status)
                 {
+                    SPDLOG_INFO("Connect printer list: HTTP {}, {} bytes", status, body.size());
                     if (std::optional<std::vector<ConnectPrinter>> printers =
                             parse_connect_printer_list(body))
                     {
@@ -209,7 +209,7 @@ void ConnectPrinterService::start_mqtt()
     const std::string access_token = m_user_account_interactor.access_token();
     try {
         m_mqtt_subscriber = std::make_unique<Network::Mqtt::Subscriber>(
-            MQTT_ADDRESS,
+            Network::ServiceConfig::instance().connect_mqtt_url(),
             m_user_account_interactor.user_id(),
             access_token,
             [this,

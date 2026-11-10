@@ -34,7 +34,9 @@ void PrintHostPrusaLink::set_auth(Network::IHttp* http) const
 
     switch (auth->auth_type) {
     case Domain::PrintHostAuthType::ApiKey:
-        http->header("X-Api-Key", auth->api_key);
+        if (!auth->api_key.empty()) {
+            http->header("X-Api-Key", auth->api_key);
+        }
         break;
     case Domain::PrintHostAuthType::Digest:
         http->auth_digest(auth->username, auth->password);

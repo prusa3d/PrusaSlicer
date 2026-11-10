@@ -53,3 +53,87 @@ TEST_CASE("Load Connect HW Config Tests", "[preset]")
         }
     }
 }
+
+TEST_CASE("Load Connect HW Config from the slicer API printer list", "[preset]")
+{
+    SECTION("tools carry type instead of class, feeder slots are addressed 0.N") {
+        const std::string json = R"({
+            "uuid": "u", "name": "MK4 MMU", "model": "MK4", "base_model": "MK4", "tool_count": 1,
+            "tools": {
+                "0": {
+                    "type": "FFF_PRINT_HEAD",
+                    "features": {"nozzle_diameter": 0.4, "nozzle_high_flow": true, "nozzle_hardened": true, "feeder": true},
+                    "feeder": {"type": "MMU", "model": "MMU3", "base_model": "MMU3", "num_slots": 5},
+                    "material_package_instance": null
+                },
+                "0.0": {"type": "FFF_FEEDER_SLOT", "material_package_instance": {"package": {"material": {"type": "PLA"}}}},
+                "0.1": {"type": "FFF_FEEDER_SLOT", "material_package_instance": {"package": {"material": {"type": "PLA"}}}},
+                "0.2": {"type": "FFF_FEEDER_SLOT", "material_package_instance": null},
+                "0.3": {"type": "FFF_FEEDER_SLOT", "material_package_instance": {"package": {"material": {"type": "PETG"}}}},
+                "0.4": {"type": "FFF_FEEDER_SLOT", "telemetry": {"active": false, "odometer_e": 0}}
+            }
+        })";
+        const auto hw_config = Biz::PhysicalPrinter::hw_config_from_connect_json(json);
+        REQUIRE(hw_config.has_value());
+        CHECK(hw_config->technology == Domain::PrinterTechnology::FFF);
+        CHECK(hw_config->model.model == "MK4");
+        CHECK(hw_config->tool_count == 1);
+        REQUIRE(hw_config->tools.size() == 1);
+        CHECK(
+            hw_config->tools[0].features
+            == Domain::Preset::FeatureValueMap{
+                {"nozzle_diameter", 0.4}, {"nozzle_high_flow", true}, {"nozzle_hardened", true}, {"feeder", true}
+            }
+        );
+        REQUIRE(hw_config->feeders.size() == 1);
+        CHECK(hw_config->feeders.begin()->second.model.model == "MMU3");
+    }
+
+    SECTION("tool without features") {
+        const std::string json = R"({
+            "uuid": "u", "name": "MK3.9B", "model": "MK4", "base_model": "MK4", "tool_count": 1,
+            "tools": {"0": {"type": "FFF_PRINT_HEAD", "telemetry": {"active": false}, "material_package_instance": null}}
+        })";
+        const auto hw_config = Biz::PhysicalPrinter::hw_config_from_connect_json(json);
+        REQUIRE(hw_config.has_value());
+        CHECK(hw_config->technology == Domain::PrinterTechnology::FFF);
+        REQUIRE(hw_config->tools.size() == 1);
+        CHECK(hw_config->tools[0].features.empty());
+    }
+
+    SECTION("empty tools is SLA") {
+        const std::string json = R"({"uuid": "u", "model": "SL1", "base_model": "SL1", "tool_count": 1, "tools": {}})";
+        const auto hw_config = Biz::PhysicalPrinter::hw_config_from_connect_json(json);
+        REQUIRE(hw_config.has_value());
+        CHECK(hw_config->technology == Domain::PrinterTechnology::SLA);
+    }
+
+    SECTION("printer without model is rejected") {
+        const std::string json = R"({
+            "uuid": "u", "name": "The Real Next", "connect_state": "OFFLINE", "supported_printer_models": ["TC"],
+            "legacy_printer_model": "NEXT",
+            "tools": {"0": {"type": "FFF_PRINT_HEAD", "telemetry": {"active": false}, "material_package_instance": null}}
+        })";
+        CHECK_FALSE(Biz::PhysicalPrinter::hw_config_from_connect_json(json).has_value());
+    }
+
+    SECTION("legacy class is still accepted") {
+        const std::string json = R"({
+            "uuid": "u", "model": "MK4", "base_model": "MK4", "tool_count": 1,
+            "tools": {"0": {"class": "FFF", "type": "PRINT_HEAD", "features": {"nozzle_diameter": 0.4}}}
+        })";
+        const auto hw_config = Biz::PhysicalPrinter::hw_config_from_connect_json(json);
+        REQUIRE(hw_config.has_value());
+        CHECK(hw_config->technology == Domain::PrinterTechnology::FFF);
+    }
+
+    SECTION("tool with a non-string type is skipped") {
+        const std::string json = R"({
+            "uuid": "u", "model": "MK4", "base_model": "MK4", "tool_count": 2,
+            "tools": {"0": {"type": null}, "1": {"type": "FFF_PRINT_HEAD"}}
+        })";
+        const auto hw_config = Biz::PhysicalPrinter::hw_config_from_connect_json(json);
+        REQUIRE(hw_config.has_value());
+        CHECK(hw_config->technology == Domain::PrinterTechnology::FFF);
+    }
+}

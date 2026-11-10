@@ -130,6 +130,9 @@ HttpCurl::HttpCurl(RequestMethod request_method, std::string&& url, RetryFn fn) 
     case IHttp::RequestMethod::Put:
         curl_easy_setopt(m_curl.get(), CURLOPT_UPLOAD, 1L);
         break;
+    case IHttp::RequestMethod::Patch:
+        curl_easy_setopt(m_curl.get(), CURLOPT_CUSTOMREQUEST, "PATCH");
+        break;
     case IHttp::RequestMethod::Get:
     default:
         break;
@@ -524,10 +527,12 @@ IHttp& HttpCurl::restrict_redirects(long max_redirects)
 
 IHttp& HttpCurl::header(std::string name, const std::string& value)
 {
-    if (name.size() > 0) {
-        name.append(": ").append(value);
-    } else {
+    if (name.empty()) {
         name.push_back(':');
+    } else if (value.empty()) {
+        name.push_back(';');
+    } else {
+        name.append(": ").append(value);
     }
     m_header_list.reset(curl_slist_append(m_header_list.release(), name.c_str()));
     return *this;
@@ -658,7 +663,7 @@ IHttp& HttpCurl::set_put_body(const fs::path& path)
     if (!ec) {
         m_put_file = std::make_unique<fs::ifstream>(path, std::ios::binary);
         ::curl_easy_setopt(m_curl.get(), CURLOPT_READDATA, (void*) (m_put_file.get()));
-        ::curl_easy_setopt(m_curl.get(), CURLOPT_INFILESIZE, file_size);
+        ::curl_easy_setopt(m_curl.get(), CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(file_size));
     } else {
         SPDLOG_ERROR("Failed to set PUT body with file {}. {}", path.string(), ec.message());
     }

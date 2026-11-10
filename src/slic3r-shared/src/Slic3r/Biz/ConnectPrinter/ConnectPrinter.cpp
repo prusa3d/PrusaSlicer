@@ -56,7 +56,7 @@ std::string string_field(const nlohmann::json& j, const char* key)
 }
 } // namespace
 
-std::optional<std::vector<ConnectPrinter>> parse_connect_printer_list(const std::string& body)
+std::optional<nlohmann::json> extract_connect_printers_array(const std::string& body)
 {
     nlohmann::json json;
     try {
@@ -66,14 +66,25 @@ std::optional<std::vector<ConnectPrinter>> parse_connect_printer_list(const std:
         return std::nullopt;
     }
 
-    const nlohmann::json& root = json.is_array() && json.size() == 1 ? json[0] : json;
-    if (!root.is_object() || !root.contains("printers") || !root["printers"].is_array()) {
-        SPDLOG_ERROR("Unexpected format of Connect printer list.");
+    if (json.is_object()) {
+        if (auto it = json.find("printers"); it != json.end() && it->is_array()) {
+            return std::move(*it);
+        }
+    }
+
+    SPDLOG_ERROR("Unexpected format of Connect printer list.");
+    return std::nullopt;
+}
+
+std::optional<std::vector<ConnectPrinter>> parse_connect_printer_list(const std::string& body)
+{
+    const std::optional<nlohmann::json> printers_json = extract_connect_printers_array(body);
+    if (!printers_json) {
         return std::nullopt;
     }
 
     std::vector<ConnectPrinter> printers;
-    for (const nlohmann::json& printer_json : root["printers"]) {
+    for (const nlohmann::json& printer_json : *printers_json) {
         if (!printer_json.is_object()) {
             continue;
         }

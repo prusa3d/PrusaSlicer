@@ -47,8 +47,17 @@ class MockHttp : public IHttp
 {
 public:
     MockHttp(std::string url, IHttp::RetryFn retryfn) :
-        IHttp(RequestMethod::Get, std::move(url), retryfn)
+        MockHttp(RequestMethod::Get, std::move(url), std::move(retryfn))
     {}
+
+    MockHttp(RequestMethod method, std::string url, IHttp::RetryFn retryfn) :
+        IHttp(method, std::move(url), retryfn)
+    {}
+
+    RequestMethod request_method() const
+    {
+        return m_request_method;
+    }
 
     void invoke_complete(std::string body, unsigned status)
     {
@@ -60,6 +69,18 @@ public:
     {
         if (errorfn)
             errorfn(std::move(body), std::move(error), status);
+    }
+
+    /**
+     * @brief Drives the on_progress callback from a test.
+     * @return The cancel flag the callback produced (false when no callback is set).
+     */
+    bool invoke_progress(size_t ultotal, size_t ulnow)
+    {
+        bool cancel = false;
+        if (progressfn)
+            progressfn(Progress(0, 0, ultotal, ulnow, m_empty_buffer), cancel);
+        return cancel;
     }
 
     MAKE_MOCK1(timeout_connection_mock, void(long));
@@ -282,6 +303,7 @@ public:
 
 private:
     PerformOverrideFn m_perform_override_fn{nullptr};
+    std::string m_empty_buffer;
 };
 
 } // namespace Slic3r::Biz::Network

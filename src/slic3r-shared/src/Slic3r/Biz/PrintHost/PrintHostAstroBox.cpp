@@ -146,7 +146,9 @@ void PrintHostAstroBox::set_auth(Network::IHttp* http) const
     const PhysicalPrinter::PrinterUpload* auth = std::get_if<PhysicalPrinter::PrinterUpload>(&m_print_host_config.payload);
     ASSERT(auth);
 
-    http->header("X-Api-Key", auth->api_key);
+    if (!auth->api_key.empty()) {
+        http->header("X-Api-Key", auth->api_key);
+    }
 
     if (!auth->ca_file.empty()) {
         http->ca_file(auth->ca_file);

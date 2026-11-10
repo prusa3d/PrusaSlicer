@@ -53,6 +53,7 @@ void update_url_from_env(std::string& dest, const char* env_name, const std::vec
 ServiceConfig::ServiceConfig() :
     m_connect_url("https://connect.prusa3d.com"),
     m_connect_api_url("https://connect-api.prusa3d.com"),
+    m_connect_mqtt_url("wss://mqtt.prusa3d.com:8084/mqtt"),
     m_account_url("https://account.prusa3d.com"),
     m_account_client_id("oamhmhZez7opFosnwzElIgE2oGgI2iJORSkw587O"),
     m_media_url("https://media.printables.com"),

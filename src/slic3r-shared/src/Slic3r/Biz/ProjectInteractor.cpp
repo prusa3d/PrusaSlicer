@@ -1024,7 +1024,7 @@ void ProjectInteractor::do_result_upload_connect(
 )
 {
     PhysicalPrinter::PhysicalPrinterConfig config;
-    config.host = Network::ServiceConfig::instance().connect_url();
+    config.host = Network::ServiceConfig::instance().connect_api_url();
     PhysicalPrinter::ConnectUpload auth;
     auth.access_token = m_user_account_interactor.access_token();
     config.payload = std::move(auth);
@@ -1033,8 +1033,22 @@ void ProjectInteractor::do_result_upload_connect(
     std::string body_json;
     if (!UserAccount::ConnectUtils::config_from_json(connect_msg, config, filename, body_json)) {
         SPDLOG_ERROR("Upload to Connect has failed - failed to read Connect message.");
+        report_connect_upload_error(Biz::_u8L("Prusa Connect sent an invalid print request."));
         return;
     }
+
+    const PhysicalPrinter::ConnectUpload& upload = std::get<PhysicalPrinter::ConnectUpload>(config.payload);
+    if (upload.organization_id.empty()) {
+        SPDLOG_ERROR(
+            "Upload to Connect has failed - the Connect message has no organization for printer {}.",
+            upload.printer_uuid
+        );
+        report_connect_upload_error(
+            Biz::_u8L("Prusa Connect did not provide the organization of the selected printer.")
+        );
+        return;
+    }
+    SPDLOG_INFO("Upload to Connect: printer {}, organization {}.", upload.printer_uuid, upload.organization_id);
 
     if (!filename_override.empty()) {
         filename = filename_override;
@@ -1046,6 +1060,13 @@ void ProjectInteractor::do_result_upload_connect(
     PrintHost::PrintHostJobData data{std::monostate{}, filename};
     data.request_body_json = std::move(body_json);
     do_result_export_inner(id, std::move(config), std::move(data));
+}
+
+void ProjectInteractor::report_connect_upload_error(const std::string& msg)
+{
+    if (m_dialog_provider) {
+        m_dialog_provider->show_error_dialog(msg, Biz::_u8L("Prusa Connect"));
+    }
 }
 
 void ProjectInteractor::on_download_models(const std::vector<std::string>& message)

@@ -23,17 +23,16 @@ estimate_technology(const nlohmann::ordered_json& node)
         return Domain::PrinterTechnology::SLA;
     }
 
-    for (const auto& [k, v] : tools_node.items()) {
-        if (v.contains("class")) {
-            const auto& class_node = v.at("class");
-            if (!class_node.is_string()) {
-                return tl::unexpected{fmt::format("'class' node of tools '{}' is not string", k)};
+    for (const auto& tool : tools_node) {
+        for (const char* key : {"class", "type"}) {
+            if (!tool.contains(key) || !tool.at(key).is_string()) {
+                continue;
             }
-            auto class_type = class_node.get<std::string>();
-            if (boost::iequals(class_type, "fff")) {
+            const auto class_type = tool.at(key).get<std::string>();
+            if (boost::istarts_with(class_type, "fff")) {
                 return Domain::PrinterTechnology::FFF;
             }
-            else if (boost::iequals(class_type, "sla")) {
+            if (boost::istarts_with(class_type, "sla")) {
                 return Domain::PrinterTechnology::SLA;
             }
         }
@@ -46,7 +45,9 @@ tl::expected<Domain::Preset::HwToolConfig, std::string>
 load_external_tool(const nlohmann::ordered_json& node)
 {
     Domain::Preset::HwToolConfig ret;
-    node.at("features").get_to(ret.features);
+    if (node.contains("features")) {
+        node.at("features").get_to(ret.features);
+    }
     return ret;
 }
 

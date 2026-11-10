@@ -16,6 +16,7 @@
 #include "Slic3r/App/AddPrinterPanel.hpp"
 #include "Slic3r/App/WarningPanel.hpp"
 #include "Slic3r/App/Navigator.hpp"
+#include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/Preset/HwConfigEvaluator.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
@@ -873,24 +874,20 @@ public:
                             std::vector<PrinterIdentifier> parsing_failures;
                             std::map<PrinterIdentifier, std::vector<std::string>> parsing_warnings;
                             try {
-                                auto json{nlohmann::json::parse(body)};
-                                const auto& root{json.is_array() && json.size() == 1 ? json[0] :
-                                                                                       json};
-                                if (!root.is_object()
-                                    || !root.contains("printers")
-                                    || !root["printers"].is_array())
-                                {
+                                const std::optional<nlohmann::json> printers_json{
+                                    Biz::ConnectPrinter::extract_connect_printers_array(body)};
+                                if (!printers_json) {
                                     handle_error(Biz::_u8L("Invalid response!"));
                                     return;
                                 }
 
-                                if (root["printers"].empty()) {
+                                if (printers_json->empty()) {
                                     m_title->set_title(Biz::_u8L("There are no printers to synchronize."));
                                     m_title->set_sub_title(Biz::_u8L("Please add your printer manually."));
                                     return;
                                 }
 
-                                for (const nlohmann::json& printer_json : root["printers"]) {
+                                for (const nlohmann::json& printer_json : *printers_json) {
                                     if (!printer_json.is_object()) {
                                         handle_error(Biz::_u8L("No printers in the response"));
                                         return;

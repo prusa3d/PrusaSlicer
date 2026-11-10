@@ -38,7 +38,7 @@ bool PrintHostDuet::perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn er
              Network::IHttp::create(Network::IHttp::RequestMethod::Post, std::move(upload_cmd), retry_fn));
     if (dsf) {
         http->set_put_body(m_upload_data.source_path);
-        if (connect_msg.empty())
+        if (!connect_msg.empty())
             http->header("X-Session-Key", connect_msg);
     } else {
         http->set_post_body(m_upload_data.source_path);

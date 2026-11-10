@@ -46,7 +46,7 @@ std::optional<Domain::Preset::HwPrinterConfig> hw_config_from_connect_json(std::
 {
     auto result = Preset::IO::load_external_hw_config(json);
     if (!result.has_value()) {
-        SPDLOG_ERROR("Failed load external hw_config from json: {}", result.error());
+        SPDLOG_WARN("Failed load external hw_config from json: {}", result.error());
         return std::nullopt;
     }
     return result.value();

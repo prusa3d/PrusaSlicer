@@ -526,8 +526,10 @@ public:
 
     /**
      * @brief Same as do_result_upload, but does parse connect_msg first.
-     * Uploads to PrintHostType::PrusaConnect.
+     * Uploads to Prusa Connect. The organization of the target printer comes with connect_msg.
      * @param filename_override is used f.e. when bgcode is not allowed in profiles, but user still writes .bgcode to filename and then agrees to change it back to .gcode
+     * When the message is invalid or the organization of the printer is unknown,
+     * an error dialog is shown and no export is started.
      */
     void do_result_upload_connect(
         const Domain::SlicingId id,
@@ -759,6 +761,8 @@ private:
         PhysicalPrinter::PhysicalPrinterConfig&& print_host_config,
         PrintHost::PrintHostJobData&& job_data
     );
+
+    void report_connect_upload_error(const std::string& msg);
 
 private:
     struct Selection
