@@ -254,23 +254,21 @@ tl::expected<SelectionId, std::string> ProjectInteractor::do_load_project(
 
 namespace {
 
-const std::string PROJECT_LOAD_JOB_NAME{std::string(FileOpen::FILE_LOAD_JOB_PREFIX) + "_project"};
-
 /**
- * @brief Each file takes the same share, the rest is left for adding to the scene.
+ * @brief Each file takes the same share, its stages start at fixed offsets within the share.
  */
 double file_load_progress(
     FileOpen::FileLoadStage stage,
     const FileOpen::FileLoadProgressPayload& payload
 )
 {
-    constexpr double reading_share{0.9};
-    if (stage == FileOpen::FileLoadStage::AddingToScene) {
-        return reading_share;
-    }
-    const double file_share{reading_share / static_cast<double>(std::max<size_t>(payload.file_count, 1))};
-    const double stage_offset{stage == FileOpen::FileLoadStage::Reading ? 0.1 : 0.7};
-    return (static_cast<double>(payload.file_index) + stage_offset) * file_share;
+    const double stage_offset{
+        stage == FileOpen::FileLoadStage::Reading      ? 0.1
+        : stage == FileOpen::FileLoadStage::Converting ? 0.7
+                                                       : 0.9
+    };
+    return (static_cast<double>(payload.file_index) + stage_offset)
+        / static_cast<double>(std::max<size_t>(payload.file_count, 1));
 }
 
 /**
@@ -311,20 +309,29 @@ std::optional<MainThreadDialogProvider> make_job_dialog_provider(
     return std::make_optional<MainThreadDialogProvider>(*dialog_provider, dispatcher, stop_token);
 }
 
+/**
+ * @param batch_index Order of the project in a batch of projects loaded one by one.
+ * @param batch_count Count of the projects in the batch, 1 for a single project.
+ */
 Project load_project_job(
     Biz::JThread::StopToken stop_token,
     Platform::IMainThreadDispatcher& dispatcher,
     Platform::JobManager::ProgressTracker progress_tracker,
     const boost::filesystem::path& file_path,
     const Domain::Preset::Bundle& preset_bundle,
-    IMessageDialogProvider* dialog_provider
+    IMessageDialogProvider* dialog_provider,
+    size_t batch_index,
+    size_t batch_count
 )
 {
     std::optional<MainThreadDialogProvider> job_dialog_provider{
         make_job_dialog_provider(dialog_provider, dispatcher, stop_token)
     };
     const FileOpen::FileLoadProgressFn report_progress{
-        make_file_load_progress_fn(stop_token, progress_tracker)
+        [report = make_file_load_progress_fn(stop_token, progress_tracker), batch_index, batch_count](
+            FileOpen::FileLoadStage stage,
+            const FileOpen::FileLoadProgressPayload& payload
+        ) { report(stage, {payload.file_name, batch_index, batch_count}); }
     };
 
     Project project{FileLoadingLogic::load_file_as_project(
@@ -383,7 +390,9 @@ std::vector<FileLoadingLogic::ImportedFileData> read_files_job(
     )};
     report_progress(
         FileOpen::FileLoadStage::AddingToScene,
-        {paths.size() == 1 ? paths.front().filename().string() : std::string{}, 0, paths.size()}
+        {paths.size() == 1 ? paths.front().filename().string() : std::string{},
+         paths.size() - 1,
+         paths.size()}
     );
     return data;
 }
@@ -394,7 +403,7 @@ void ProjectInteractor::load_project(
     const boost::filesystem::path& file_path,
     EmptyProjectAction empty_project_action,
     bool temporary_file,
-    std::function<void()> on_done
+    FileOpen::FileLoadDoneFn on_done
 )
 {
     invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
@@ -412,6 +421,7 @@ void ProjectInteractor::load_project(
 
     auto on_result{[this, file_path, empty_project_action, temporary_file, on_done, report_error](Project&& project)
     {
+        FileOpen::FileLoadResult result{FileOpen::FileLoadResult::Failed};
         try {
             const SelectionId previous_project_id = m_selection.project_id;
             const bool replace_previous_project = empty_project_action == EmptyProjectAction::Replace
@@ -428,6 +438,7 @@ void ProjectInteractor::load_project(
                 temporary_file ? std::nullopt : std::make_optional(file_path)
             );
             if (loaded.has_value()) {
+                result = FileOpen::FileLoadResult::Loaded;
                 if (replace_previous_project) {
                     this->remove_project(previous_project_id);
                 }
@@ -436,7 +447,7 @@ void ProjectInteractor::load_project(
             report_error(fmt::format("Loading file failed: {}", e.what()));
         }
         if (on_done) {
-            on_done();
+            on_done(result);
         }
     }};
 
@@ -447,7 +458,7 @@ void ProjectInteractor::load_project(
                           std::rethrow_exception(eptr);
                       } catch (FileOpen::FileLoadCancelled&) {
                           if (on_done) {
-                              on_done();
+                              on_done(FileOpen::FileLoadResult::Cancelled);
                           }
                           return;
                       } catch (Loaded3MFException& e) {
@@ -458,14 +469,14 @@ void ProjectInteractor::load_project(
                       }
                       report_error(description);
                       if (on_done) {
-                          on_done();
+                          on_done(FileOpen::FileLoadResult::Failed);
                       }
                   }};
 
     Platform::PlatformServices::instance()
         .job_manager()
         .create_job(
-            PROJECT_LOAD_JOB_NAME,
+            next_file_load_job_name("project"),
             // TODO: preset_bundle may change, making its copy wouldn't help
             [&preset_bundle = m_workbench.preset_bundle(), dialog_provider = m_dialog_provider](
                 Biz::JThread::StopToken stop_token,
@@ -480,7 +491,9 @@ void ProjectInteractor::load_project(
                     std::move(progress_tracker),
                     file_path,
                     preset_bundle,
-                    dialog_provider
+                    dialog_provider,
+                    0,
+                    1
                 );
             },
             file_path
@@ -500,10 +513,12 @@ void ProjectInteractor::load_projects(
         std::deque<boost::filesystem::path> queue;
         std::list<boost::filesystem::path> restored;
         std::function<void()> next;
+        size_t count{0};
     };
 
     auto state = std::make_shared<State>();
     state->queue.assign(file_paths.begin(), file_paths.end());
+    state->count = file_paths.size();
 
     state->next = [this, state, restored_projects]
     {
@@ -520,13 +535,16 @@ void ProjectInteractor::load_projects(
 
         const boost::filesystem::path file_path = std::move(state->queue.front());
         state->queue.pop_front();
+        const size_t batch_index{state->count - state->queue.size() - 1};
 
         Platform::PlatformServices::instance()
             .job_manager()
             .create_job(
-                PROJECT_LOAD_JOB_NAME,
+                next_file_load_job_name("project"),
                 [&preset_bundle = m_workbench.preset_bundle(),
-                 dialog_provider = m_dialog_provider](
+                 dialog_provider = m_dialog_provider,
+                 batch_index,
+                 batch_count = state->count](
                     Biz::JThread::StopToken stop_token,
                     Platform::IMainThreadDispatcher& dispatcher,
                     Platform::JobManager::ProgressTracker progress_tracker,
@@ -539,7 +557,9 @@ void ProjectInteractor::load_projects(
                         std::move(progress_tracker),
                         file_path,
                         preset_bundle,
-                        dialog_provider
+                        dialog_provider,
+                        batch_index,
+                        batch_count
                     );
                 },
                 file_path
@@ -576,6 +596,8 @@ void ProjectInteractor::load_projects(
                     try {
                         std::rethrow_exception(eptr);
                     } catch (FileOpen::FileLoadCancelled&) {
+                        // Backups of the projects which weren't loaded stay for the next recovery.
+                        state->queue.clear();
                         state->next();
                         return;
                     } catch (Loaded3MFException& e) {
@@ -1342,13 +1364,13 @@ std::string ProjectInteractor::next_file_load_job_name(const std::string& kind)
         + std::to_string(++m_file_load_job_counter);
 }
 
-void ProjectInteractor::report_file_load_job_failure(std::exception_ptr eptr)
+FileOpen::FileLoadResult ProjectInteractor::report_file_load_job_failure(std::exception_ptr eptr)
 {
     std::string description = "Unknown error";
     try {
         std::rethrow_exception(eptr);
     } catch (const FileOpen::FileLoadCancelled&) {
-        return;
+        return FileOpen::FileLoadResult::Cancelled;
     } catch (const std::exception& e) {
         description = fmt::format("Loading file failed: {}", e.what());
     } catch (...) {
@@ -1357,12 +1379,13 @@ void ProjectInteractor::report_file_load_job_failure(std::exception_ptr eptr)
     SPDLOG_ERROR(description);
     invoke_listeners<IProjectsChangedListener>([&description](IProjectsChangedListener* l)
                                                { l->on_project_load_failed(description); });
+    return FileOpen::FileLoadResult::Failed;
 }
 
 void ProjectInteractor::load_models_to_project(
     std::vector<boost::filesystem::path> paths,
     bool temporary_sources,
-    std::function<void()> on_done
+    FileOpen::FileLoadDoneFn on_done
 )
 {
     invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
@@ -1430,7 +1453,7 @@ void ProjectInteractor::load_models_to_project(
 void ProjectInteractor::load_volumes_to_selected_object(
     std::vector<boost::filesystem::path> paths,
     Domain::ModelVolumeType volume_type,
-    std::function<void()> on_done
+    FileOpen::FileLoadDoneFn on_done
 )
 {
     const SelectionId project_id{selected_project_id()};
@@ -1462,7 +1485,7 @@ void ProjectInteractor::start_file_read_job(
     int tool_count,
     SelectionId project_id,
     std::function<void(std::vector<FileLoadingLogic::ImportedFileData>)> apply,
-    std::function<void()> on_done
+    FileOpen::FileLoadDoneFn on_done
 )
 {
     SharedStepImportSettings step_settings{make_shared_step_import_settings()};
@@ -1497,7 +1520,7 @@ void ProjectInteractor::start_file_read_job(
                 store_shared_step_import_settings(step_settings);
                 apply(std::move(data));
                 if (on_done) {
-                    on_done();
+                    on_done(FileOpen::FileLoadResult::Loaded);
                 }
             }
         )
@@ -1505,9 +1528,9 @@ void ProjectInteractor::start_file_read_job(
             [this, on_done, step_settings](std::exception_ptr eptr)
             {
                 store_shared_step_import_settings(step_settings);
-                report_file_load_job_failure(eptr);
+                const FileOpen::FileLoadResult result{report_file_load_job_failure(eptr)};
                 if (on_done) {
-                    on_done();
+                    on_done(result);
                 }
             }
         )

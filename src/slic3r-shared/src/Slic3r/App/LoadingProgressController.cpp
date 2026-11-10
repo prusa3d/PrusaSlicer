@@ -8,7 +8,6 @@
 
 #include <fmt/format.h>
 
-#include <algorithm>
 #include <any>
 #include <chrono>
 
@@ -24,6 +23,8 @@ namespace {
 /// Delay before the dialog opens, and the interval of the next attempts while another modal
 /// dialog is open.
 constexpr std::chrono::milliseconds OPEN_DELAY{400};
+/// Delay before the dialog closes, a job which follows the finished one starts meanwhile.
+constexpr std::chrono::milliseconds CLOSE_DELAY{100};
 
 std::string progress_label(const Domain::ProgressDetail& detail)
 {
@@ -81,40 +82,48 @@ void LoadingProgressController::shutdown()
         return;
     }
     m_shut_down = true;
-    m_job_name.clear();
-    cancel_open_timer();
+    m_job_names.clear();
+    m_shown_job.clear();
+    cancel_timer(m_open_timer_id);
+    cancel_timer(m_close_timer_id);
     m_job_manager.remove_listener<IJobManagerStatusChangedListener>(this);
 }
 
 void LoadingProgressController::on_job_manager_status_changed(const JobManagerStatus& status)
 {
-    const auto it{std::ranges::find_if(
-        status,
-        [](const auto& job)
+    m_job_names.clear();
+    for (const auto& [job_name, progress] : status) {
+        if (job_name.starts_with(Biz::FileOpen::FILE_LOAD_JOB_PREFIX)
+            && progress.status == Domain::JobStatus::Started)
         {
-            return job.first.starts_with(Biz::FileOpen::FILE_LOAD_JOB_PREFIX)
-                && job.second.status == Domain::JobStatus::Started;
+            m_job_names.insert(job_name);
         }
-    )};
+    }
 
-    if (it == status.end()) {
-        stop_tracking();
+    if (m_job_names.empty()) {
+        if (!m_shown_job.empty()) {
+            start_close_timer();
+        }
         return;
     }
 
-    const auto& [job_name, progress] = *it;
-    if (job_name != m_job_name) {
-        start_tracking(job_name);
+    cancel_timer(m_close_timer_id);
+    if (m_cancelling) {
+        request_stop_of_jobs();
     }
-    update_progress(progress);
+    if (!m_job_names.contains(m_shown_job)) {
+        m_shown_job = *m_job_names.begin();
+    }
+    start_open_timer();
+    update_progress(status.at(m_shown_job));
 }
 
 void LoadingProgressController::cancel()
 {
-    if (m_job_name.empty()) {
+    if (m_job_names.empty()) {
         return;
     }
-    m_job_manager.request_job_stop(m_job_name);
+    request_stop_of_jobs();
     m_cancelling = true;
     // TRN Loading progress dialog. Shown after the user cancelled the loading.
     m_label = fmt::format("{}...", Biz::_u8L("Cancelling"));
@@ -131,16 +140,19 @@ int LoadingProgressController::percent() const
     return m_percent;
 }
 
-void LoadingProgressController::start_tracking(const std::string& job_name)
+void LoadingProgressController::request_stop_of_jobs()
 {
-    // The dialog stays as it is when a next job follows, e.g. when projects load one by one.
-    m_job_name   = job_name;
-    m_cancelling = false;
+    for (const std::string& job_name : m_job_names) {
+        m_job_manager.request_job_stop(job_name);
+    }
+}
+
+void LoadingProgressController::start_open_timer()
+{
     if (m_timer_queue.is_timer_running(m_open_timer_id)) {
         return;
     }
-
-    // Repeats while the job runs: the dialog opens once no other modal dialog is open, and
+    // Repeats while the jobs run: the dialog opens once no other modal dialog is open, and
     // opens again when another modal dialog replaced it meanwhile.
     m_open_timer_id = m_timer_queue.set_timer(
         OPEN_DELAY,
@@ -149,15 +161,24 @@ void LoadingProgressController::start_tracking(const std::string& job_name)
     );
 }
 
-void LoadingProgressController::stop_tracking()
+void LoadingProgressController::start_close_timer()
 {
-    if (m_job_name.empty()) {
+    if (m_timer_queue.is_timer_running(m_close_timer_id)) {
         return;
     }
+    m_close_timer_id = m_timer_queue.set_timer(CLOSE_DELAY, [this]() { finish(); });
+}
 
-    m_job_name.clear();
+void LoadingProgressController::finish()
+{
+    // The callback may already be dispatched when a next job starts and the timer is cancelled.
+    if (!m_job_names.empty()) {
+        return;
+    }
+    m_shown_job.clear();
     m_cancelling = false;
-    cancel_open_timer();
+    cancel_timer(m_open_timer_id);
+    cancel_timer(m_close_timer_id);
     if (m_navigator.current_modal_dialog() == ModalDialog::LoadingProgress) {
         m_navigator.set_modal_dialog(ModalDialog::None);
     }
@@ -175,8 +196,8 @@ void LoadingProgressController::update_progress(const Progress& progress)
 
 void LoadingProgressController::open_dialog_if_possible()
 {
-    // The callback may already be dispatched when the job ends and the timer is cancelled.
-    if (m_job_name.empty()) {
+    // The callback may already be dispatched when the jobs end and the timer is cancelled.
+    if (m_job_names.empty()) {
         return;
     }
     if (m_navigator.current_modal_dialog() == ModalDialog::None) {
@@ -184,11 +205,12 @@ void LoadingProgressController::open_dialog_if_possible()
     }
 }
 
-void LoadingProgressController::cancel_open_timer()
+void LoadingProgressController::cancel_timer(Biz::Platform::TimerQueue::TimerID& timer_id)
 {
-    if (m_timer_queue.is_timer_running(m_open_timer_id)) {
-        m_timer_queue.cancel_timer(m_open_timer_id);
+    if (m_timer_queue.is_timer_running(timer_id)) {
+        m_timer_queue.cancel_timer(timer_id);
     }
+    timer_id = {};
 }
 
 void LoadingProgressController::notify_progress_changed()

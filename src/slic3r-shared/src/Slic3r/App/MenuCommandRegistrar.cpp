@@ -1201,9 +1201,10 @@ void MenuCommandRegistrar::load_object(Wildcards::TypeFlag specific_type)
             m_project_interactor.file_opening_interactor().open(
                 file_paths,
                 {.as_geometry = true},
-                [this]()
+                [this](Biz::FileOpen::FileLoadResult result)
                 {
-                    if (m_render_module.has_command(CommandName::SvgGizmo)
+                    if (result == Biz::FileOpen::FileLoadResult::Loaded
+                        && m_render_module.has_command(CommandName::SvgGizmo)
                         && m_render_module.command(CommandName::SvgGizmo).enabled())
                     {
                         // open SvgGizmo, when svg volume is selected(was imported)
@@ -1327,10 +1328,10 @@ MenuCommandRegistrar::load_volume(Domain::ModelVolumeType type, Wildcards::TypeF
         m_project_interactor.load_volumes_to_selected_object(
             file_paths,
             type,
-            [this, svg_loading, svg_transform]()
+            [this, svg_loading, svg_transform](Biz::FileOpen::FileLoadResult result)
             {
                 // open SvgGizmo, when svg volume is selected(was imported)
-                if (svg_loading) {
+                if (svg_loading && result == Biz::FileOpen::FileLoadResult::Loaded) {
                     open_svg_gizmo(svg_transform, m_project_interactor, m_render_module);
                 }
             }

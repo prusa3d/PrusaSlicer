@@ -50,4 +50,16 @@ public:
     const char* what() const noexcept override { return "File loading was cancelled"; }
 };
 
+enum class FileLoadResult
+{
+    Loaded,
+    Failed,
+    Cancelled
+};
+
+/**
+ * @brief Called on the main thread when a file loading job ends.
+ */
+using FileLoadDoneFn = std::function<void(FileLoadResult)>;
+
 } // namespace Slic3r::Biz::FileOpen

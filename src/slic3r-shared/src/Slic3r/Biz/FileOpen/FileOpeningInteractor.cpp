@@ -495,7 +495,7 @@ void remove_stale_extractions(std::chrono::hours max_age, const fs::path& root)
 void FileOpeningInteractor::open(
     std::vector<fs::path> paths,
     OpenFilesOptions options,
-    std::function<void()> on_done
+    FileLoadDoneFn on_done
 )
 {
     std::vector<fs::path> archives;
@@ -642,9 +642,9 @@ void FileOpeningInteractor::open_archive_selection(
     auto open_projects{[this,
                         projects = std::move(selection.projects),
                         replace_empty_project,
-                        directories = std::move(directories)]()
+                        directories = std::move(directories)](FileLoadResult models_result)
     {
-        if (projects.empty()) {
+        if (projects.empty() || models_result == FileLoadResult::Cancelled) {
             remove_directories(directories);
             return;
         }
@@ -655,7 +655,7 @@ void FileOpeningInteractor::open_archive_selection(
     }};
 
     if (selection.models.empty()) {
-        open_projects();
+        open_projects(FileLoadResult::Loaded);
         return;
     }
     import_models(
@@ -682,8 +682,16 @@ void FileOpeningInteractor::open_archive_projects(
         file,
         replace_empty_project ? EmptyProjectAction::Replace : EmptyProjectAction::Keep,
         true,
-        [this, projects = std::move(projects), directories = std::move(directories)]()
-        { open_archive_projects(projects, false, directories); }
+        [this, projects = std::move(projects), directories = std::move(directories)](
+            FileLoadResult result
+        )
+        {
+            open_archive_projects(
+                result == FileLoadResult::Cancelled ? std::vector<fs::path>{} : projects,
+                false,
+                directories
+            );
+        }
     );
 }
 
@@ -691,7 +699,7 @@ void FileOpeningInteractor::import_models(
     std::vector<fs::path> files,
     bool to_new_project,
     bool temporary_files,
-    std::function<void()> on_done
+    FileLoadDoneFn on_done
 )
 {
     if (to_new_project && !m_project_interactor.selected_project_is_empty()) {

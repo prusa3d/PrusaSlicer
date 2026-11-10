@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Slic3r/Biz/FileOpen/FileLoadProgress.hpp"
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
 
 #include <boost/filesystem/path.hpp>
@@ -155,8 +156,8 @@ public:
      */
     void open(
         std::vector<boost::filesystem::path> paths,
-        OpenFilesOptions options      = {},
-        std::function<void()> on_done = {}
+        OpenFilesOptions options = {},
+        FileLoadDoneFn on_done   = {}
     );
 
     /**
@@ -171,6 +172,7 @@ private:
     void open_archives(std::vector<boost::filesystem::path> archives, OpenFilesOptions options);
     /**
      * @brief Projects are opened once the imported models are arranged, opening a project selects it.
+     * Cancelled loading of the models or of a project skips the projects which follow.
      * @param directories Removed once everything is opened.
      */
     void open_archive_selection(
@@ -195,7 +197,7 @@ private:
         std::vector<boost::filesystem::path> files,
         bool to_new_project,
         bool temporary_files,
-        std::function<void()> on_done = {}
+        FileLoadDoneFn on_done = {}
     );
     void report_archive_error(const std::string& message);
 

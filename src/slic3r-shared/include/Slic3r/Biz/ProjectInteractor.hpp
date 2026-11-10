@@ -28,6 +28,7 @@
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterInteractor.hpp"
 #include "Slic3r/Biz/RemovableDrive/RemovableDriveService.hpp"
 #include "Slic3r/Biz/FileDownloader/FileDownloaderInteractor.hpp"
+#include "Slic3r/Biz/FileOpen/FileLoadProgress.hpp"
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 #include "Slic3r/Biz/ExportDestination/ExportDestinationInteractor.hpp"
 #include "Slic3r/Biz/IUndoProvider.hpp"
@@ -215,13 +216,13 @@ public:
      * @param empty_project_action Replace takes over the selected project instead of adding a new
      * one, when that project is still empty once the file is loaded.
      * @param temporary_file The project is loaded without a path to the file and stays unmodified.
-     * @param on_done Called on the main thread after the project is loaded or failed.
+     * @param on_done Called on the main thread after the project is loaded, failed or cancelled.
      */
     void load_project(
         const boost::filesystem::path& file_path,
         EmptyProjectAction empty_project_action = EmptyProjectAction::Keep,
         bool temporary_file                     = false,
-        std::function<void()> on_done           = {}
+        FileOpen::FileLoadDoneFn on_done        = {}
     );
     /**
      * @brief Load projects from files
@@ -576,8 +577,8 @@ public:
      */
     void load_models_to_project(
         std::vector<boost::filesystem::path> paths,
-        bool temporary_sources       = false,
-        std::function<void()> on_done = {}
+        bool temporary_sources           = false,
+        FileOpen::FileLoadDoneFn on_done = {}
     );
 
     /**
@@ -590,7 +591,7 @@ public:
     void load_volumes_to_selected_object(
         std::vector<boost::filesystem::path> paths,
         Domain::ModelVolumeType volume_type,
-        std::function<void()> on_done = {}
+        FileOpen::FileLoadDoneFn on_done = {}
     );
 
     /**
@@ -804,13 +805,14 @@ private:
         int tool_count,
         Domain::SelectionId project_id,
         std::function<void(std::vector<FileLoadingLogic::ImportedFileData>)> apply,
-        std::function<void()> on_done
+        FileOpen::FileLoadDoneFn on_done
     );
 
     /**
      * @brief Reports a failed model or volume loading job, a cancelled one is not reported.
+     * @return Cancelled or Failed.
      */
-    void report_file_load_job_failure(std::exception_ptr eptr);
+    FileOpen::FileLoadResult report_file_load_job_failure(std::exception_ptr eptr);
 
 private:
     struct Selection

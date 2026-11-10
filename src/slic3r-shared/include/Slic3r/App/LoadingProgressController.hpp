@@ -4,6 +4,7 @@
 #include "Slic3r/Biz/Platform/TimerQueue.hpp"
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
 
+#include <set>
 #include <string>
 
 namespace Slic3r::Biz::Platform::JobManager {
@@ -24,9 +25,11 @@ struct ILoadingProgressChangedListener
  * @brief Tracks file loading jobs (see Biz::FileOpen::FILE_LOAD_JOB_PREFIX) and shows their
  * progress in ModalDialog::LoadingProgress through the Navigator.
  *
- * The dialog opens when a loading job runs longer than a short delay, so quick loads don't flash
- * it, and closes when the job ends. It doesn't replace another modal dialog, it opens once that
- * one is closed.
+ * The dialog opens when loading runs longer than a short delay, so quick loads don't flash it,
+ * and closes shortly after the last loading job ends, so it stays open between jobs which follow
+ * each other. It doesn't replace another modal dialog, it opens once that one is closed.
+ *
+ * More jobs may run at once, the dialog shows the progress of one of them.
  */
 class LoadingProgressController :
     public WithListeners<ILoadingProgressChangedListener>,
@@ -49,7 +52,8 @@ public:
     ) override;
 
     /**
-     * @brief Asks the tracked job to stop, the dialog stays open until the job ends.
+     * @brief Asks all loading jobs to stop, also the ones which start until the dialog closes.
+     * The dialog stays open until the jobs end.
      */
     void cancel();
 
@@ -58,11 +62,16 @@ public:
     int percent() const;
 
 private:
-    void start_tracking(const std::string& job_name);
-    void stop_tracking();
+    void request_stop_of_jobs();
+    void start_open_timer();
+    void start_close_timer();
+    /**
+     * @brief Closes the dialog and forgets the finished loading.
+     */
+    void finish();
     void update_progress(const Biz::Platform::JobManager::Progress& progress);
     void open_dialog_if_possible();
-    void cancel_open_timer();
+    void cancel_timer(Biz::Platform::TimerQueue::TimerID& timer_id);
     void notify_progress_changed();
 
 private:
@@ -71,9 +80,11 @@ private:
     Biz::Platform::TimerQueue& m_timer_queue;
     bool m_shut_down{false};
 
-    /// Name of the tracked job, empty when no loading job runs.
-    std::string m_job_name;
+    std::set<std::string> m_job_names;
+    /// Job whose progress is shown, empty when the loading finished.
+    std::string m_shown_job;
     Biz::Platform::TimerQueue::TimerID m_open_timer_id;
+    Biz::Platform::TimerQueue::TimerID m_close_timer_id;
     bool m_cancelling{false};
 
     std::string m_label;
