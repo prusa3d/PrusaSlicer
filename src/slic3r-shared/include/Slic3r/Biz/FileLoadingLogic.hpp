@@ -4,7 +4,7 @@
 #include "Slic3r/Domain/Project.hpp"
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Domain/TriangleMesh.hpp"
-#include "Slic3r/Biz/FileOpen/FileLoadProgress.hpp"
+#include "Slic3r/Biz/FileOpen/FileLoadJob.hpp"
 
 #include <optional>
 #include <string>

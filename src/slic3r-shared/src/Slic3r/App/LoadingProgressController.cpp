@@ -2,7 +2,7 @@
 
 #include "Slic3r/App/Navigator.hpp"
 
-#include "Slic3r/Biz/FileOpen/FileLoadProgress.hpp"
+#include "Slic3r/Biz/FileOpen/FileLoadJob.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/Platform/JobManager/JobManager.hpp"
 
@@ -91,12 +91,17 @@ void LoadingProgressController::shutdown()
 
 void LoadingProgressController::on_job_manager_status_changed(const JobManagerStatus& status)
 {
+    const std::set<std::string> previous_job_names{std::move(m_job_names)};
     m_job_names.clear();
     for (const auto& [job_name, progress] : status) {
         if (job_name.starts_with(Biz::FileOpen::FILE_LOAD_JOB_PREFIX)
             && progress.status == Domain::JobStatus::Started)
         {
             m_job_names.insert(job_name);
+            // The already running jobs were asked to stop before.
+            if (m_cancelling && !previous_job_names.contains(job_name)) {
+                m_job_manager.request_job_stop(job_name);
+            }
         }
     }
 
@@ -108,9 +113,6 @@ void LoadingProgressController::on_job_manager_status_changed(const JobManagerSt
     }
 
     cancel_timer(m_close_timer_id);
-    if (m_cancelling) {
-        request_stop_of_jobs();
-    }
     if (!m_job_names.contains(m_shown_job)) {
         m_shown_job = *m_job_names.begin();
     }

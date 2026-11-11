@@ -106,7 +106,7 @@ void Navigator::set_render_module_type(Render::ModuleType type)
         m_canvas->set_next_render_module(m_preview_module);
     }
 
-    move_modal_dialog_to_current_module();
+    move_loading_progress_dialog_to_current_module();
 
     if (force_render_modele_switch && m_callbacks.render_module_switched) {
         m_callbacks.render_module_switched();
@@ -201,7 +201,7 @@ bool Navigator::is_any_modal_dialog_opened() const
     return m_current_modal_dialog != ModalDialog::None;
 }
 
-void Navigator::move_modal_dialog_to_current_module()
+void Navigator::move_loading_progress_dialog_to_current_module()
 {
     RenderModuleBase* module{current_render_module()};
     if (m_current_modal_dialog != ModalDialog::LoadingProgress || m_modal_dialog_module == nullptr

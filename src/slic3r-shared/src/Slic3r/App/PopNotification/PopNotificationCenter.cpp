@@ -2,7 +2,7 @@
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/Platform/IFileExplorerHandler.hpp"
 #include "Slic3r/Biz/FileDownloader/FileDownloaderJob.hpp"
-#include "Slic3r/Biz/FileOpen/FileLoadProgress.hpp"
+#include "Slic3r/Biz/FileOpen/FileLoadJob.hpp"
 #include "Slic3r/App/DisplayStrings.hpp"
 
 #include "Slic3r/Biz/I18N/I18N.hpp"

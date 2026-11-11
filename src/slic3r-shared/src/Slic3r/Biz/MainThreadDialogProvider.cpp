@@ -19,7 +19,7 @@ constexpr std::chrono::milliseconds STOP_CHECK_INTERVAL{50};
 struct YesNoAnswer
 {
     std::optional<bool> answer;
-    bool checked{false};
+    std::optional<bool> checked;
 };
 
 enum class YesNoCancelAnswer
@@ -138,7 +138,7 @@ void MainThreadDialogProvider::show_rich_yesno_dialog(
         callback(*answer->answer);
     }
     if (answer->checked && checked_callback) {
-        checked_callback(true);
+        checked_callback(*answer->checked);
     }
 }
 

@@ -13,6 +13,7 @@
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Domain/Workbench.hpp"
+#include "Slic3r/TestUtils/DispatchUtils.hpp"
 #include "Slic3r/TestUtils/JobManagerScope.hpp"
 #include "Slic3r/TestUtils/TestData.hpp"
 #include "Slic3r/TestUtils/TestTempDir.hpp"
@@ -24,9 +25,7 @@
 #include <boost/nowide/filesystem.hpp>
 
 #include <algorithm>
-#include <chrono>
 #include <memory>
-#include <thread>
 
 using namespace Slic3r::Biz::FileOpen;
 using Slic3r::Biz::FileOpen::Tests::make_stl_bytes;
@@ -151,15 +150,16 @@ struct FileOpeningInteractorFixture
     template <typename Predicate>
     bool wait_until(Predicate predicate)
     {
-        const auto start = std::chrono::steady_clock::now();
-        while (std::chrono::steady_clock::now() - start < std::chrono::seconds(10)) {
-            dispatcher.dispatch_enqueued();
-            if (predicate()) {
-                return true;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-        return false;
+        return ::Tests::dispatch_until(dispatcher, predicate);
+    }
+
+    /**
+     * @return 0 also when the project doesn't exist.
+     */
+    std::size_t object_count(Slic3r::Domain::SelectionId project_id) const
+    {
+        const auto it = workbench.projects().find(project_id);
+        return it == workbench.projects().end() ? 0 : it->second.model().objects.size();
     }
 
     std::size_t extraction_count() const
@@ -221,6 +221,25 @@ TEST_CASE_METHOD(FileOpeningInteractorFixture, "FileOpeningInteractor imports mo
         CHECK(workbench.projects().size() == 2);
         CHECK(wait_until([&] { return selected_objects().size() == 1; }));
     }
+    SECTION("to a new project when models are still read into the selected one") {
+        const Slic3r::Domain::SelectionId loading_project_id{project_interactor->selected_project_id()};
+        opener().open({stl_file("part.stl")});
+        opener().open({stl_file("part2.stl")}, {.new_project = true});
+        CHECK(workbench.projects().size() == 2);
+        REQUIRE(wait_until([&] {
+            return object_count(loading_project_id) == 1 && selected_objects().size() == 1;
+        }));
+    }
+}
+
+TEST_CASE_METHOD(FileOpeningInteractorFixture, "FileOpeningInteractor new_project keeps a project which models are read into", "[FileOpen][FileOpeningInteractor]")
+{
+    const Slic3r::Domain::SelectionId loading_project_id{project_interactor->selected_project_id()};
+    opener().open({stl_file("part.stl")});
+    opener().open({project_file("project.3mf")}, {.new_project = true});
+    REQUIRE(wait_until([&] {
+        return workbench.projects().size() == 2 && object_count(loading_project_id) == 1;
+    }));
 }
 
 TEST_CASE_METHOD(FileOpeningInteractorFixture, "FileOpeningInteractor imports models from an archive", "[FileOpen][FileOpeningInteractor]")

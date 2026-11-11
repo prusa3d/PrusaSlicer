@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Slic3r/Biz/FileOpen/FileLoadProgress.hpp"
+#include "Slic3r/Biz/FileOpen/FileLoadJob.hpp"
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
 
 #include <boost/filesystem/path.hpp>

@@ -2,9 +2,9 @@
 
 #include "Slic3r/App/Platform/StdMainThreadDispatcher.hpp"
 #include "Slic3r/Biz/MainThreadDialogProvider.hpp"
+#include "Slic3r/TestUtils/DispatchUtils.hpp"
 
 #include <atomic>
-#include <chrono>
 #include <memory>
 #include <string>
 #include <thread>
@@ -23,6 +23,8 @@ struct FakeDialogProvider : IMessageDialogProvider
 {
     bool yes_no_answer{true};
     bool checked{false};
+    /// The checkbox callback is called also when the checkbox stays unchecked.
+    bool report_unchecked{false};
     std::optional<StepLoadDialogResult> step_result;
 
     std::vector<std::string> shown;
@@ -50,8 +52,8 @@ struct FakeDialogProvider : IMessageDialogProvider
     {
         record("rich_yesno");
         callback(yes_no_answer);
-        if (checked) {
-            checked_callback(true);
+        if (checked || report_unchecked) {
+            checked_callback(checked);
         }
     }
 
@@ -91,11 +93,7 @@ struct MainThreadDialogProviderFixture
             function();
             done = true;
         }};
-        const auto start = std::chrono::steady_clock::now();
-        while (!done && std::chrono::steady_clock::now() - start < std::chrono::seconds(10)) {
-            dispatcher.dispatch_enqueued();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
+        ::Tests::dispatch_until(dispatcher, [&done]() { return done.load(); });
         worker.join();
     }
 };
@@ -134,11 +132,29 @@ TEST_CASE_METHOD(MainThreadDialogProviderFixture, "MainThreadDialogProvider call
             "text",
             "check",
             [&](bool value) { calls.push_back(value ? "yes" : "no"); },
-            [&](bool) { calls.push_back("checked"); }
+            [&](bool checked) { calls.push_back(checked ? "checked" : "unchecked"); }
         );
     });
 
     CHECK(calls == std::vector<std::string>{"no", "checked"});
+}
+
+TEST_CASE_METHOD(MainThreadDialogProviderFixture, "MainThreadDialogProvider passes an unchecked checkbox", "[MainThreadDialogProvider]")
+{
+    fake.report_unchecked = true;
+    std::vector<std::string> calls;
+
+    run_in_worker([&]() {
+        provider.show_rich_yesno_dialog(
+            "title",
+            "text",
+            "check",
+            [&](bool value) { calls.push_back(value ? "yes" : "no"); },
+            [&](bool checked) { calls.push_back(checked ? "checked" : "unchecked"); }
+        );
+    });
+
+    CHECK(calls == std::vector<std::string>{"yes", "unchecked"});
 }
 
 TEST_CASE_METHOD(MainThreadDialogProviderFixture, "MainThreadDialogProvider calls the chosen button of a yes/no/cancel dialog", "[MainThreadDialogProvider]")

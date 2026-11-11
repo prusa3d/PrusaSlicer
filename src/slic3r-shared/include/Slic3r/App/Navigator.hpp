@@ -168,10 +168,10 @@ private:
     RenderModuleBase* current_render_module();
 
     /**
-     * @brief Shows the opened modal dialog in the module switched to, when the dialog doesn't
-     * depend on the module which opened it. Only ModalDialog::LoadingProgress is moved.
+     * @brief Moves the opened ModalDialog::LoadingProgress to the module switched to, the dialog
+     * doesn't depend on the module which opened it.
      */
-    void move_modal_dialog_to_current_module();
+    void move_loading_progress_dialog_to_current_module();
 
 private:
     struct ProjectContext

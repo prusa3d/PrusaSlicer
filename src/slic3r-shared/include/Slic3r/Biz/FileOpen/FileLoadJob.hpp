@@ -53,8 +53,8 @@ public:
 enum class FileLoadResult
 {
     Loaded,
-    Failed,
-    Cancelled
+    Failed,   ///< Nothing was added, an error may have been reported.
+    Cancelled ///< By the user, or the target project was closed.
 };
 
 /**
