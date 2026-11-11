@@ -1746,6 +1746,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/App/Lua/MarketplaceClientTests.cpp
 
             test/Slic3r/App/Config/CategoryUtilsTests.cpp
+            test/Slic3r/App/Config/ConfigItemComboBoxTests.cpp
 
             test/Slic3r/App/Undo/ToolStateSerializeTests.cpp
 
@@ -1776,6 +1777,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/App/Yoga/SegmentedControlTests.cpp
             test/Slic3r/App/Yoga/SplitLayoutTests.cpp
             test/Slic3r/App/Yoga/ScrollAreaTests.cpp
+            test/Slic3r/App/Yoga/SliderTests.cpp
             test/Slic3r/App/Yoga/PopupTests.cpp
             test/Slic3r/App/Yoga/DialogTests.cpp
             test/Slic3r/App/Yoga/ObjectTests.cpp

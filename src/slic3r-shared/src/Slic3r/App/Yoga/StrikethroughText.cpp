@@ -29,7 +29,7 @@ void StrikethroughText::render(const Vec2f& pos, const Vec2f& size)
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ASSERT(draw_list);
 
-    ImFont*     font        = m_imgui_render->font(font_type());
+    ImFont*     font        = imgui_render()->font(font_type());
     const float font_size   = used_font_size();
     const ImVec2 block_pos  = to_im(pos) + text_rect.Min;
     const float line_height = font_size;

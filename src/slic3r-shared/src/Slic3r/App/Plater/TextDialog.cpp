@@ -61,6 +61,7 @@ TextDialog::TextDialog() : GizmoWindow()
         &m_font,
         _u8L("Revert font changes.")
     );
+    m_font->set_wheel_enabled(false);
     m_font->callbacks().selection_changed = [this](int index)
     {
         if (index < 0 || static_cast<size_t>(index) >= m_fonts.size())

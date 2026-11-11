@@ -139,9 +139,8 @@ void RootItem::push_event(EventPtr event)
 
 void RootItem::render_debug_overlay()
 {
-    if (debug_enabled() && m_debug_item) {
-        m_debug_item->render_debug_overlay(ImGui::GetForegroundDrawList());
-        m_debug_item = nullptr;
+    if (Item* item = take_debug_item()) {
+        item->render_debug_overlay(ImGui::GetForegroundDrawList());
     }
 }
 

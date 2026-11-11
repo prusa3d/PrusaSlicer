@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <Slic3r/App/Yoga/InputText.hpp>
+#include <Slic3r/App/Yoga/InputTextWithSpin.hpp>
+#include <Slic3r/App/Yoga/ScrollArea.hpp>
 #include <Slic3r/App/Yoga/Validator.hpp>
 
 #include "YogaComponentFixture.hpp"
@@ -154,4 +156,135 @@ TEST_CASE_METHOD(YogaComponentFixture, "InputText: hovered is true when mouse is
     render();
 
     REQUIRE(input->hovered());
+}
+
+static InputTextWithSpin* make_spin(Item* parent, const std::string& text)
+{
+    auto* spin = parent->emplace_back<InputTextWithSpin>(std::make_unique<IntValidator>());
+    spin->set_width(280.f);
+    spin->set_height(30.f);
+    spin->set_flex_shrink(0.f);
+    spin->set_text(text);
+    return spin;
+}
+
+TEST_CASE_METHOD(YogaComponentFixture, "InputTextWithSpin: mouse wheel steps the value")
+{
+    InputTextWithSpin* spin       = make_spin(window, "2");
+    int edited                    = 0;
+    spin->callbacks().text_edited = [&]() { ++edited; };
+
+    hover(spin, 0.3f);
+    mouse_wheel(1.f);
+    REQUIRE(spin->text() == "3");
+    mouse_wheel(-1.f);
+    REQUIRE(spin->text() == "2");
+    REQUIRE(edited == 2);
+
+    key_down(ImGuiMod_Ctrl);
+    mouse_wheel(1.f);
+    key_up(ImGuiMod_Ctrl);
+    REQUIRE(spin->text() == "7");
+}
+
+TEST_CASE_METHOD(
+    YogaComponentFixture,
+    "InputTextWithSpin: mouse wheel sums deltas into one step per frame"
+)
+{
+    InputTextWithSpin* spin = make_spin(window, "2");
+
+    hover(spin, 0.3f);
+    for (int i = 0; i < 10; ++i) {
+        mouse_wheel(0.25f);
+    }
+    REQUIRE(spin->text() == "4");
+
+    mouse_wheel(2.f);
+    REQUIRE(spin->text() == "5");
+}
+
+TEST_CASE_METHOD(YogaComponentFixture, "InputTextWithSpin: mouse wheel works over the spin buttons")
+{
+    InputTextWithSpin* spin = make_spin(window, "2");
+
+    hover(spin, 0.99f);
+    mouse_wheel(1.f);
+
+    REQUIRE(spin->text() == "3");
+}
+
+TEST_CASE_METHOD(YogaComponentFixture, "InputTextWithSpin: mouse wheel is ignored while typing")
+{
+    InputTextWithSpin* spin = make_spin(window, "2");
+    std::vector<std::string> edited_texts;
+    spin->callbacks().text_edited = [&]() { edited_texts.push_back(spin->text()); };
+
+    render();
+    const Vec2f pos = spin->get_global_pos();
+    simulate_click(pos.x() + spin->width() * 0.3f, pos.y() + spin->height() * 0.5f);
+    key_down(ImGuiMod_Ctrl);
+    key_tap(ImGuiKey_A);
+    key_up(ImGuiMod_Ctrl);
+    type_text("50");
+    mouse_wheel(1.f);
+    key_tap(ImGuiKey_Enter);
+
+    REQUIRE(edited_texts == std::vector<std::string>{"50"});
+}
+
+TEST_CASE_METHOD(
+    YogaComponentFixture,
+    "InputTextWithSpin: mouse wheel is ignored when it does not change values"
+)
+{
+    InputTextWithSpin* spin = make_spin(window, "2");
+
+    Item::set_wheel_changes_value(false);
+    hover(spin, 0.3f);
+    mouse_wheel(1.f);
+    Item::set_wheel_changes_value(true);
+
+    REQUIRE(spin->text() == "2");
+}
+
+TEST_CASE_METHOD(YogaComponentFixture, "InputTextWithSpin: mouse wheel is ignored on Mixed")
+{
+    InputTextWithSpin* spin = make_spin(window, "2");
+    spin->set_override_label("Mixed");
+
+    hover(spin, 0.3f);
+    mouse_wheel(1.f);
+
+    REQUIRE(spin->text() == "2");
+}
+
+TEST_CASE_METHOD(YogaComponentFixture, "InputTextWithSpin: mouse wheel at the bound does nothing")
+{
+    InputTextWithSpin* spin = make_spin(window, "2");
+    static_cast<IntValidator*>(spin->validator())->set_to(2);
+    int edited                    = 0;
+    spin->callbacks().text_edited = [&]() { ++edited; };
+
+    hover(spin, 0.3f);
+    mouse_wheel(1.f);
+
+    REQUIRE(spin->text() == "2");
+    REQUIRE(edited == 0);
+}
+
+TEST_CASE_METHOD(
+    YogaComponentFixture,
+    "InputTextWithSpin: mouse wheel does not scroll parent ScrollArea"
+)
+{
+    ScrollArea* page        = make_page();
+    InputTextWithSpin* spin = make_spin(page, "2");
+    add_overflow(page);
+
+    hover(spin, 0.3f);
+    mouse_wheel(-1.f);
+
+    REQUIRE(spin->text() == "1");
+    REQUIRE(page->scroll_pos().y() == 0.f);
 }

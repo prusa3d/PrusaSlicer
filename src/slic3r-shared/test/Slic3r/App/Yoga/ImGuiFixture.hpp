@@ -40,6 +40,7 @@ struct ImGuiFixture : public Slic3r::Biz::Platform::IRenderRequestHandler
         io.BackendRendererName = "UnitTest-NoRenderer";
         // NavEnableKeyboard is required for SetKeyboardFocusHere() / InputText focus to work.
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.ConfigMacOSXBehaviors = false;
 
         ImGui::NewFrame();
         process_textures();
@@ -84,6 +85,13 @@ struct ImGuiFixture : public Slic3r::Biz::Platform::IRenderRequestHandler
     void mouse_move(float x, float y)
     {
         ImGui::GetIO().AddMousePosEvent(x, y);
+    }
+
+    /** @brief Inject a vertical mouse wheel event and advance one frame. */
+    void mouse_wheel(float y)
+    {
+        ImGui::GetIO().AddMouseWheelEvent(0.f, y);
+        render();
     }
 
     void mouse_down(int btn = 0)

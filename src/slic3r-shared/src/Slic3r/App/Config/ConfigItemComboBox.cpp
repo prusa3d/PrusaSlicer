@@ -104,6 +104,7 @@ ConfigItemComboBox::ConfigItemComboBox(
         }
 
         if (value.has_value()) {
+            update_value(value.value());
             set_item_value(value.value());
         }
     };
@@ -143,20 +144,22 @@ void ConfigItemComboBox::update_value(const Domain::ConfigValue& value)
     const Domain::ConfigItemDef::GUIType gui_type = m_state->def().gui_type;
     if (gui_type == Domain::ConfigItemDef::GUIType::f_enum_open) {
         if (*m_state->def().type == typeid(Domain::Percentage)) {
-            set_current_label(fmt::format("{:.10g}", value.get<Domain::Percentage>().value));
+            const double percentage = value.get<Domain::Percentage>().value;
+            set_current_label(fmt::format("{:.10g}", percentage), percentage);
         } else if (*m_state->def().type == typeid(Domain::FloatOrPercentage)) {
             Domain::FloatOrPercentage val = value.get<Domain::FloatOrPercentage>();
-            set_current_label(
-                val.is_percentage() ? fmt::format("{:.10g} %", val.percentage().value) :
-                                      fmt::format("{:.10g}", val.float_value())
-            );
+            if (val.is_percentage()) {
+                set_current_label(fmt::format("{:.10g} %", val.percentage().value));
+            } else {
+                set_current_label(fmt::format("{:.10g}", val.float_value()), val.float_value());
+            }
 
         } else if (*m_state->def().type == typeid(double)) {
-            set_current_label(fmt::format("{:.10g}", value.get<double>()));
+            set_current_label(fmt::format("{:.10g}", value.get<double>()), value.get<double>());
         }
 
     } else if (gui_type == Domain::ConfigItemDef::GUIType::i_enum_open) {
-        set_current_label(std::to_string(value.get<int>()));
+        set_current_label(std::to_string(value.get<int>()), value.get<int>());
     } else if (gui_type == Domain::ConfigItemDef::GUIType::s_enum_open) {
         set_current_label(value.get<std::string>());
     } else if (*m_state->def().type == typeid(Domain::EnumWrapper)) {
@@ -173,6 +176,7 @@ void ConfigItemComboBox::initialize()
     { return context.empty() ? Biz::_u8(s) : Biz::_ctx_u8(s, context); };
 
     std::vector<std::string> items;
+    std::vector<double> values;
     const Domain::ConfigItemDef::GUIType gui_type = m_state->def().gui_type;
     const std::string& i18n_context               = m_state->def().i18n_context;
     if (gui_type == Domain::ConfigItemDef::GUIType::f_enum_open) {
@@ -187,6 +191,7 @@ void ConfigItemComboBox::initialize()
 
         for (const auto& choice : m_state->def().choices) {
             items.push_back(i18n_str(choice.second, i18n_context));
+            values.push_back(std::get<double>(choice.first));
         }
     } else if (gui_type == Domain::ConfigItemDef::GUIType::i_enum_open) {
         set_editable(true);
@@ -196,6 +201,7 @@ void ConfigItemComboBox::initialize()
 
         for (const auto& [v, str_ui] : m_state->def().choices) {
             items.push_back(i18n_str(str_ui, i18n_context));
+            values.push_back(std::get<int>(v));
         }
 
     } else if (gui_type == Domain::ConfigItemDef::GUIType::s_enum_open) {
@@ -219,6 +225,7 @@ void ConfigItemComboBox::initialize()
     }
 
     set_items(items);
+    set_item_numbers(values);
 }
 
 } // namespace Slic3r::App

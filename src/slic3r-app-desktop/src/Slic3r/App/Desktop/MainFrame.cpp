@@ -33,6 +33,7 @@
 #include "Slic3r/App/Platform/AbstractRenderModule.hpp"
 
 #include "Slic3r/App/Scene/Scene.hpp"
+#include "Slic3r/App/Yoga/Item.hpp"
 
 #include "Slic3r/App/WX/Scalable.hpp"
 #include "Slic3r/App/WX/WindowMetrics.hpp"
@@ -367,6 +368,8 @@ void MainFrame::on_app_config_changed(const std::string& key)
         update_graphics_settings();
     } else if (key == "transparent_window_alpha") {
         AppServices::instance().theme().set_transparent_window_alpha(app_config.get<double>(key));
+    } else if (key == "scroll_wheel_changes_value") {
+        Yoga::Item::set_wheel_changes_value(app_config.get<bool>(key));
     }
     else if (key == "translation_language") {
         if (const std::string new_language = app_config.get<std::string>("translation_language");

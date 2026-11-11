@@ -109,7 +109,7 @@ void InputText::render(const Vec2f& pos, const Vec2f& size)
         ImU32 text_color = ImGui::GetColorU32(enabled() ? ImGuiCol_Text : ImGuiCol_TextDisabled);
         ImGui::PushStyleColor(ImGuiCol_Text, text_color);
 
-        ImFont* font = m_imgui_render ? m_imgui_render->font(m_font_type) : nullptr;
+        ImFont* font = imgui_render() ? imgui_render()->font(m_font_type) : nullptr;
         ImGui::PushFont(font, GImGui->FontSizeBase);
 
         ImGuiID input_id = ImGui::GetID(id.c_str());

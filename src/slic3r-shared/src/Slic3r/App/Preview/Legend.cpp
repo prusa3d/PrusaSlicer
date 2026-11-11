@@ -1064,7 +1064,7 @@ void Legend::render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size)
     else {
         ImGui::SetCursorScreenPos(to_im(pos));
         if (m_detail_view)
-            legend_detail(*m_imgui_render, *m_viewer, *m_wrapper, m_callback, m_show_time_estimate);
+            legend_detail(*imgui_render(), *m_viewer, *m_wrapper, m_callback, m_show_time_estimate);
         else
             legend_coarse(*m_viewer, *m_wrapper);
 

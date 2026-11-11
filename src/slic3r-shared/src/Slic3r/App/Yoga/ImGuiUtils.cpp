@@ -1,6 +1,9 @@
 #include "Slic3r/App/Yoga/ImGuiUtils.hpp"
 #include <imgui_internal.h>
 
+#include <algorithm>
+#include <cmath>
+
 namespace Slic3r::App::Yoga {
 
 /**
@@ -60,6 +63,32 @@ void YGRenderArrow(ImDrawList* draw_list, ImVec2 pos, ImVec2 size, ImU32 col, Im
     draw_list->PathLineTo(center + c);
     draw_list->PathStroke(col, false, 1.f);
     // clang-format on
+}
+
+int wheel_step(ImGuiID owner_id, ImVec2 min, ImVec2 max, bool enabled)
+{
+    const ImGuiContext& g = *GImGui;
+    float& accumulated    = *ImGui::GetStateStorage()->GetFloatRef(owner_id, 0.f);
+    const bool owned      = ImGui::GetKeyOwner(ImGuiKey_MouseWheelY) == owner_id;
+    const bool hovered    = enabled
+        && ImGui::GetActiveID() == 0
+        && ImGui::IsWindowHovered()
+        && ImGui::IsMouseHoveringRect(min, max);
+
+    if (!hovered || (g.WheelingWindow != nullptr && !owned)) {
+        accumulated = 0.f;
+        return 0;
+    }
+
+    ImGui::SetKeyOwner(ImGuiKey_MouseWheelY, owner_id);
+    if (!owned) {
+        return 0;
+    }
+
+    accumulated += g.IO.MouseWheel;
+    const int step = std::clamp(static_cast<int>(accumulated), -1, 1);
+    accumulated -= std::trunc(accumulated);
+    return step;
 }
 
 } // namespace Slic3r::App::Yoga

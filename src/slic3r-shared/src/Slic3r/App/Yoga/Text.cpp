@@ -72,7 +72,7 @@ void Text::render(const Vec2f& pos, const Vec2f& size)
     const ImVec2 text_pos = align_rectangle(to_im(size), m_taken_size, m_align).GetTL();
     ImGui::SetCursorScreenPos(to_im(pos) + text_pos);
 
-    ImGui::PushFont(m_imgui_render ? m_imgui_render->font(m_font_type) : nullptr, used_font_size());
+    ImGui::PushFont(imgui_render() ? imgui_render()->font(m_font_type) : nullptr, used_font_size());
     ImGui::PushStyleColor(
         ImGuiCol_Text,
         enabled() ?
@@ -135,7 +135,7 @@ void Text::on_resized()
 Vec2f Text::get_item_size()
 {
     Vec2f min_size;
-    ImGui::PushFont(m_imgui_render ? m_imgui_render->font(m_font_type) : nullptr, used_font_size());
+    ImGui::PushFont(imgui_render() ? imgui_render()->font(m_font_type) : nullptr, used_font_size());
 
     ImVec2 taken_size;
     if (m_wrap_mode == WrapMode::NoWrap) {

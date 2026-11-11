@@ -7,6 +7,13 @@
 
 #include <imgui_internal.h>
 
+#include <fmt/format.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <limits>
+
 namespace Slic3r::App::Yoga {
 
 static float CalcMaxPopupHeightFromItemCount(int items_count)
@@ -170,7 +177,7 @@ bool ComboBox::YGBeginCombo(
             }
         }
 
-        if (edited && ImGui::IsItemDeactivatedAfterEdit()) {
+        if (edited && ImGui::IsItemDeactivatedAfterEdit() && m_current_label != buffer) {
             edited = false;
             if (validator) {
                 std::string text(buffer);
@@ -185,10 +192,9 @@ bool ComboBox::YGBeginCombo(
             if (callbacks.text_edited) {
                 callbacks.text_edited();
             }
-        } else if (ImGui::IsItemDeactivated() && validator) {
-            std::string text = m_validator->string_with_unit();
-            strncpy(buffer, text.data(), std::min(text.size(), static_cast<size_t>(buf_size)));
-            buffer[std::min(text.size(), static_cast<size_t>(buf_size) - 1)] = '\0';
+        } else if (ImGui::IsItemDeactivated()) {
+            edited = false;
+            snprintf(buffer, buf_size, "%s", m_current_label.c_str());
 
             if (ImGuiInputTextState* state = ImGui::GetInputTextState(ImGui::GetItemID())) {
                 state->ReloadUserBufAndSelectAll();
@@ -373,7 +379,7 @@ void ComboBox::render(const Vec2f& pos, const Vec2f& size)
                 m_validator.get(),
                 m_callbacks,
                 new_hovered,
-                m_imgui_render ? m_imgui_render->font(m_label_font_type) : nullptr,
+                imgui_render() ? imgui_render()->font(m_label_font_type) : nullptr,
                 m_label_color
             ))
         {
@@ -398,6 +404,21 @@ void ComboBox::render(const Vec2f& pos, const Vec2f& size)
             }
 
             ImGui::EndCombo();
+        }
+
+        const bool wheel_on =
+            wheel_changes_value() && m_wheel_enabled && enabled() && !m_items.empty();
+        const ImGuiID wheel_id = ImGui::GetID(id.c_str());
+        const int step         = wheel_step(wheel_id, to_im(pos), to_im(pos + size), wheel_on);
+        if (step != 0) {
+            const int index = wheel_index(step);
+            if (index >= 0 && (index != m_current_index || !m_override_label.empty())) {
+                set_current_index(index);
+                set_style_dirty();
+                if (m_callbacks.selection_changed) {
+                    m_callbacks.selection_changed(index);
+                }
+            }
         }
 
         ImGui::PopStyleVar(1);
@@ -431,6 +452,7 @@ void ComboBox::set_items(const std::vector<std::string>& items)
 {
     if (m_items != items) {
         m_items = items;
+        m_item_numbers.clear();
         set_current_index(0);
     }
 }
@@ -531,18 +553,58 @@ std::string ComboBox::current_label() const
     return m_editable ? std::string(m_buffer.data()) : m_current_label;
 }
 
-void ComboBox::set_current_label(const std::string& current_label)
+void ComboBox::set_item_numbers(std::vector<double> numbers)
+{
+    ASSERT(numbers.empty() || numbers.size() == m_items.size());
+    m_item_numbers = std::move(numbers);
+    if (m_current_index >= 0) {
+        m_current_number = item_number(m_current_index);
+    }
+}
+
+bool ComboBox::wheel_enabled() const
+{
+    return m_wheel_enabled;
+}
+
+void ComboBox::set_wheel_enabled(bool wheel_enabled)
+{
+    m_wheel_enabled = wheel_enabled;
+}
+
+std::optional<double> ComboBox::item_number(int index) const
+{
+    return index >= 0 && index < static_cast<int>(m_item_numbers.size()) ?
+        std::optional(m_item_numbers[index]) :
+        std::nullopt;
+}
+
+void ComboBox::set_current_label(const std::string& current_label, std::optional<double> number)
 {
     ASSERT(m_editable);
     ASSERT(current_label.size() < 2'048);
 
-    const std::string label = m_validator ? m_validator->process(current_label) : current_label;
-
-    if (m_current_label != label) {
-        m_current_label = label;
-        strncpy(m_buffer.data(), m_current_label.data(), m_current_label.size());
-        m_buffer[m_current_label.size()] = '\0';
+    const auto index_of = [](const auto& range, const auto& item)
+    {
+        const auto it = std::ranges::find(range, item);
+        return it == range.end() ? -1 : static_cast<int>(it - range.begin());
+    };
+    const int index = number ? index_of(m_item_numbers, *number) : index_of(m_items, current_label);
+    if (index >= 0) {
+        set_current_index(index);
+        return;
     }
+
+    m_current_index  = -1;
+    m_current_number = number;
+    show_label(m_validator ? m_validator->process(current_label) : current_label);
+    update_revert_button();
+}
+
+void ComboBox::show_label(const std::string& label)
+{
+    m_current_label = label;
+    snprintf(m_buffer.data(), m_buffer.size(), "%s", label.c_str());
 }
 
 int ComboBox::current_index() const
@@ -552,23 +614,39 @@ int ComboBox::current_index() const
 
 void ComboBox::set_current_index(int current_index)
 {
-    if (m_items.empty()) {
-        m_current_index = -1;
-        m_current_label.clear();
-        std::fill(m_buffer.begin(), m_buffer.end(), 0);
+    m_current_index =
+        m_items.empty() ? -1 : std::clamp(current_index, 0, static_cast<int>(m_items.size()) - 1);
+    m_current_number = item_number(m_current_index);
+
+    const std::string item = m_items.empty() ? std::string() : m_items.at(m_current_index);
+    if (m_validator && m_current_number) {
+        m_validator->process(fmt::format("{:.10g}", *m_current_number));
+        show_label(item);
     } else {
-        m_current_index = std::clamp(current_index, 0, static_cast<int>(m_items.size()) - 1);
-
-        const std::string label = m_validator ? m_validator->process(m_items.at(m_current_index)) :
-                                                m_items.at(m_current_index);
-
-        if (m_current_label != label) {
-            m_current_label = label;
-            strncpy(m_buffer.data(), m_current_label.c_str(), m_current_label.size());
-            m_buffer[m_current_label.size()] = '\0';
-        }
+        show_label(m_validator && !m_items.empty() ? m_validator->process(item) : item);
     }
     update_revert_button();
+}
+
+int ComboBox::wheel_index(int step) const
+{
+    const int last = static_cast<int>(m_items.size()) - 1;
+    if (!m_override_label.empty()) {
+        return step > 0 ? 0 : last;
+    }
+    if (!m_current_number) {
+        return m_current_index >= 0 ? std::clamp(m_current_index + step, 0, last) : -1;
+    }
+
+    const auto distance = [&](double number)
+    {
+        const double ahead = (number - *m_current_number) * step;
+        return ahead > 0. ? ahead : std::numeric_limits<double>::infinity();
+    };
+    const auto nearest = std::ranges::min_element(m_item_numbers, {}, distance);
+    return nearest != m_item_numbers.end() && std::isfinite(distance(*nearest)) ?
+        static_cast<int>(nearest - m_item_numbers.begin()) :
+        -1;
 }
 
 } // namespace Slic3r::App::Yoga

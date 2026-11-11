@@ -144,7 +144,7 @@ void Slider::render(const Vec2f& pos, const Vec2f& size)
         }
     }
     // wheel behavior
-    else if (m_hovered)
+    else if (m_hovered && wheel_changes_value())
     {
         double mw    = sign(io.MouseWheel);
         double accer = io.KeyCtrl || io.KeyShift ? 5. : 1.;

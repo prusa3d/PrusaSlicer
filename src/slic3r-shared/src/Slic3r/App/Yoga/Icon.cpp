@@ -101,8 +101,8 @@ void Icon::set_image(const std::string& image, bool force_reload)
         return;
     }
 
-    if (force_reload && !image.empty() && m_imgui_render) {
-        m_imgui_render->invalidate_image_texture(image);
+    if (force_reload && !image.empty() && imgui_render()) {
+        imgui_render()->invalidate_image_texture(image);
     }
 
     m_image     = image;
@@ -187,12 +187,12 @@ void Icon::update_draw_sizes()
 void Icon::update_texture()
 {
     if (m_icon_type == IconType::Icon) {
-        if (m_icon == Render::Icon::None || m_max_texture_size == 0 || !m_imgui_render) {
+        if (m_icon == Render::Icon::None || m_max_texture_size == 0 || !imgui_render()) {
             m_texture = nullptr;
         } else {
             constexpr ImVec4 WhiteColor{1, 1, 1, 1};
             const bool colors_preserved = m_preserve_colors || m_tint != WhiteColor;
-            m_texture                   = m_imgui_render->icon_texture(
+            m_texture                   = imgui_render()->icon_texture(
                 m_icon,
                 m_max_texture_size,
                 colors_preserved ? std::unordered_map<std::string, std::string>{} :
@@ -200,23 +200,23 @@ void Icon::update_texture()
             );
             m_disabled_texture = colors_preserved ?
                 m_texture :
-                m_imgui_render->icon_texture(m_icon, m_max_texture_size);
+                imgui_render()->icon_texture(m_icon, m_max_texture_size);
         }
     } else if (m_icon_type == IconType::Image) {
         if (m_image.empty() || m_max_texture_size == 0) {
             m_texture = nullptr;
         } else {
-            m_texture = m_imgui_render->image_texture(m_image, m_max_texture_size);
+            m_texture = imgui_render()->image_texture(m_image, m_max_texture_size);
         }
     }
     if (m_texture) {
         // There is a chance that Icon::set_icon would be called several times in a single
         // loop before Icon::render, in those cases, let us cache all images that we are
         // creating, all unused ones will be cleared in the next frame.
-        m_imgui_render->use_texture(m_texture);
+        imgui_render()->use_texture(m_texture);
     }
     if (m_disabled_texture) {
-        m_imgui_render->use_texture(m_disabled_texture);
+        imgui_render()->use_texture(m_disabled_texture);
     }
 }
 

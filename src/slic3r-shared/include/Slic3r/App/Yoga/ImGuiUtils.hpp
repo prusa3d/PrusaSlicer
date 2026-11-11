@@ -11,6 +11,12 @@ namespace Slic3r::App::Yoga {
  */
 void YGRenderArrow(ImDrawList* draw_list, ImVec2 pos, ImVec2 size, ImU32 col, ImGuiDir dir, float scale);
 
+/**
+ * @brief Claims the vertical mouse wheel for owner_id while the rect is hovered and returns the
+ * wheel direction to apply this frame (-1, 0 or 1). Leaves the wheel to a window being scrolled.
+ */
+int wheel_step(ImGuiID owner_id, ImVec2 min, ImVec2 max, bool enabled);
+
 /// Applies the styling every root item is rendered with, for the lifetime of the instance.
 struct SetOurStyleVars
 {

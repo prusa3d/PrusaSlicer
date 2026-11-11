@@ -28,6 +28,8 @@ public:
         std::function<void()> text_edited{nullptr};
     };
 
+    void render(const Vec2f& pos, const Vec2f& size) override;
+
     // @note those callbacks hide a callbacks from InputText
     Callbacks& callbacks();
 
@@ -46,8 +48,7 @@ private:
     void set_last_value();
 
 private:
-    void increase_value();
-    void decrease_value();
+    void step_value(int steps);
     void text_updated_internal() override;
 
     SpinButton* m_increase_button{nullptr};

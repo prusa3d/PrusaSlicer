@@ -7,6 +7,9 @@
 
 #include <imgui_internal.h>
 
+#include <optional>
+#include <vector>
+
 namespace Slic3r::App::Yoga {
 
 class Validator;
@@ -53,14 +56,21 @@ public:
 
     const std::vector<std::string>& items() const;
     void set_items(const std::vector<std::string>& items);
+    /// @brief Number each item stands for. Orders the items for the mouse wheel; a selected item
+    /// shows its own text while the validator gets the number.
+    void set_item_numbers(std::vector<double> numbers);
+
+    bool wheel_enabled() const;
+    void set_wheel_enabled(bool wheel_enabled);
 
     int current_index() const;
     void set_current_index(int current_index);
     std::string current_label() const;
     /**
      * @note this seter can only be used for editable comboboxes, otherwise use set_current_index
+     * @param number numeric position of the label, selects the item with the same number
      */
-    void set_current_label(const std::string& current_label);
+    void set_current_label(const std::string& current_label, std::optional<double> number = {});
 
     bool editable() const;
     void set_editable(bool editable);
@@ -89,6 +99,10 @@ protected:
     void visible_updated_internal() override;
 
 private:
+    int wheel_index(int step) const;
+    std::optional<double> item_number(int index) const;
+    void show_label(const std::string& label);
+
     ////////////////////// Copied from ImGui //////////////////////////////////////
     bool YGBeginCombo(
         const char* label,
@@ -124,6 +138,8 @@ private:
      */
     std::array<char, 2'048> m_buffer = {0};
     int m_current_index              = 0;
+    std::vector<double> m_item_numbers;
+    std::optional<double> m_current_number;
     int m_default_index              = 0;
     std::string m_current_label;
     ImGuiComboFlags m_flags = 0;
@@ -134,6 +150,7 @@ private:
     std::string m_override_label;
     Render::ImguiFontType m_label_font_type = Render::ImguiFontType::Regular;
     ImColor m_label_color;
+    bool m_wheel_enabled{true};
 };
 
 } // namespace Slic3r::App::Yoga

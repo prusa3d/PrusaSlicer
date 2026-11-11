@@ -21,6 +21,14 @@ using ItemPtr = std::unique_ptr<Item>;
 class Popup;
 class RootItem;
 
+struct YogaConfiguration
+{
+    Render::ImguiRender* imgui_render = nullptr;
+    Item* debug_item                  = nullptr;
+    bool test_mode                    = false;
+    bool wheel_changes_value          = true;
+};
+
 /**
  * @brief The Item class is an Object Item in a tree that can be styled using Yoga
  *
@@ -183,6 +191,7 @@ public:
      */
     static void set_test_mode(bool test_mode);
     static bool debug_enabled();
+    static void set_wheel_changes_value(bool wheel_changes_value);
 
     void set_debug_border(bool show_debug_border);
 
@@ -205,6 +214,9 @@ protected:
     static ImVec2 to_im(const Vec2f& val);
     static Vec2f from_im(const ImVec2& val);
     static bool is_node_visible(YGNodeRef node);
+    static Render::ImguiRender* imgui_render();
+    static bool wheel_changes_value();
+    static Item* take_debug_item();
 
     virtual Vec2f get_item_size();
 
@@ -247,16 +259,10 @@ protected:
     void invalidate_min_size_calculation();
 
 protected:
-    // Todo: Cleanup this when slic3r-yoga will be introduced
-    static Render::ImguiRender* m_imgui_render;
-
     std::vector<Item*> m_children_render_order;
 
     float m_last_width  = 0;
     float m_last_height = 0;
-
-    static Item* m_debug_item;
-    static bool m_test_mode;
 
 private:
     void update_enabled();
@@ -268,6 +274,9 @@ private:
 
 private:
     using YogaSize = std::variant<EvaluatedUnit, float>;
+
+    // Todo: Cleanup this when slic3r-yoga will be introduced
+    inline static YogaConfiguration m_configuration;
 
     YGNodeRef m_node = nullptr;
 

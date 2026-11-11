@@ -5,8 +5,6 @@
 
 namespace Slic3r::App::Yoga {
 
-Item* Item::m_debug_item = nullptr;
-
 namespace {
 
 constexpr float default_font_size       = 14.f;

@@ -29,7 +29,8 @@ void ScrollArea::render(const Vec2f& p, const Vec2f& size)
     // normally ImGui scrolls horizontally with SHIFT + Mouse Wheel, we want to use Mouse Wheel
     // only if m_remap_horizontal_scroll is true
     if (m_remap_horizontal_scroll
-        && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+        && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)
+        && ImGui::TestKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_NoOwner))
     {
         ImGuiIO& io  = ImGui::GetIO();
         float delta  = io.MouseWheel;

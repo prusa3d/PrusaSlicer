@@ -10,11 +10,9 @@
 #include <imgui_internal.h>
 #include <fmt/format.h>
 #include <cmath>
+#include <utility>
 
 namespace Slic3r::App::Yoga {
-
-Render::ImguiRender* Item::m_imgui_render = nullptr;
-bool Item::m_test_mode                    = false;
 
 Item::Item()
 {
@@ -535,12 +533,17 @@ Vec2f Item::get_global_pos() const
 
 void Item::set_imgui_render(Render::ImguiRender* imgui_render)
 {
-    m_imgui_render = imgui_render;
+    m_configuration.imgui_render = imgui_render;
+}
+
+Render::ImguiRender* Item::imgui_render()
+{
+    return m_configuration.imgui_render;
 }
 
 void Item::set_test_mode(bool test_mode)
 {
-    m_test_mode = test_mode;
+    m_configuration.test_mode = test_mode;
 }
 
 bool Item::debug_enabled()
@@ -548,8 +551,23 @@ bool Item::debug_enabled()
 #ifdef DEBUG
     return true;
 #else
-    return m_test_mode;
+    return m_configuration.test_mode;
 #endif
+}
+
+void Item::set_wheel_changes_value(bool wheel_changes_value)
+{
+    m_configuration.wheel_changes_value = wheel_changes_value;
+}
+
+bool Item::wheel_changes_value()
+{
+    return m_configuration.wheel_changes_value;
+}
+
+Item* Item::take_debug_item()
+{
+    return std::exchange(m_configuration.debug_item, nullptr);
 }
 
 void Object::set_theme(Theme* theme)
@@ -926,7 +944,7 @@ void Item::render_debug(const Vec2f& pos, const Vec2f& size)
                 ImDrawList* draw_list = ImGui::GetForegroundDrawList();
                 draw_list->AddRect(rect.Min, rect.Max, IM_COL32(255, 0, 0, 128));
             } else if (ImGui::IsKeyDown(ImGuiMod_Alt)) {
-                m_debug_item = this;
+                m_configuration.debug_item = this;
             }
         }
     }
@@ -966,7 +984,7 @@ void Item::render_image(
         background_col,
         tint_col
     );
-    m_imgui_render->use_texture(texture);
+    imgui_render()->use_texture(texture);
     ImGui::PopStyleVar();
 }
 

@@ -297,7 +297,7 @@ void BarycentricRatioPicker::render(const Vec2f& pos, const Vec2f& size)
     draw_list->AddTriangle(p0, p1, p2, outline_color, m_outline_thickness.result);
 
     const ImColor badge_border_color   = m_theme->color_imgui(Platform::Color::WindowBg);
-    ImFont* bold_font                  = m_imgui_render->font(Render::ImguiFontType::Bold);
+    ImFont* bold_font                  = imgui_render()->font(Render::ImguiFontType::Bold);
     const float badge_font_size        = ImGui::GetFontSize() * 0.8f;
     const float badge_radius           = m_badge_radius.result;
     const float badge_border_thickness = m_badge_border_thickness.result;

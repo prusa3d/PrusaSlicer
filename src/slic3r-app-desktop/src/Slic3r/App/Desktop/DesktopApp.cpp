@@ -288,6 +288,9 @@ bool DesktopApp::OnInit()
     app_services.theme().set_transparent_window_alpha(
         app_services.app_config().get<double>("transparent_window_alpha")
     );
+    Yoga::Item::set_wheel_changes_value(
+        app_services.app_config().get<bool>("scroll_wheel_changes_value")
+    );
 
     const AppearanceResult result = SetAppearance(
         style == Theme::Style::Dark ? wxAppBase::Appearance::Dark : wxAppBase::Appearance::Light

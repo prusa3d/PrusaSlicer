@@ -1,5 +1,6 @@
 #include "Slic3r/App/Yoga/InputTextWithSpin.hpp"
 #include "Slic3r/App/Yoga/SpinButton.hpp"
+#include "Slic3r/App/Yoga/ImGuiUtils.hpp"
 
 #include "Slic3r/App/Yoga/Validator.hpp"
 #include <fmt/format.h>
@@ -44,14 +45,27 @@ InputTextWithSpin::InputTextWithSpin(
     spins->set_flex_shrink(0.f);
 
     m_increase_button                     = spins->emplace_back<SpinButton>(ImGuiDir_Up);
-    m_increase_button->callbacks().action = [this]() -> void { increase_value(); };
+    m_increase_button->callbacks().action = [this]() -> void { step_value(1); };
     m_increase_button->set_width(10);
     m_increase_button->set_height(10);
 
     m_decrease_button                     = spins->emplace_back<SpinButton>(ImGuiDir_Down);
-    m_decrease_button->callbacks().action = [this]() -> void { decrease_value(); };
+    m_decrease_button->callbacks().action = [this]() -> void { step_value(-1); };
     m_decrease_button->set_width(10);
     m_decrease_button->set_height(10);
+}
+
+void InputTextWithSpin::render(const Vec2f& pos, const Vec2f& size)
+{
+    InputTextField::render(pos, size);
+
+    const ImGuiID wheel_id = ImGui::GetID(object_name().c_str());
+    const bool wheel_on    = wheel_changes_value() && enabled() && override_label().empty();
+    const int step         = wheel_step(wheel_id, to_im(pos), to_im(pos + size), wheel_on);
+    if (step != 0) {
+        step_value(step);
+        set_style_dirty();
+    }
 }
 
 InputTextWithSpin::Callbacks& InputTextWithSpin::callbacks()
@@ -95,20 +109,12 @@ void InputTextWithSpin::set_override_label(const std::string& override_label)
     input_text()->set_override_label(override_label);
 }
 
-void InputTextWithSpin::increase_value()
+void InputTextWithSpin::step_value(int steps)
 {
-    m_last_value += GImGui->IO.KeyCtrl ? m_step_fast : m_step;
+    const std::string old_text = text();
+    m_last_value += steps * (GImGui->IO.KeyCtrl ? m_step_fast : m_step);
     set_text(fmt::format("{:.10g}", m_last_value));
-    if (m_callbacks.text_edited) {
-        m_callbacks.text_edited();
-    }
-}
-
-void InputTextWithSpin::decrease_value()
-{
-    m_last_value -= GImGui->IO.KeyCtrl ? m_step_fast : m_step;
-    set_text(fmt::format("{:.10g}", m_last_value));
-    if (m_callbacks.text_edited) {
+    if (text() != old_text && m_callbacks.text_edited) {
         m_callbacks.text_edited();
     }
 }
