@@ -7,6 +7,13 @@ add_library(slic3r-platform-wx STATIC
     src/Slic3r/App/Platform/WX/DpiScale.cpp
 )
 
+if (APPLE)
+    target_sources(slic3r-platform-wx PRIVATE
+        src/Slic3r/App/Platform/WX/MacScrollUtils.hpp
+        src/Slic3r/App/Platform/WX/MacScrollUtils.mm
+    )
+endif ()
+
 if(WIN32)
     message(STATUS "WXWIN environment set to: $ENV{WXWIN}")
 elseif(UNIX)
