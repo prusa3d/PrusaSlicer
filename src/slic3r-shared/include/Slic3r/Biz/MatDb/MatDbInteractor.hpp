@@ -63,6 +63,18 @@ public:
         const std::string& preset_id
     );
 
+    /**
+     * @brief Selects the MDB material with the given uuid in the slot, together with the
+     *        preset the material selection offers first for it.
+     *
+     * A slot that already holds the material keeps its preset when that is one offered for
+     * the material. Unlike select_material_preset() this is not an action of the user: the
+     * project is not marked as modified and the color of the slot is left to the caller.
+     *
+     * @return false when the material cannot be read from MDB or no preset matches it;
+     *         nothing changes then.
+     */
+    bool select_material_by_uuid(size_t material_index, const std::string& uuid);
 
     ObservableList<MatDbItem>& result()
     {
@@ -96,6 +108,14 @@ public:
 
 private:
     const Domain::Preset::SelectedPreset& selected_preset() const;
+    /**
+     * @brief Presets matching the MDB material in the slot, the best match first.
+     */
+    PresetMatches resolve_presets(
+        Domain::SelectionId project_id,
+        size_t material_index,
+        const Domain::MatDb::Material& mat
+    ) const;
     void run_query(Domain::SelectionId project_id);
     bool is_favorite(const Domain::MatDb::Material& mat) const;
 

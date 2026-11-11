@@ -205,6 +205,7 @@ private:
     using ProjectContexts = Biz::ProjectScoped<ProjectContext>;
 
     Domain::Workbench& m_workbench;
+    ProjectInteractor& m_project_interactor;
     std::unique_ptr<ProjectContexts> m_project_contexts;
     Platform::IMainThreadDispatcher& m_dispatcher;
     Preset::PresetInteractor& m_preset_interactor;

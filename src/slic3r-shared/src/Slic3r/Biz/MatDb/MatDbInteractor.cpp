@@ -1,5 +1,6 @@
 #include "Slic3r/Biz/MatDb/MatDbInteractor.hpp"
 #include "Slic3r/Directories.hpp"
+#include "Slic3r/Log.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
@@ -102,6 +103,91 @@ void MatDbInteractor::select_material_preset(
         m_project_interactor.selected_config_container_id(),
         static_cast<int>(material_index)
     );
+}
+
+bool MatDbInteractor::select_material_by_uuid(size_t material_index, const std::string& uuid)
+{
+    std::optional<Domain::MatDb::Material> mat;
+    try {
+        mat = m_client.get_by_uuid(uuid);
+    } catch (const std::exception& e) {
+        // A damaged database is handled as one that does not know the material.
+        SPDLOG_ERROR("Cannot read material {} from the material database: {}", uuid, e.what());
+        return false;
+    }
+    if (!mat.has_value()) {
+        return false;
+    }
+    const PresetMatches matches =
+        resolve_presets(m_projects->selected_project_id(), material_index, *mat);
+    if (matches.empty()) {
+        return false;
+    }
+
+    // The user may have picked another preset offered for the material than the first one.
+    // The uuid alone does not tell that the slot holds the material: it also stays in a slot
+    // whose preset was replaced, e.g. by the default one after another printer was selected.
+    const auto& sp                       = selected_preset();
+    const std::string& current_preset_id = sp.materials.at(material_index).id;
+    const bool holds_material =
+        sp.material_matdb_uuid(material_index) == uuid
+        && std::ranges::any_of(
+            matches,
+            [&current_preset_id](const PresetMatch& match)
+            { return match.preset_id == current_preset_id; }
+        );
+    if (!holds_material) {
+        m_preset_interactor
+            .select_material_preset(material_index, matches.front().preset_id, false, mat->uuid);
+    }
+    return true;
+}
+
+PresetMatches MatDbInteractor::resolve_presets(
+    Domain::SelectionId project_id,
+    size_t material_index,
+    const Domain::MatDb::Material& mat
+) const
+{
+    const auto& sp = selected_preset();
+    auto mpv       = m_preset_interactor.get_material_presets_view(
+        project_id,
+        sp.hw_config.id,
+        sp.printer.id,
+        sp.print.id,
+        material_index
+    );
+    MATDB_PRESET_MATCH_LOG("=================================================");
+    MATDB_PRESET_MATCH_LOG("Resolve presets for MatDB Item {}", mat.slug);
+    PresetMatches ret;
+    for (const auto& [preset, mr] : mpv.match_rules()) {
+        if (auto rank = mr.match(mat); rank > 0) {
+            MATDB_PRESET_MATCH_LOG(
+                "Match ranked {} with {} ({}:{}:{})",
+                rank,
+                preset.short_name(),
+                preset.last_node_location.file,
+                preset.last_node_location.line,
+                preset.last_node_location.column
+            );
+            MATDB_PRESET_MATCH_LOG("Rule: {}", to_string(mr));
+            ret.emplace_back(
+                preset.id,
+                std::string{preset.short_name()},
+                rank,
+                Domain::Preset::get_feature<bool>(preset.features, "generic").value_or(false)
+            );
+        }
+    }
+    MATDB_PRESET_MATCH_LOG("----Sorted results-------------------------------");
+    std::ranges::stable_sort(ret, std::ranges::greater(), [](const auto& v) { return v.rank; });
+#if MATDB_PRESET_MATCH_DEBUG
+    for (const auto& r : ret) {
+        MATDB_PRESET_MATCH_LOG("{}: {}", r.rank, r.preset_name);
+    }
+#endif
+    MATDB_PRESET_MATCH_LOG("=================================================");
+    return ret;
 }
 
 std::optional<std::string> MatDbInteractor::get_color(const std::string& uuid) const
@@ -224,54 +310,17 @@ void MatDbInteractor::run_query(Domain::SelectionId project_id)
         }
     }
     std::vector<MatDbItem> items;
-    auto resolve_preset =
-        [this, project_id, material_index](const Domain::MatDb::Material& mat) -> PresetMatches
-    {
-        const auto& sp = selected_preset();
-        auto mpv       = m_preset_interactor.get_material_presets_view(
-            project_id,
-            sp.hw_config.id,
-            sp.printer.id,
-            sp.print.id,
-            material_index
-        );
-        MATDB_PRESET_MATCH_LOG("=================================================");
-        MATDB_PRESET_MATCH_LOG("Resolve presets for MatDB Item {}", mat.slug);
-        PresetMatches ret;
-        for (const auto& [preset, mr] : mpv.match_rules()) {
-            if (auto rank = mr.match(mat); rank > 0) {
-                MATDB_PRESET_MATCH_LOG(
-                    "Match ranked {} with {} ({}:{}:{})",
-                    rank,
-                    preset.short_name(),
-                    preset.last_node_location.file,
-                    preset.last_node_location.line,
-                    preset.last_node_location.column
-                );
-                MATDB_PRESET_MATCH_LOG("Rule: {}", to_string(mr));
-                ret.emplace_back(
-                    preset.id,
-                    std::string{preset.short_name()},
-                    rank,
-                    Domain::Preset::get_feature<bool>(preset.features, "generic").value_or(false)
-                );
-            }
-        }
-        MATDB_PRESET_MATCH_LOG("----Sorted results-------------------------------");
-        std::ranges::stable_sort(ret, std::ranges::greater(), [](const auto& v) { return v.rank; });
-#if MATDB_PRESET_MATCH_DEBUG
-        for (const auto& r : ret) {
-            MATDB_PRESET_MATCH_LOG("{}: {}", r.rank, r.preset_name);
-        }
-#endif
-        MATDB_PRESET_MATCH_LOG("=================================================");
-        return ret;
-    };
     std::ranges::copy(
         result
             | std::views::transform(
-                [this, &resolve_preset](const Domain::MatDb::Material& mat)
-                { return MatDbItem{mat, resolve_preset(mat), is_favorite(mat)}; }
+                [this, project_id, material_index](const Domain::MatDb::Material& mat)
+                {
+                    return MatDbItem{
+                        mat,
+                        resolve_presets(project_id, material_index, mat),
+                        is_favorite(mat)
+                    };
+                }
             ),
         std::back_inserter(items)
     );

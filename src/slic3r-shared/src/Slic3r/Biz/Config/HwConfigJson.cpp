@@ -1,5 +1,4 @@
 #include "Slic3r/Biz/Config/HwConfigJson.hpp"
-#include <fmt/ranges.h>
 #include <tl/expected.hpp>
 #include <variant>
 #include "Slic3r/Biz/JsonValueJson.hpp"
@@ -36,6 +35,7 @@ using PartiallyParsedMaterialConfigs = std::map<std::string, MaterialConfig>;
 
 using Slic3r::Domain::Preset::Address;
 using Slic3r::Domain::Preset::to_address;
+using Slic3r::Domain::Preset::to_string;
 
 uint8_t address_from_legacy_public(uint8_t address)
 {
@@ -49,13 +49,6 @@ Address address_from_legacy_public(const Address& address)
     for (const auto component : address)
         ret.push_back(address_from_legacy_public(component));
     return ret;
-}
-
-std::string to_string(const Address& v)
-{
-    return fmt::to_string(
-        fmt::join(v | std::views::transform([](auto slot) { return int(slot); }), ".")
-    );
 }
 } // namespace
 

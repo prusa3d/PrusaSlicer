@@ -2,6 +2,7 @@
 
 #include "Slic3r/Domain/Color.hpp"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -24,6 +25,13 @@ bool can_decode_color(std::string_view color);
 
 bool decode_color(std::string_view color_in, Domain::ColorRGB& color_out);
 bool decode_color(std::string_view color_in, Domain::ColorRGBA& color_out);
+
+/**
+ * @brief Strips the alpha channel of a "#rrggbbaa" color; a "#rrggbb" color is returned as is.
+ *
+ * @return std::nullopt when the input is neither of the two forms.
+ */
+std::optional<std::string> strip_alpha(std::string_view color);
 
 bool decode_colors(const std::vector<std::string>& colors_in, std::vector<Domain::ColorRGB>& colors_out);
 bool decode_colors(const std::vector<std::string>& colors_in, std::vector<Domain::ColorRGBA>& colors_out);

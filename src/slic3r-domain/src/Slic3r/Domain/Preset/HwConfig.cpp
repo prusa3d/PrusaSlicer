@@ -28,6 +28,18 @@ tl::expected<Address, std::string> to_address(const std::string& input)
     return address;
 }
 
+std::string to_string(const Address& address)
+{
+    std::string result;
+    for (const uint8_t slot : address) {
+        if (!result.empty()) {
+            result += '.';
+        }
+        result += std::to_string(slot);
+    }
+    return result;
+}
+
 FeatureValueMap build_features(const FeatureDefs& feature_defs)
 {
     FeatureValueMap result;
