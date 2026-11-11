@@ -1,6 +1,9 @@
 kind: filament
 id: Prusament PLA
 name: Prusament PLA
+features:
+  $.type: PLA
+  $.brand.slug: prusament
 values:
   bed_temperature: '60'
   bridge_fan_speed: '100'

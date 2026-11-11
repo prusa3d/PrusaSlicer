@@ -8,6 +8,7 @@
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/SecretStoreDummy.hpp"
 #include "Slic3r/Biz/AppInstance/AppInstanceMessageHandlerFactory.hpp"
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 #include "Slic3r/Biz/Connect/ConnectMessageHandler.hpp"
 #include "Slic3r/Biz/Preset/PrinterPresetSelector.hpp"
 #include "Slic3r/Biz/JsonValueJson.hpp"
@@ -28,6 +29,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/nowide/filesystem.hpp>
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 using Slic3r::Biz::IProjectsChangedListener;
@@ -582,9 +584,27 @@ TEST_CASE_METHOD(
 
 namespace {
 
-struct ConnectSelectPrinterFixture : public PhysicalPrinterFromProjectFixture,
-                                     public Slic3r::Biz::Connect::IConnectHandlerListener,
-                                     public Slic3r::Biz::Preset::IPrinterPresetSelectorListener
+// Directory of the material database (MDB) a test opens. It is a base of the fixture that
+// comes before the one owning the ProjectInteractor, so that it is removed only after the
+// ProjectInteractor, which keeps the MDB open, is gone.
+struct TestMatDbDir
+{
+    ~TestMatDbDir()
+    {
+        if (!matdb_dir.empty()) {
+            boost::system::error_code ec;
+            boost::filesystem::remove_all(matdb_dir, ec);
+        }
+    }
+
+    boost::filesystem::path matdb_dir;
+};
+
+struct ConnectSelectPrinterFixture :
+    public TestMatDbDir,
+    public PhysicalPrinterFromProjectFixture,
+    public Slic3r::Biz::Connect::IConnectHandlerListener,
+    public Slic3r::Biz::Preset::IPrinterPresetSelectorListener
 {
     ConnectSelectPrinterFixture()
     {
@@ -717,6 +737,94 @@ struct ConnectSelectPrinterFixture : public PhysicalPrinterFromProjectFixture,
         return value->holds_alternative<std::string>() ? value->get<std::string>() : std::string{};
     }
 
+    /// Sets what the last added Connect printer reports in a tool, null for an empty tool.
+    void set_connect_material(size_t tool, const nlohmann::json& material)
+    {
+        nlohmann::json& tool_json = printer_list["printers"].back()["tools"][std::to_string(tool)];
+        if (material.is_null()) {
+            tool_json["material_package_instance"] = nullptr;
+        } else {
+            tool_json["material_package_instance"] = {{"package", {{"material", material}}}};
+        }
+    }
+
+    std::string selected_material_id(size_t slot)
+    {
+        return project_interactor->preset_interactor()
+            .selected_printer_preset()
+            .materials.at(slot)
+            .id;
+    }
+
+    std::string selected_matdb_uuid(size_t slot)
+    {
+        return std::string{
+            project_interactor->preset_interactor().selected_printer_preset().material_matdb_uuid(
+                slot
+            )
+        };
+    }
+
+    std::vector<std::string> extruder_colours()
+    {
+        return selected_config_container()
+            .project_settings()
+            .items.opt("extruder_colour")
+            .get<std::vector<std::string>>();
+    }
+
+    /// Opens the small material database (MDB) of the test data, as the app opens its own.
+    /// A damaged one has only its index, the files of the brands are missing.
+    void open_test_matdb(bool damaged = false)
+    {
+        namespace fs = boost::filesystem;
+        matdb_dir    = fs::temp_directory_path() / fs::unique_path();
+        fs::create_directories(matdb_dir / "matdb");
+        const fs::path source = Tests::get_datadir() / "matdb" / "matdb-mini.zip";
+        const fs::path target = matdb_dir / "matdb" / "matdb.zip";
+        if (damaged) {
+            using Slic3r::Biz::Algorithms::ZipArchive;
+            const fs::path index = matdb_dir / "index.json";
+            ZipArchive full      = ZipArchive::open(source.string(), ZipArchive::Mode::Read);
+            REQUIRE(full.extract_to_file(full.locate_file("index.json"), index.string()));
+            ZipArchive index_only = ZipArchive::open(target.string(), ZipArchive::Mode::Write);
+            REQUIRE(index_only.add_entry_file("index.json", index.string()));
+            REQUIRE(index_only.close());
+        } else {
+            fs::copy_file(source, target);
+        }
+
+        // The data directory is global, it is restored even when opening the MDB throws.
+        struct DataDirRestorer
+        {
+            ~DataDirRestorer()
+            {
+                Slic3r::set_data_dir(data_dir);
+            }
+
+            std::string data_dir = Slic3r::data_dir();
+        } restorer;
+
+        Slic3r::set_data_dir(matdb_dir.string());
+        project_interactor->matdb_interactor().init_client();
+    }
+
+    /// Selects the MDB material in the slot the way the material selection does.
+    void select_matdb_material(size_t slot, const std::string& matdb_uuid)
+    {
+        auto& matdb         = project_interactor->matdb_interactor();
+        const auto material = matdb.get_material_by_uuid(matdb_uuid);
+        REQUIRE(material.has_value());
+        matdb.select_material_preset(slot, *material, selected_material_id(slot));
+    }
+
+    bool is_project_unsaved()
+    {
+        return project_interactor->backup_store().is_project_unsaved(
+            project_interactor->selected_project_id()
+        );
+    }
+
     nlohmann::json printer_list{{"printers", nlohmann::json::array()}};
     std::vector<std::string> errors;
     std::vector<std::string> warnings;
@@ -843,3 +951,348 @@ TEST_CASE_METHOD(
     CHECK(selected_filament_type(0) == filament_type);
 }
 
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect uses the material abbreviation without a type",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    const std::string filament_type = selected_filament_type(0);
+    REQUIRE(!filament_type.empty());
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, current_hw_config());
+
+    SECTION("abbreviation with a profile")
+    {
+        // The color is taken only from a filament that was matched, here by the abbreviation.
+        set_connect_material(
+            0,
+            {{"class", "FFF"},
+             {"abbreviation", filament_type},
+             {"primary_color", {{"color_rgba", "#12ab34ff"}}}}
+        );
+        select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+        CHECK(errors.empty());
+        CHECK(warnings.empty());
+        CHECK(selected_filament_type(0) == filament_type);
+        const std::vector<std::string> colors = extruder_colours();
+        REQUIRE(!colors.empty());
+        CHECK(colors.front() == "#12ab34");
+    }
+
+    SECTION("abbreviation without a profile")
+    {
+        set_connect_material(0, {{"class", "FFF"}, {"abbreviation", "UNKNOWN_FILAMENT"}});
+        select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+        CHECK(errors.empty());
+        REQUIRE(warnings.size() == 1);
+        CHECK(warnings.front().find("UNKNOWN_FILAMENT") != std::string::npos);
+        CHECK(selected_filament_type(0) == filament_type);
+    }
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect leaves an empty tool alone",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    const std::string material_id = selected_material_id(0);
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, current_hw_config());
+    set_connect_material(0, nullptr);
+    select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+    CHECK(errors.empty());
+    CHECK(warnings.empty());
+    CHECK(selected_material_id(0) == material_id);
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect applies the filament color",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    const std::string filament_type = selected_filament_type(0);
+    REQUIRE(!filament_type.empty());
+
+    const std::vector<std::string> previous_colors = extruder_colours();
+    REQUIRE(!previous_colors.empty());
+    REQUIRE(previous_colors.front() != "#12ab34");
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, current_hw_config());
+    const auto select_with_color = [&](const std::string& color)
+    {
+        set_connect_material(
+            0,
+            {{"type", filament_type}, {"primary_color", {{"color_rgba", color}}}}
+        );
+        select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+        CHECK(errors.empty());
+        CHECK(warnings.empty());
+    };
+
+    SECTION("with alpha, as Connect reports it")
+    {
+        select_with_color("#12ab34ff");
+        CHECK(extruder_colours().front() == "#12ab34");
+    }
+
+    SECTION("without alpha")
+    {
+        select_with_color("#12ab34");
+        CHECK(extruder_colours().front() == "#12ab34");
+    }
+
+    SECTION("malformed")
+    {
+        select_with_color("#12ab34zz");
+        CHECK(extruder_colours() == previous_colors);
+    }
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect keeps the color of a slot it cannot synchronize",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    const std::string material_id                  = selected_material_id(0);
+    const std::vector<std::string> previous_colors = extruder_colours();
+    REQUIRE(!previous_colors.empty());
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, current_hw_config());
+
+    SECTION("filament without a profile")
+    {
+        set_connect_material(
+            0,
+            {{"type", "UNKNOWN_FILAMENT"}, {"primary_color", {{"color_rgba", "#12ab34ff"}}}}
+        );
+        select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+        CHECK(warnings.size() == 1);
+    }
+
+    SECTION("filament without a type")
+    {
+        set_connect_material(
+            0,
+            {{"class", "FFF"}, {"primary_color", {{"color_rgba", "#12ab34ff"}}}}
+        );
+        select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+        CHECK(warnings.empty());
+    }
+
+    CHECK(errors.empty());
+    CHECK(selected_material_id(0) == material_id);
+    CHECK(extruder_colours() == previous_colors);
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Connect tool keys address tools and feeder slots",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    bool tested_tools   = false;
+    bool tested_feeders = false;
+    for (const auto& [id, hw_config] : workbench.preset_bundle().printer_configs) {
+        if (hw_config.technology != Slic3r::Domain::PrinterTechnology::FFF) {
+            continue;
+        }
+        // Connect reports a tool as "<tool>" and a slot of a feeder on it as "<tool>.<slot>".
+        std::vector<std::string> expected;
+        for (uint8_t tool = 0; tool < hw_config.tool_count; ++tool) {
+            const auto feeder = hw_config.feeders.find({tool});
+            if (feeder == hw_config.feeders.end()) {
+                expected.push_back(std::to_string(tool));
+                continue;
+            }
+            for (uint32_t slot = 0; slot < feeder->second.slot_count; ++slot) {
+                expected.push_back(fmt::format("{}.{}", tool, slot));
+            }
+        }
+        REQUIRE(hw_config.material_slot_count() == expected.size());
+
+        INFO("printer config " << hw_config.name);
+        for (size_t slot = 0; slot < expected.size(); ++slot) {
+            CHECK(Slic3r::Biz::Preset::connect_tool_key(hw_config, slot) == expected[slot]);
+        }
+        tested_tools   = tested_tools || hw_config.tool_count > 1;
+        tested_feeders = tested_feeders || !hw_config.feeders.empty();
+    }
+    CHECK(tested_tools);
+    CHECK(tested_feeders);
+}
+
+namespace {
+
+// Prusament PLA Azure Blue as Connect reports it (see hw_config_connect/printer_4.json);
+// the material is in the test MDB (matdb-mini.zip).
+const std::string AZURE_BLUE_UUID = "f7bf0baf-0419-51ee-89ec-f6fc6020f7b6";
+// Prusament PETG Ocean Blue, also in the test MDB. The test bundle has no PETG profile.
+const std::string OCEAN_BLUE_UUID = "421e0d10-0ec7-50c9-927c-7a585e8a15c2";
+
+nlohmann::json azure_blue_material(const std::string& uuid)
+{
+    return {
+        {"abbreviation", "PLA"},
+        {"brand", {{"name", "Prusament"}, {"uuid", "ae5ff34e-298e-50c9-8f77-92a97fb30b09"}}},
+        {"class", "FFF"},
+        {"name", "PLA Azure Blue"},
+        {"primary_color", {{"color_rgba", "#008fbeff"}}},
+        {"type", "PLA"},
+        {"uuid", uuid},
+    };
+}
+
+} // namespace
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect selects the material from the material database",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    open_test_matdb();
+    REQUIRE(project_interactor->matdb_interactor().get_material_by_uuid(AZURE_BLUE_UUID));
+    REQUIRE(selected_matdb_uuid(0).empty());
+    REQUIRE(!is_project_unsaved());
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, current_hw_config());
+
+    SECTION("with the color Connect reports")
+    {
+        set_connect_material(0, azure_blue_material(AZURE_BLUE_UUID));
+    }
+
+    SECTION("with the color from the material database")
+    {
+        nlohmann::json material = azure_blue_material(AZURE_BLUE_UUID);
+        material.erase("primary_color");
+        set_connect_material(0, material);
+    }
+
+    select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+    CHECK(errors.empty());
+    CHECK(warnings.empty());
+    CHECK(selected_matdb_uuid(0) == AZURE_BLUE_UUID);
+    CHECK(selected_filament_type(0) == "PLA");
+    const std::vector<std::string> colors = extruder_colours();
+    REQUIRE(!colors.empty());
+    CHECK(colors.front() == "#008fbe");
+    // Like the rest of what "Set as current" selects, it is not a change made by the user.
+    CHECK(!is_project_unsaved());
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect does not trust a material database uuid left in a slot",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    open_test_matdb();
+    // The slot keeps the uuid when its preset is replaced, e.g. by the default one after
+    // another printer was selected: the uuid is of a PETG, the preset is for PLA.
+    project_interactor->preset_interactor().set_material_matdb_uuid(0, OCEAN_BLUE_UUID);
+    REQUIRE(selected_filament_type(0) == "PLA");
+    const std::string material_id                  = selected_material_id(0);
+    const std::vector<std::string> previous_colors = extruder_colours();
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, current_hw_config());
+    set_connect_material(
+        0,
+        {{"abbreviation", "PETG"},
+         {"primary_color", {{"color_rgba", "#194c55ff"}}},
+         {"type", "PETG"},
+         {"uuid", OCEAN_BLUE_UUID}}
+    );
+    select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+    // The PETG is not taken for selected: it has no profile here, which is reported.
+    CHECK(errors.empty());
+    REQUIRE(warnings.size() == 1);
+    CHECK(warnings.front().find("PETG") != std::string::npos);
+    CHECK(selected_material_id(0) == material_id);
+    CHECK(extruder_colours() == previous_colors);
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect matches the type when the material database is damaged",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    open_test_matdb(true);
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, current_hw_config());
+    set_connect_material(0, azure_blue_material(AZURE_BLUE_UUID));
+    select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+    CHECK(errors.empty());
+    CHECK(warnings.empty());
+    CHECK(physical_printers().selected_uuid() == uuid);
+    CHECK(selected_matdb_uuid(0).empty());
+    CHECK(selected_filament_type(0) == "PLA");
+    const std::vector<std::string> colors = extruder_colours();
+    REQUIRE(!colors.empty());
+    CHECK(colors.front() == "#008fbe");
+}
+
+TEST_CASE_METHOD(
+    ConnectSelectPrinterFixture,
+    "Set as current in Connect matches the type of a material missing in the material database",
+    "[ProjectInteractor][PhysicalPrinter]"
+)
+{
+    open_test_matdb();
+    const std::string unknown_uuid = "00000000-0000-0000-0000-00000000beef";
+    REQUIRE(!project_interactor->matdb_interactor().get_material_by_uuid(unknown_uuid));
+
+    // The slot holds an MDB material, which the filament matched by its type replaces.
+    const std::vector<std::string> auto_colors = extruder_colours();
+    select_matdb_material(0, AZURE_BLUE_UUID);
+    REQUIRE(selected_matdb_uuid(0) == AZURE_BLUE_UUID);
+    REQUIRE(extruder_colours().front() == "#008fbe");
+    REQUIRE(auto_colors.front() != "#008fbe");
+
+    const std::string uuid = "c0ffee00-0000-0000-0000-000000000001";
+    add_connect_printer(uuid, current_hw_config());
+
+    SECTION("with a color")
+    {
+        nlohmann::json material   = azure_blue_material(unknown_uuid);
+        material["primary_color"] = {{"color_rgba", "#12ab34ff"}};
+        set_connect_material(0, material);
+        select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+        CHECK(extruder_colours().front() == "#12ab34");
+    }
+
+    SECTION("without a color")
+    {
+        // The slot must not keep the color of the MDB material it lost.
+        set_connect_material(0, {{"class", "FFF"}, {"type", "PLA"}});
+        select_from_connect(uuid, [&] { return physical_printers().selected_uuid() == uuid; });
+
+        CHECK(extruder_colours() == auto_colors);
+    }
+
+    CHECK(errors.empty());
+    CHECK(warnings.empty());
+    CHECK(selected_matdb_uuid(0).empty());
+    CHECK(selected_filament_type(0) == "PLA");
+}

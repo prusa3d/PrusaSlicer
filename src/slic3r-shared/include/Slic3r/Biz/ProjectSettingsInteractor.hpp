@@ -95,7 +95,8 @@ public:
      *
      * @param project_id          Project containing the config container.
      * @param config_container_id Container to update.
-     * @param colors              New colors for all slots. Must not contain empty strings.
+     * @param colors              New colors for all slots. An empty string keeps the color of
+     *                            its slot.
      */
     void set_colors_from_connect(
         Domain::SelectionId project_id,

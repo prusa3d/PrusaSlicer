@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
+#include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
@@ -64,6 +65,7 @@ PhysicalPrinterInteractor::PhysicalPrinterInteractor(
     UserAccount::UserAccountInteractor& user_account_interactor
 ) :
     m_workbench(workbench),
+    m_project_interactor(project_interactor),
     m_project_contexts(std::make_unique<ProjectContexts>(project_interactor)),
     m_dispatcher(dispatcher),
     m_preset_interactor(preset_interactor),
@@ -192,12 +194,39 @@ void PhysicalPrinterInteractor::select_connect_materials(const std::string& prin
     if (connect_printer == nullptr) {
         return;
     }
+    std::vector<Preset::ConnectSlotColor> slot_colors;
     try {
-        m_printer_preset_selector.select_connect_materials(
-            nlohmann::json::parse(connect_printer->json)
+        slot_colors = m_printer_preset_selector.select_connect_materials(
+            nlohmann::json::parse(connect_printer->json),
+            [this](size_t slot_index, const std::string& matdb_uuid)
+            {
+                return m_project_interactor.matdb_interactor()
+                    .select_material_by_uuid(slot_index, matdb_uuid);
+            }
         );
     } catch (const nlohmann::json::exception& e) {
         SPDLOG_ERROR("Failed to parse Connect printer json: {}", e.what());
+        return;
+    }
+
+    ProjectSettingsInteractor& settings = m_project_interactor.project_settings_interactor();
+    std::vector<std::string> colors(slot_colors.size());
+    for (size_t slot = 0; slot < slot_colors.size(); ++slot) {
+        if (slot_colors[slot].reset_to_auto) {
+            settings.reset_color_to_auto(
+                m_current_project_id,
+                m_current_container_id,
+                static_cast<int>(slot)
+            );
+        }
+        colors[slot] = std::move(slot_colors[slot].color);
+    }
+    if (std::ranges::any_of(colors, [](const std::string& color) { return !color.empty(); })) {
+        settings.set_colors_from_connect(
+            m_current_project_id,
+            m_current_container_id,
+            std::move(colors)
+        );
     }
 }
 

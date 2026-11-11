@@ -269,6 +269,20 @@ bool decode_color(std::string_view color_in, Domain::ColorRGBA& color_out)
     return true;
 }
 
+std::optional<std::string> strip_alpha(std::string_view color)
+{
+    if (color.length() == 9) {
+        if (hex_digit_to_int(color.at(7)) == -1 || hex_digit_to_int(color.at(8)) == -1) {
+            return std::nullopt;
+        }
+        color = color.substr(0, 7);
+    }
+    if (!can_decode_color(color)) {
+        return std::nullopt;
+    }
+    return std::string{color};
+}
+
 bool decode_colors(const std::vector<std::string>& colors_in, std::vector<Domain::ColorRGB>& colors_out)
 {
     colors_out = std::vector<Domain::ColorRGB>(colors_in.size(), Domain::ColorRGB::BLACK());
