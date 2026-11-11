@@ -1020,11 +1020,13 @@ void WXRenderCanvas::on_mouse(wxMouseEvent& evt)
         // per frame, so overwriting drops earlier events in the same frame window.
         float wheel_ticks = static_cast<float>(evt.GetWheelRotation()) / wheel_delta;
 #ifdef __APPLE__
-        // wxOSX reports pixel-precise deltas (trackpad, Magic Mouse) as a rotation in pixels
-        // with a wheel delta of 10, i.e. 10 px per tick. ImGui expects 100 px per tick for
-        // such devices (see imgui_impl_osx.mm), otherwise scrolling is 10x too fast.
+        // wxOSX reports pixel-precise deltas (trackpad, Magic Mouse) as a rotation in pixels,
+        // so its wheel delta does not describe a wheel tick for such events. Convert the pixels
+        // to ImGui wheel ticks with the ratio used by ImGui's own macOS backend
+        // (imgui_impl_osx.mm scales precise scrolling deltas by 0.01).
+        static constexpr float IMGUI_PIXELS_PER_WHEEL_TICK = 100.0f;
         if (mac_current_scroll_event_is_precise())
-            wheel_ticks *= 0.1f;
+            wheel_ticks = static_cast<float>(evt.GetWheelRotation()) / IMGUI_PIXELS_PER_WHEEL_TICK;
 #endif // __APPLE__
         if (evt.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL) {
             io.MouseWheelH += wheel_ticks;
