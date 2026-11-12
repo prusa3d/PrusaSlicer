@@ -798,8 +798,6 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/CommandBindingManager.cpp
         include/Slic3r/App/CrashedProjectsDialog.hpp
         src/Slic3r/App/CrashedProjectsDialog.cpp
-        include/Slic3r/App/LoadingProgressController.hpp
-        src/Slic3r/App/LoadingProgressController.cpp
         include/Slic3r/App/LoadingProgressDialog.hpp
         src/Slic3r/App/LoadingProgressDialog.cpp
         include/Slic3r/App/ProjectSaver.hpp
@@ -1680,7 +1678,7 @@ if(SLIC3R_BUILD_TESTS)
             test/main.cpp
 
             test/Slic3r/App/DialogNavigationTests.cpp
-            test/Slic3r/App/LoadingProgressControllerTests.cpp
+            test/Slic3r/App/LoadingProgressDialogTests.cpp
             test/Slic3r/App/OpenFiles/OpenFilesDialogModelTests.cpp
 
             test/Slic3r/App/Lua/PluginBundleTests.cpp

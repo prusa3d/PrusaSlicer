@@ -7,7 +7,6 @@
 #include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/PresetUpdater/PresetUpdaterController.hpp"
 #include "Slic3r/App/Navigator.hpp"
-#include "Slic3r/App/LoadingProgressController.hpp"
 #include "Slic3r/App/Theme.hpp"
 #include "Slic3r/App/Mouse3D/Mouse3DController.hpp"
 
@@ -38,12 +37,6 @@ void AppServices::set_navigator(std::unique_ptr<Navigator>&& navigator)
     m_navigator = std::move(navigator);
 }
 
-void AppServices::set_loading_progress_controller(
-    std::unique_ptr<LoadingProgressController>&& controller
-)
-{
-    m_loading_progress_controller = std::move(controller);
-}
 
 void AppServices::set_file_explorer_handler(
     std::unique_ptr<Platform::IFileExplorerHandler>&& handler
@@ -95,16 +88,6 @@ Navigator& AppServices::navigator() const
     return *m_navigator;
 }
 
-LoadingProgressController& AppServices::loading_progress_controller() const
-{
-    ASSERT(m_loading_progress_controller != nullptr);
-    return *m_loading_progress_controller;
-}
-
-bool AppServices::has_loading_progress_controller() const
-{
-    return m_loading_progress_controller != nullptr;
-}
 
 Platform::IFileExplorerHandler& AppServices::file_explorer_handler() const
 {

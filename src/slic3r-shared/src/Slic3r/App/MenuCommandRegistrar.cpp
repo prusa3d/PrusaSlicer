@@ -1212,7 +1212,6 @@ void MenuCommandRegistrar::load_object(Wildcards::TypeFlag specific_type)
                     }
                 }
             );
-            m_navigator.navigate_to_module_type(App::Render::ModuleType::Plater);
         }
     };
 

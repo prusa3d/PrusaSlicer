@@ -90,6 +90,12 @@ public:
 
     void navigate_to_module_type(Render::ModuleType type);
 
+    /**
+     * @brief Navigates to the module type, unlike navigate_to_module_type() it keeps the opened
+     * dialog when the module type is already selected.
+     */
+    void ensure_module_type(Render::ModuleType type);
+
     void on_selected_project_changed(size_t index) override;
 
     void set_opened_dialog(Yoga::Dialog* opened_dialog);
@@ -167,12 +173,6 @@ private:
 
     RenderModuleBase* current_render_module();
 
-    /**
-     * @brief Moves the opened ModalDialog::LoadingProgress to the module switched to, the dialog
-     * doesn't depend on the module which opened it.
-     */
-    void move_loading_progress_dialog_to_current_module();
-
 private:
     struct ProjectContext
     {
@@ -191,8 +191,6 @@ private:
     Platform::AbstractRenderCanvas* m_canvas{nullptr};
     bool m_object_list_collapsed{false};
     ModalDialog m_current_modal_dialog{ModalDialog::None};
-    /// Module which shows the opened modal dialog, nullptr when none is opened.
-    RenderModuleBase* m_modal_dialog_module{nullptr};
 };
 
 } // namespace Slic3r::App

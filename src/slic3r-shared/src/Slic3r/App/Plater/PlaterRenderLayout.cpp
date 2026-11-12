@@ -2,6 +2,7 @@
 #include "Slic3r/App/Lua/PluginDialog.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
 #include "Slic3r/App/EffectiveValuesDialog.hpp"
+#include "Slic3r/App/LoadingProgressDialog.hpp"
 #include <Yoga.h>
 
 namespace Slic3r::App::Plater {
@@ -23,7 +24,8 @@ PlaterRenderLayout::PlaterRenderLayout(
     std::unique_ptr<EffectiveValuesDialog> effective_values_dialog,
     std::unique_ptr<Lua::PluginDialog> plugin_dialog,
     std::unique_ptr<CrashedProjectsDialog> crashed_projects_dialog,
-    std::unique_ptr<PresetUpdaterDialog> preset_updater_dialog
+    std::unique_ptr<PresetUpdaterDialog> preset_updater_dialog,
+    std::unique_ptr<LoadingProgressDialog> loading_progress_dialog
 ) :
     AbstractRenderLayout(
         navigator,
@@ -43,7 +45,8 @@ PlaterRenderLayout::PlaterRenderLayout(
     m_welcome_dialog(std::move(welcome_dialog)),
     m_invalid_data_dialog(std::move(invalid_data_dialog)),
     m_effective_values_dialog(std::move(effective_values_dialog)),
-    m_plugin_dialog(std::move(plugin_dialog))
+    m_plugin_dialog(std::move(plugin_dialog)),
+    m_loading_progress_dialog(std::move(loading_progress_dialog))
 {}
 
 void PlaterRenderLayout::init()
@@ -58,6 +61,8 @@ void PlaterRenderLayout::init()
     m_effective_values_dialog->attach_to_center();
     m_layout_main.append(m_plugin_dialog.release());
     m_plugin_dialog->attach_to_center();
+    m_layout_main.append(m_loading_progress_dialog.release());
+    m_loading_progress_dialog->attach_to_center();
 }
 
 void PlaterRenderLayout::init_left_column()

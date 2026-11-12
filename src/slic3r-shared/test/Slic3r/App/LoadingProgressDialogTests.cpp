@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "Slic3r/App/LoadingProgressController.hpp"
+#include "Slic3r/App/LoadingProgressDialog.hpp"
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/Platform/StdMainThreadDispatcher.hpp"
 #include "Slic3r/Biz/FileOpen/FileLoadJob.hpp"
@@ -8,14 +8,15 @@
 #include "Slic3r/Biz/Platform/TimerQueue.hpp"
 #include "Slic3r/TestUtils/DispatchUtils.hpp"
 
+#include "Yoga/ImGuiFixture.hpp"
+
 #include <atomic>
 #include <chrono>
 #include <memory>
 #include <string>
 #include <thread>
 
-using Slic3r::App::ILoadingProgressChangedListener;
-using Slic3r::App::LoadingProgressController;
+using Slic3r::App::LoadingProgressDialog;
 using Slic3r::Biz::FileOpen::FileLoadProgressPayload;
 using Slic3r::Biz::FileOpen::FileLoadStage;
 using Slic3r::Biz::JThread::StopToken;
@@ -28,20 +29,6 @@ namespace {
 const std::string LOAD_JOB_1{std::string(Slic3r::Biz::FileOpen::FILE_LOAD_JOB_PREFIX) + "_models_1"};
 const std::string LOAD_JOB_2{std::string(Slic3r::Biz::FileOpen::FILE_LOAD_JOB_PREFIX) + "_models_2"};
 
-struct RecordingListener : ILoadingProgressChangedListener
-{
-    int calls{0};
-    std::string label;
-    int percent{0};
-
-    void on_loading_progress_changed(const std::string& new_label, int new_percent) override
-    {
-        ++calls;
-        label   = new_label;
-        percent = new_percent;
-    }
-};
-
 Progress make_progress(JobStatus status, FileLoadStage stage, FileLoadProgressPayload payload, double fraction)
 {
     Progress progress{.status = status};
@@ -49,7 +36,6 @@ Progress make_progress(JobStatus status, FileLoadStage stage, FileLoadProgressPa
     progress.percent         = Slic3r::Domain::Percentage{fraction};
     return progress;
 }
-
 /**
  * @brief Job which runs until it is asked to stop, it records that.
  */
@@ -84,27 +70,20 @@ struct StoppableJob
 };
 
 /**
- * @brief Without the render modules the Navigator doesn't open any dialog, the controller logic
- * independent of the dialog is tested.
+ * @brief Without the render modules the Navigator doesn't open the dialog, the loading tracking
+ * independent of the opened dialog is tested.
  */
-struct LoadingProgressControllerFixture
+struct LoadingProgressDialogFixture : ImGuiFixture
 {
     Slic3r::App::Platform::StdMainThreadDispatcher dispatcher;
     Slic3r::Biz::Platform::JobManager::JobManager job_manager{dispatcher};
     Slic3r::Biz::Platform::TimerQueue timer_queue{dispatcher};
     Slic3r::App::Navigator navigator;
-    LoadingProgressController controller{navigator, job_manager, timer_queue};
-    RecordingListener listener;
+    LoadingProgressDialog dialog{navigator, job_manager, timer_queue};
 
-    LoadingProgressControllerFixture()
+    ~LoadingProgressDialogFixture()
     {
-        controller.add_listener<ILoadingProgressChangedListener>(&listener);
-    }
-
-    ~LoadingProgressControllerFixture()
-    {
-        controller.remove_listener<ILoadingProgressChangedListener>(&listener);
-        controller.shutdown();
+        dialog.shutdown();
         dispatcher.close();
     }
 
@@ -122,99 +101,96 @@ struct LoadingProgressControllerFixture
 
 } // namespace
 
-TEST_CASE_METHOD(LoadingProgressControllerFixture, "LoadingProgressController shows the progress of a loading job", "[LoadingProgressController]")
+TEST_CASE_METHOD(LoadingProgressDialogFixture, "LoadingProgressDialog shows the progress of a loading job", "[LoadingProgressDialog]")
 {
     SECTION("reading one of more files") {
-        controller.on_job_manager_status_changed(JobManagerStatus{
+        dialog.on_job_manager_status_changed(JobManagerStatus{
             {LOAD_JOB_1, make_progress(JobStatus::Started, FileLoadStage::Reading, {"a.stl", 0, 2}, 0.25)}
         });
-        CHECK(listener.calls == 1);
-        CHECK(controller.label() == "Reading a.stl (1 of 2)");
-        CHECK(controller.percent() == 25);
-        CHECK(listener.label == controller.label());
-        CHECK(listener.percent == 25);
+        CHECK(dialog.label() == "Reading a.stl (1 of 2)");
+        CHECK(dialog.percent() == 25);
     }
     SECTION("reading a single file") {
-        controller.on_job_manager_status_changed(JobManagerStatus{
+        dialog.on_job_manager_status_changed(JobManagerStatus{
             {LOAD_JOB_1, make_progress(JobStatus::Started, FileLoadStage::Reading, {"a.stl", 0, 1}, 0.1)}
         });
-        CHECK(controller.label() == "Reading a.stl");
-        CHECK(controller.percent() == 10);
+        CHECK(dialog.label() == "Reading a.stl");
+        CHECK(dialog.percent() == 10);
     }
     SECTION("adding more files to the scene") {
-        controller.on_job_manager_status_changed(JobManagerStatus{
+        dialog.on_job_manager_status_changed(JobManagerStatus{
             {LOAD_JOB_1, make_progress(JobStatus::Started, FileLoadStage::AddingToScene, {"", 1, 2}, 0.95)}
         });
-        CHECK(controller.label() == "Adding the files to the scene");
-        CHECK(controller.percent() == 95);
+        CHECK(dialog.label() == "Adding the files to the scene");
+        CHECK(dialog.percent() == 95);
     }
     SECTION("before the first file is processed") {
-        controller.on_job_manager_status_changed(JobManagerStatus{{LOAD_JOB_1, Progress{.status = JobStatus::Started}}});
-        CHECK(controller.label() == "Loading...");
-        CHECK(controller.percent() == 0);
+        dialog.on_job_manager_status_changed(JobManagerStatus{{LOAD_JOB_1, Progress{.status = JobStatus::Started}}});
+        CHECK(dialog.label() == "Loading...");
+        CHECK(dialog.percent() == 0);
     }
 }
 
-TEST_CASE_METHOD(LoadingProgressControllerFixture, "LoadingProgressController ignores other jobs", "[LoadingProgressController]")
+TEST_CASE_METHOD(LoadingProgressDialogFixture, "LoadingProgressDialog ignores other jobs", "[LoadingProgressDialog]")
 {
-    controller.on_job_manager_status_changed(JobManagerStatus{
+    dialog.on_job_manager_status_changed(JobManagerStatus{
         {"slicing", make_progress(JobStatus::Started, FileLoadStage::Reading, {"a.stl", 0, 1}, 0.5)},
         {LOAD_JOB_1, make_progress(JobStatus::Finished, FileLoadStage::Reading, {"b.stl", 0, 1}, 1.0)}
     });
-    CHECK(listener.calls == 0);
-    CHECK(controller.label().empty());
+    CHECK(dialog.label().empty());
+    CHECK(dialog.percent() == 0);
 
-    controller.cancel();
-    CHECK(listener.calls == 0);
+    dialog.cancel();
+    CHECK(dialog.label().empty());
 }
 
-TEST_CASE_METHOD(LoadingProgressControllerFixture, "LoadingProgressController keeps the shown job while it runs", "[LoadingProgressController]")
+TEST_CASE_METHOD(LoadingProgressDialogFixture, "LoadingProgressDialog keeps the shown job while it runs", "[LoadingProgressDialog]")
 {
-    controller.on_job_manager_status_changed(JobManagerStatus{
+    dialog.on_job_manager_status_changed(JobManagerStatus{
         {LOAD_JOB_2, make_progress(JobStatus::Started, FileLoadStage::Reading, {"b.stl", 0, 1}, 0.1)}
     });
-    REQUIRE(controller.label() == "Reading b.stl");
+    REQUIRE(dialog.label() == "Reading b.stl");
 
     // LOAD_JOB_1 is first in the status, the shown job doesn't change anyway.
-    controller.on_job_manager_status_changed(JobManagerStatus{
+    dialog.on_job_manager_status_changed(JobManagerStatus{
         {LOAD_JOB_1, make_progress(JobStatus::Started, FileLoadStage::Reading, {"a.stl", 0, 1}, 0.1)},
         {LOAD_JOB_2, make_progress(JobStatus::Started, FileLoadStage::Converting, {"b.stl", 0, 1}, 0.7)}
     });
-    CHECK(controller.label() == "Processing b.stl");
-    CHECK(controller.percent() == 70);
+    CHECK(dialog.label() == "Processing b.stl");
+    CHECK(dialog.percent() == 70);
 
     // The shown job ended, the other one is shown.
-    controller.on_job_manager_status_changed(JobManagerStatus{
+    dialog.on_job_manager_status_changed(JobManagerStatus{
         {LOAD_JOB_1, make_progress(JobStatus::Started, FileLoadStage::AddingToScene, {"a.stl", 0, 1}, 0.9)}
     });
-    CHECK(controller.label() == "Adding a.stl to the scene");
+    CHECK(dialog.label() == "Adding a.stl to the scene");
 }
 
-TEST_CASE_METHOD(LoadingProgressControllerFixture, "LoadingProgressController cancel stops the loading jobs", "[LoadingProgressController]")
+TEST_CASE_METHOD(LoadingProgressDialogFixture, "LoadingProgressDialog cancel stops the loading jobs", "[LoadingProgressDialog]")
 {
     StoppableJob first;
     StoppableJob second;
     first.start(job_manager, LOAD_JOB_1);
     second.start(job_manager, LOAD_JOB_2);
-    REQUIRE(wait_until([&] { return controller.label() == "Loading..."; }));
+    REQUIRE(wait_until([&] { return dialog.label() == "Loading..."; }));
 
-    controller.cancel();
-    CHECK(controller.label() == "Cancelling...");
+    dialog.cancel();
+    CHECK(dialog.label() == "Cancelling...");
     REQUIRE(wait_until([&] { return first.has_ended() && second.has_ended(); }));
     CHECK(first.was_stopped());
     CHECK(second.was_stopped());
     // The progress isn't shown anymore after the cancel.
-    CHECK(listener.label == "Cancelling...");
+    CHECK(dialog.label() == "Cancelling...");
 }
 
-TEST_CASE_METHOD(LoadingProgressControllerFixture, "LoadingProgressController cancel stops a job which follows the cancelled one", "[LoadingProgressController]")
+TEST_CASE_METHOD(LoadingProgressDialogFixture, "LoadingProgressDialog cancel stops a job which follows the cancelled one", "[LoadingProgressDialog]")
 {
     StoppableJob first;
     StoppableJob follower;
     first.start(job_manager, LOAD_JOB_1);
-    REQUIRE(wait_until([&] { return !controller.label().empty(); }));
+    REQUIRE(wait_until([&] { return !dialog.label().empty(); }));
 
-    controller.cancel();
+    dialog.cancel();
     REQUIRE(wait_until([&] { return first.has_ended(); }));
     // Started before the close delay elapsed, like a project which follows the cancelled models.
     follower.start(job_manager, LOAD_JOB_2);
@@ -223,19 +199,19 @@ TEST_CASE_METHOD(LoadingProgressControllerFixture, "LoadingProgressController ca
     CHECK(follower.was_stopped());
 }
 
-TEST_CASE_METHOD(LoadingProgressControllerFixture, "LoadingProgressController doesn't stop a job started after the cancelled loading finished", "[LoadingProgressController]")
+TEST_CASE_METHOD(LoadingProgressDialogFixture, "LoadingProgressDialog doesn't stop a job started after the cancelled loading finished", "[LoadingProgressDialog]")
 {
     StoppableJob first;
     first.start(job_manager, LOAD_JOB_1);
-    REQUIRE(wait_until([&] { return !controller.label().empty(); }));
-    controller.cancel();
+    REQUIRE(wait_until([&] { return !dialog.label().empty(); }));
+    dialog.cancel();
     REQUIRE(wait_until([&] { return first.has_ended(); }));
     // Lets the close delay elapse.
     dispatch_for(std::chrono::milliseconds(300));
 
     StoppableJob next;
     next.start(job_manager, LOAD_JOB_2);
-    REQUIRE(wait_until([&] { return controller.label() == "Loading..."; }));
+    REQUIRE(wait_until([&] { return dialog.label() == "Loading..."; }));
     dispatch_for(std::chrono::milliseconds(100));
     CHECK_FALSE(next.was_stopped());
 

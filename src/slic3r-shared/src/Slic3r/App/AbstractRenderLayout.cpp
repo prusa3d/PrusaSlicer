@@ -11,7 +11,6 @@
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/App/Navigator.hpp"
-#include "Slic3r/App/LoadingProgressDialog.hpp"
 
 #include "Slic3r/Assert.hpp"
 
@@ -199,12 +198,6 @@ Yoga::RootItem& AbstractRenderLayout::root_item()
     return m_layout_main;
 }
 
-LoadingProgressDialog& AbstractRenderLayout::loading_progress_dialog()
-{
-    ASSERT(m_loading_progress_dialog != nullptr);
-    return *m_loading_progress_dialog;
-}
-
 ToolBar* AbstractRenderLayout::tool_right_toolbar() const
 {
     return m_tool_right_toolbar;
@@ -254,11 +247,6 @@ void AbstractRenderLayout::init()
 
     m_layout_main.append(m_preset_updater_dialog.release());
     m_preset_updater_dialog->attach_to_center();
-
-    m_loading_progress_dialog = m_layout_main.emplace_back<LoadingProgressDialog>(
-        AppServices::instance().loading_progress_controller()
-    );
-    m_loading_progress_dialog->attach_to_center();
 
     set_sidebars_visible(!AppServices::instance().app_config().get<bool>("hide_sidebars"));
 }
