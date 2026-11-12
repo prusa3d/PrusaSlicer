@@ -48,6 +48,9 @@ std::future<ThumbnailImageResults> ThumbnailImageGenerator::enqueue_thumbnail_re
         }))
     {
         SPDLOG_INFO("Thumbnail generation request not dispatched!");
+        std::promise<ThumbnailImageResults> empty;
+        empty.set_value({});
+        return empty.get_future();
     }
     return future;
 }
