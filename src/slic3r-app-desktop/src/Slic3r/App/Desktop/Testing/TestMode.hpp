@@ -55,6 +55,7 @@ private:
 
     HttpResponse handle_status(const HttpRequest& request);
     HttpResponse handle_tree(const HttpRequest& request);
+    HttpResponse handle_screenshot(const HttpRequest& request);
     HttpResponse handle_mouse(const HttpRequest& request);
     HttpResponse handle_key(const HttpRequest& request);
     HttpResponse handle_text(const HttpRequest& request);

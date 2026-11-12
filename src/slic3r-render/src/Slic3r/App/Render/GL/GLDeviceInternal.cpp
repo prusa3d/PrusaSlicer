@@ -471,8 +471,19 @@ void GLDeviceInternal::blit_to_draw_framebuffer(const Framebuffer& fb, int width
 
 void GLDeviceInternal::read_pixels(const Framebuffer& fb, int x, int y, int width, int height, Domain::PixelFormat format, void* pixels)
 {
-    ResourceId fb_id = fb.get_internal_as<GLFramebufferInternal>().m_id;
+    read_pixels(fb.get_internal_as<GLFramebufferInternal>().m_id, x, y, width, height, format, pixels);
+}
 
+void GLDeviceInternal::read_draw_framebuffer_pixels(int x, int y, int width, int height, Domain::PixelFormat format, void* pixels)
+{
+    ResourceId draw_id;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, reinterpret_cast<GLint*>(&draw_id));
+    glCheck();
+    read_pixels(draw_id, x, y, width, height, format, pixels);
+}
+
+void GLDeviceInternal::read_pixels(ResourceId fb_id, int x, int y, int width, int height, Domain::PixelFormat format, void* pixels)
+{
     ResourceId read_id;
     glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, reinterpret_cast<GLint*>(&read_id));
     glCheck();

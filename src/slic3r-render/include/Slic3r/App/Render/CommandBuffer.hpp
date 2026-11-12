@@ -63,6 +63,8 @@ public:
     void blit_to_draw_framebuffer(const Framebuffer& fb, int width, int height, BlitFramebufferMask mask, BlitFramebufferFilter filter);
 
     void read_pixels(const Framebuffer& fb, int x, int y, int width, int height, Domain::PixelFormat format, void* pixels);
+    /// Reads the framebuffer being drawn to, like `blit_to_draw_framebuffer`. Rows come from the bottom.
+    void read_draw_framebuffer_pixels(int x, int y, int width, int height, Domain::PixelFormat format, void* pixels);
 
     void draw(PrimitiveType primitive, size_t offset, size_t count);
     void draw(const DrawCommand& cmd);

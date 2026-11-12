@@ -53,6 +53,7 @@ public:
     void blit_to_draw_framebuffer(const Framebuffer& fb, int width, int height, BlitFramebufferMask mask, BlitFramebufferFilter filter);
 
     void read_pixels(const Framebuffer& fb, int x, int y, int width, int height, Domain::PixelFormat format, void* pixels);
+    void read_draw_framebuffer_pixels(int x, int y, int width, int height, Domain::PixelFormat format, void* pixels);
 
     void draw(PrimitiveType primitive, size_t offset, size_t count);
     void draw_instanced(PrimitiveType primitive, size_t offset, size_t count, size_t instances_count);
@@ -62,6 +63,8 @@ private:
     friend class ::Slic3r::App::Render::Geometry;
     friend class ::Slic3r::App::Render::PullGeometry;
     void activate_texture_unit(uint8_t unit);
+    void read_pixels(ResourceId fb_id, int x, int y, int width, int height, Domain::PixelFormat format, void* pixels);
+
     void bind_vertex_buffer(ResourceId vb);
     void bind_index_buffer(ResourceId ib);
 #ifdef SLIC3R_RENDER_TEXTURE_BUFFER_SUPPORTED

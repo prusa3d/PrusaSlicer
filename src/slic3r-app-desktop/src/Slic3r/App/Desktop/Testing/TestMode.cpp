@@ -15,13 +15,17 @@
 
 #include <wx/display.h>
 #include <wx/event.h>
+#include <wx/image.h>
+#include <wx/mstream.h>
 #include <wx/weakref.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
 #include <future>
 #include <map>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 #include <thread>
@@ -302,6 +306,11 @@ bool TestMode::start()
         [this](const HttpRequest& request) { return handle_tree(request); }
     );
     m_server.add_route(
+        "GET",
+        "/screenshot",
+        [this](const HttpRequest& request) { return handle_screenshot(request); }
+    );
+    m_server.add_route(
         "POST",
         "/mouse",
         [this](const HttpRequest& request) { return handle_mouse(request); }
@@ -511,6 +520,42 @@ HttpResponse TestMode::handle_tree(const HttpRequest& request)
         return response;
     }
     return HttpResponse{200, dump_json(*tree)};
+}
+
+HttpResponse TestMode::handle_screenshot(const HttpRequest&)
+{
+    auto shot                   = std::make_shared<std::optional<Domain::Image>>();
+    const HttpResponse response = run_on_main(
+        [shot](Platform::WX::WXRenderCanvas& canvas)
+        {
+            *shot = canvas.screenshot();
+            return shot->has_value() ? HttpResponse{} :
+                                       error_response(503, "No frame was rendered");
+        },
+        std::chrono::steady_clock::now() + main_timeout
+    );
+    if (response.status != 200) {
+        return response;
+    }
+
+    // wx wants RGB with the top row first; the frame is RGBA with the bottom row first.
+    const Domain::Image& frame = **shot;
+    wxImage image(frame.width(), frame.height(), false);
+    unsigned char* out = image.GetData();
+    for (int y = frame.height() - 1; y >= 0; --y) {
+        const uint8_t* in = frame.pixels.data() + size_t(y) * frame.width() * 4;
+        for (int x = 0; x < frame.width(); ++x, in += 4, out += 3) {
+            std::copy_n(in, 3, out);
+        }
+    }
+    image.SetOption(wxIMAGE_OPTION_PNG_COMPRESSION_LEVEL, 1);
+    wxMemoryOutputStream stream;
+    if (!image.SaveFile(stream, wxBITMAP_TYPE_PNG)) {
+        return error_response(500, "Cannot encode the screenshot");
+    }
+    std::string png(stream.GetSize(), '\0');
+    stream.CopyTo(png.data(), png.size());
+    return HttpResponse{200, std::move(png), "image/png"};
 }
 
 HttpResponse TestMode::handle_mouse(const HttpRequest& request)

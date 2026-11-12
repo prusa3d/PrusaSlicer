@@ -194,6 +194,11 @@ void CommandBuffer::read_pixels(const Framebuffer& fb, int x, int y, int width, 
     m_device.get_internal_as<GL::GLDeviceInternal>().read_pixels(fb, x, y, width, height, format, pixels);
 }
 
+void CommandBuffer::read_draw_framebuffer_pixels(int x, int y, int width, int height, Domain::PixelFormat format, void* pixels)
+{
+    m_device.get_internal_as<GL::GLDeviceInternal>().read_draw_framebuffer_pixels(x, y, width, height, format, pixels);
+}
+
 void CommandBuffer::draw(PrimitiveType primitive, size_t offset, size_t count)
 {
     auto& device = m_device.get_internal_as<GL::GLDeviceInternal>();

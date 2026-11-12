@@ -1,7 +1,9 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 #include "Slic3r/Assert.hpp"
+#include "Slic3r/Domain/Image.hpp"
 
 #include "Slic3r/App/Platform/AbstractRenderModule.hpp"
 #include "Slic3r/Biz/Platform/IRenderRequestHandler.hpp"
@@ -55,6 +57,13 @@ public:
     ~AbstractRenderCanvas() override = default;
 
     virtual void render();
+
+    /**
+     * @brief Renders a frame and returns it: RGBA8 in physical pixels, rows from the bottom.
+     * Nothing when no frame was rendered.
+     */
+    std::optional<Domain::Image> screenshot();
+
     void set_render_module(AbstractRenderModule* render_module);
     void set_next_render_module(AbstractRenderModule* render_module);
     AbstractRenderModule* get_render_module() { return m_render_module; }
@@ -138,6 +147,8 @@ private:
     AnimationManager m_animation_manager;
     double m_last_time{0};
     bool m_is_text_input_focused{false};
+    bool m_screenshot_requested{false};
+    std::optional<Domain::Image> m_screenshot;
 };
 
 } // namespace Slic3r::App::Platform

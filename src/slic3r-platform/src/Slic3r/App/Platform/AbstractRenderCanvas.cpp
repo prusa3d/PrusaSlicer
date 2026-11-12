@@ -1,6 +1,7 @@
 #include "Slic3r/App/Platform/AbstractRenderCanvas.hpp"
 
 #include <algorithm>
+#include <utility>
 
 #include <imgui/imgui.h>
 #include <imgui/backends/imgui_impl_opengl3.h>
@@ -212,7 +213,22 @@ void AbstractRenderCanvas::end_frame(Render::CommandBuffer& cmd_buffer)
         m_imgui_render->render(cmd_buffer, draw_data);
         cmd_buffer.submit();
     }
+    const int width  = static_cast<int>(m_screen_info.physical_width());
+    const int height = static_cast<int>(m_screen_info.physical_height());
+    if (m_screenshot_requested && width > 0 && height > 0) {
+        Domain::Image image(Domain::PixelFormat::RGBA8, width, height);
+        cmd_buffer.read_draw_framebuffer_pixels(0, 0, width, height, image.format(), image.pixels.data());
+        m_screenshot = std::move(image);
+    }
     end_frame_platform();
+}
+
+std::optional<Domain::Image> AbstractRenderCanvas::screenshot()
+{
+    m_screenshot_requested = true;
+    render();
+    m_screenshot_requested = false;
+    return std::exchange(m_screenshot, std::nullopt);
 }
 
 void AbstractRenderCanvas::update_key_modifiers(KeyboardEvent::Type event_type, KeyCode code)
