@@ -303,20 +303,20 @@ struct SelectedPresetPtrs
     std::vector<const Domain::Preset::EvaluatedMaterialPreset::Preset*> materials;
 };
 
-/** @brief Returns presets from @p bundle and @p runtime given by @p ids. */
+/** @brief Returns presets from @p evaluated_presets and @p runtime given by @p ids. */
 static SelectedPresetPtrs get_presets_by_ids(
-    const Domain::Preset::Bundle& bundle,
+    const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets,
     const RuntimePresets& runtime,
     const SelectedPresetIds& ids
 )
 {
     SelectedPresetPtrs presets{
         .printer = find_in_view(
-            PrinterPresetProjectView{bundle, runtime, ids.hw_config_id},
+            PrinterPresetProjectView{evaluated_presets, runtime, ids.hw_config_id},
             ids.printer_id
         ),
         .print = find_in_view(
-            PrintPresetProjectView{bundle, runtime, ids.hw_config_id, ids.printer_id},
+            PrintPresetProjectView{evaluated_presets, runtime, ids.hw_config_id, ids.printer_id},
             ids.print_id
         )
     };
@@ -325,7 +325,7 @@ static SelectedPresetPtrs get_presets_by_ids(
 
     for (size_t tool_index = 0, n = ids.tool_ids.size(); tool_index < n; ++tool_index) {
         const ToolPrintPresetProjectView view{
-            bundle, runtime, ids.hw_config_id, ids.printer_id, ids.print_id, tool_index
+            evaluated_presets, runtime, ids.hw_config_id, ids.printer_id, ids.print_id, tool_index
         };
         presets.tools.emplace_back(find_in_view(view, ids.tool_ids[tool_index]));
         ASSERT(presets.tools.back() != nullptr, ids.tool_ids[tool_index]);
@@ -333,7 +333,7 @@ static SelectedPresetPtrs get_presets_by_ids(
 
     for (size_t slot_index = 0, n = ids.material_ids.size(); slot_index < n; ++slot_index) {
         const MaterialPresetProjectView view{
-            bundle, runtime, ids.hw_config_id, ids.printer_id, ids.print_id, slot_index
+            evaluated_presets, runtime, ids.hw_config_id, ids.printer_id, ids.print_id, slot_index
         };
         presets.materials.emplace_back(find_in_view(view, ids.material_ids[slot_index]));
         ASSERT(presets.materials.back() != nullptr, ids.material_ids[slot_index]);
@@ -347,7 +347,7 @@ static SelectedPresetPtrs
 get_presets_by_ids(const PresetInteractor& preset_interactor, const SelectedPresetIds& ids)
 {
     return get_presets_by_ids(
-        preset_interactor.preset_bundle(),
+        preset_interactor.evaluated_presets(),
         preset_interactor.selected_runtime_presets(),
         ids
     );
@@ -551,36 +551,37 @@ bool can_select_external_printer_config(
         return resolve_printer_config_switch(preset_interactor, *hw_config_id, material_types);
     }
 
-    // A new hw config is created on selection. Its presets are evaluated into a separate bundle
+    // A new hw config is created on selection. Its presets are evaluated without storing them
     // to get the new presets for the dialog.
     const tl::expected<Domain::Preset::HwPrinterConfig, std::string> hw_config =
         preset_interactor.evaluate_external_printer_config(printer);
     if (!hw_config.has_value())
         return true; // The selection fails, so presets aren't switched.
 
-    const std::optional<Domain::Preset::Bundle> new_bundle =
-        preset_interactor.evaluate_new_hw_config_bundle(*hw_config);
-    if (!new_bundle.has_value())
+    const std::optional<NewHwConfigPresets> new_presets =
+        preset_interactor.evaluate_new_hw_config(*hw_config);
+    if (!new_presets.has_value())
         return true; // The selection fails, so presets aren't switched.
 
-    // a new hw config has no runtime presets
-    const RuntimePresets no_runtime_presets;
     return resolve_printer_switch(
         preset_interactor,
-        *hw_config,
+        new_presets->hw_config,
         [&]
         {
+            // a new hw config has no runtime presets
             const std::string printer_preset_id = preset_interactor.printer_preset_id_for_hw_config(
-                PrinterPresetProjectView{*new_bundle, no_runtime_presets, hw_config->id}
+                PrinterPresetProjectView{
+                    new_presets->evaluated_presets,
+                    no_runtime_presets(),
+                    new_presets->hw_config.id
+                }
             );
-            // returned presets point into new_bundle, which outlives the dialog
+            // returned presets point into new_presets, which outlives the dialog
             return get_presets_by_ids(
-                *new_bundle,
-                no_runtime_presets,
+                new_presets->evaluated_presets,
+                no_runtime_presets(),
                 preset_interactor.get_preset_ids_after_selection(
-                    *new_bundle,
-                    no_runtime_presets,
-                    *hw_config,
+                    *new_presets,
                     printer_preset_id,
                     {},
                     material_types

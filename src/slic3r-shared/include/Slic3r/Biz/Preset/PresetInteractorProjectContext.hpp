@@ -68,6 +68,9 @@ struct RuntimePresets
 
 };
 
+/** @brief Empty runtime presets, e.g. for a hw config which isn't stored yet. */
+const RuntimePresets& no_runtime_presets();
+
 struct PresetInteractorProjectContext
 {
     using ConfigContainerContexts = std::map<Domain::SelectionId, PresetInteractorConfigContainerContext>;

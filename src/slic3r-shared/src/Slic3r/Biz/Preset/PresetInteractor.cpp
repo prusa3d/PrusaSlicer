@@ -1080,7 +1080,7 @@ PresetInteractor::evaluate_external_printer_config(const Domain::Preset::HwPrint
     return HwBundleEvaluator{m_workbench.preset_bundle()}.evaluate_config(printer);
 }
 
-std::optional<Domain::Preset::Bundle> PresetInteractor::evaluate_new_hw_config_bundle(
+std::optional<NewHwConfigPresets> PresetInteractor::evaluate_new_hw_config(
     const Domain::Preset::HwPrinterConfig& hw_config
 ) const
 {
@@ -1089,16 +1089,18 @@ std::optional<Domain::Preset::Bundle> PresetInteractor::evaluate_new_hw_config_b
     if (epps.empty())
         return std::nullopt;
 
-    Domain::Preset::Bundle bundle;
-    bundle.printer_configs[hw_config.id]   = hw_config;
-    bundle.evaluated_presets[hw_config.id] = std::move(epps);
+    NewHwConfigPresets new_presets{.hw_config = hw_config};
+    new_presets.evaluated_presets.emplace(hw_config.id, std::move(epps));
 
-    const RuntimePresets no_runtime_presets;
-    const PrinterPresetProjectView printer_presets{bundle, no_runtime_presets, hw_config.id};
+    const PrinterPresetProjectView printer_presets{
+        new_presets.evaluated_presets,
+        no_runtime_presets(),
+        hw_config.id
+    };
     if (!has_system_printer_preset(printer_presets))
         return std::nullopt;
 
-    return bundle;
+    return new_presets;
 }
 
 std::string
@@ -1250,7 +1252,7 @@ PresetInteractor::evaluate_presets_for_hw_config(
     const Domain::Preset::HwPrinterConfig& hw_config
 ) const
 {
-    const auto& vendor_bundle = preset_bundle().vendor_bundles.at(hw_config.vendor_id);
+    const auto& vendor_bundle = m_workbench.preset_bundle().vendor_bundles.at(hw_config.vendor_id);
     PresetEvaluator preset_evaluator{vendor_bundle.presets, vendor_bundle.vendor_data.info};
     PresetEvaluator::EvaluatedPrinterPresets epps;
     try {
@@ -1928,7 +1930,7 @@ SelectedPresetIds PresetInteractor::get_preset_ids_after_selection(
 ) const
 {
     return get_preset_ids_after_selection(
-        preset_bundle(),
+        evaluated_presets(),
         selected_runtime_presets(),
         get_printer_config(hw_config_id).first.get(),
         printer_preset_id,
@@ -1938,7 +1940,25 @@ SelectedPresetIds PresetInteractor::get_preset_ids_after_selection(
 }
 
 SelectedPresetIds PresetInteractor::get_preset_ids_after_selection(
-    const Domain::Preset::Bundle& bundle,
+    const NewHwConfigPresets& new_presets,
+    const std::string& printer_preset_id,
+    const std::string& print_id,
+    const PreferredMaterialTypes& material_types
+) const
+{
+    // a new hw config has no runtime presets
+    return get_preset_ids_after_selection(
+        new_presets.evaluated_presets,
+        no_runtime_presets(),
+        new_presets.hw_config,
+        printer_preset_id,
+        print_id,
+        material_types
+    );
+}
+
+SelectedPresetIds PresetInteractor::get_preset_ids_after_selection(
+    const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets,
     const RuntimePresets& runtime,
     const Domain::Preset::HwPrinterConfig& hw_config,
     const std::string& printer_preset_id,
@@ -1949,10 +1969,15 @@ SelectedPresetIds PresetInteractor::get_preset_ids_after_selection(
     const Domain::Preset::SelectedPreset& current = selected_printer_preset();
     const std::string& hw_config_id               = hw_config.id;
 
-    const auto* printer =
-        find_in_view(PrinterPresetProjectView{bundle, runtime, hw_config_id}, printer_preset_id);
+    const auto* printer = find_in_view(
+        PrinterPresetProjectView{evaluated_presets, runtime, hw_config_id},
+        printer_preset_id
+    );
     ASSERT(printer != nullptr, std::tuple{hw_config_id, printer_preset_id});
 
+    const PrintPresetProjectView print_presets{
+        evaluated_presets, runtime, hw_config_id, printer_preset_id
+    };
     SelectedPresetIds ids = {
         .hw_config_id = hw_config_id,
         .repo_id      = hw_config.repo_id,
@@ -1960,17 +1985,13 @@ SelectedPresetIds PresetInteractor::get_preset_ids_after_selection(
         .printer_id   = printer_preset_id,
         .print_id     = print_id.empty() ?
                 get_selected_preset_id(
-                    PrintPresetProjectView{bundle, runtime, hw_config_id, printer_preset_id}
-                        .items(),
+                    print_presets.items(),
                     current.print,
                     get_string(*printer, "default_print")
                 ) :
                 print_id
     };
-    const auto* print = find_in_view(
-        PrintPresetProjectView{bundle, runtime, hw_config_id, printer_preset_id},
-        ids.print_id
-    );
+    const auto* print = find_in_view(print_presets, ids.print_id);
     ASSERT(print != nullptr, std::tuple{hw_config_id, printer_preset_id, ids.print_id});
 
     // Previously selected presets per slot, resized the same way select_printer_preset() does.
@@ -1985,7 +2006,7 @@ SelectedPresetIds PresetInteractor::get_preset_ids_after_selection(
     const std::string default_tool_print = get_string(*print, "default_tool_print");
     for (size_t tool_index = 0; tool_index < tool_count; ++tool_index) {
         const ToolPrintPresetProjectView view{
-            bundle, runtime, hw_config_id, printer_preset_id, ids.print_id, tool_index
+            evaluated_presets, runtime, hw_config_id, printer_preset_id, ids.print_id, tool_index
         };
         ASSERT(tool_index < previous_tools.size(), std::tuple{tool_index, previous_tools.size()});
         ids.tool_ids.emplace_back(get_selected_preset_id(
@@ -1998,7 +2019,7 @@ SelectedPresetIds PresetInteractor::get_preset_ids_after_selection(
     const std::string default_material = get_string(*print, "default_material");
     for (size_t n = hw_config.material_slot_count(), slot_index = 0; slot_index < n; ++slot_index) {
         const MaterialPresetProjectView view{
-            bundle, runtime, hw_config_id, printer_preset_id, ids.print_id, slot_index
+            evaluated_presets, runtime, hw_config_id, printer_preset_id, ids.print_id, slot_index
         };
         ASSERT(
             slot_index < previous_materials.size(),
@@ -2018,9 +2039,9 @@ SelectedPresetIds PresetInteractor::get_preset_ids_after_selection(
     return ids;
 }
 
-const Domain::Preset::Bundle& PresetInteractor::preset_bundle() const
+const Domain::Preset::EvaluatedPrinterPresets& PresetInteractor::evaluated_presets() const
 {
-    return m_workbench.preset_bundle();
+    return m_workbench.preset_bundle().evaluated_presets;
 }
 
 const RuntimePresets& PresetInteractor::selected_runtime_presets() const

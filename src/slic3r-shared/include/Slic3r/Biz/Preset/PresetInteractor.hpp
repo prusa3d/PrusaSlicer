@@ -93,6 +93,17 @@ struct SelectedPresetIds
 };
 
 /**
+ * Presets evaluated for a hw config which isn't stored in the preset bundle yet,
+ * i.e. what PresetInteractor::select_external_printer_config() would store for it.
+ */
+struct NewHwConfigPresets
+{
+    Domain::Preset::HwPrinterConfig hw_config;
+    /// The only entry is for hw_config.id; in the shape read by the preset project views.
+    Domain::Preset::EvaluatedPrinterPresets evaluated_presets;
+};
+
+/**
  * Manipulates presets associated with config containers.
  */
 class PresetInteractor final :
@@ -174,19 +185,18 @@ public:
         const PreferredMaterialTypes& material_types = {}
     ) const;
     /**
-     * @brief Same as above, but presets of @p hw_config are taken from @p bundle and @p runtime
-     * (e.g. from evaluate_new_hw_config_bundle() for a hw config which isn't stored yet).
+     * @brief Same as above, but for a hw config which isn't stored yet
+     * (see evaluate_new_hw_config()).
      */
     SelectedPresetIds get_preset_ids_after_selection(
-        const Domain::Preset::Bundle& bundle,
-        const RuntimePresets& runtime,
-        const Domain::Preset::HwPrinterConfig& hw_config,
+        const NewHwConfigPresets& new_presets,
         const std::string& printer_preset_id,
         const std::string& print_id                 = {},
         const PreferredMaterialTypes& material_types = {}
     ) const;
 
-    const Domain::Preset::Bundle& preset_bundle() const;
+    /** @brief Printer presets evaluated for hw configs of the preset bundle. */
+    const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets() const;
     /** @brief Presets loaded at runtime (i.e. coming from 3MF file) of the selected project. */
     const RuntimePresets& selected_runtime_presets() const;
 
@@ -361,12 +371,12 @@ public:
     ) const;
     /**
      * @brief Evaluates presets of @p hw_config, which isn't stored in the preset bundle yet,
-     * into a bundle containing only this hw config, i.e. what select_external_printer_config()
-     * stores for a new hw config. Doesn't modify any state.
+     * i.e. what select_external_printer_config() stores for a new hw config.
+     * Doesn't modify any state.
      * @return std::nullopt if select_external_printer_config() fails for @p hw_config
      *         (no printer presets, or no system one).
      */
-    std::optional<Domain::Preset::Bundle> evaluate_new_hw_config_bundle(
+    std::optional<NewHwConfigPresets> evaluate_new_hw_config(
         const Domain::Preset::HwPrinterConfig& hw_config
     ) const;
 
@@ -997,6 +1007,18 @@ private:
     );
     std::vector<Domain::Preset::EvaluatedPrinterPreset>
     evaluate_presets_for_hw_config(const Domain::Preset::HwPrinterConfig& hw_config) const;
+    /**
+     * @brief Common implementation of the public get_preset_ids_after_selection() overloads:
+     * presets of @p hw_config are taken from @p evaluated_presets and @p runtime.
+     */
+    SelectedPresetIds get_preset_ids_after_selection(
+        const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets,
+        const RuntimePresets& runtime,
+        const Domain::Preset::HwPrinterConfig& hw_config,
+        const std::string& printer_preset_id,
+        const std::string& print_id,
+        const PreferredMaterialTypes& material_types
+    ) const;
     /**
      * @brief Updates presets for changed hw configuration
      * @return Returns true if the updated presets are valid, otherwise false---the caller is then
