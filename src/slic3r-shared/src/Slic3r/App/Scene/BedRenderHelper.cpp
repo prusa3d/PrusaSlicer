@@ -36,7 +36,7 @@ using namespace Slic3r::Biz;
 
 namespace Slic3r::App::Scene {
 
-size_t BedRenderHelper::s_bed_texture_size = 2048;
+size_t BedRenderHelper::s_bed_texture_size = 4096;
 std::unique_ptr<Render::TextImageGenerator> BedRenderHelper::s_text_to_image = nullptr;
 
 std::shared_ptr<Render::Texture> BedRenderHelper::texture(const Domain::Bed& bed, Render::TextureManager& manager)
@@ -46,7 +46,9 @@ std::shared_ptr<Render::Texture> BedRenderHelper::texture(const Domain::Bed& bed
         return nullptr;
 
     Render::ImageLoadOptions opts;
-    opts.max_size_px = s_bed_texture_size;
+    // Clamp to what the GPU supports (0 = not queried yet).
+    const size_t gpu_max = Render::Context::instance().max_texture_size();
+    opts.max_size_px = int(gpu_max > 0 ? std::min(s_bed_texture_size, gpu_max) : s_bed_texture_size);
     opts.flip_y = true;
     opts.gen_mipmaps = true;
     opts.compressed = true;
