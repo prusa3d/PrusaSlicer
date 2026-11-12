@@ -5,6 +5,8 @@
 #include "Slic3r/App/Render/GL/GLTextureInternal.hpp"
 #include "Slic3r/App/Render/GL/GLDeviceInternal.hpp"
 
+#include <algorithm>
+
 namespace Slic3r::App::Render {
 
 int Texture::width() const
@@ -96,6 +98,19 @@ void Texture::set_filtering(TextureMinFilter min_filter, TextureMagFilter mag_fi
     glCheck();
     glTexParameteri(gl_target, GL_TEXTURE_MAG_FILTER, GL::type(mag_filter));
     glCheck();
+
+    // Without the anisotropic filtering, textures seen at low angles look blurry/pixelated.
+    const bool mipmapped = min_filter != TextureMinFilter::Nearest && min_filter != TextureMinFilter::Linear;
+    if (mipmapped && (GLEW_ARB_texture_filter_anisotropic || GLEW_EXT_texture_filter_anisotropic)) {
+        static const float max_anisotropy = [] {
+            float v = 1.0f;
+            glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &v);
+            glCheck();
+            return std::min(v, 16.0f);
+        }();
+        glTexParameterf(gl_target, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
+        glCheck();
+    }
 }
 
 void Texture::set_object_name(const std::string& object_name)
