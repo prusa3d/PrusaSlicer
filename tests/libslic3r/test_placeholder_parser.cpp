@@ -98,6 +98,7 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
     SECTION("math: zdigits(5., 15, 8)") { REQUIRE(parser.process("{zdigits(5, 15, 8)}") == "000005.00000000"); }
     SECTION("math: digits(13.84375892476, 15, 8)") { REQUIRE(parser.process("{digits(13.84375892476, 15, 8)}") == "    13.84375892"); }
     SECTION("math: zdigits(13.84375892476, 15, 8)") { REQUIRE(parser.process("{zdigits(13.84375892476, 15, 8)}") == "000013.84375892"); }
+    SECTION("math: digits(-1e308, 64, 64) does not overflow") { REQUIRE(parser.process("{digits(-1e308, 64, 64)}").size() == 375); }
     SECTION("math: ternary1") { REQUIRE(parser.process("{12 == 12 ? 1 - 3 : 2 * 2 * unknown_symbol}") == "-2"); }
     SECTION("math: ternary2") { REQUIRE(parser.process("{12 == 21/2 ? 1 - 1 - unknown_symbol : 2 * 2}") == "4"); }
     SECTION("math: ternary3") { REQUIRE(parser.process("{12 == 13 ? 1 - 1 * unknown_symbol : 2 * 2}") == "4"); }

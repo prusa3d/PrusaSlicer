@@ -30,6 +30,9 @@ public:
 	void pause();
 	void resume();
 	static bool is_subdomain(const std::string& url, const std::string& domain);
+	// Turns an untrusted name (from URL or from HTTP headers) into a plain file name without any path components.
+	// Returns an empty string if no usable name remains.
+	static std::string sanitize_filename(const std::string& filename);
 private:
 	std::unique_ptr<priv> p;
 };

@@ -1663,7 +1663,7 @@ namespace Slic3r {
                 } catch (const boost::property_tree::ptree_bad_path&) {
                     // Probably an old project with no bed_idx info. Imagine that we saw 0.
                 }
-                if (bed_idx >= int(m_model->get_custom_gcode_per_print_z_vector().size()))
+                if (bed_idx < 0 || bed_idx >= int(m_model->get_custom_gcode_per_print_z_vector().size()))
                     continue;
 
                 pt::ptree code_tree = bed_block.second;
@@ -1732,7 +1732,7 @@ namespace Slic3r {
                     } catch (const boost::property_tree::ptree_bad_path&) {
                         // Probably an old project with no bed_idx info - pretend that we saw 0.
                     }
-                    if (bed_idx >= int(m_model->get_wipe_tower_vector().size()))
+                    if (bed_idx < 0 || bed_idx >= int(m_model->get_wipe_tower_vector().size()))
                         continue;                
                     double pos_x = bed_block.second.get<double>("<xmlattr>.position_x");
                     double pos_y = bed_block.second.get<double>("<xmlattr>.position_y");

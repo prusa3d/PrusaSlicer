@@ -187,6 +187,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "thumbnails_format",
         "use_firmware_retraction",
         "use_relative_e_distances",
+        "used_filament_compensation",
         "use_volumetric_e",
         "variable_layer_height",
         "wipe",
