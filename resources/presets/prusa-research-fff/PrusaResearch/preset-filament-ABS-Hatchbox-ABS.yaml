@@ -1,0 +1,15 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Hatchbox ABS
+id: Hatchbox ABS
+features:
+  $.brand.uuid: 110154ad-c944-5b94-9a9c-47797de61efa
+  $.brand.slug: hatchbox
+values:
+  filament_vendor: Hatchbox
+  filament_spool_weight: 245
+  first_layer_temperature: 255
+  temperature: 255
+
+

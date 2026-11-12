@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg id="a" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
   <path fill="none" stroke="#808080" stroke-linecap="round" stroke-miterlimit="10" d="m1.5,11.5V3.5c0-1.104569435119629.895430564880371-2,2-2h9c1.104569435119629,0,2,.895430564880371,2,2v8" />
-  <line x1="1.5" y1="14.5" x2="14.5" y2="14.5" style="fill:none; stroke:#ed6b21; stroke-linecap:round; stroke-miterlimit:10;"/>
-  <path d="m7,15h-3V5.237499999999272c0-.683452377914364.447715250171314-1.237499999999272,1-1.237499999999272h2v11Z" style="fill:#ed6b21; stroke-width:0px;"/>
-  <path d="m9,15h3V5.237499999999272c0-.683452377914364-.447715250171314-1.237499999999272-1-1.237499999999272h-2v11Z" style="fill:#ed6b21; stroke-width:0px;"/>
+  <line x1="1.5" y1="14.5" x2="14.5" y2="14.5" style="fill:none; stroke:#FFFFFF; stroke-linecap:round; stroke-miterlimit:10;"/>
+  <path d="m7,15h-3V5.237499999999272c0-.683452377914364.447715250171314-1.237499999999272,1-1.237499999999272h2v11Z" style="fill:#FFFFFF; stroke-width:0px;"/>
+  <path d="m9,15h3V5.237499999999272c0-.683452377914364-.447715250171314-1.237499999999272-1-1.237499999999272h-2v11Z" style="fill:#FFFFFF; stroke-width:0px;"/>
 </svg>

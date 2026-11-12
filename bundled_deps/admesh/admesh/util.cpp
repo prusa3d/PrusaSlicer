@@ -25,7 +25,7 @@
 #include <string.h>
 #include <math.h>
 
-#include <boost/log/trivial.hpp>
+#include <spdlog/spdlog.h>
 
 #include "stl.h"
 
@@ -58,7 +58,7 @@ void stl_verify_neighbors(stl_file *stl)
 			}
 			if (edge_a.p1 != edge_b.p1 || edge_a.p2 != edge_b.p2) {
 				// These edges should match but they don't.  Print results.
-				BOOST_LOG_TRIVIAL(info) << "edge " << j << " of facet " << i << " doesn't match edge " << (vnot + 1) << " of facet " << neighbor;
+				SPDLOG_INFO("edge {} of facet {} doesn't match edge {} of facet {}", j, i, (vnot + 1), neighbor);
 				stl_write_facet(stl, (char*)"first facet", i);
 				stl_write_facet(stl, (char*)"second facet", neighbor);
 			}
@@ -326,7 +326,7 @@ void stl_repair(
   	if (nearby_flag || fixall_flag) {
     	if (! tolerance_flag)
       		tolerance = stl->stats.shortest_edge;
- 	   	if (! increment_flag)
+    	if (! increment_flag)
       		increment = stl->stats.bounding_diameter / 10000.0;
     }
 

@@ -1,0 +1,6 @@
+kind: tool_print
+id: common MK3
+variants:
+- condition: printer.base_model == "MK3"
+  name: no tool
+  id: wcyd8JrsT5qtfRIHPkYS8g

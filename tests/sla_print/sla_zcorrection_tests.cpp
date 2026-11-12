@@ -8,12 +8,19 @@
 #include "libslic3r/TriangleMeshSlicer.hpp"
 #include "libslic3r/SLA/ZCorrection.hpp"
 #include "libslic3r/MTUtils.hpp"
-#include "libslic3r/SVG.hpp"
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
+#include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
+
+using namespace Slic3r::Biz;
 
 using Catch::Approx;
+using Slic3r::Biz::Algorithms::SVG::SVG;
+using Slic3r::Biz::Algorithms::BoundingBox::to_2d;
+using Slic3r::Biz::Algorithms::BoundingBox::scaled;
+using Slic3r::Domain::TriangleMesh;
 
 void print_depthmap(std::string_view prefix,
-                    const Slic3r::BoundingBox &bb,
+                    const Slic3r::Domain::BoundingBox2crd &bb,
                     const Slic3r::sla::zcorr_detail::DepthMap &dm)
 {
     using namespace Slic3r;
@@ -51,7 +58,7 @@ TEST_CASE("Testing DepthMap for a cube", "[ZCorr]")
 
     TriangleMesh mesh = load_model("20mm_cube.obj");
     auto bb = bounding_box(mesh);
-    bb.offset(-0.1);
+    bb = Slic3r::Biz::Algorithms::BoundingBox::inflated(bb, -0.1);
 
     std::vector<float> hgrid = grid<float>(bb.min.z(), bb.max.z(), 1.f);
 
@@ -66,8 +73,8 @@ TEST_CASE("Testing DepthMap for a cube", "[ZCorr]")
         const ExPolygons &slayer = slices[i];
         REQUIRE(dlayer.size() == 1);
         REQUIRE(dlayer.begin()->first == i);
-        double ad = area(dlayer.begin()->second);
-        double as = area(slayer);
+        double ad = Algorithms::ExPolygon::area(dlayer.begin()->second);
+        double as = Algorithms::ExPolygon::area(slayer);
         REQUIRE(ad == Approx(as).margin(EPSILON));
     }
 }
@@ -80,7 +87,7 @@ TEST_CASE("Testing DepthMap for arbitrary shapes", "[ZCorr]")
 
     TriangleMesh mesh = load_model(modelname);
     auto bb = bounding_box(mesh);
-    bb.offset(-0.1);
+    bb = Slic3r::Biz::Algorithms::BoundingBox::inflated(bb, -0.1);
 
     std::vector<float> hgrid = grid<float>(bb.min.z(), bb.max.z(), 0.5f);
 
@@ -103,8 +110,8 @@ TEST_CASE("Testing DepthMap for arbitrary shapes", "[ZCorr]")
     for (size_t i = 0; i < corrslices_fast.size(); ++i) {
         ExPolygons dlayer = sla::zcorr_detail::merged_layer(dmap[i]);
         const ExPolygons &slayer = corrslices_fast[i];
-        double ad = area(dlayer);
-        double as = area(slayer);
+        double ad = Algorithms::ExPolygon::area(dlayer);
+        double as = Algorithms::ExPolygon::area(slayer);
         REQUIRE(ad == Approx(as).margin(EPSILON));
     }
 }

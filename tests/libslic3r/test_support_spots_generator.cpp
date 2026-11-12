@@ -1,8 +1,22 @@
-#include "libslic3r/Point.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <libslic3r/SupportSpotsGenerator.hpp>
+
+#include "Slic3r/Biz/Algorithms/Scaling.hpp"
+
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/SupportSpotsGenerator.hpp"
+
+using Slic3r::Domain::ExPolygon;
+using Slic3r::Domain::Point;
+using Slic3r::Domain::Polygon;
+using Slic3r::Domain::Polygons;
+using Slic3r::Domain::Polyline;
+using Slic3r::Domain::Vec2f;
+using Slic3r::Domain::Vec3f;
+
+using Slic3r::Biz::Algorithms::Scaling::scaled;
 
 using namespace Slic3r;
 using namespace SupportSpotsGenerator;
@@ -124,8 +138,8 @@ struct ObjectPartFixture {
     };
     const float width = 0.1f;
     bool connected_to_bed = true;
-    coordf_t print_head_z = 0.2;
-    coordf_t layer_height = 0.2;
+    double print_head_z = 0.2;
+    double layer_height = 0.2;
     ExtrusionAttributes attributes;
     ExtrusionEntityCollection collection;
     std::vector<const ExtrusionEntityCollection*> extrusions{};
@@ -171,7 +185,7 @@ TEST_CASE_METHOD(ObjectPartFixture, "Constructing ObjectPart using extrusion col
 
 TEST_CASE_METHOD(ObjectPartFixture, "Constructing ObjectPart with brim", "[SupportSpotsGenerator]") {
     float brim_width = 1;
-    Polygons brim = get_brim(ExPolygon{expected_polygon}, BrimType::btOuterOnly, brim_width);
+    Polygons brim = get_brim(ExPolygon{expected_polygon}, Domain::BrimType::OuterOnly, brim_width);
 
     ObjectPart part{
         extrusions,

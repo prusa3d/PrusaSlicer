@@ -1,0 +1,5 @@
+min_slic3r_version = 3.0.0-alpha0
+2.0.1 Test
+max_slic3r_version = 2.9.9-alpha0
+min_slic3r_version = 2.9.9-alpha0
+2.0.0 Initial release

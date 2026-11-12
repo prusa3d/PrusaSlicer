@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <test_utils.hpp>
 
+#include "Slic3r/Domain/enum_bitmask.hpp"
+
 #include <libslic3r/GCode/Thumbnails.hpp>
 
 using namespace Slic3r;
@@ -66,87 +68,82 @@ static std::string invalid_val_thumbnail4()
 
 
 TEST_CASE("Empty Thumbnails", "[Thumbnails]") {
-    auto [thumbnails, errors] = make_and_check_thumbnail_list(empty_thumbnails());
-    REQUIRE(errors == enum_bitmask<ThumbnailError>());
-    REQUIRE(thumbnails.empty());
+    auto parsing_result = parse_request(empty_thumbnails());
+    REQUIRE(parsing_result.has_value());
+    REQUIRE(parsing_result->formats.empty());
+    REQUIRE(parsing_result->sizes.empty());
 }
 
 TEST_CASE("Valid Thumbnails", "[Thumbnails]") {
 
     SECTION("Test 1") {
-        auto [thumbnails, errors] = make_and_check_thumbnail_list(valid_thumbnails());
-        REQUIRE(errors == enum_bitmask<ThumbnailError>());
-        REQUIRE(thumbnails.size() == 3);
+        auto parsing_result = parse_request(valid_thumbnails());
+        REQUIRE(parsing_result.has_value());
+        REQUIRE(parsing_result->formats.size() == 3);
+        REQUIRE(parsing_result->sizes.size() == 3);
     }
 
     SECTION("Test 2") {
-        auto [thumbnails, errors] = make_and_check_thumbnail_list(valid_thumbnails2());
-        REQUIRE(errors == enum_bitmask<ThumbnailError>());
-        REQUIRE(thumbnails.size() == 4);
+        auto parsing_result = parse_request(valid_thumbnails2());
+        REQUIRE(parsing_result.has_value());
+        REQUIRE(parsing_result->formats.size() == 4);
+        REQUIRE(parsing_result->sizes.size() == 4);
     }
 }
 
 TEST_CASE("Out of range Thumbnails", "[Thumbnails]") {
 
     SECTION("Test 1") {
-        auto [thumbnails, errors] = make_and_check_thumbnail_list(out_of_range_thumbnail());
-        REQUIRE(errors != enum_bitmask<ThumbnailError>());
-        REQUIRE(errors.has(ThumbnailError::OutOfRange));
-        REQUIRE(thumbnails.size() == 3);
+        auto parsing_result = parse_request(out_of_range_thumbnail());
+        REQUIRE(!parsing_result.has_value());
+        REQUIRE(parsing_result.error().has(ThumbnailError::OutOfRange));
     }
 
     SECTION("Test 2") {
-        auto [thumbnails, errors] = make_and_check_thumbnail_list(out_of_range_thumbnail2());
-        REQUIRE(errors != enum_bitmask<ThumbnailError>());
-        REQUIRE(errors.has(ThumbnailError::OutOfRange));
-        REQUIRE(thumbnails.size() == 3);
+        auto parsing_result = parse_request(out_of_range_thumbnail2());
+        REQUIRE(!parsing_result.has_value());
+        REQUIRE(parsing_result.error().has(ThumbnailError::OutOfRange));
     }
 }
 
 TEST_CASE("Invalid extention Thumbnails", "[Thumbnails]") {
 
     SECTION("Test 1") {
-        auto [thumbnails, errors] = make_and_check_thumbnail_list(invalid_ext_thumbnail());
-        REQUIRE(errors != enum_bitmask<ThumbnailError>());
-        REQUIRE(errors.has(ThumbnailError::InvalidExt));
-        REQUIRE(thumbnails.size() == 4);
+        auto parsing_result = parse_request(invalid_ext_thumbnail());
+        REQUIRE(!parsing_result.has_value());
+        REQUIRE(parsing_result.error().has(ThumbnailError::InvalidExt));
     }
 
     SECTION("Test 2") {
-        auto [thumbnails, errors] = make_and_check_thumbnail_list(invalid_ext_thumbnail2());
-        REQUIRE(errors != enum_bitmask<ThumbnailError>());
-        REQUIRE(errors.has(ThumbnailError::InvalidExt));
-        REQUIRE(thumbnails.size() == 4);
+        auto parsing_result = parse_request(invalid_ext_thumbnail2());
+        REQUIRE(!parsing_result.has_value());
+        REQUIRE(parsing_result.error().has(ThumbnailError::InvalidExt));
     }
 }
 
 TEST_CASE("Invalid value Thumbnails", "[Thumbnails]") {
 
     SECTION("Test 1") {
-        auto [thumbnails, errors] = make_and_check_thumbnail_list(invalid_val_thumbnail());
-        REQUIRE(errors != enum_bitmask<ThumbnailError>());
-        REQUIRE(errors.has(ThumbnailError::InvalidVal));
-        REQUIRE(thumbnails.size() == 3);
+        auto parsing_result = parse_request(invalid_val_thumbnail());
+        REQUIRE(!parsing_result.has_value());
+        REQUIRE(parsing_result.error().has(ThumbnailError::InvalidVal));
     }
 
     SECTION("Test 2") {
-        auto [thumbnails, errors] = make_and_check_thumbnail_list(invalid_val_thumbnail2());
-        REQUIRE(errors != enum_bitmask<ThumbnailError>());
-        REQUIRE(errors.has(ThumbnailError::InvalidVal));
-        REQUIRE(thumbnails.size() == 3);
+        auto parsing_result = parse_request(invalid_val_thumbnail2());
+        REQUIRE(!parsing_result.has_value());
+        REQUIRE(parsing_result.error().has(ThumbnailError::InvalidVal));
     }
 
     SECTION("Test 3") {
-        auto [thumbnails, errors] = make_and_check_thumbnail_list(invalid_val_thumbnail3());
-        REQUIRE(errors != enum_bitmask<ThumbnailError>());
-        REQUIRE(errors.has(ThumbnailError::InvalidVal));
-        REQUIRE(thumbnails.size() == 3);
+        auto parsing_result = parse_request(invalid_val_thumbnail3());
+        REQUIRE(!parsing_result.has_value());
+        REQUIRE(parsing_result.error().has(ThumbnailError::InvalidVal));
     }
 
     SECTION("Test 4") {
-        auto [thumbnails, errors] = make_and_check_thumbnail_list(invalid_val_thumbnail4());
-        REQUIRE(errors != enum_bitmask<ThumbnailError>());
-        REQUIRE(errors.has(ThumbnailError::InvalidVal));
-        REQUIRE(thumbnails.size() == 2);
+        auto parsing_result = parse_request(invalid_val_thumbnail4());
+        REQUIRE(!parsing_result.has_value());
+        REQUIRE(parsing_result.error().has(ThumbnailError::InvalidVal));
     }
 }

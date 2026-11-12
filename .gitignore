@@ -21,3 +21,14 @@ deps/build-linux/*
 **/.idea/
 .pkg_cache
 CMakeUserPresets.json
+**/bundle_cache
+
+# These are generated and shouldn't be commit to git# These are generated and shouldn't be commit to git
+/doc/doxy/
+
+.aider*
+/src/slic3r-shared/imgui.ini
+/cmake-build-*/
+
+# Copied from the deps install prefix at configure time
+/resources/matdb/

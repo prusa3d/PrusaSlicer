@@ -1,0 +1,12 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: AmazonBasics PLA
+id: AmazonBasics PLA
+features:
+  $.brand.uuid: dc87c951-0127-56ca-a572-19cd93e23b6e
+  $.brand.slug: amazonbasics
+values:
+  filament_vendor: AmazonBasics
+  filament_cost: '24.99'
+  filament_spool_weight: 0

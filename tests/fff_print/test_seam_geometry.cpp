@@ -114,7 +114,7 @@ TEST_CASE("Vertex angle is rotation agnostic", "[Seams][SeamGeometry]") {
         return scaled(point);
     });
     Polygon polygon{polygon_points};
-    polygon.rotate(M_PI - Slic3r::Geometry::deg2rad(10.0));
+    polygon.rotate(M_PI - Slic3r::deg2rad(10.0));
 
     std::vector<Vec2d> rotated_points;
     using std::transform, std::back_inserter;

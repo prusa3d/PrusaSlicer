@@ -6,4 +6,8 @@
 add_cmake_project(NanoSVG
     URL https://github.com/fltk/nanosvg/archive/abcd277ea45e9098bed752cf9c6875b533c0892f.zip
     URL_HASH SHA256=e859938fbaee4b351bd8a8b3d3c7a75b40c36885ce00b73faa1ce0b98aa0ad34
+    EMSCRIPTEN_CMAKE_ARGS
+        -DCMAKE_CXX_FLAGS=-pthread
+        -DCMAKE_C_FLAGS=-pthread
+
 )

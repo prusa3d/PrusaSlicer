@@ -1,0 +1,14 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Verbatim ABS
+id: Verbatim ABS
+features:
+  $.brand.uuid: 78375eb2-5656-5697-967f-9223fd575323
+  $.brand.slug: verbatim
+values:
+  filament_cost: 25.87
+  filament_vendor: Verbatim
+  filament_density: 1.05
+  filament_spool_weight: 235
+

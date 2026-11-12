@@ -1,0 +1,16 @@
+kind: filament
+inherits:
+- '*PETCF*'
+name: Kimya PETG Carbon
+id: Kimya PETG Carbon
+features:
+  $.brand.uuid: e8fef7d9-d618-5b98-8566-ea543e46f84e
+  $.brand.slug: kimya
+values:
+  filament_vendor: Kimya
+  extrusion_multiplier: 1.05
+  filament_cost: 150.02
+  filament_density: 1.317
+  filament_spool_weight: 0
+  first_layer_temperature: 240
+  temperature: 240

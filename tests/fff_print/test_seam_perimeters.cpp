@@ -45,24 +45,24 @@ TEST_CASE("Remove redundant points", "[Seams][SeamPerimeters]") {
     using Perimeters::PointClassification;
 
     Perimeters::PerimeterPoints points(9);
-    points[0].position = {0.0, 0.0};
+    points[0].position = Vec2d{0.0, 0.0};
     points[0].type = PointType::common;
-    points[1].position = {1.0, 0.0};
+    points[1].position = Vec2d{1.0, 0.0};
     points[1].type = PointType::enforcer; // Should keep
-    points[2].position = {2.0, 0.0};
+    points[2].position = Vec2d{2.0, 0.0};
     points[2].type = PointType::enforcer; // Should keep
-    points[3].position = {3.0, 0.0};
+    points[3].position = Vec2d{3.0, 0.0};
     points[3].type = PointType::blocker;
-    points[4].position = {3.0, 1.0};
+    points[4].position = Vec2d{3.0, 1.0};
     points[4].type = PointType::blocker; // Should remove
-    points[5].position = {3.0, 1.1};
+    points[5].position = Vec2d{3.0, 1.1};
     points[5].type = PointType::blocker;
-    points[6].position = {3.0, 1.2};
+    points[6].position = Vec2d{3.0, 1.2};
     points[6].type = PointType::blocker;
     points[6].classification = PointClassification::overhang; // Should keep
-    points[7].position = {3.0, 2.0};
+    points[7].position = Vec2d{3.0, 2.0};
     points[7].type = PointType::blocker;
-    points[8].position = {0.0, 2.0};
+    points[8].position = Vec2d{0.0, 2.0};
     points[8].type = PointType::common;
 
     Perimeters::PerimeterPoints result{
@@ -217,7 +217,7 @@ TEST_CASE("Offset along perimeter forward", "[Seams][SeamPerimeters]") {
     )};
     REQUIRE(result);
     const auto &[previous_index, next_index, point] = *result;
-    CHECK((scaled(point) - Point::new_scale(0.4, 0.0)).norm() < scaled(EPSILON));
+    CHECK((scaled(point) - scaled(Vec2d{0.4, 0.0})).norm() < scaled(EPSILON));
     CHECK(previous_index == 0);
     CHECK(next_index == 1);
 }
@@ -229,7 +229,7 @@ TEST_CASE("Offset along perimeter backward", "[Seams][SeamPerimeters]") {
     )};
     REQUIRE(result);
     const auto &[previous_index, next_index, point] = *result;
-    CHECK((scaled(point) - Point::new_scale(0.0, 0.3)).norm() < scaled(EPSILON));
+    CHECK((scaled(point) - scaled(Vec2d{0.0, 0.3})).norm() < scaled(EPSILON));
     CHECK(previous_index == 3);
     CHECK(next_index == 0);
 }
@@ -246,7 +246,7 @@ TEST_CASE("Offset along perimeter forward respects stop condition", "[Seams][Sea
     )};
     REQUIRE(result);
     const auto &[previous_index, next_index, point] = *result;
-    CHECK((scaled(point) - Point::new_scale(1.0, 0.0)).norm() < scaled(EPSILON));
+    CHECK((scaled(point) - scaled(Vec2d{1.0, 0.0})).norm() < scaled(EPSILON));
     CHECK(previous_index == 1);
     CHECK(next_index == 1);
 }

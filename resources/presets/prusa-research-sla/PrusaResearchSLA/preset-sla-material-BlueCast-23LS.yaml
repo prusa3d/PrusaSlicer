@@ -1,0 +1,22 @@
+id: BlueCast 23LS
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: BlueCast
+  material_type: Tough
+  material_colour: '#007EFD'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: SIp9mX6BSuq1sYCNhzd46Q
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: BlueCast 23LS @SL1 0.05
+    id: O7YtP973S26XjPZ+G3TmWQ
+    values:
+      exposure_time: 8
+      initial_exposure_time: 50

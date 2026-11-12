@@ -1,0 +1,23 @@
+# WIN10SDK_PATH is used to point CMake to the WIN10 SDK installation directory.
+# We pick it from environment if it is not defined in another way
+if(WIN32)
+    if(NOT DEFINED WIN10SDK_PATH)
+        if(DEFINED ENV{WIN10SDK_PATH})
+                set(WIN10SDK_PATH "$ENV{WIN10SDK_PATH}")
+        endif()
+    endif()
+    if(DEFINED WIN10SDK_PATH)
+        if (EXISTS "${WIN10SDK_PATH}/include/winrt/windows.graphics.printing3d.h")
+            set(WIN10SDK_INCLUDE_PATH "${WIN10SDK_PATH}/Include")
+        endif()
+    else()
+        # Try to use the default Windows 10 SDK path.
+        set(WIN10SDK_INCLUDE_PATH "$ENV{WindowsSdkDir}/Include/$ENV{WindowsSDKVersion}")
+        if (NOT EXISTS "${WIN10SDK_INCLUDE_PATH}/winrt/windows.graphics.printing3d.h")
+            unset(WIN10SDK_INCLUDE_PATH)
+        endif()
+    endif()
+    if(WIN10SDK_INCLUDE_PATH)
+        include_directories("${WIN10SDK_INCLUDE_PATH}")
+    endif()
+endif()

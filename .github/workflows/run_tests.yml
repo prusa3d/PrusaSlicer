@@ -1,0 +1,18 @@
+name: Run tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'Build to test: git hash (7+ chars, e.g. e0d148c) or release tag (e.g. version_3.0.0-alpha12). Empty = head of the selected branch.'
+        type: string
+        required: false
+        default: ''
+
+jobs:
+  run_tests:
+    uses: Prusa-Development/PrusaSlicer-Testing/.github/workflows/run_tests.yml@main
+    secrets: inherit
+    with:
+      build: ${{ inputs.build || github.sha }}
+      testing_branch: main

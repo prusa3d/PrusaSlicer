@@ -3,10 +3,10 @@
 <svg version="1.0" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 viewBox="0 0 16 16" enable-background="new 0 0 16 16" xml:space="preserve">
 <g id="error_tick">
-	<path fill="#646464" stroke="#ED6B21" d="M 8 1.85 M 8 1 L 2 5 v 2 v 4 l 6 4 l 6 -4 V 7 V 5 L 8 1 L 8 1 z"/>	
+	<path fill="#646464" stroke="#FFFFFF" d="M 8 1.85 M 8 1 L 2 5 v 2 v 4 l 6 4 l 6 -4 V 7 V 5 L 8 1 L 8 1 z"/>	
 	
-    <path fill="none" stroke="#ED6B21" stroke-linecap="round" stroke-width="2" d="M8 4 L8 9" />
+    <path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="2" d="M8 4 L8 9" />
 		
-	<circle fill="#ED6B21" cx="8" cy="12" r="1"/>	
+	<circle fill="#FFFFFF" cx="8" cy="12" r="1"/>	
 </g>
 </svg>

@@ -1,0 +1,11 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Das Filament PLA
+id: Das Filament PLA
+features:
+  $.brand.uuid: 123407fa-471d-5bb4-8e8b-6aab858f4532
+  $.brand.slug: das-filament
+values:
+  filament_cost: '19.99'
+  filament_vendor: Das Filament

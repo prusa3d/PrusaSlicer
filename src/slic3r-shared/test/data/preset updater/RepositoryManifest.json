@@ -1,0 +1,10 @@
+[{
+    "description": "Test purpose only.",
+    "id": "test_repo",
+    "index_url": "http://localhost:8000/test_repo/vendor_indices.zip",
+    "name": "Test Repo",
+    "selected": true,
+    "url": "http://localhost:8000/test_repo/",
+    "uuid": "d349e27d-c8c8-49f6-8d10-62190e25ccbb",
+    "visibility": ""
+}]

@@ -1,0 +1,35 @@
+id: Monocure 3D White Rapid Resin
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Monocure
+  material_type: Tough
+  material_colour: '#FFFFFF'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: B7InhSgvRVufDQMGx1FnkA
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Monocure 3D White Rapid Resin @SL1 0.05
+    id: kh9V5Kh7QKq4NQZ7WVsDgg
+    values:
+      exposure_time: 10
+      initial_exposure_time: 35
+## SL1S
+- condition: printer.model == "SL1S"
+  id: x7sNr6DcRo62xi5j7PZG9g
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Monocure 3D White Rapid Resin @SL1S 0.05
+    id: myLHltnBTcuaBYK51HKSrQ
+    values:
+      exposure_time: 3.3
+      initial_exposure_time: 28

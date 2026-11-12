@@ -20,7 +20,8 @@
 #include <vector>
 #include "libslic3r/ExPolygon.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
-#include "libslic3r/SVG.hpp"
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
+#include "Slic3r/Biz/Algorithms/Point.hpp"
 
 #include <z3++.h>
 
@@ -1143,7 +1144,7 @@ TEST_CASE("Polygon test 7", "[Polygon]")
     }
     #endif
     
-    SVG preview_svg("polygon_test_7.svg");
+    Biz::Algorithms::SVG::SVG preview_svg("polygon_test_7.svg");
 
     #ifdef DEBUG
     {
@@ -1182,7 +1183,11 @@ Polygon scale_UP(const Polygon &polygon, double x_pos, double y_pos)
 
     for (unsigned int i = 0; i < poly.points.size(); ++i)
     {
-	poly.points[i] = Point(poly.points[i].x() * SCALE_FACTOR + x_pos * SCALE_FACTOR, poly.points[i].y() * SCALE_FACTOR + y_pos * SCALE_FACTOR);
+        using Slic3r::Biz::Algorithms::Point::round;
+	    poly.points[i] = Point(round(Vec2d{
+            poly.points[i].x() * SCALE_FACTOR + x_pos * SCALE_FACTOR,
+            poly.points[i].y() * SCALE_FACTOR + y_pos * SCALE_FACTOR
+        }).cast<coord_t>());
     }
 
     return poly;    
@@ -1472,7 +1477,7 @@ void polygon_test_8(void)
     }
     #endif
     
-    SVG preview_svg("polygon_test_8.svg");
+    Biz::Algorithms::SVG::SVG preview_svg("polygon_test_8.svg");
 
     Polygon display_polygon_1 = scale_UP(polygon_1, poly_1_pos_x, poly_1_pos_y);
     Polygon display_polygon_2 = scale_UP(polygon_2, poly_2_pos_x, poly_2_pos_y);
@@ -1773,7 +1778,7 @@ TEST_CASE("Polygon test 9", "[Polygon]")
     }
     #endif
     
-    SVG preview_svg("polygon_test_9.svg");
+    Biz::Algorithms::SVG::SVG preview_svg("polygon_test_9.svg");
 
     Polygon display_polygon_1 = scale_UP(polygon_1, poly_1_pos_x, poly_1_pos_y);
     Polygon display_polygon_2 = scale_UP(polygon_2, poly_2_pos_x, poly_2_pos_y);
@@ -2062,7 +2067,7 @@ void polygon_test_10(void)
     }
     #endif
     
-    SVG preview_svg("polygon_test_10.svg");
+    Biz::Algorithms::SVG::SVG preview_svg("polygon_test_10.svg");
 
     Polygon display_polygon_1 = scale_UP(polygons[0], poly_1_pos_x, poly_1_pos_y);
     Polygon display_polygon_2 = scale_UP(polygons[1], poly_2_pos_x, poly_2_pos_y);
@@ -2503,7 +2508,7 @@ TEST_CASE("Polygon test 11", "[Polygon]")
     }
     #endif
     
-    SVG preview_svg("polygon_test_11.svg");
+    Biz::Algorithms::SVG::SVG preview_svg("polygon_test_11.svg");
 
     Polygon display_polygon_1 = scale_UP(polygons[0], poly_1_pos_x, poly_1_pos_y);
     Polygon display_polygon_2 = scale_UP(polygons[1], poly_2_pos_x, poly_2_pos_y);
@@ -2588,7 +2593,7 @@ TEST_CASE("Polygon test 12", "[Polygon]")
 	}
 	#endif
     
-	SVG preview_svg("polygon_test_12.svg");
+	Biz::Algorithms::SVG::SVG preview_svg("polygon_test_12.svg");
 	
 	for (unsigned int i = 0; i < polygons.size(); ++i)
 	{
@@ -2732,7 +2737,7 @@ void polygon_test_13(void)
 	}
 	#endif
     
-	SVG preview_svg("polygon_test_13.svg");
+	Biz::Algorithms::SVG::SVG preview_svg("polygon_test_13.svg");
 	
 	for (unsigned int i = 0; i < polygons.size(); ++i)
 	{
@@ -3009,7 +3014,7 @@ TEST_CASE("Polygon test 14", "[Polygon]")
 	    }
 	    #endif
 	    
-	    SVG preview_svg("polygon_test_14.svg");
+	    Biz::Algorithms::SVG::SVG preview_svg("polygon_test_14.svg");
 	
 	    for (unsigned int i = 0; i < decided.size(); ++i)
 	    {
@@ -3199,7 +3204,7 @@ TEST_CASE("Polygon test 15", "[Polygon]")
 	    }
 	    #endif
 	
-	    SVG preview_svg("polygon_test_15.svg");
+	    Biz::Algorithms::SVG::SVG preview_svg("polygon_test_15.svg");
 	
 	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 	    {

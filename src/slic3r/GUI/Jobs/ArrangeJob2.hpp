@@ -14,11 +14,14 @@
 #include <arrange-wrapper/Items/ArrangeItem.hpp>
 #include <arrange-wrapper/SceneBuilder.hpp>
 
+namespace Slic3r::Domain {
+class Model;
+class ModelInstance;
+} // namespace Slic3r::Domain
+
 namespace Slic3r {
 
-class Model;
 class DynamicPrintConfig;
-class ModelInstance;
 
 class Print;
 class SLAPrint;

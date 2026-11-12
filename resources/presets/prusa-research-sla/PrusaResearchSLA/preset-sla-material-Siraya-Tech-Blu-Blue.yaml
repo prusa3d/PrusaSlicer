@@ -1,0 +1,42 @@
+id: Siraya Tech Blu Blue
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Siraya Tech
+  material_type: Tough
+  material_colour: '#007EFD'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: a3QWfK62Q82bAzdHo/+bJg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Siraya Tech Blu Blue @SL1 0.025
+    id: 48tXny3oS0a10xwVz7vqeQ
+    values:
+      exposure_time: 6
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Siraya Tech Blu Blue @SL1 0.05
+    id: bSG+GcD1QOOmd77emrX36g
+    values:
+      exposure_time: 12
+      initial_exposure_time: 35
+## SL1S
+- condition: printer.model == "SL1S"
+  id: /oFmMGGyRJW2HFBKk6ZIqg
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Siraya Tech Blu Blue @SL1S 0.05
+    id: JgKIfYlkTU6gHH4kgqPYzA
+    values:
+      exposure_time: 4
+      initial_exposure_time: 28

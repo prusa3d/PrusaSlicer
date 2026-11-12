@@ -7,8 +7,8 @@ on:
 
 jobs:
   static_analysis_dev:
-    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/static_analysis.yml@legacy
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/static_analysis.yml@master
     secrets: inherit
     with:
       branch: ms_dev
-      actions_branch: legacy
+      actions_branch: master

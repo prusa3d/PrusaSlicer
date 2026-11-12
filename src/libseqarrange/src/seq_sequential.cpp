@@ -9,8 +9,10 @@
  */
 /*================================================================*/
 
-#include <libslic3r/SVG.hpp>
+#include "Slic3r/Biz/Algorithms/Line.hpp"
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
 #include <libslic3r/Geometry/ConvexHull.hpp>
+#include "Slic3r/Biz/Algorithms/Point.hpp"
 
 #include "seq_defs.hpp"
 
@@ -22,6 +24,8 @@
 
 using namespace std;
 using namespace Slic3r;
+using namespace Slic3r::Biz;
+using Algorithms::SVG::SVG;
 
 
 /*----------------------------------------------------------------*/
@@ -859,7 +863,7 @@ void introduce_LineNonIntersection_implicit(z3::solver         &Solver,
 {    
     Point point;
     
-    if (line1.intersection_infinite(line2, &point))
+    if (Algorithms::Line::intersection_infinite(line1, line2, point))
     {
 	int v1x = line1.b.x() - line1.a.x();
 	int v1y = line1.b.y() - line1.a.y();
@@ -900,7 +904,7 @@ void introduce_SequentialLineNonIntersection_implicit(z3::solver         &Solver
 {    
     Point point;
     
-    if (line1.intersection_infinite(line2, &point))
+    if (Algorithms::Line::intersection_infinite(line1, line2, point))
     {
 	int v1x = line1.b.x() - line1.a.x();
 	int v1y = line1.b.y() - line1.a.y();
@@ -943,7 +947,7 @@ void introduce_ConsequentialLineNonIntersection_implicit(z3::solver         &Sol
 {    
     Point point;
     
-    if (line1.intersection_infinite(line2, &point))
+    if (Algorithms::Line::intersection_infinite(line1, line2, point))
     {
 	int v1x = line1.b.x() - line1.a.x();
 	int v1y = line1.b.y() - line1.a.y();
@@ -985,7 +989,7 @@ void introduce_LineNonIntersection_explicit(z3::solver         &Solver,
 					    const Slic3r::Line &line2)
 {
     Point point;
-    if (line1.intersection_infinite(line2, &point))
+    if (Algorithms::Line::intersection_infinite(line1, line2, point))
     {    
 	int v1x = line1.b.x() - line1.a.x();
 	int v1y = line1.b.y() - line1.a.y();
@@ -1217,7 +1221,7 @@ void introduce_LineNonIntersectionAgainstFixedLine_implicit(z3::solver         &
 {    
     Point point;
     
-    if (line1.intersection_infinite(line2, &point))
+    if (Algorithms::Line::intersection_infinite(line1, line2, point))
     {
 	int v1x = line1.b.x() - line1.a.x();
 	int v1y = line1.b.y() - line1.a.y();
@@ -1255,7 +1259,7 @@ void introduce_LineNonIntersectionAgainstFixedLine_explicit(z3::solver         &
 							    const Slic3r::Line &line2)
 {
     Point point;
-    if (line1.intersection_infinite(line2, &point))
+    if (Algorithms::Line::intersection_infinite(line1, line2, point))
     {    
 	int v1x = line1.b.x() - line1.a.x();
 	int v1y = line1.b.y() - line1.a.y();
@@ -1352,7 +1356,7 @@ void introduce_SequentialLineNonIntersectionAgainstFixedLine_implicit(z3::solver
 {    
     Point point;
     
-    if (line1.intersection_infinite(line2, &point))
+    if (Algorithms::Line::intersection_infinite(line1, line2, point))
     {
 	int v1x = line1.b.x() - line1.a.x();
 	int v1y = line1.b.y() - line1.a.y();
@@ -1395,7 +1399,7 @@ void introduce_SequentialFixedLineNonIntersectionAgainstLine_implicit(z3::solver
 {    
     Point point;
     
-    if (line1.intersection_infinite(line2, &point))
+    if (Algorithms::Line::intersection_infinite(line1, line2, point))
     {
 	int v1x = line1.b.x() - line1.a.x();
 	int v1y = line1.b.y() - line1.a.y();
@@ -1440,7 +1444,7 @@ void introduce_ConsequentialLineNonIntersectionAgainstFixedLine_implicit(z3::sol
     {
 	Point point;
     
-	if (line1.intersection_infinite(line2, &point))
+	if (Algorithms::Line::intersection_infinite(line1, line2, point))
 	{
 	    int v1x = line1.b.x() - line1.a.x();
 	    int v1y = line1.b.y() - line1.a.y();
@@ -1487,7 +1491,7 @@ void introduce_ConsequentialFixedLineNonIntersectionAgainstLine_implicit(z3::sol
     {
 	Point point;
     
-	if (line1.intersection_infinite(line2, &point))
+	if (Algorithms::Line::intersection_infinite(line1, line2, point))
 	{
 	    int v1x = line1.b.x() - line1.a.x();
 	    int v1y = line1.b.y() - line1.a.y();
@@ -3721,6 +3725,7 @@ void introduce_ConsequentialPolygonWeakNonoverlapping(const SolverConfiguration 
 						     _unreachable_polygons);   
 }
 
+using Slic3r::Biz::Algorithms::Point::round;
 
 void introduce_ConsequentialPolygonWeakNonoverlapping(const SolverConfiguration                        &solver_configuration,
 						      z3::solver                                       &Solver,
@@ -3822,7 +3827,9 @@ void introduce_ConsequentialPolygonWeakNonoverlapping(const SolverConfiguration 
 	    
 	    for (unsigned int p = 0; p < fixed_polygon.points.size(); ++p)
 	    {		
-		fixed_polygon.points[p] += Point(dec_values_X[fixed[i]].as_double(), dec_values_Y[fixed[i]].as_double());
+            fixed_polygon.points[p] += Point(round(Vec2d{
+                dec_values_X[fixed[i]].as_double(), dec_values_Y[fixed[i]].as_double()
+            }).cast<coord_t>());
 	    }
 	    flat_polygons.push_back(fixed_polygon);
 	}
@@ -3836,7 +3843,7 @@ void introduce_ConsequentialPolygonWeakNonoverlapping(const SolverConfiguration 
 		
 		for (unsigned int p = 0; p < fixed_polygon.points.size(); ++p)
 		{		
-		    fixed_polygon.points[p] += Point(dec_values_X[fixed[i]].as_double(), dec_values_Y[fixed[i]].as_double());
+		    fixed_polygon.points[p] += Point(round(Vec2d{dec_values_X[fixed[i]].as_double(), dec_values_Y[fixed[i]].as_double()}).cast<coord_t>());
 		}
 		flat_unreachable_polygons.push_back(fixed_polygon);
 	    }
@@ -6636,7 +6643,7 @@ std::optional<std::pair<int, int> > check_PointsOutsidePolygons(const std::vecto
 								const std::vector<Slic3r::Polygon>               &polygons,
 								const std::vector<std::vector<Slic3r::Polygon> > &unreachable_polygons)
 {
-    #ifdef DEBUG
+    #if 0 // TODO: Martin: This segfaults.
     {
 	printf("Levels U %zu,%zu\n", unreachable_polygons[0].size(), unreachable_polygons[1].size());
 	
@@ -9938,7 +9945,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 								   const ProgressRange                              &progress_range,								   
 								   std::function<void(int)>                          progress_callback)
 {
-    assert(solver_configuration.plate_bounding_polygon.is_counter_clockwise());
+    assert(Algorithms::Polygon::is_counter_clockwise(solver_configuration.plate_bounding_polygon));
     assert(solver_configuration.plate_bounding_polygon.points.size() > 0);
 	   
     z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
@@ -11672,18 +11679,18 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 							  trans_bed_lepox,
 							  presence_assumptions);	    
 	    
-	    #ifdef DEBUG
+	    #ifdef DEBUG_
 	    {
 		printf("Undecided\n");
 		for (unsigned int j = 0; j < undecided.size(); ++j)
 		{
 		    printf("  %d\n", undecided[j]);
 		}
-		printf("Missing\n");
-		for (unsigned int j = 0; j < missing.size(); ++j)
-		{
-		    printf("  %d\n", missing[j]);
-		}		
+		// printf("Missing\n");
+		// for (unsigned int j = 0; j < missing.size(); ++j)
+		// {
+		//     printf("  %d\n", missing[j]);
+		// }
 		printf("Decided\n");
 		for (unsigned int j = 0; j < decided_polygons.size(); ++j)
 		{

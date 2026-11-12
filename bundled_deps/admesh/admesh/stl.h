@@ -28,7 +28,7 @@
 #include <stddef.h>
 
 #include <vector>
-#include <Eigen/Geometry> 
+#include <Slic3r/Domain/Types.hpp>
 
 // Size of the binary STL header, free form.
 #define LABEL_SIZE             80
@@ -39,9 +39,9 @@
 #define STL_MIN_FILE_SIZE      284
 #define ASCII_LINES_PER_FACET  7
 
-typedef Eigen::Matrix<float, 3, 1, Eigen::DontAlign> stl_vertex;
-typedef Eigen::Matrix<float, 3, 1, Eigen::DontAlign> stl_normal;
-typedef Eigen::Matrix<int,   3, 1, Eigen::DontAlign> stl_triangle_vertex_indices;
+typedef Slic3r::Domain::Vec3f stl_vertex;
+typedef Slic3r::Domain::Vec3f stl_normal;
+typedef Slic3r::Domain::Index3 stl_triangle_vertex_indices;
 static_assert(sizeof(stl_vertex) == 12, "size of stl_vertex incorrect");
 static_assert(sizeof(stl_normal) == 12, "size of stl_normal incorrect");
 
@@ -305,7 +305,7 @@ extern bool its_write_off(const indexed_triangle_set &its, const char *file);
 extern bool its_write_vrml(const indexed_triangle_set &its, const char *file);
 
 
-typedef Eigen::Matrix<float, 3, 1, Eigen::DontAlign> obj_color; // Vec3f
+typedef Slic3r::Domain::Vec3f obj_color;
 /// <summary>
 /// write idexed triangle set into obj file with color
 /// </summary>

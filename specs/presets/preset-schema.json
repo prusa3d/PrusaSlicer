@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prusa3d.com/schemas/slicer-presets",
+  "title": "Slicer Presets",
+  "type": "object",
+  "$defs": {
+    "fragment": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": {
+          "type": "string"
+        },
+        "values": {
+          "type": "object"
+        },
+        "features": {
+          "type": "object"
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/conditional-fragment"
+          }
+        },
+        "inherits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+        "unconditional_inherits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+        },
+        "match_mode": {
+          "enum": ["first_match","all_matches"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "conditional-fragment": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/fragment"
+        }
+      ],
+      "properties": {
+        "condition": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "top-fragment": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/conditional-fragment"
+        }
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "printer",
+            "print",
+            "tool_print",
+            "material",
+            "filament"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ]
+    }
+  },
+  "oneOf": [{"$ref": "#/$defs/top-fragment"}]
+}

@@ -1,0 +1,2122 @@
+kind: print
+id: '*common COREONEL*'
+values:
+  default_material: Prusament PLA
+variants:
+- condition: printer.model == "COREONEL"
+  id: uCTI5HmoSFar4ZX010v06A
+  values:
+    retract_before_travel: 1.5
+    retract_layer_change: 1
+    retract_length_toolchange: 0
+    retract_lift_above: 0
+    retract_lift_below: 329
+    retract_restart_extra: 0
+    retract_restart_extra_toolchange: 0
+    travel_ramping_lift: 1
+    travel_slope: 1
+    travel_max_lift: 1.5
+    wipe: 0
+  variants:
+# 0.25    
+  - condition: tool.nozzle_diameter == 0.25
+    id: 6pMJ3mnwQe61N8q/88+Axw
+    values:
+      deretract_speed: 25
+      max_layer_height: 0.15
+      min_layer_height: 0.05
+      retract_before_wipe: 80%
+      retract_length: 0.8
+      retract_lift: 0.15
+      retract_speed: 45
+# 0.3    
+  - condition: tool.nozzle_diameter == 0.3
+    id: ITxdr+XdSbis1qEG+UiUtw
+    values:
+      deretract_speed: 25
+      max_layer_height: 0.22
+      min_layer_height: 0.05
+      retract_before_wipe: 80%
+      retract_length: 0.7
+      retract_lift: 0.2
+      retract_speed: 45
+# 0.4    
+  - condition: tool.nozzle_diameter == 0.4
+    id: EVYY1N07SKKSG/vWzn0sVQ
+    values:
+      deretract_speed: 25
+      max_layer_height: 0.30
+      min_layer_height: 0.07
+      retract_before_wipe: 80%
+      retract_length: 0.7
+      retract_lift: 0.2
+      retract_speed: 45
+  # 0.4HF    
+      # variants:
+        # -condition: tool.nozzle_high_flow
+           # values:
+             # deretract_speed: 25
+             # max_layer_height: 0.30
+             # min_layer_height: 0.07
+             # retract_before_wipe: '80%'
+             # retract_length: 0.8
+             # retract_lift: 0.2
+             # retract_speed: 45
+# 0.5    
+  - condition: tool.nozzle_diameter == 0.5
+    id: 4cg9rpelQZSTKgCaTZXv3g
+    values:
+      deretract_speed: 25
+      max_layer_height: 0.32
+      min_layer_height: 0.07
+      retract_before_wipe: 80%
+      retract_length: 0.7
+      retract_lift: 0.2
+      retract_speed: 45
+      wipe: 1
+# 0.6    
+  - condition: tool.nozzle_diameter == 0.6
+    id: 3zm182BiTG2iHWEvkO6kjg
+    values:
+      deretract_speed: 25
+      max_layer_height: 0.40
+      min_layer_height: 0.15
+      retract_before_wipe: 0%
+      retract_length: 0.7
+      retract_lift: 0.2
+      retract_speed: 45
+      wipe: 1
+# 0.8    
+  - condition: tool.nozzle_diameter == 0.8
+    id: PN5biTQDTRSlTwPcDJ1/GQ
+    values:
+      deretract_speed: 15
+      max_layer_height: 0.6
+      min_layer_height: 0.2
+      retract_before_wipe: 50%
+      retract_length: 0.6
+      retract_lift: 0.25
+      retract_speed: 25
+      wipe: 1
+---
+id: 2OhcfTU0Q++/MNF3+Sd4Qw
+kind: print
+inherits:
+- '*common*'
+- '*common COREONEL*'
+variants:
+- condition: printer.model == "COREONEL"
+  id: iTh9+CbtS12FvWaO66uUWg
+  values:
+    bottom_solid_layers: 4
+    bridge_acceleration: 1500
+    bridge_flow_ratio: 1
+    bridge_speed: 50
+    brim_separation: 0.1
+    default_acceleration: 3000
+    dont_support_bridges: 0
+    elefant_foot_compensation: 0.2
+    enable_dynamic_overhang_speeds: 1
+    external_perimeter_acceleration: 3000
+    external_perimeter_extrusion_width: 0.45
+    external_perimeter_speed: 170
+    extrusion_width: 0.45
+    fill_density: 15%
+    fill_pattern: grid
+    first_layer_acceleration: 500
+    first_layer_acceleration_over_raft: 0
+    first_layer_extrusion_width: 0.5
+    first_layer_speed: 45
+    first_layer_solid_infill_speed: 100
+    first_layer_speed_over_raft: 30
+    gap_fill_enabled: 1
+    gap_fill_speed: 120
+    gcode_resolution: 0.008
+    infill_acceleration: 6000
+    infill_anchor: 2
+    infill_anchor_max: 12
+    infill_every_layers: 1
+    infill_extrusion_width: 0.45
+    infill_overlap: 15%
+    infill_speed: 200
+    max_print_speed: 300
+    max_volumetric_extrusion_rate_slope_negative: 0
+    max_volumetric_extrusion_rate_slope_positive: 0
+    max_volumetric_speed: 0
+    min_bead_width: 85%
+    min_feature_size: 25%
+    only_retract_when_crossing_perimeters: 0
+    overhang_speed_0: 15
+    overhang_speed_1: 25
+    overhang_speed_2: 50
+    overhang_speed_3: 80%
+    overhangs: 1
+    perimeter_acceleration: 5000
+    perimeter_extrusion_width: 0.45
+    perimeter_speed: 170
+    perimeters: 2
+    raft_contact_distance: 0.15
+    raft_expansion: 1.5
+    raft_first_layer_density: 80%
+    raft_first_layer_expansion: 3
+    support_material_first_layer_density: 80%
+    support_material_first_layer_expansion: 3
+    seam_position: aligned
+    small_perimeter_speed: 170
+    solid_infill_acceleration: 5000
+    solid_infill_extrusion_width: 0.45
+    solid_infill_speed: 200
+    over_bridge_speed: 50%
+    support_material: enforcers_only
+    support_material_angle: 0
+    support_material_bottom_contact_distance: 0
+    support_material_bottom_interface_layers: 0
+    support_material_buildplate_only: 0
+    support_material_closing_radius: 2
+    support_material_contact_distance: 0.2
+    support_material_enforce_layers: 0
+    support_material_extruder: 0
+    support_material_extrusion_width: 0.4
+    support_material_interface_contact_loops: 0
+    support_material_interface_extruder: 0
+    support_material_interface_layers: 3
+    support_material_interface_pattern: auto
+    support_material_interface_spacing: 0.2
+    support_material_interface_speed: 50%
+    support_material_pattern: rectilinear
+    support_material_spacing: 2
+    support_material_speed: 120
+    support_material_style: snug
+    support_material_synchronize_layers: 0
+    support_material_threshold: 40
+    support_material_with_sheath: 0
+    support_material_xy_spacing: 80%
+    support_tree_angle: 40
+    support_tree_angle_slow: 25
+    support_tree_branch_diameter: 2
+    support_tree_branch_diameter_angle: 5
+    support_tree_branch_diameter_double_wall: 8
+    support_tree_branch_distance: 1
+    support_tree_tip_diameter: 0.8
+    support_tree_top_rate: 30%
+    top_infill_extrusion_width: 0.42
+    top_solid_infill_acceleration: 2000
+    top_solid_infill_speed: 100
+    top_solid_layers: 5
+    travel_acceleration: 6000
+    travel_speed: 500
+    travel_speed_z: 8
+    thick_bridges: 0
+    top_solid_min_thickness: 0.7
+    bottom_solid_min_thickness: 0.5
+    wipe_tower_extra_spacing: 110%
+    wipe_tower_extra_flow: 250%
+    travel_short_distance_acceleration: 250
+  variants:
+  - name: '*non-MMU branch*'
+    id: kF/piufVRwSfXEdhC4TjnA
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: /ovGtqKGTX6HC3p8t7GyCw
+      values:
+        max_print_speed: 300
+# 0.4 high-flow nozzle
+      variants:
+      - condition: tool.nozzle_diameter == 0.4
+# 0.4HF/0.10mm layer
+        id: vEieQxXlRWeRnEqUZbNb6w
+        variants:
+        - name: 0.10mm FAST DETAIL @COREONEL 0.4HF
+          id: K59U1xuSQxKuypP7qOeCwQ
+          values:
+            layer_height: 0.1
+            bottom_solid_layers: 7
+            top_solid_layers: 8
+            support_material_contact_distance: 0.17
+            raft_contact_distance: 0.15
+            perimeter_speed: 140
+            external_perimeter_speed: 140
+            small_perimeter_speed: 140
+            gap_fill_speed: 120
+            support_material_speed: 120
+            support_material_interface_speed: 50
+            external_perimeter_acceleration: 2000
+            perimeter_acceleration: 3000
+            solid_infill_acceleration: 4000
+            top_solid_infill_acceleration: 1500
+            default_acceleration: 3000
+            infill_speed: 140
+            infill_acceleration: 6000
+            perimeters: 3
+            top_infill_extrusion_width: 0.4
+            overhang_speed_2: 30
+            overhang_speed_3: 80%
+            bridge_speed: 40
+# 0.4HF/0.15mm layer
+        - name: 0.15mm STRUCTURAL @COREONEL 0.4HF
+          id: 0.15mm STRUCTURAL @COREONEL 0.4HF
+          values:
+            layer_height: 0.15
+            top_solid_layers: 6
+            support_material_contact_distance: 0.17
+            raft_contact_distance: 0.15
+            bridge_speed: 45
+            support_material_speed: 120
+            support_material_interface_speed: 50
+            max_print_speed: 300
+            bottom_solid_layers: 5
+            perimeter_speed: 70
+            external_perimeter_speed: 50
+            small_perimeter_speed: 50
+            infill_speed: 120
+            solid_infill_speed: 140
+            gap_fill_speed: 60
+            top_solid_infill_speed: 80
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            solid_infill_acceleration: 4000
+            default_acceleration: 3000
+            infill_acceleration: 6000
+            overhang_speed_2: 45
+            overhang_speed_3: 90%
+        - name: 0.15mm BALANCED @COREONEL 0.4HF
+          id: El7xdJliQ9KXO7cu83Pf2Q
+          values:
+            layer_height: 0.15
+            bottom_solid_layers: 4
+            top_solid_layers: 6
+            support_material_contact_distance: 0.17
+            raft_contact_distance: 0.15
+            bridge_speed: 45
+            support_material_speed: 120
+            support_material_interface_speed: 50
+            max_print_speed: 300
+            perimeter_speed: 150
+            external_perimeter_speed: 200
+            small_perimeter_speed: 170
+            infill_speed: 150
+            gap_fill_speed: 120
+            solid_infill_speed: 150
+            external_perimeter_acceleration: 2500
+            perimeter_acceleration: 3000
+            solid_infill_acceleration: 5000
+            infill_acceleration: 5000
+            default_acceleration: 3000
+            overhang_speed_2: 50
+            overhang_speed_3: 60%
+            over_bridge_speed: 60%
+            support_material_threshold: 35
+        - name: 0.15mm SPEED @COREONEL 0.4HF
+          id: QOVs9H5fSDS3egTZLppzHw
+          values:
+            layer_height: 0.15
+            bottom_solid_layers: 4
+            top_solid_layers: 6
+            support_material_contact_distance: 0.17
+            raft_contact_distance: 0.15
+            bridge_speed: 45
+            support_material_speed: 120
+            support_material_interface_speed: 50
+            max_print_speed: 300
+            perimeter_speed: 250
+            external_perimeter_speed: 200
+            small_perimeter_speed: 170
+            infill_speed: 300
+            gap_fill_speed: 120
+            solid_infill_speed: 250
+            external_perimeter_acceleration: 3000
+            perimeter_acceleration: 5000
+            solid_infill_acceleration: 5000
+            default_acceleration: 3000
+            overhang_speed_2: 50
+            overhang_speed_3: 60%
+            over_bridge_speed: 35%
+            support_material_threshold: 35
+# 0.4HF/0.20mm layer
+        - name: 0.20mm STRUCTURAL @COREONEL 0.4HF
+          id: 0.20mm STRUCTURAL @COREONEL 0.4HF
+          unconditional_inherits:
+          - 0.15mm STRUCTURAL @COREONEL 0.4HF
+          values:
+            layer_height: 0.20
+            top_solid_layers: 5
+            raft_contact_distance: 0.15
+            bottom_solid_layers: 3
+            infill_speed: 120
+            support_material_contact_distance: 0.2
+            support_material_interface_speed: 50
+            bridge_speed: 50
+        - name: 0.20mm BALANCED @COREONEL 0.4HF
+          id: JqmTfyW+TKq72mp6qp0JSQ
+          values:
+            layer_height: 0.20
+            bottom_solid_layers: 3
+            top_solid_layers: 5
+            support_material_contact_distance: 0.2
+            raft_contact_distance: 0.15
+            perimeter_speed: 150
+            external_perimeter_speed: 200
+            small_perimeter_speed: 170
+            infill_speed: 150
+            gap_fill_speed: 120
+            solid_infill_speed: 150
+            external_perimeter_acceleration: 2500
+            perimeter_acceleration: 3000
+            solid_infill_acceleration: 5000
+            infill_acceleration: 5000
+            default_acceleration: 3000
+            overhang_speed_2: 50
+            overhang_speed_3: 60%
+            over_bridge_speed: 60%
+            support_material_threshold: 35
+        - name: 0.20mm SPEED @COREONEL 0.4HF
+          id: Hps1HXzjQG6wlIbGGBqCWQ
+          values:
+            layer_height: 0.20
+            bottom_solid_layers: 3
+            top_solid_layers: 5
+            support_material_contact_distance: 0.2
+            raft_contact_distance: 0.15
+            perimeter_speed: 250
+            external_perimeter_speed: 200
+            small_perimeter_speed: 170
+            infill_speed: 300
+            solid_infill_speed: 250
+            overhang_speed_3: 70%
+            over_bridge_speed: 35%
+            support_material_threshold: 35
+# 0.4HF/0.25mm layer
+        - name: 0.25mm STRUCTURAL @COREONEL 0.4HF
+          id: 0.25mm STRUCTURAL @COREONEL 0.4HF
+          values:
+            layer_height: 0.25
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.2
+            perimeter_extrusion_width: 0.5
+            external_perimeter_extrusion_width: 0.5
+            infill_extrusion_width: 0.5
+            solid_infill_extrusion_width: 0.5
+            support_material_extrusion_width: 0.4
+            perimeter_speed: 70
+            external_perimeter_speed: 50
+            small_perimeter_speed: 50
+            infill_speed: 120
+            solid_infill_speed: 140
+            gap_fill_speed: 60
+            top_solid_infill_speed: 80
+            support_material_speed: 120
+            support_material_interface_speed: 50
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            solid_infill_acceleration: 4000
+            infill_acceleration: 6000
+            overhang_speed_2: 45
+            overhang_speed_3: 90%
+        - name: 0.25mm BALANCED @COREONEL 0.4HF
+          id: IlG9R1JIQqeLPwS6Z70wiA
+          values:
+            layer_height: 0.25
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.2
+            perimeter_extrusion_width: 0.5
+            external_perimeter_extrusion_width: 0.5
+            infill_extrusion_width: 0.5
+            solid_infill_extrusion_width: 0.5
+            support_material_extrusion_width: 0.4
+            perimeter_speed: 150
+            external_perimeter_speed: 200
+            small_perimeter_speed: 170
+            infill_speed: 150
+            gap_fill_speed: 120
+            solid_infill_speed: 150
+            external_perimeter_acceleration: 2500
+            perimeter_acceleration: 3000
+            solid_infill_acceleration: 5000
+            infill_acceleration: 5000
+            default_acceleration: 3000
+            overhang_speed_2: 50
+            overhang_speed_3: 60%
+            over_bridge_speed: 60%
+            support_material_threshold: 35
+        - name: 0.25mm SPEED @COREONEL 0.4HF
+          id: TSCppzf0SHewuAG0qCtQtw
+          values:
+            layer_height: 0.25
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.2
+            perimeter_extrusion_width: 0.5
+            external_perimeter_extrusion_width: 0.5
+            infill_extrusion_width: 0.5
+            solid_infill_extrusion_width: 0.5
+            support_material_extrusion_width: 0.4
+            perimeter_speed: 220
+            external_perimeter_speed: 200
+            small_perimeter_speed: 170
+            infill_speed: 300
+            solid_infill_speed: 240
+            overhang_speed_2: 50
+            overhang_speed_3: 60%
+            over_bridge_speed: 35%
+            support_material_threshold: 35
+# 0.4HF/0.28mm layer
+        - name: 0.28mm DRAFT @COREONEL 0.4HF
+          id: nhCEPQjORhGkKplK73HYAw
+          values:
+            layer_height: 0.28
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            raft_contact_distance: 0.25
+            support_material_extrusion_width: 0.4
+            perimeter_speed: 200
+            external_perimeter_speed: 180
+            small_perimeter_speed: 200
+            solid_infill_speed: 200
+            infill_speed: 300
+            first_layer_extrusion_width: 0.55
+            perimeter_extrusion_width: 0.55
+            external_perimeter_extrusion_width: 0.55
+            infill_extrusion_width: 0.55
+            solid_infill_extrusion_width: 0.55
+            top_infill_extrusion_width: 0.45
+            support_material_contact_distance: 0.28
+            support_material_interface_layers: 3
+            support_material_spacing: 2.5
+            support_material_threshold: 35
+            overhang_speed_2: 50
+            over_bridge_speed: 50%
+# 0.5 high-flow nozzle
+      - condition: tool.nozzle_diameter == 0.5
+        id: 8lSGqeMTTPGcVQB+jUsPgw
+        values:
+          extrusion_width: 0.55
+          first_layer_extrusion_width: 0.55
+          perimeter_extrusion_width: 0.55
+          external_perimeter_extrusion_width: 0.55
+          infill_extrusion_width: 0.55
+          solid_infill_extrusion_width: 0.55
+          top_infill_extrusion_width: 0.5
+          support_material_extrusion_width: 0.4
+          gcode_resolution: 0.008
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.25
+          support_material_xy_spacing: 80%
+          support_material_interface_spacing: 0.22
+          support_material_interface_speed: 75%
+          support_tree_tip_diameter: 1
+          raft_contact_distance: 0.25
+          gap_fill_speed: 70
+          top_solid_min_thickness: 0.7
+          bottom_solid_min_thickness: 0.5
+          infill_anchor: 2
+          infill_anchor_max: 15
+# 0.5HF/0.10mm layer
+        variants:
+        - name: 0.10mm STRUCTURAL @COREONEL 0.5HF
+          id: 0.10mm STRUCTURAL @COREONEL 0.5HF
+          values:
+            layer_height: 0.1
+            bottom_solid_layers: 7
+            top_solid_layers: 8
+            raft_contact_distance: 0.15
+            perimeter_speed: 70
+            small_perimeter_speed: 50
+            external_perimeter_speed: 50
+            infill_speed: 200
+            solid_infill_speed: 200
+            top_solid_infill_speed: 70
+            bridge_speed: 30
+            gap_fill_speed: 40
+            support_material_speed: 80
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2000
+            top_solid_infill_acceleration: 1000
+            solid_infill_acceleration: 2500
+            infill_acceleration: 3000
+            bridge_acceleration: 1000
+            default_acceleration: 3000
+            extrusion_width: 0.55
+            perimeter_extrusion_width: 0.5
+            external_perimeter_extrusion_width: 0.5
+            infill_extrusion_width: 0.5
+            solid_infill_extrusion_width: 0.5
+            top_infill_extrusion_width: 0.45
+            support_material_contact_distance: 0.2
+            overhang_speed_2: 30
+# 0.5HF/0.15mm layer
+        - name: 0.15mm STRUCTURAL @COREONEL 0.5HF
+          id: 0.15mm STRUCTURAL @COREONEL 0.5HF
+          values:
+            layer_height: 0.15
+            bottom_solid_layers: 4
+            top_solid_layers: 6
+            support_material_contact_distance: 0.2
+            raft_contact_distance: 0.17
+            perimeter_speed: 70
+            small_perimeter_speed: 50
+            external_perimeter_speed: 50
+            infill_speed: 200
+            solid_infill_speed: 180
+            top_solid_infill_speed: 70
+            bridge_speed: 40
+            gap_fill_speed: 50
+            support_material_speed: 80
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            solid_infill_acceleration: 4000
+            bridge_acceleration: 1000
+            infill_acceleration: 6000
+            overhang_speed_2: 45
+# 0.5HF/0.20mm layer
+        - name: 0.20mm STRUCTURAL @COREONEL 0.5HF
+          id: 0.20mm STRUCTURAL @COREONEL 0.5HF
+          values:
+            layer_height: 0.2
+            bottom_solid_layers: 3
+            top_solid_layers: 5
+            support_material_contact_distance: 0.2
+            raft_contact_distance: 0.2
+            top_solid_infill_speed: 70
+            gap_fill_speed: 70
+            bridge_acceleration: 1000
+            perimeter_speed: 70
+            small_perimeter_speed: 50
+            external_perimeter_speed: 50
+            infill_speed: 200
+            solid_infill_speed: 120
+            bridge_speed: 40
+            support_material_speed: 80
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            solid_infill_acceleration: 4000
+            infill_acceleration: 6000
+            overhang_speed_2: 45
+        - name: 0.20mm SPEED @COREONEL 0.5HF
+          id: RCU30hWySlKsYDenEBVlbw
+          values:
+            layer_height: 0.2
+            bottom_solid_layers: 3
+            top_solid_layers: 5
+            support_material_contact_distance: 0.2
+            raft_contact_distance: 0.2
+            top_solid_infill_speed: 70
+            gap_fill_speed: 70
+            bridge_acceleration: 1000
+            perimeter_speed: 200
+            small_perimeter_speed: 170
+            external_perimeter_speed: 200
+            infill_speed: 220
+            solid_infill_speed: 220
+            bridge_speed: 40
+            support_material_speed: 120
+            over_bridge_speed: 40%
+            overhang_speed_2: 50
+# 0.5HF/0.25mm layer
+        - name: 0.25mm STRUCTURAL @COREONEL 0.5HF
+          id: 0.25mm STRUCTURAL @COREONEL 0.5HF
+          values:
+            layer_height: 0.25
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            bridge_acceleration: 1000
+            perimeter_speed: 70
+            small_perimeter_speed: 50
+            external_perimeter_speed: 50
+            infill_speed: 200
+            solid_infill_speed: 110
+            top_solid_infill_speed: 70
+            bridge_speed: 40
+            gap_fill_speed: 70
+            support_material_speed: 80
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            solid_infill_acceleration: 4000
+            infill_acceleration: 6000
+            overhang_speed_2: 45
+        - name: 0.25mm BALANCED @COREONEL 0.5HF
+          id: ZYB2W6gUSHiaDihY2ywgPA
+          values:
+            layer_height: 0.25
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            bridge_acceleration: 1000
+            perimeter_speed: 150
+            small_perimeter_speed: 170
+            external_perimeter_speed: 200
+            infill_speed: 150
+            solid_infill_speed: 150
+            top_solid_infill_speed: 70
+            bridge_speed: 40
+            gap_fill_speed: 70
+            support_material_speed: 120
+            over_bridge_speed: 40%
+            overhang_speed_2: 50
+            perimeter_acceleration: 3000
+            external_perimeter_acceleration: 2500
+            infill_acceleration: 5000
+            solid_infill_acceleration: 5000
+        - name: 0.25mm SPEED @COREONEL 0.5HF
+          id: +zfAyZKkSZav5gmKP/9KDg
+          values:
+            layer_height: 0.25
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            bridge_acceleration: 1000
+            perimeter_speed: 200
+            small_perimeter_speed: 170
+            external_perimeter_speed: 200
+            infill_speed: 200
+            solid_infill_speed: 200
+            top_solid_infill_speed: 70
+            bridge_speed: 40
+            gap_fill_speed: 70
+            support_material_speed: 120
+            over_bridge_speed: 40%
+            overhang_speed_2: 50
+# 0.5HF/0.32mm layer
+        - name: 0.32mm STRUCTURAL @COREONEL 0.5HF
+          id: 0.32mm STRUCTURAL @COREONEL 0.5HF
+          values:
+            layer_height: 0.32
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            perimeter_speed: 70
+            small_perimeter_speed: 50
+            external_perimeter_speed: 50
+            infill_speed: 200
+            solid_infill_speed: 110
+            top_solid_infill_speed: 70
+            bridge_speed: 40
+            gap_fill_speed: 70
+            support_material_speed: 120
+            support_material_interface_speed: 50%
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            infill_acceleration: 6000
+            solid_infill_acceleration: 4000
+            overhang_speed_2: 45
+        - name: 0.32mm BALANCED @COREONEL 0.5HF
+          id: 4v1GhC9pQVGnkjfycVJdWA
+          values:
+            layer_height: 0.32
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            perimeter_speed: 150
+            small_perimeter_speed: 160
+            external_perimeter_speed: 160
+            infill_speed: 150
+            solid_infill_speed: 150
+            top_solid_infill_speed: 70
+            bridge_speed: 40
+            gap_fill_speed: 70
+            support_material_speed: 120
+            over_bridge_speed: 40%
+            overhang_speed_2: 50
+            perimeter_acceleration: 3000
+            external_perimeter_acceleration: 2500
+            infill_acceleration: 5000
+            solid_infill_acceleration: 5000
+        - name: 0.32mm SPEED @COREONEL 0.5HF
+          id: 3BCpWzihS02V51ALnoSGfw
+          values:
+            layer_height: 0.32
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            perimeter_speed: 160
+            small_perimeter_speed: 160
+            external_perimeter_speed: 160
+            infill_speed: 200
+            solid_infill_speed: 160
+            top_solid_infill_speed: 70
+            bridge_speed: 40
+            gap_fill_speed: 70
+            support_material_speed: 120
+            solid_infill_acceleration: 5000
+            over_bridge_speed: 40%
+            overhang_speed_2: 50
+            support_material_interface_speed: 50%
+# 0.6 high-flow nozzle
+      - condition: tool.nozzle_diameter == 0.6
+        id: qFaZViU8Q/ecskqVr4MY+Q
+        values:
+          extrusion_width: 0.68
+          first_layer_extrusion_width: 0.68
+          perimeter_extrusion_width: 0.68
+          external_perimeter_extrusion_width: 0.68
+          infill_extrusion_width: 0.68
+          solid_infill_extrusion_width: 0.68
+          top_infill_extrusion_width: 0.55
+          support_material_extrusion_width: 0.5
+          gcode_resolution: 0.0125
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.15
+          support_material_xy_spacing: 80%
+          support_material_interface_spacing: 0.25
+          support_material_interface_speed: 75%
+          support_tree_tip_diameter: 1.2
+          raft_contact_distance: 0.25
+          gap_fill_speed: 70
+          overhang_speed_0: 15
+          overhang_speed_1: 20
+          overhang_speed_2: 25
+          overhang_speed_3: 50
+          top_solid_min_thickness: 0.9
+          bottom_solid_min_thickness: 0.6
+          infill_anchor: 2.5
+          infill_anchor_max: 20
+          support_material_speed: 90
+          fill_density: 20%
+          first_layer_solid_infill_speed: 70
+          over_bridge_speed: 0
+        variants:
+# 0.6HF/0.15mm layer
+        - name: 0.15mm STRUCTURAL @COREONEL 0.6HF
+          id: 0.15mm STRUCTURAL @COREONEL 0.6HF
+          values:
+            layer_height: 0.15
+            bottom_solid_layers: 4
+            top_solid_layers: 6
+            perimeter_speed: 70
+            external_perimeter_speed: 50
+            small_perimeter_speed: 50
+            solid_infill_speed: 160
+            infill_speed: 100
+            top_solid_infill_speed: 70
+            bridge_speed: 30
+            gap_fill_speed: 70
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            solid_infill_acceleration: 4000
+            infill_acceleration: 6000
+            bridge_acceleration: 1500
+            support_material_contact_distance: 0.22
+            extrusion_width: 0.68
+            perimeter_extrusion_width: 0.6
+            external_perimeter_extrusion_width: 0.6
+            infill_extrusion_width: 0.6
+            solid_infill_extrusion_width: 0.6
+            top_infill_extrusion_width: 0.5
+            overhang_speed_2: 30
+            overhang_speed_3: 70%
+# 0.6HF/0.20mm layer
+        - name: 0.20mm STRUCTURAL @COREONEL 0.6HF
+          id: 0.20mm STRUCTURAL @COREONEL 0.6HF
+          values:
+            layer_height: 0.20
+            bottom_solid_layers: 3
+            top_solid_layers: 5
+            support_material_contact_distance: 0.22
+            raft_contact_distance: 0.2
+            top_solid_infill_speed: 70
+            bridge_acceleration: 1500
+            extrusion_width: 0.68
+            perimeter_extrusion_width: 0.62
+            external_perimeter_extrusion_width: 0.62
+            infill_extrusion_width: 0.65
+            solid_infill_extrusion_width: 0.65
+            top_infill_extrusion_width: 0.5
+            perimeter_speed: 70
+            external_perimeter_speed: 50
+            small_perimeter_speed: 50
+            solid_infill_speed: 110
+            infill_speed: 100
+            bridge_speed: 30
+            gap_fill_speed: 80
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            solid_infill_acceleration: 4000
+            top_solid_infill_acceleration: 2000
+            infill_acceleration: 6000
+            overhang_speed_2: 30
+            overhang_speed_3: 80%
+        - name: 0.20mm BALANCED @COREONEL 0.6HF
+          id: JhkOA/TaRNK8It3hUWF68Q
+          values:
+            layer_height: 0.20
+            bottom_solid_layers: 3
+            top_solid_layers: 5
+            support_material_contact_distance: 0.22
+            raft_contact_distance: 0.2
+            top_solid_infill_speed: 70
+            bridge_acceleration: 1500
+            extrusion_width: 0.68
+            perimeter_extrusion_width: 0.62
+            external_perimeter_extrusion_width: 0.62
+            infill_extrusion_width: 0.65
+            solid_infill_extrusion_width: 0.65
+            top_infill_extrusion_width: 0.5
+            perimeter_speed: 150
+            external_perimeter_speed: 200
+            small_perimeter_speed: 170
+            solid_infill_speed: 150
+            infill_speed: 150
+            bridge_speed: 40
+            gap_fill_speed: 80
+            support_material_speed: 110
+            support_material_interface_speed: 50%
+            overhang_speed_2: 30
+            overhang_speed_3: 70%
+        - name: 0.20mm SPEED @COREONEL 0.6HF
+          id: 6GfoLEGXTFSUkYzgCyUuXQ
+          values:
+            layer_height: 0.20
+            bottom_solid_layers: 3
+            top_solid_layers: 5
+            support_material_contact_distance: 0.22
+            raft_contact_distance: 0.2
+            top_solid_infill_speed: 120
+            bridge_acceleration: 1500
+            extrusion_width: 0.68
+            perimeter_extrusion_width: 0.62
+            external_perimeter_extrusion_width: 0.62
+            infill_extrusion_width: 0.65
+            solid_infill_extrusion_width: 0.65
+            top_infill_extrusion_width: 0.5
+            perimeter_speed: 230
+            external_perimeter_speed: 200
+            small_perimeter_speed: 170
+            solid_infill_speed: 200
+            infill_speed: 250
+            bridge_speed: 40
+            gap_fill_speed: 130
+            support_material_speed: 110
+            support_material_interface_speed: 50%
+            overhang_speed_2: 30
+            overhang_speed_3: 70%
+# 0.6HF/0.25mm layer
+        - name: 0.25mm STRUCTURAL @COREONEL 0.6HF
+          id: 0.25mm STRUCTURAL @COREONEL 0.6HF
+          values:
+            layer_height: 0.25
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            top_solid_infill_acceleration: 2000
+            gap_fill_speed: 70
+            top_solid_infill_speed: 60
+            support_material_speed: 80
+            perimeter_speed: 70
+            small_perimeter_speed: 50
+            external_perimeter_speed: 50
+            infill_speed: 100
+            solid_infill_speed: 90
+            bridge_speed: 30
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            bridge_acceleration: 1500
+            infill_acceleration: 6000
+            solid_infill_acceleration: 4000
+            overhang_speed_2: 30
+            overhang_speed_3: 80%
+        - name: 0.25mm BALANCED @COREONEL 0.6HF
+          id: ri5a338sTFW5MyBLSAT+9Q
+          values:
+            layer_height: 0.25
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            top_solid_infill_acceleration: 2000
+            top_solid_infill_speed: 60
+            perimeter_speed: 150
+            external_perimeter_speed: 180
+            small_perimeter_speed: 170
+            solid_infill_speed: 150
+            infill_speed: 150
+            bridge_speed: 40
+            gap_fill_speed: 80
+            support_material_speed: 110
+            support_material_interface_speed: 50%
+            overhang_speed_2: 30
+            overhang_speed_3: 70%
+        - name: 0.25mm SPEED @COREONEL 0.6HF
+          id: tImuhoiRQkChOcSRHUclCQ
+          values:
+            layer_height: 0.25
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            top_solid_infill_acceleration: 2000
+            gap_fill_speed: 120
+            top_solid_infill_speed: 120
+            perimeter_speed: 200
+            external_perimeter_speed: 180
+            small_perimeter_speed: 170
+            infill_speed: 200
+            solid_infill_speed: 190
+            support_material_speed: 120
+            support_material_interface_speed: 50%
+            bridge_speed: 40
+            bridge_acceleration: 1500
+            overhang_speed_2: 30
+            overhang_speed_3: 70%
+# 0.6HF/0.32mm layer
+        - name: 0.32mm STRUCTURAL @COREONEL 0.6HF
+          id: 0.32mm STRUCTURAL @COREONEL 0.6HF
+          values:
+            layer_height: 0.32
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            solid_infill_speed: 70
+            gap_fill_speed: 60
+            top_solid_infill_acceleration: 1500
+            bridge_acceleration: 1500
+            top_solid_infill_speed: 60
+            perimeter_speed: 70
+            external_perimeter_speed: 50
+            small_perimeter_speed: 50
+            infill_speed: 120
+            bridge_speed: 40
+            infill_acceleration: 6000
+            solid_infill_acceleration: 4000
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            overhang_speed_2: 35
+            overhang_speed_3: 50
+            support_material_speed: 110
+            support_material_interface_speed: 50%
+        - name: 0.32mm BALANCED @COREONEL 0.6HF
+          id: 2WqCVWBFRUGz1jRRiH1xDg
+          values:
+            layer_height: 0.32
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            top_solid_infill_acceleration: 1500
+            bridge_acceleration: 1500
+            top_solid_infill_speed: 60
+            perimeter_speed: 145
+            external_perimeter_speed: 145
+            small_perimeter_speed: 145
+            solid_infill_speed: 120
+            infill_speed: 120
+            bridge_speed: 40
+            gap_fill_speed: 80
+            support_material_speed: 110
+            support_material_interface_speed: 50%
+            overhang_speed_2: 35
+            overhang_speed_3: 70%
+        - name: 0.32mm SPEED @COREONEL 0.6HF
+          id: 4joK8lyUQYeoBm4F6wau9Q
+          values:
+            layer_height: 0.32
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            gap_fill_speed: 120
+            bridge_acceleration: 1500
+            perimeter_speed: 160
+            external_perimeter_speed: 145
+            small_perimeter_speed: 145
+            infill_speed: 160
+            solid_infill_speed: 140
+            bridge_speed: 40
+            top_solid_infill_speed: 110
+            support_material_speed: 110
+            top_solid_infill_acceleration: 2000
+            support_material_interface_speed: 50%
+            overhang_speed_2: 35
+            overhang_speed_3: 70%
+# 0.6HF/0.40mm layer
+        - name: 0.40mm STRUCTURAL @COREONEL 0.6HF
+          id: 0.40mm STRUCTURAL @COREONEL 0.6HF
+          values:
+            layer_height: 0.4
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            perimeter_speed: 70
+            external_perimeter_speed: 50
+            small_perimeter_speed: 50
+            infill_speed: 100
+            solid_infill_speed: 100
+            top_solid_infill_speed: 60
+            support_material_speed: 110
+            support_material_interface_speed: 50%
+            bridge_speed: 30
+            gap_fill_speed: 60
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            solid_infill_acceleration: 4000
+            infill_acceleration: 6000
+            bridge_acceleration: 1500
+            over_bridge_speed: 70%
+            overhang_speed_2: 35
+        - name: 0.40mm SPEED @COREONEL 0.6HF
+          id: FO6PF0m5Q8m7Yd+78IfALA
+          values:
+            layer_height: 0.4
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            support_material_contact_distance: 0.25
+            raft_contact_distance: 0.25
+            perimeter_speed: 130
+            external_perimeter_speed: 120
+            small_perimeter_speed: 120
+            infill_speed: 150
+            solid_infill_speed: 120
+            top_solid_infill_speed: 60
+            support_material_speed: 110
+            support_material_interface_speed: 50%
+            bridge_speed: 40
+            gap_fill_speed: 60
+            bridge_acceleration: 1500
+            over_bridge_speed: 70%
+            overhang_speed_2: 35
+            overhang_speed_3: 70%
+# 0.8 high-flow nozzle
+      - condition: tool.nozzle_diameter == 0.8
+        id: LhHo2U18SV+/v7rr1bQOnw
+        values:
+          fill_pattern: rectilinear
+          thick_bridges: 1
+          extrusion_width: 0.9
+          first_layer_extrusion_width: 1
+          perimeter_extrusion_width: 0.9
+          external_perimeter_extrusion_width: 0.9
+          infill_extrusion_width: 0.9
+          solid_infill_extrusion_width: 0.9
+          top_infill_extrusion_width: 0.8
+          support_material_extrusion_width: 0.65
+          gcode_resolution: 0.0125
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.25
+          support_material_xy_spacing: 80%
+          support_material_interface_spacing: 0.35
+          support_material_interface_speed: 85%
+          support_tree_tip_diameter: 1.6
+          raft_contact_distance: 0.2
+          gap_fill_speed: 40
+          top_solid_min_thickness: 1.2
+          bottom_solid_min_thickness: 0.8
+          seam_position: nearest
+          infill_anchor: 2.5
+          infill_anchor_max: 20
+          overhang_speed_1: 20
+          overhang_speed_2: 25
+          overhang_speed_3: 80%
+          first_layer_solid_infill_speed: 55
+          over_bridge_speed: 0
+          bridge_speed: 22
+          support_tree_branch_diameter_double_wall: 0
+        variants:
+# 0.8HF/0.30mm layer
+        - name: 0.30mm STRUCTURAL @COREONEL 0.8HF
+          id: 0.30mm STRUCTURAL @COREONEL 0.8HF
+          values:
+            layer_height: 0.3
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            bridge_acceleration: 1000
+            perimeter_speed: 70
+            external_perimeter_speed: 50
+            small_perimeter_speed: 50
+            infill_speed: 120
+            solid_infill_speed: 120
+            top_solid_infill_speed: 60
+            support_material_speed: 100
+            support_material_interface_speed: 55%
+            gap_fill_speed: 60
+            external_perimeter_acceleration: 1500
+            infill_acceleration: 6000
+            perimeter_acceleration: 2500
+            solid_infill_acceleration: 4000
+            top_infill_extrusion_width: 0.7
+            overhang_speed_2: 40
+        - name: 0.30mm SPEED @COREONEL 0.8HF
+          id: aX+LiXLqRIiOOpCqPU3l4A
+          values:
+            layer_height: 0.3
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            bridge_acceleration: 1000
+            perimeter_speed: 150
+            external_perimeter_speed: 125
+            small_perimeter_speed: 125
+            infill_speed: 180
+            solid_infill_speed: 125
+            top_solid_infill_speed: 80
+            support_material_speed: 110
+            gap_fill_speed: 80
+            external_perimeter_acceleration: 2500
+            perimeter_acceleration: 3000
+            solid_infill_acceleration: 5000
+            top_infill_extrusion_width: 0.7
+            overhang_speed_2: 45
+            overhang_speed_3: 60%
+            over_bridge_speed: 60%
+# 0.8HF/0.40mm layer
+        - name: 0.40mm STRUCTURAL @COREONEL 0.8HF
+          id: 0.40mm STRUCTURAL @COREONEL 0.8HF
+          values:
+            layer_height: 0.4
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            bridge_acceleration: 1000
+            perimeter_speed: 70
+            external_perimeter_speed: 50
+            small_perimeter_speed: 50
+            infill_speed: 100
+            solid_infill_speed: 100
+            top_solid_infill_speed: 65
+            support_material_speed: 80
+            gap_fill_speed: 60
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            solid_infill_acceleration: 4000
+            infill_acceleration: 6000
+            top_infill_extrusion_width: 0.75
+            overhang_speed_2: 40
+        - name: 0.40mm SPEED @COREONEL 0.8HF
+          id: XoJtInCnRH63I3UZImOzmA
+          values:
+            layer_height: 0.4
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            bridge_acceleration: 1000
+            perimeter_speed: 120
+            external_perimeter_speed: 85
+            small_perimeter_speed: 85
+            infill_speed: 130
+            solid_infill_speed: 100
+            top_solid_infill_speed: 75
+            support_material_speed: 90
+            gap_fill_speed: 75
+            external_perimeter_acceleration: 2500
+            perimeter_acceleration: 3000
+            solid_infill_acceleration: 5000
+            top_infill_extrusion_width: 0.75
+            overhang_speed_2: 45
+            over_bridge_speed: 70%
+# 0.8HF/0.55mm layer
+        - name: 0.55mm STRUCTURAL @COREONEL 0.8HF
+          id: 0.55mm STRUCTURAL @COREONEL 0.8HF
+          values:
+            layer_height: 0.55
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            bridge_acceleration: 1000
+            top_infill_extrusion_width: 0.75
+            perimeter_extrusion_width: 1
+            external_perimeter_extrusion_width: 1
+            perimeter_speed: 70
+            external_perimeter_speed: 50
+            small_perimeter_speed: 50
+            infill_speed: 75
+            solid_infill_speed: 65
+            top_solid_infill_speed: 45
+            support_material_speed: 65
+            gap_fill_speed: 60
+            external_perimeter_acceleration: 1500
+            perimeter_acceleration: 2500
+            infill_acceleration: 6000
+            solid_infill_acceleration: 4000
+            overhang_speed_2: 40
+        - name: 0.55mm SPEED @COREONEL 0.8HF
+          id: yBcybTQxSP6NeMqL9NRJJg
+          values:
+            layer_height: 0.55
+            bottom_solid_layers: 3
+            top_solid_layers: 4
+            bridge_acceleration: 1000
+            top_infill_extrusion_width: 0.75
+            perimeter_extrusion_width: 1
+            external_perimeter_extrusion_width: 1
+            perimeter_speed: 100
+            external_perimeter_speed: 70
+            small_perimeter_speed: 70
+            infill_speed: 100
+            solid_infill_speed: 70
+            top_solid_infill_speed: 60
+            support_material_speed: 80
+            gap_fill_speed: 75
+            external_perimeter_acceleration: 2500
+            perimeter_acceleration: 3000
+            solid_infill_acceleration: 5000
+            overhang_speed_2: 45
+# 0.25 nozzle
+    - condition: tool.nozzle_diameter == 0.25
+      id: FAmdd7GmR2yjYW3M4XT4wA
+      values:
+        extrusion_width: 0.27
+        first_layer_extrusion_width: 0.32
+        perimeter_extrusion_width: 0.27
+        external_perimeter_extrusion_width: 0.27
+        infill_extrusion_width: 0.27
+        solid_infill_extrusion_width: 0.27
+        top_infill_extrusion_width: 0.27
+        support_material_extrusion_width: 0.25
+        first_layer_speed: 25
+        first_layer_solid_infill_speed: 45
+        gcode_resolution: 0.008
+        elefant_foot_compensation: 0
+        brim_separation: 0
+        bottom_solid_layers: 6
+        top_solid_layers: 9
+        support_material_speed: 70
+        support_material_interface_speed: 75%
+        infill_overlap: 15%
+        default_acceleration: 3000
+        travel_acceleration: 4000
+        infill_acceleration: 3000
+        solid_infill_acceleration: 2500
+        top_solid_infill_acceleration: 1000
+        bridge_speed: 30
+        bridge_flow_ratio: 1
+        infill_speed: 100
+        solid_infill_speed: 140
+        top_solid_infill_speed: 60
+        perimeters: 3
+        infill_anchor: 1
+        support_material_contact_distance: 0.15
+        support_material_spacing: 1
+        support_material_xy_spacing: 150%
+        support_tree_tip_diameter: 0.5
+        raft_contact_distance: 0.15
+        raft_first_layer_density: 95%
+        support_material_first_layer_density: 95%
+        gap_fill_speed: 50
+# 0.25n/0.05mm layer
+      variants:
+      - name: 0.05mm DETAIL @COREONEL 0.25
+        id: GxQuKrT7QsCsQ4JI7X09mg
+        values:
+          layer_height: 0.05
+          bottom_solid_layers: 10
+          top_solid_layers: 13
+          top_solid_infill_speed: 60
+          support_material_contact_distance: 0.11
+          perimeter_speed: 60
+          small_perimeter_speed: 45
+          external_perimeter_speed: 45
+          gap_fill_speed: 45
+          support_material_speed: 60
+          external_perimeter_acceleration: 800
+          perimeter_acceleration: 1200
+          top_solid_infill_acceleration: 1000
+          solid_infill_acceleration: 2000
+          infill_acceleration: 2500
+          bridge_acceleration: 1000
+          default_acceleration: 3000
+          perimeter_extrusion_width: 0.25
+          external_perimeter_extrusion_width: 0.25
+          infill_extrusion_width: 0.25
+          solid_infill_extrusion_width: 0.25
+          solid_infill_speed: 100
+          bridge_speed: 25
+          raft_contact_distance: 0.1
+          overhang_speed_2: 30
+# 0.25n/0.07mm layer
+      - name: 0.07mm DETAIL @COREONEL 0.25
+        id: w6SzeWtTSSOEuKbX2Oo+ag
+        values:
+          layer_height: 0.07
+          bottom_solid_layers: 9
+          top_solid_layers: 11
+          top_solid_infill_speed: 60
+          support_material_contact_distance: 0.11
+          perimeter_speed: 60
+          small_perimeter_speed: 45
+          external_perimeter_speed: 45
+          gap_fill_speed: 45
+          support_material_speed: 60
+          external_perimeter_acceleration: 800
+          perimeter_acceleration: 1200
+          top_solid_infill_acceleration: 1000
+          solid_infill_acceleration: 2000
+          infill_acceleration: 2500
+          bridge_acceleration: 1000
+          default_acceleration: 3000
+          perimeter_extrusion_width: 0.25
+          external_perimeter_extrusion_width: 0.25
+          infill_extrusion_width: 0.25
+          solid_infill_extrusion_width: 0.25
+          solid_infill_speed: 140
+          bridge_speed: 30
+          raft_contact_distance: 0.1
+          overhang_speed_2: 30
+# 0.25n/0.12mm layer
+      - name: 0.12mm STRUCTURAL @COREONEL 0.25
+        id: ZCCr8K5FRvyjVFn+GMs1aw
+        values:
+          layer_height: 0.12
+          bottom_solid_layers: 6
+          top_solid_layers: 9
+          support_material_contact_distance: 0.11
+          raft_contact_distance: 0.1
+          infill_acceleration: 3000
+          solid_infill_acceleration: 2500
+          overhang_speed_2: 30
+          perimeter_speed: 70
+          external_perimeter_speed: 45
+          small_perimeter_speed: 45
+          external_perimeter_acceleration: 1000
+          perimeter_acceleration: 1500
+      - name: 0.12mm SPEED @COREONEL 0.25
+        id: sLa3iACcRBOGu8PoeENfdA
+        values:
+          layer_height: 0.12
+          bottom_solid_layers: 6
+          top_solid_layers: 9
+          support_material_contact_distance: 0.11
+          raft_contact_distance: 0.1
+          infill_acceleration: 3000
+          solid_infill_acceleration: 2500
+          overhang_speed_2: 30
+          perimeter_speed: 130
+          external_perimeter_speed: 130
+          small_perimeter_speed: 130
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          travel_acceleration: 6000
+# 0.25n/0.15mm layer
+      - name: 0.15mm STRUCTURAL @COREONEL 0.25
+        id: i4tsGwrVS26v+doFC+84GQ
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 6
+          top_solid_layers: 7
+          support_material_contact_distance: 0.12
+          raft_contact_distance: 0.1
+          infill_acceleration: 3000
+          solid_infill_acceleration: 2500
+          overhang_speed_2: 30
+          perimeter_speed: 70
+          external_perimeter_speed: 45
+          small_perimeter_speed: 45
+          external_perimeter_acceleration: 1000
+          perimeter_acceleration: 1500
+      - name: 0.15mm SPEED @COREONEL 0.25
+        id: VRsABWEJQcOYSREXcFCc5A
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 6
+          top_solid_layers: 7
+          support_material_contact_distance: 0.12
+          raft_contact_distance: 0.1
+          infill_acceleration: 3000
+          solid_infill_acceleration: 2500
+          overhang_speed_2: 30
+          perimeter_speed: 130
+          external_perimeter_speed: 130
+          small_perimeter_speed: 130
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          travel_acceleration: 6000
+# 0.3 nozzle
+    - condition: tool.nozzle_diameter == 0.3
+      id: FV2S10LdRdOND9gGrYPqNw
+      values:
+        extrusion_width: 0.34
+        solid_infill_extrusion_width: 0.34
+        top_infill_extrusion_width: 0.3
+        brim_separation: 0
+        infill_extrusion_width: 0.34
+        support_material_extrusion_width: 0.3
+        elefant_foot_compensation: 0.1
+        first_layer_extrusion_width: 0.4
+        perimeter_extrusion_width: 0.34
+        external_perimeter_extrusion_width: 0.34
+        top_solid_layers: 6
+        support_material_speed: 70
+        support_material_interface_speed: 75%
+        infill_overlap: 15%
+        top_solid_infill_acceleration: 1500
+        bridge_speed: 30
+        bridge_flow_ratio: 1
+        perimeters: 3
+        infill_anchor: 1
+        support_material_contact_distance: 0.15
+        support_material_spacing: 1
+        support_material_xy_spacing: 100%
+        support_tree_tip_diameter: 0.6
+        raft_contact_distance: 0.15
+        raft_first_layer_density: 90%
+        support_material_first_layer_density: 90%
+        gap_fill_speed: 50
+        top_solid_min_thickness: 0.7
+        bottom_solid_min_thickness: 0.5
+        first_layer_solid_infill_speed: 60
+        overhang_speed_2: 30
+      variants:
+# 0.3n/0.12mm layer
+      - name: 0.12mm STRUCTURAL @COREONEL 0.3
+        id: M3V5gaM4TNeIxC3cuVcQOg
+        values:
+          layer_height: 0.12
+          bottom_solid_layers: 6
+          top_solid_layers: 7
+          support_material_contact_distance: 0.12
+          raft_contact_distance: 0.12
+          perimeter_speed: 70
+          small_perimeter_speed: 45
+          external_perimeter_speed: 45
+          infill_speed: 100
+          solid_infill_speed: 200
+          top_solid_infill_speed: 45
+          support_material_speed: 70
+          external_perimeter_acceleration: 1200
+          perimeter_acceleration: 1500
+          solid_infill_acceleration: 2500
+          infill_acceleration: 5000
+          bridge_acceleration: 1000
+# 0.3n/0.16mm layer              
+      - name: 0.16mm STRUCTURAL @COREONEL 0.3
+        id: 0h7rSEz5RJqQ8pxhJnfQMg
+        values:
+          layer_height: 0.16
+          bottom_solid_layers: 5
+          top_solid_layers: 6
+          support_material_contact_distance: 0.16
+          raft_contact_distance: 0.16
+          infill_speed: 120
+          solid_infill_speed: 200
+          infill_acceleration: 6000
+          bridge_acceleration: 1000
+          top_solid_infill_acceleration: 1500
+          perimeter_speed: 70
+          small_perimeter_speed: 50
+          external_perimeter_speed: 50
+          top_solid_infill_speed: 50
+          support_material_speed: 70
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          solid_infill_acceleration: 2500
+      - name: 0.16mm SPEED @COREONEL 0.3
+        id: SU36kGoeSRaBgHdJ05KZPQ
+        values:
+          layer_height: 0.16
+          bottom_solid_layers: 5
+          top_solid_layers: 6
+          support_material_contact_distance: 0.16
+          raft_contact_distance: 0.16
+          infill_speed: 120
+          solid_infill_speed: 200
+          infill_acceleration: 6000
+          bridge_acceleration: 1000
+          top_solid_infill_acceleration: 1500
+          perimeter_speed: 140
+          small_perimeter_speed: 130
+          external_perimeter_speed: 130
+          top_solid_infill_speed: 50
+          support_material_speed: 100
+          support_material_interface_speed: 45%
+          external_perimeter_acceleration: 2500
+          perimeter_acceleration: 3000
+          solid_infill_acceleration: 3000
+# 0.3n/0.20mm layer
+      - name: 0.20mm STRUCTURAL @COREONEL 0.3
+        id: RCn03ZIMTT2OfIRvl/ED7g
+        values:
+          layer_height: 0.2
+          top_solid_layers: 5
+          support_material_contact_distance: 0.2
+          raft_contact_distance: 0.18
+          infill_speed: 120
+          top_solid_infill_speed: 50
+          top_solid_infill_acceleration: 1500
+          infill_acceleration: 6000
+          bridge_acceleration: 1000
+          bottom_solid_layers: 4
+          perimeter_speed: 70
+          small_perimeter_speed: 50
+          external_perimeter_speed: 50
+          solid_infill_speed: 200
+          support_material_speed: 70
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          solid_infill_acceleration: 2500
+      - name: 0.20mm SPEED @COREONEL 0.3
+        id: fYySrngfSRepKXtseT1SPA
+        values:
+          layer_height: 0.2
+          bottom_solid_layers: 3
+          top_solid_layers: 5
+          support_material_contact_distance: 0.2
+          raft_contact_distance: 0.18
+          infill_speed: 120
+          top_solid_infill_speed: 50
+          top_solid_infill_acceleration: 1500
+          infill_acceleration: 6000
+          bridge_acceleration: 1000
+          perimeter_speed: 140
+          small_perimeter_speed: 130
+          external_perimeter_speed: 130
+          solid_infill_speed: 200
+          support_material_speed: 100
+          support_material_interface_speed: 45%
+          external_perimeter_acceleration: 2500
+          perimeter_acceleration: 3000
+          solid_infill_acceleration: 3000
+# 0.4 nozzle
+    - condition: tool.nozzle_diameter == 0.4
+# 0.4n/0.10mm layer
+      id: H8RrQtjcTTGtOGhaBDttFg
+      variants:
+      - name: 0.10mm FAST DETAIL @COREONEL 0.4
+        id: oDOFbi/vTzewM9H7M3UDeQ
+        values:
+          layer_height: 0.1
+          bottom_solid_layers: 7
+          top_solid_layers: 8
+          support_material_contact_distance: 0.17
+          raft_contact_distance: 0.15
+          perimeter_speed: 140
+          external_perimeter_speed: 140
+          small_perimeter_speed: 140
+          gap_fill_speed: 120
+          support_material_speed: 120
+          support_material_interface_speed: 50
+          external_perimeter_acceleration: 2000
+          perimeter_acceleration: 3000
+          solid_infill_acceleration: 4000
+          top_solid_infill_acceleration: 1500
+          infill_acceleration: 6000
+          infill_speed: 140
+          perimeters: 3
+          top_infill_extrusion_width: 0.4
+          overhang_speed_2: 30
+          overhang_speed_3: 80%
+          bridge_speed: 40
+# 0.4n/0.15mm layer
+      - name: 0.15mm STRUCTURAL @COREONEL 0.4
+        id: vXCuO3pbT4iJIJakUfvJaQ
+        unconditional_inherits:
+        - 0.15mm STRUCTURAL @COREONEL 0.4HF
+      - name: 0.15mm SPEED @COREONEL 0.4
+        id: JdPqHK/CRxGm+fl0PhRoXQ
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 4
+          top_solid_layers: 6
+          support_material_contact_distance: 0.17
+          raft_contact_distance: 0.15
+          bridge_speed: 45
+          support_material_speed: 120
+          support_material_interface_speed: 50
+          perimeter_speed: 170
+          external_perimeter_speed: 170
+          small_perimeter_speed: 170
+          gap_fill_speed: 120
+          overhang_speed_2: 50
+          overhang_speed_3: 80%
+          support_material_threshold: 35
+      - name: 0.15mm BALANCED @COREONEL 0.4
+        id: wNH3AsLETF2AW4rccmVvgQ
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 4
+          top_solid_layers: 6
+          support_material_contact_distance: 0.17
+          raft_contact_distance: 0.15
+          bridge_speed: 45
+          support_material_speed: 120
+          support_material_interface_speed: 50
+          perimeter_speed: 150
+          external_perimeter_speed: 170
+          small_perimeter_speed: 170
+          gap_fill_speed: 120
+          overhang_speed_2: 50
+          overhang_speed_3: 80%
+          support_material_threshold: 35
+          infill_speed: 150
+          solid_infill_speed: 150
+          external_perimeter_acceleration: 2500
+          perimeter_acceleration: 3000
+          infill_acceleration: 5000
+          over_bridge_speed: 0
+# 0.4n/0.20mm layer
+      - name: 0.20mm STRUCTURAL @COREONEL 0.4
+        id: uS7i0PZTS1iOU3vAVgjprQ
+        unconditional_inherits:
+        - 0.20mm STRUCTURAL @COREONEL 0.4HF
+      - name: 0.20mm SPEED @COREONEL 0.4
+        id: uRM+poVlQtSdrKzqhrR/lQ
+        values:
+          layer_height: 0.2
+          bottom_solid_layers: 3
+          top_solid_layers: 5
+          support_material_contact_distance: 0.2
+          raft_contact_distance: 0.2
+          overhang_speed_2: 50
+          support_material_threshold: 35
+      - name: 0.20mm BALANCED @COREONEL 0.4
+        id: sQLZvxTcQWKMQG62c9Xvjw
+        values:
+          layer_height: 0.2
+          bottom_solid_layers: 3
+          top_solid_layers: 5
+          support_material_contact_distance: 0.2
+          raft_contact_distance: 0.2
+          perimeter_speed: 150
+          external_perimeter_speed: 170
+          small_perimeter_speed: 170
+          gap_fill_speed: 120
+          overhang_speed_2: 50
+          overhang_speed_3: 80%
+          support_material_threshold: 35
+          infill_speed: 150
+          solid_infill_speed: 150
+          external_perimeter_acceleration: 2500
+          perimeter_acceleration: 3000
+          infill_acceleration: 5000
+          over_bridge_speed: 0
+# 0.5 nozzle
+    - condition: tool.nozzle_diameter == 0.5
+      id: MNILYwxfSyad9tQ6gVVLCw
+      values:
+        extrusion_width: 0.55
+        first_layer_extrusion_width: 0.55
+        perimeter_extrusion_width: 0.55
+        external_perimeter_extrusion_width: 0.55
+        infill_extrusion_width: 0.55
+        solid_infill_extrusion_width: 0.55
+        top_infill_extrusion_width: 0.5
+        support_material_extrusion_width: 0.4
+        gcode_resolution: 0.008
+        bottom_solid_layers: 3
+        top_solid_layers: 4
+        support_material_contact_distance: 0.25
+        support_material_xy_spacing: 80%
+        support_material_interface_spacing: 0.22
+        support_material_interface_speed: 75%
+        support_tree_tip_diameter: 1
+        raft_contact_distance: 0.25
+        gap_fill_speed: 70
+        top_solid_min_thickness: 0.7
+        bottom_solid_min_thickness: 0.5
+        infill_anchor: 2
+        infill_anchor_max: 15
+# 0.5n/0.10mm layer
+      variants:
+      - name: 0.10mm STRUCTURAL @COREONEL 0.5
+        id: U5FpB49lSE2WwYDQPel2zA
+        unconditional_inherits:
+        - 0.10mm STRUCTURAL @COREONEL 0.5HF
+# 0.5n/0.15mm layer
+      - name: 0.15mm STRUCTURAL @COREONEL 0.5
+        id: JOdlhE90TzuBjkML6yij1g
+        unconditional_inherits:
+        - 0.15mm STRUCTURAL @COREONEL 0.5HF
+# 0.5n/0.20mm layer
+      - name: 0.20mm STRUCTURAL @COREONEL 0.5
+        id: h8qOAoTsRU6b+vfjRG/YVQ
+        unconditional_inherits:
+        - 0.20mm STRUCTURAL @COREONEL 0.5HF
+      - name: 0.20mm SPEED @COREONEL 0.5
+        id: TQ4Gg9NRQH2pFTNw8IOi/w
+        values:
+          layer_height: 0.2
+          bottom_solid_layers: 3
+          top_solid_layers: 5
+          support_material_contact_distance: 0.2
+          raft_contact_distance: 0.2
+          top_solid_infill_speed: 70
+          gap_fill_speed: 70
+          bridge_acceleration: 1000
+          perimeter_speed: 140
+          small_perimeter_speed: 140
+          external_perimeter_speed: 140
+          infill_speed: 200
+          solid_infill_speed: 135
+          bridge_speed: 40
+          support_material_speed: 120
+          overhang_speed_2: 50
+# 0.5n/0.25mm layer
+      - name: 0.25mm STRUCTURAL @COREONEL 0.5
+        id: jxQteIBVSImyKsb1XjQ/hw
+        unconditional_inherits:
+        - 0.25mm STRUCTURAL @COREONEL 0.5HF
+      - name: 0.25mm SPEED @COREONEL 0.5
+        id: 9AbpyEctQM6I0Uo/zAsACg
+        values:
+          layer_height: 0.25
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.25
+          raft_contact_distance: 0.25
+          bridge_acceleration: 1000
+          default_acceleration: 3000
+          perimeter_speed: 140
+          small_perimeter_speed: 140
+          external_perimeter_speed: 140
+          infill_speed: 200
+          solid_infill_speed: 110
+          top_solid_infill_speed: 70
+          bridge_speed: 40
+          gap_fill_speed: 70
+          support_material_speed: 120
+          overhang_speed_2: 50
+          infill_acceleration: 6000
+
+# 0.6 nozzle
+    - condition: tool.nozzle_diameter == 0.6
+      id: DMvl8wgeRqWiTkbMXiFqcw
+      values:
+        extrusion_width: 0.68
+        first_layer_extrusion_width: 0.68
+        perimeter_extrusion_width: 0.68
+        external_perimeter_extrusion_width: 0.68
+        infill_extrusion_width: 0.68
+        solid_infill_extrusion_width: 0.68
+        top_infill_extrusion_width: 0.55
+        support_material_extrusion_width: 0.5
+        gcode_resolution: 0.0125
+        bottom_solid_layers: 3
+        top_solid_layers: 4
+        support_material_contact_distance: 0.15
+        support_material_xy_spacing: 80%
+        support_material_interface_spacing: 0.25
+        support_material_interface_speed: 75%
+        support_tree_tip_diameter: 1.2
+        raft_contact_distance: 0.25
+        gap_fill_speed: 70
+        overhang_speed_0: 15
+        overhang_speed_1: 20
+        overhang_speed_2: 25
+        overhang_speed_3: 50
+        top_solid_min_thickness: 0.9
+        bottom_solid_min_thickness: 0.6
+        infill_anchor: 2.5
+        infill_anchor_max: 20
+        support_material_speed: 90
+        fill_density: 20%
+        first_layer_solid_infill_speed: 70
+        over_bridge_speed: 0
+      variants:
+# 0.6n/0.15mm layer
+      - name: 0.15mm STRUCTURAL @COREONEL 0.6
+        id: PAGcOYjSRAO33E6RTBEoLg
+        unconditional_inherits:
+        - 0.15mm STRUCTURAL @COREONEL 0.6HF
+# 0.6n/0.20mm layer
+      - name: 0.20mm STRUCTURAL @COREONEL 0.6
+        id: QG9BK89uRnC9FCpvXGykgg
+        unconditional_inherits:
+        - 0.20mm STRUCTURAL @COREONEL 0.6HF
+        values:
+          infill_acceleration: 6000
+          overhang_speed_2: 30
+      - name: 0.20mm SPEED @COREONEL 0.6
+        id: DrJjl+f9QrSDxliEgk8FsA
+        values:
+          layer_height: 0.2
+          bottom_solid_layers: 3
+          top_solid_layers: 5
+          support_material_contact_distance: 0.22
+          raft_contact_distance: 0.2
+          top_solid_infill_speed: 70
+          bridge_acceleration: 1500
+          extrusion_width: 0.68
+          perimeter_extrusion_width: 0.62
+          external_perimeter_extrusion_width: 0.62
+          infill_extrusion_width: 0.65
+          solid_infill_extrusion_width: 0.65
+          top_infill_extrusion_width: 0.5
+          top_solid_infill_acceleration: 2000
+          perimeter_speed: 130
+          external_perimeter_speed: 130
+          small_perimeter_speed: 130
+          solid_infill_speed: 110
+          infill_speed: 110
+          bridge_speed: 40
+          gap_fill_speed: 80
+          overhang_speed_2: 30
+          overhang_speed_3: 70%
+# 0.6n/0.25mm layer
+      - name: 0.25mm STRUCTURAL @COREONEL 0.6
+        id: 4TVc3OHfSre7Yfm653DOow
+        unconditional_inherits:
+        - 0.25mm STRUCTURAL @COREONEL 0.6HF
+      - name: 0.25mm SPEED @COREONEL 0.6
+        id: AdT9xpGPSESt2khq/1dqkA
+        values:
+          layer_height: 0.25
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.25
+          raft_contact_distance: 0.25
+          gap_fill_speed: 70
+          top_solid_infill_speed: 60
+          support_material_speed: 80
+          perimeter_speed: 95
+          external_perimeter_speed: 75
+          small_perimeter_speed: 75
+          infill_speed: 100
+          solid_infill_speed: 90
+          bridge_speed: 40
+          external_perimeter_acceleration: 3000
+          perimeter_acceleration: 5000
+          bridge_acceleration: 1500
+          overhang_speed_2: 30
+          overhang_speed_3: 70%
+# 0.6n/0.32mm layer
+      - name: 0.32mm STRUCTURAL @COREONEL 0.6
+        id: h656zN+CQBy7lOt7sP5YyQ
+        unconditional_inherits:
+        - 0.32mm STRUCTURAL @COREONEL 0.6HF
+        values:
+          layer_height: 0.32
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.25
+          raft_contact_distance: 0.25
+          solid_infill_speed: 70
+          gap_fill_speed: 60
+          bridge_acceleration: 1500
+          top_solid_infill_speed: 60
+          infill_acceleration: 6000
+          infill_speed: 70
+          bridge_speed: 30
+          overhang_speed_2: 30
+          overhang_speed_3: 80%
+          perimeter_speed: 70
+          support_material_speed: 70
+      - name: 0.32mm SPEED @COREONEL 0.6
+        id: zi8PosXbS0enzgbSg0JqGg
+        values:
+          layer_height: 0.32
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.25
+          raft_contact_distance: 0.25
+          solid_infill_speed: 70
+          gap_fill_speed: 60
+          support_material_speed: 70
+          bridge_acceleration: 1500
+          top_solid_infill_speed: 60
+          perimeter_speed: 70
+          external_perimeter_speed: 70
+          small_perimeter_speed: 70
+          infill_speed: 100
+          bridge_speed: 40
+          external_perimeter_acceleration: 3000
+          perimeter_acceleration: 5000
+          overhang_speed_2: 30
+          overhang_speed_3: 70%
+# 0.8 nozzle
+    - condition: tool.nozzle_diameter == 0.8
+      id: hPkKy6zTQjC10F+4KdNDGw
+      values:
+        fill_pattern: rectilinear
+        thick_bridges: 1
+        extrusion_width: 0.9
+        first_layer_extrusion_width: 1
+        perimeter_extrusion_width: 0.9
+        external_perimeter_extrusion_width: 0.9
+        infill_extrusion_width: 0.9
+        solid_infill_extrusion_width: 0.9
+        top_infill_extrusion_width: 0.8
+        support_material_extrusion_width: 0.65
+        gcode_resolution: 0.0125
+        bottom_solid_layers: 3
+        top_solid_layers: 4
+        support_material_contact_distance: 0.25
+        support_material_xy_spacing: 80%
+        support_material_interface_spacing: 0.35
+        support_material_interface_speed: 85%
+        support_tree_tip_diameter: 1.6
+        raft_contact_distance: 0.2
+        gap_fill_speed: 40
+        top_solid_min_thickness: 1.2
+        bottom_solid_min_thickness: 0.8
+        seam_position: nearest
+        infill_anchor: 2.5
+        infill_anchor_max: 20
+        overhang_speed_1: 20
+        overhang_speed_2: 25
+        overhang_speed_3: 80%
+        first_layer_solid_infill_speed: 55
+        over_bridge_speed: 0
+        bridge_speed: 22
+        support_tree_branch_diameter_double_wall: 0
+      variants:
+# 0.8n/0.30mm layer
+      - name: 0.30mm DETAIL @COREONEL 0.8
+        id: xyNu3SUdToOoG1zTeyMaiQ
+        values:
+          layer_height: 0.3
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          perimeter_speed: 70
+          external_perimeter_speed: 45
+          small_perimeter_speed: 45
+          infill_speed: 100
+          solid_infill_speed: 50
+          top_solid_infill_speed: 35
+          support_material_speed: 60
+          gap_fill_speed: 45
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2500
+          top_solid_infill_acceleration: 2000
+          solid_infill_acceleration: 4000
+          infill_acceleration: 6000
+          bridge_acceleration: 1000
+          default_acceleration: 3000
+          top_infill_extrusion_width: 0.7
+          overhang_speed_2: 35
+# 0.8n/0.40mm layer
+      - name: 0.40mm QUALITY @COREONEL 0.8
+        id: slnxcUJbSnKLkgES10QvrA
+        values:
+          layer_height: 0.4
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          perimeter_speed: 50
+          external_perimeter_speed: 45
+          small_perimeter_speed: 45
+          infill_speed: 90
+          solid_infill_speed: 45
+          top_solid_infill_speed: 35
+          support_material_speed: 50
+          gap_fill_speed: 35
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2500
+          top_solid_infill_acceleration: 2000
+          solid_infill_acceleration: 4000
+          infill_acceleration: 6000
+          bridge_acceleration: 1000
+          default_acceleration: 3000
+          top_infill_extrusion_width: 0.75
+          overhang_speed_2: 35
+# 0.8n/0.55mm layer
+      - name: 0.55mm DRAFT @COREONEL 0.8
+        id: 2jU5F3g8St2JRPskpalkTw
+        values:
+          layer_height: 0.55
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          perimeter_speed: 45
+          external_perimeter_speed: 35
+          small_perimeter_speed: 35
+          infill_speed: 60
+          solid_infill_speed: 35
+          top_solid_infill_speed: 30
+          support_material_speed: 35
+          gap_fill_speed: 30
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2500
+          top_solid_infill_acceleration: 2000
+          solid_infill_acceleration: 4000
+          infill_acceleration: 6000
+          bridge_acceleration: 1000
+          top_infill_extrusion_width: 0.75
+          perimeter_extrusion_width: 1
+          external_perimeter_extrusion_width: 1
+# # MMU branch
+  # - name: '*MMU branch*'
+    # id: NRqrMgkSTuifHuNuaTktoA
+    # variants:
+    # - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      # id: rGtgpkpyQiGxDcnEVJXnEw
+      # variants:
+      # - condition: tool.nozzle_diameter == 0.4
+        # id: wjF+bq1HRqGmgEroJoZkQA
+        # variants:
+# # 0.4n/0.20mm/MMU SOLUBLE
+        # - name: 0.20mm SOLUBLE FULL @COREONEL 0.4
+          # id: 2rLMkIS4TfWOF8DWqeHugQ
+          # values:
+            # layer_height: 0.2
+            # bottom_solid_layers: 3
+            # top_solid_layers: 5
+            # raft_contact_distance: 0
+            # top_infill_extrusion_width: 0.42
+            # overhangs: 1
+            # support_material: everywhere
+            # support_material_extruder: 5
+            # support_material_extrusion_width: 0.4
+            # support_material_interface_extruder: 5
+            # support_material_interface_spacing: 0.1
+            # support_material_synchronize_layers: 1
+            # support_material_threshold: 60
+            # support_material_with_sheath: 1
+            # wipe_tower_bridging: 6
+            # support_material_bottom_interface_layers: -1
+            # thick_bridges: 0
+            # support_material_xy_spacing: 40%
+            # raft_first_layer_density: 90%
+            # support_material_first_layer_density: 90%
+            # support_material_interface_pattern: auto
+            # perimeter_speed: 80
+            # external_perimeter_speed: 45
+            # small_perimeter_speed: 45
+            # infill_speed: 120
+            # gap_fill_speed: 60
+            # top_solid_infill_speed: 80
+            # external_perimeter_acceleration: 1500
+            # perimeter_acceleration: 2500
+            # solid_infill_acceleration: 3000
+            # default_acceleration: 2500
+            # overhang_speed_3: 90%
+            # support_material_contact_distance: 0
+            # solid_infill_speed: 60
+            # support_material_speed: 80
+            # support_material_interface_speed: 40
+        # - name: 0.20mm SOLUBLE INTERFACE @COREONEL 0.4
+          # id: U8SPxrZJSTW9x0so5KGHUA
+          # values:
+            # layer_height: 0.2
+            # support_material_interface_layers: 3
+            # bottom_solid_layers: 3
+            # top_solid_layers: 5
+            # raft_contact_distance: 0
+            # top_infill_extrusion_width: 0.42
+            # overhangs: 1
+            # support_material: everywhere
+            # support_material_extruder: 0
+            # support_material_extrusion_width: 0.4
+            # support_material_interface_extruder: 5
+            # support_material_interface_spacing: 0.1
+            # support_material_synchronize_layers: 1
+            # support_material_threshold: 60
+            # support_material_with_sheath: false
+            # wipe_tower_bridging: 6
+            # support_material_bottom_interface_layers: -1
+            # thick_bridges: 0
+            # support_material_xy_spacing: 40%
+            # raft_first_layer_density: 90%
+            # support_material_first_layer_density: 90%
+            # support_material_interface_pattern: auto
+            # perimeter_speed: 80
+            # external_perimeter_speed: 45
+            # small_perimeter_speed: 45
+            # infill_speed: 120
+            # gap_fill_speed: 60
+            # top_solid_infill_speed: 80
+            # external_perimeter_acceleration: 1500
+            # perimeter_acceleration: 2500
+            # solid_infill_acceleration: 3000
+            # default_acceleration: 2500
+            # overhang_speed_3: 90%
+            # support_material_contact_distance: 0
+            # solid_infill_speed: 60
+            # support_material_speed: 80
+            # support_material_interface_speed: 40

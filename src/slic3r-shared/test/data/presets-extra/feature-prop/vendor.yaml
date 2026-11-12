@@ -1,0 +1,75 @@
+kind: vendor
+id: 'feature-prop'
+name: 'Feature Propagation Test'
+version: '1.0.0'
+features:
+  printer:
+    input_shaper:
+      default: false
+    planetary_gearbox:
+      default: true
+  tool:
+    nozzle_high_flow:
+      default: false
+  sheet:
+    cold:
+      default: false
+  presets:
+    printer:
+      printer_feat:
+        default: false
+    print:
+      print_feat:
+        default: false
+---
+kind: printer
+technology: FFF
+id: 'COREONE'
+name: 'Prusa CORE One'
+model:
+  base_model: 'COREONE'
+  model: 'COREONE'
+tool_count: 1
+features:
+  input_shaper:
+    default: true
+---
+kind: tool
+technology: FFF
+id: '0.4HF'
+name: '0.4 HF'
+features:
+  nozzle_diameter:
+    default: 0.4
+  nozzle_high_flow:
+    default: true
+---
+kind: tool
+technology: FFF
+id: '0.4'
+name: '0.4'
+features:
+  nozzle_diameter:
+    default: 0.4
+---
+kind: sheet
+id: 'pei_smooth'
+name: 'PEI Smooth'
+type: 'pei_smooth'
+---
+kind: sheet
+id: 'cold'
+name: 'Cold'
+type: 'cold'
+features:
+  cold:
+    default: true
+---
+kind: printer_config
+printer: COREONE
+id: 'c1-default'
+name: 'Prusa CORE One'
+tool_count: 1
+tools:
+  - tool: '0.4HF'
+default_sheet: 'pei_smooth'

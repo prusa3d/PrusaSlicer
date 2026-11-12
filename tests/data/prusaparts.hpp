@@ -2,10 +2,11 @@
 #define PRUSAPARTS_H
 
 #include <vector>
-#include <libslic3r/ExPolygon.hpp>
 
-using TestData = std::vector<Slic3r::Polygon>;
-using TestDataEx = std::vector<Slic3r::ExPolygons>;
+#include "Slic3r/Domain/ExPolygon.hpp"
+
+using TestData = std::vector<Slic3r::Domain::Polygon>;
+using TestDataEx = std::vector<Slic3r::Domain::ExPolygons>;
 
 extern const TestData PRUSA_PART_POLYGONS;
 extern const TestData PRUSA_STEGOSAUR_POLYGONS;

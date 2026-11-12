@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
 #include "libslic3r/ExtrusionEntityCollection.hpp"
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Point.hpp"
@@ -12,6 +13,7 @@
 #include "test_data.hpp"
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
 using namespace Catch;
 
 static inline Slic3r::Point random_point(float LO=-50, float HI=50) 
@@ -62,7 +64,7 @@ SCENARIO("ExtrusionLoop", "[ExtrusionEntity]")
         Polygon square { { 100, 100 }, { 200, 100 }, { 200, 200 }, { 100, 200 } };
 
         ExtrusionLoop loop;
-        loop.paths.emplace_back(new_extrusion_path(square.split_at_first_point(), ExtrusionRole::ExternalPerimeter, 1.));
+        loop.paths.emplace_back(new_extrusion_path(Algorithms::Polygon::split_at_first_point(square), ExtrusionRole::ExternalPerimeter, 1.));
         THEN("polygon area") {
             REQUIRE(loop.polygon().area() == Approx(square.area()));
             REQUIRE(loop.area() == Approx(square.area()));
@@ -255,7 +257,7 @@ SCENARIO("ExtrusionEntityCollection: Basics", "[ExtrusionEntity]")
     Polyline        polyline { { 100, 100 }, { 200, 100 }, { 200, 200 } };
     ExtrusionPath   path = new_extrusion_path(polyline, ExtrusionRole::ExternalPerimeter, 1.);
     ExtrusionLoop   loop;
-    loop.paths.emplace_back(new_extrusion_path(Polygon(polyline.points).split_at_first_point(), ExtrusionRole::InternalInfill, 1.));
+    loop.paths.emplace_back(new_extrusion_path(Algorithms::Polygon::split_at_first_point(Polygon(polyline.points)), ExtrusionRole::InternalInfill, 1.));
     ExtrusionEntityCollection collection;
     collection.append(path);
     THEN("no_sort is false by default") {

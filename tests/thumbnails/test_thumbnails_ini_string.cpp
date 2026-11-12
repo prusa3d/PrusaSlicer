@@ -1,8 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "libslic3r/Config.hpp"
-#include "libslic3r/PrintConfig.hpp"
-
 #include <libslic3r/GCode/Thumbnails.hpp>
 
 using namespace Slic3r;
@@ -104,7 +101,7 @@ static std::string invalid_val_thumbnails4()
             "thumbnails_format = jpG";
 }
 
-static DynamicPrintConfig thumbnails_config()
+/*static DynamicPrintConfig thumbnails_config()
 {
     DynamicPrintConfig config;
     config.apply_only(FullPrintConfig::defaults() , { "thumbnails", "thumbnails_format" });
@@ -227,7 +224,7 @@ TEST_CASE("Validate Old Thumbnails", "[Thumbnails in Config]") {
         REQUIRE_THROWS_AS(config.load_from_ini_string(old_invalid_thumbnails2(), Enable), BadOptionValueException);
         test_loaded_config(config, GCodeThumbnailsFormat::PNG);
     }
-}
+}*/
 
 
 

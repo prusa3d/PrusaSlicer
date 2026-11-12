@@ -1,0 +1,66 @@
+id: Prusament Resin Flex80 Black
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Flexible
+  material_colour: '#595959'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: ZEy0yCj3QBimvY5JZHNlzg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Flex80 Black @SL1 0.025
+    id: V7ESyP3PQq6u0HjxEhbtRQ
+    values:
+      exposure_time: 8
+      initial_exposure_time: 30
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Flex80 Black @SL1 0.05
+    id: oLD3n+kVTaihLx21ORJq8Q
+    values:
+      exposure_time: 10
+      initial_exposure_time: 30
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Flex80 Black @SL1 0.1
+    id: HMPX1CHLSJePZog2V5SDeg
+    values:
+      exposure_time: 13
+      initial_exposure_time: 30
+## SL1S
+- condition: printer.model == "SL1S"
+  id: TF0YuPQcQFm7Ui6nLLIFqQ
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [1, 10]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Flex80 Black @SL1S 0.025
+    id: 1mv50nHYRi2j9AeDePYA3Q
+    values:
+      exposure_time: 2.6
+      initial_exposure_time: 9
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Flex80 Black @SL1S 0.05
+    id: PD4gXerQT4ie0NmFZnun0Q
+    values:
+      exposure_time: 3
+      initial_exposure_time: 9
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Flex80 Black @SL1S 0.1
+    id: tD11ZbVBSLSQ5mffGJbIbQ
+    values:
+      exposure_time: 3.5
+      initial_exposure_time: 12

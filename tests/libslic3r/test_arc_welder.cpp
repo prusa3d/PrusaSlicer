@@ -9,8 +9,8 @@
 #include <libslic3r/GCode/ExtrusionOrder.hpp>
 #include <libslic3r/GCode/SmoothPath.hpp>
 #include <libslic3r/Geometry/ArcWelder.hpp>
-#include <libslic3r/Geometry/Circle.hpp>
-#include <libslic3r/SVG.hpp>
+#include <Slic3r/Biz/Algorithms/Geometry/Circle.hpp>
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
 #include <libslic3r/libslic3r.h>
 
 using namespace Slic3r;
@@ -114,9 +114,9 @@ TEST_CASE("arc basics", "[ArcWelder]") {
 TEST_CASE("arc discretization", "[ArcWelder]") {
     using namespace Slic3r::Geometry;
     WHEN("arc from { 2, 1 } to { 1, 2 }") {
-        const Point p1         = Point::new_scale(2., 1.);
-        const Point p2         = Point::new_scale(1., 2.);
-        const Point center     = Point::new_scale(1., 1.);
+        const Point p1         = scaled(Vec2d(2., 1.));
+        const Point p2         = scaled(Vec2d(1., 2.));
+        const Point center     = scaled(Vec2d(1., 1.));
         const float radius     = scaled<float>(1.);
         const float resolution = scaled<float>(0.002);
         auto test = [center, resolution, radius](const Point &p1, const Point &p2, const float r, const bool ccw) {
@@ -171,9 +171,9 @@ TEST_CASE("arc fitting", "[ArcWelder]") {
     using namespace Slic3r::Geometry;
 
     WHEN("arc from { 2, 1 } to { 1, 2 }") {
-        const Point p1         = Point::new_scale(2., 1.);
-        const Point p2         = Point::new_scale(1., 2.);
-        const Point center     = Point::new_scale(1., 1.);
+        const Point p1         = scaled(Vec2d(2., 1.));
+        const Point p2         = scaled(Vec2d(1., 2.));
+        const Point center     = scaled(Vec2d(1., 1.));
         const float radius     = scaled<float>(1.);
         const float resolution = scaled<float>(0.002);
         auto test = [center, resolution](const Point &p1, const Point &p2, const float r, const bool ccw) {
@@ -201,11 +201,11 @@ TEST_CASE("arc fitting", "[ArcWelder]") {
     }
 
     WHEN("arc from { 2, 1 } to { 1, 2 }, another arc from { 2, 1 } to { 0, 2 }, tangentially connected") {
-        const Point p1 = Point::new_scale(2., 1.);
-        const Point p2 = Point::new_scale(1., 2.);
-        const Point p3 = Point::new_scale(0., 3.);
-        const Point center1 = Point::new_scale(1., 1.);
-        const Point center2 = Point::new_scale(1., 3.);
+        const Point p1 = scaled(Vec2d(2., 1.));
+        const Point p2 = scaled(Vec2d(1., 2.));
+        const Point p3 = scaled(Vec2d(0., 3.));
+        const Point center1 = scaled(Vec2d(1., 1.));
+        const Point center2 = scaled(Vec2d(1., 3.));
         const float radius = scaled<float>(1.);
         const float resolution = scaled<float>(0.002);
         auto test = [center1, center2, resolution](const Point &p1, const Point &p2, const Point &p3, const float r, const bool ccw) {
@@ -257,8 +257,8 @@ TEST_CASE("least squares arc fitting, interpolating end points", "[ArcWelder]") 
     std::uniform_real_distribution<double>  angle_sampler(0.001, 2. * M_PI - 0.001);
     std::uniform_real_distribution<double>  radius_sampler(min_radius, max_radius);
     std::uniform_int_distribution<int>      num_samples_sampler(1, 100);
-    auto test_arc_fitting = [&rng, &coord_sampler, &num_samples_sampler, &angle_sampler, &radius_sampler]() {
-        auto sample_point = [&rng, &coord_sampler]() {
+    auto test_arc_fitting = [&]() {
+        auto sample_point = [&]() {
             return Vec2d(coord_sampler(rng), coord_sampler(rng));
         };
         // Start and end point of the arc:
@@ -346,15 +346,15 @@ TEST_CASE("arc wedge test", "[ArcWelder]") {
 
     WHEN("test point inside wedge, arc from { 2, 1 } to { 1, 2 }") {
         const int64_t s  = 1000000;
-        const Vec2i64 p1{ 2 * s, s };
-        const Vec2i64 p2{ s, 2 * s };
-        const Vec2i64 center{ s, s };
+        const Domain::Vec2big p1{ 2 * s, s };
+        const Domain::Vec2big p2{ s, 2 * s };
+        const Domain::Vec2big center{ s, s };
         const int64_t radius{ s };
         auto test = [center](
             // Arc data
-            const Vec2i64 &p1, const Vec2i64 &p2, const int64_t r, const bool ccw,
+            const Domain::Vec2big &p1, const Domain::Vec2big &p2, const int64_t r, const bool ccw,
             // Test data
-            const Vec2i64 &ptest, const bool ptest_inside) {
+            const Domain::Vec2big &ptest, const bool ptest_inside) {
             const Vec2d c = ArcWelder::arc_center(p1.cast<double>(), p2.cast<double>(), double(r), ccw);
             REQUIRE(is_approx(c, center.cast<double>()));
             REQUIRE(ArcWelder::inside_arc_wedge(p1, p2, center, r > 0, ccw, ptest) == ptest_inside);
@@ -362,12 +362,12 @@ TEST_CASE("arc wedge test", "[ArcWelder]") {
         };
         auto test_quadrants = [center, test](
             // Arc data
-            const Vec2i64 &p1, const Vec2i64 &p2, const int64_t r, const bool ccw,
+            const Domain::Vec2big &p1, const Domain::Vec2big &p2, const int64_t r, const bool ccw,
             // Test data
-            const Vec2i64 &ptest1, const bool ptest_inside1,
-            const Vec2i64 &ptest2, const bool ptest_inside2, 
-            const Vec2i64 &ptest3, const bool ptest_inside3,
-            const Vec2i64 &ptest4, const bool ptest_inside4) {
+            const Domain::Vec2big &ptest1, const bool ptest_inside1,
+            const Domain::Vec2big &ptest2, const bool ptest_inside2, 
+            const Domain::Vec2big &ptest3, const bool ptest_inside3,
+            const Domain::Vec2big &ptest4, const bool ptest_inside4) {
             test(p1, p2, r, ccw, ptest1 + center, ptest_inside1);
             test(p1, p2, r, ccw, ptest2 + center, ptest_inside2);
             test(p1, p2, r, ccw, ptest3 + center, ptest_inside3);
@@ -375,31 +375,31 @@ TEST_CASE("arc wedge test", "[ArcWelder]") {
         };
         THEN("90 degrees arc, CCW") {
             test_quadrants(p1, p2, radius, true, 
-                Vec2i64{   s,   s }, true,
-                Vec2i64{   s, - s }, false,
-                Vec2i64{ - s,   s }, false,
-                Vec2i64{ - s, - s }, false);
+                Domain::Vec2big{   s,   s }, true,
+                Domain::Vec2big{   s, - s }, false,
+                Domain::Vec2big{ - s,   s }, false,
+                Domain::Vec2big{ - s, - s }, false);
         }
         THEN("270 degrees arc, CCW") {
             test_quadrants(p2, p1, -radius, true,
-                Vec2i64{   s,   s }, false,
-                Vec2i64{   s, - s }, true,
-                Vec2i64{ - s,   s }, true,
-                Vec2i64{ - s, - s }, true);
+                Domain::Vec2big{   s,   s }, false,
+                Domain::Vec2big{   s, - s }, true,
+                Domain::Vec2big{ - s,   s }, true,
+                Domain::Vec2big{ - s, - s }, true);
         }
         THEN("90 degrees arc, CW") {
             test_quadrants(p2, p1, radius, false,
-                Vec2i64{   s,   s }, true,
-                Vec2i64{   s, - s }, false,
-                Vec2i64{ - s,   s }, false,
-                Vec2i64{ - s, - s }, false);
+                Domain::Vec2big{   s,   s }, true,
+                Domain::Vec2big{   s, - s }, false,
+                Domain::Vec2big{ - s,   s }, false,
+                Domain::Vec2big{ - s, - s }, false);
         }
         THEN("270 degrees arc, CW") {
             test_quadrants(p1, p2, -radius, false,
-                Vec2i64{   s,   s }, false,
-                Vec2i64{   s, - s }, true,
-                Vec2i64{ - s,   s }, true,
-                Vec2i64{ - s, - s }, true);
+                Domain::Vec2big{   s,   s }, false,
+                Domain::Vec2big{   s, - s }, true,
+                Domain::Vec2big{ - s,   s }, true,
+                Domain::Vec2big{ - s, - s }, true);
         }
     }
 }

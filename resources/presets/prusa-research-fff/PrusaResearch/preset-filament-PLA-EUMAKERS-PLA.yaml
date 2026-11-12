@@ -1,0 +1,11 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: EUMAKERS PLA
+id: EUMAKERS PLA
+features:
+  $.brand.uuid: 9b8909f5-d3e1-550f-9e05-ee38d5ca3e22
+  $.brand.slug: eumakers
+values:
+  filament_cost: '19.99'
+  filament_vendor: EUMAKERS

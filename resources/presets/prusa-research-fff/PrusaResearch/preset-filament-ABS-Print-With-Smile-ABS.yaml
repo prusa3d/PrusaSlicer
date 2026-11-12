@@ -1,0 +1,16 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Print With Smile ABS
+id: Print With Smile ABS
+features:
+  $.brand.uuid: 31b2337a-d131-59c1-9af3-cdcd67efa655
+  $.brand.slug: print-with-smile
+values:
+  filament_cost: 535
+  filament_vendor: Print With Smile
+  filament_density: 1.08
+  filament_spool_weight: 230
+  first_layer_temperature: 250
+  temperature: 250
+

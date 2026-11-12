@@ -6,6 +6,7 @@
 #include "libslic3r/GCode/SeamAligned.hpp"
 #include "libslic3r/GCode/SeamRear.hpp"
 #include "libslic3r/GCode/SeamRandom.hpp"
+#include "libslic3r/Layer.hpp"
 
 TEST_CASE_METHOD(Slic3r::Test::SeamsFixture, "Seam benchmarks", "[Seams][.Benchmarks]") {
     BENCHMARK_ADVANCED("Create extrusions benchy")(Catch::Benchmark::Chronometer meter) {

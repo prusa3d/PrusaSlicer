@@ -1,14 +1,20 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
 #include <catch2/catch_approx.hpp>
+#include <span>
+
+#include "Slic3r/Biz/Algorithms/ExPolygon.hpp"
+#include "Slic3r/Biz/Algorithms/Polyline.hpp"
 #include <libslic3r/GCode/Travels.hpp>
 #include <libslic3r/ExPolygon.hpp>
 #include <libslic3r/GCode.hpp>
 #include <boost/math/special_functions/pow.hpp>
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
 using namespace Slic3r::GCode::Impl::Travels;
 using namespace Catch;
+namespace AABBTreeLines = Slic3r::Biz::Algorithms::AABBTreeLines;
 
 struct ApproxEqualsPoints : public Catch::Matchers::MatcherBase<Points> {
     ApproxEqualsPoints(const Points& expected, unsigned tolerance): expected(expected), tolerance(tolerance) {}
@@ -155,7 +161,7 @@ TEST_CASE("Get first crossed line distance", "[GCode]") {
     };
 
     // Bottom-up travel intersecting the squares.
-    Lines travel{Polyline{
+    Lines travel{Algorithms::Polyline::to_lines(Polyline{
         scaled(Vec2f{0, -2}),
         scaled(Vec2f{0, -0.7}),
         scaled(Vec2f{0, 0}),
@@ -164,24 +170,25 @@ TEST_CASE("Get first crossed line distance", "[GCode]") {
         scaled(Vec2f{0, 2.4}),
         scaled(Vec2f{0, 4.5}),
         scaled(Vec2f{0, 5}),
-    }.lines()};
+    })};
 
     std::vector<GCode::ObjectOrExtrusionLinef> lines;
     for (const ExPolygon& polygon : {square_with_hole, square_above}) {
-        for (const Line& line : polygon.lines()) {
+        for (const Line& line : Algorithms::ExPolygon::to_lines(polygon)) {
             lines.emplace_back(unscale(line.a), unscale(line.b));
         }
     }
+
     // Try different cases by skipping lines in the travel.
     AABBTreeLines::LinesDistancer<GCode::ObjectOrExtrusionLinef> distancer{std::move(lines)};
 
     CHECK(get_first_crossed_line_distance(travel, distancer) == Approx(1));
-    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(1), distancer) == Approx(0.2));
-    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(2), distancer) == Approx(0.5));
-    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(3), distancer) == Approx(1.0)); //Edge case
-    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(4), distancer) == Approx(0.7));
-    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(5), distancer) == Approx(1.6));
-    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(6), distancer) == std::numeric_limits<double>::max());
+    CHECK(get_first_crossed_line_distance(std::span{travel}.subspan(1), distancer) == Approx(0.2));
+    CHECK(get_first_crossed_line_distance(std::span{travel}.subspan(2), distancer) == Approx(0.5));
+    CHECK(get_first_crossed_line_distance(std::span{travel}.subspan(3), distancer) == Approx(1.0)); //Edge case
+    CHECK(get_first_crossed_line_distance(std::span{travel}.subspan(4), distancer) == Approx(0.7));
+    CHECK(get_first_crossed_line_distance(std::span{travel}.subspan(5), distancer) == Approx(1.6));
+    CHECK(get_first_crossed_line_distance(std::span{travel}.subspan(6), distancer) == std::numeric_limits<double>::max());
 }
 
 

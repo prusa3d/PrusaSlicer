@@ -1,0 +1,9 @@
+kind: filament
+inherits:
+- '*PEBA*'
+name: Generic PEBA
+id: Generic PEBA
+features:
+  generic: true
+values:
+  filament_vendor: Generic

@@ -1,0 +1,29 @@
+id: Siraya Tech Easy
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Siraya Tech
+  material_type: Tough
+  material_colour: '#F8F8F8'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: vWR2oZK1TxiC6nVe70enfQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Siraya Tech Easy @SL1 0.025
+    id: eP0ZRdZwRIG5D9aJHnrq5A
+    values:
+      exposure_time: 11
+      initial_exposure_time: 15
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Siraya Tech Easy @SL1 0.05
+    id: rIyra7A2SRaKuSt3iefv2A
+    values:
+      exposure_time: 12
+      initial_exposure_time: 15

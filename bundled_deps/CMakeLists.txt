@@ -1,25 +1,26 @@
+add_subdirectory(slic3r-domain-types)
+
 add_subdirectory(admesh)
-add_subdirectory(avrdude)
+#add_subdirectory(avrdude) # disabled because FirmwareUpdater is not ported yet.
 add_subdirectory(miniz)
 add_subdirectory(glu-libtess)
 add_subdirectory(agg)
 add_subdirectory(libigl)
 add_subdirectory(hints)
 add_subdirectory(libnest2d)
+add_subdirectory(clipper)
 
 add_library(semver STATIC
     semver/semver.c
     semver/semver.h
 )
 target_include_directories(semver PUBLIC semver)
-encoding_check(semver)
 
 add_library(qoi STATIC
     qoi/qoilib.c
     qoi/qoi.h
 )
 target_include_directories(qoi PUBLIC qoi)
-encoding_check(qoi)
 
 add_library(fastfloat INTERFACE)
 target_include_directories(fastfloat INTERFACE fast_float)
@@ -43,12 +44,11 @@ target_include_directories(stb_dxt INTERFACE stb_dxt)
 add_library(stb_image INTERFACE)
 target_include_directories(stb_image INTERFACE stb_image)
 
-add_library(tcbspan INTERFACE)
-target_include_directories(tcbspan INTERFACE tcbspan)
-
-add_subdirectory(prusa_fdm_mixer)
+if(SLIC3R_ENABLE_WEBKIT)
+    add_library(webview2 INTERFACE)
+    target_include_directories(webview2 INTERFACE webview2)
+endif()
 
 if (SLIC3R_GUI)
     add_subdirectory(imgui)
-    add_subdirectory(hidapi)
 endif ()

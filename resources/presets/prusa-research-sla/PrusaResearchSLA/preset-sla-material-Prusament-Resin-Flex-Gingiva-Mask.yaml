@@ -1,0 +1,39 @@
+id: Prusament Resin Flex Gingiva Mask
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Medical
+  material_colour: '#DB7F80'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: ovtyzwfOQ6C0RECiTtGOPw
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [3, 15]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Flex Gingiva Mask @SL1S 0.025
+    id: 5Bq29nLaQjS83MXBRsfl0g
+    values:
+      exposure_time: 2.6
+      initial_exposure_time: 9
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Flex Gingiva Mask @SL1S 0.05
+    id: Hbq2LigETLmACrUpTuOkKg
+    values:
+      exposure_time: 3
+      initial_exposure_time: 9
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Flex Gingiva Mask @SL1S 0.1
+    id: 3Nrx3yCZQ1ObYbhwyzystQ
+    values:
+      exposure_time: 3.5
+      initial_exposure_time: 12

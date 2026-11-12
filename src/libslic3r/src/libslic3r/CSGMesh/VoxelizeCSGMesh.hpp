@@ -1,0 +1,119 @@
+#ifndef VOXELIZECSGMESH_HPP
+#define VOXELIZECSGMESH_HPP
+
+#include <functional>
+#include <stack>
+
+#include "Slic3r/Biz/Algorithms/Execution/ExecutionTBB.hpp"
+
+#include "libslic3r/CSGMesh/CSGMesh.hpp"
+#include "libslic3r/OpenVDBUtils.hpp"
+
+namespace Slic3r::csg {
+
+using VoxelizeParams = MeshToGridParams;
+
+// This method can be overriden when a specific CSGPart type supports caching
+// of the voxel grid
+template<class CSGPartT>
+VoxelGridPtr get_voxelgrid(const CSGPartT &csgpart, VoxelizeParams params)
+{
+    const indexed_triangle_set *its = csg::get_mesh(csgpart);
+    VoxelGridPtr ret;
+
+    params.trafo(params.trafo() * csg::get_transform(csgpart));
+
+    if (its)
+        ret = mesh_to_grid(*its, params);
+
+    return ret;
+}
+
+namespace detail {
+
+inline void perform_csg(CSGType op, VoxelGridPtr &dst, VoxelGridPtr &src)
+{
+    if (!dst || !src)
+        return;
+
+    switch (op) {
+    case CSGType::Union:
+        if (is_grid_empty(*dst) && !is_grid_empty(*src))
+            dst = clone(*src);
+        else
+            grid_union(*dst, *src);
+
+        break;
+    case CSGType::Difference:
+        grid_difference(*dst, *src);
+        break;
+    case CSGType::Intersection:
+        grid_intersection(*dst, *src);
+        break;
+    }
+}
+
+} // namespace detail
+
+// Convert the input csgrange to a voxel grid performing the boolean operations in the voxel realm.
+template<class It>
+VoxelGridPtr voxelize_csgmesh(const Range<It>      &csgrange,
+                              const VoxelizeParams &params = {})
+{
+    using namespace detail;
+    namespace execution = Slic3r::Biz::Algorithms::Execution;
+
+    VoxelGridPtr ret;
+
+    std::vector<VoxelGridPtr> grids (csgrange.size());
+
+    execution::for_each(execution::ex_tbb, size_t(0), csgrange.size(), [&](size_t csgidx) {
+        if (params.statusfn() && params.statusfn()(-1))
+            return;
+
+        auto it = csgrange.begin();
+        std::advance(it, csgidx);
+        auto &csgpart = *it;
+        grids[csgidx] = get_voxelgrid(csgpart, params);
+    }, execution::max_concurrency(execution::ex_tbb));
+
+    size_t csgidx = 0;
+    struct Frame { CSGType op = CSGType::Union; VoxelGridPtr grid; };
+    std::stack opstack{std::vector<Frame>{}};
+
+    opstack.push({CSGType::Union, mesh_to_grid({}, params)});
+
+    for (auto &csgpart : csgrange) {
+        if (params.statusfn() && params.statusfn()(-1))
+            break;
+
+        auto &partgrid = grids[csgidx++];
+
+        auto op = get_operation(csgpart);
+
+        if (get_stack_operation(csgpart) == CSGStackOp::Push) {
+            opstack.push({op, mesh_to_grid({}, params)});
+            op = CSGType::Union;
+        }
+
+        Frame *top = &opstack.top();
+
+        perform_csg(get_operation(csgpart), top->grid, partgrid);
+
+        if (get_stack_operation(csgpart) == CSGStackOp::Pop) {
+            VoxelGridPtr popgrid = std::move(top->grid);
+            auto popop = opstack.top().op;
+            opstack.pop();
+            VoxelGridPtr &grid = opstack.top().grid;
+            perform_csg(popop, grid, popgrid);
+        }
+    }
+
+    ret = std::move(opstack.top().grid);
+
+    return ret;
+}
+
+} // namespace Slic3r::csg
+
+#endif // VOXELIZECSGMESH_HPP

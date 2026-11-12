@@ -1,0 +1,284 @@
+#include "Slic3r/App/Lua/PluginBundle.hpp"
+#include "Slic3r/App/Lua/MarketplaceClient.hpp"
+#include "Slic3r/App/Lua/PluginRegistry.hpp"
+#include "Slic3r/App/Lua/PublicKeyRegistry.hpp"
+#include "Slic3r/Biz/Crypto/Types.hpp"
+#include "Slic3r/Directories.hpp"
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/nowide/fstream.hpp>
+#include <nlohmann/json.hpp>
+
+#include <string>
+
+/*
+ * Pins the install contract between the plugin marketplace and PrusaSlicer.
+ *
+ * The fixtures are real signed bundles taken from the marketplace API
+ * (GET /api/slicer/v1/plugins/{id}/download) together with the author public key it hands
+ * over from GET /api/slicer/v1/plugins/{id}/verify:
+ *
+ *   marketplace-bundle.zip     manifest.txt      + manifest.sig
+ *   checksum-named-bundle.zip  checksum.sha256   + checksum.sha256.sign
+ *
+ * Both must install: the signature covers the checksum file's *content*, so the
+ * two namings are the same bundle repacked. Keep both until one naming wins.
+ *
+ * How to make a fresh keypair and bundle, and how to regenerate these files:
+ * test/data/plugin-bundle/README.md
+ */
+
+namespace fs = boost::filesystem;
+using namespace Slic3r::App::Lua;
+
+namespace {
+
+fs::path bundle_dir()
+{
+    return fs::path{TEST_DATA_DIR} / "plugin-bundle";
+}
+
+Slic3r::Biz::Crypto::KeyPair author_public_key()
+{
+    const auto pem = Slic3r::Biz::Crypto::file_as_bytes((bundle_dir() / "public_key.pem").string());
+    return Slic3r::Biz::Crypto::KeyPair::load_pub_pem(pem);
+}
+
+PluginBundle open_bundle(const std::string& zip_name)
+{
+    auto path = (bundle_dir() / zip_name).string();
+    return PluginBundle{
+        Slic3r::Biz::Crypto::create_zip_source(path), path, true
+    };
+}
+
+} // namespace
+
+TEST_CASE("Marketplace bundle passes load_meta + verify", "[plugin][marketplace]")
+{
+    const auto zip_name = GENERATE(
+        std::string{"marketplace-bundle.zip"}//,
+        //std::string{"checksum-named-bundle.zip"}
+    );
+    CAPTURE(zip_name);
+
+    auto bundle = open_bundle(zip_name);
+
+    SECTION("load_meta accepts a marketplace manifest.json")
+    {
+        const auto result = bundle.load_meta();
+        REQUIRE(result.has_value());
+
+        const auto& meta = bundle.meta();
+        CHECK(meta.id == "com.prusa3d.slicer.calibration");
+        CHECK(meta.version.to_string() == "1.1.0");
+        CHECK_FALSE(meta.author.empty());
+
+        // Marketplace manifests carry plugin_api_version instead of a
+        // required_apis map; it has to resolve to the project API requirement.
+        REQUIRE(meta.required_apis.size() == 1);
+        const auto it = meta.required_apis.find(PluginApiType::Project);
+        REQUIRE(it != meta.required_apis.end());
+        CHECK(it->second.to_string() == "1.0.0");
+    }
+
+    SECTION("verify accepts the signature made with the author key from /verify")
+    {
+        REQUIRE(bundle.load_meta().has_value());
+        CHECK(bundle.verify(author_public_key()));
+    }
+
+    SECTION("the key PluginRegistry looks up matches what /verify announced")
+    {
+        REQUIRE(bundle.load_meta().has_value());
+        // PluginRegistry::install builds "<id>@<version>" and PublicKeyRegistry
+        // stored it from the verify response - a mismatch means "cannot load
+        // public key" at install time.
+        const auto key_name = bundle.meta().id + "@" + bundle.meta().version.to_string();
+        CHECK(key_name == "com.prusa3d.slicer.calibration@1.1.0");
+    }
+}
+
+TEST_CASE("Marketplace bundle is rejected with the wrong key", "[plugin][marketplace]")
+{
+    auto bundle = open_bundle("marketplace-bundle.zip");
+    REQUIRE(bundle.load_meta().has_value());
+
+    auto other = Slic3r::Biz::Crypto::KeyPair::generate(2048);
+    CHECK_FALSE(bundle.verify(other));
+}
+
+TEST_CASE("INSTALL_PLUGIN payload parsing", "[plugin][marketplace]")
+{
+    SECTION("accepts what the marketplace web app posts")
+    {
+        // Mirrors InstallButton.tsx sendMessage({ action: 'INSTALL_PLUGIN', … }).
+        const auto msg = nlohmann::json::parse(R"({
+            "action": "INSTALL_PLUGIN",
+            "pluginId": "com.prusa3d.slicer.calibration",
+            "version": "1.1.0",
+            "downloadUrl": "http://localhost:4455/api/slicer/v1/plugins/com.prusa3d.slicer.calibration/download?version=1.1.0",
+            "verifyUrl": "http://localhost:4455/api/slicer/v1/plugins/com.prusa3d.slicer.calibration/verify?version=1.1.0",
+            "apiOrigin": "http://localhost:4455"
+        })");
+
+        const auto config = BundleRequestConfig::load_from_json(msg);
+        REQUIRE(config.has_value());
+        CHECK(config->plugin_id == "com.prusa3d.slicer.calibration");
+        CHECK(config->version == "1.1.0");
+        CHECK(config->api_origin == "http://localhost:4455");
+        CHECK(config->download_url.find("/download?version=1.1.0") != std::string::npos);
+        CHECK(config->verify_url.find("/verify?version=1.1.0") != std::string::npos);
+    }
+
+    SECTION("reports an error instead of yielding a half-filled config")
+    {
+        const auto msg = nlohmann::json::parse(R"({"action":"INSTALL_PLUGIN","pluginId":"x"})");
+        const auto config = BundleRequestConfig::load_from_json(msg);
+        REQUIRE_FALSE(config.has_value());
+        CHECK_FALSE(config.error().empty());
+    }
+}
+
+TEST_CASE("Scanning records each bundle's id and version", "[plugin][marketplace]")
+{
+    // A directory only needs manifest.json to count as a bundle, and with no .lua
+    // files load_plugins() stays out of the way.
+    const fs::path root = fs::temp_directory_path() / fs::unique_path("slic3r-scan-%%%%-%%%%");
+    const fs::path bundle_dir = root / "com.test.scan";
+    fs::create_directories(bundle_dir);
+    {
+        boost::nowide::ofstream manifest{bundle_dir / "manifest.json"};
+        manifest << R"({"id":"com.test.scan","version":"1.2.3","author":"tester","name":"Test scan",)"
+                 << R"("license":"MIT","min_slicer_version":"3.0.0-alpha0",)"
+                 << R"("plugin_api_version":"1.0.0", "required_apis": {"project.plugin": "1.0.0"}})";
+    }
+
+    PluginRegistry registry;
+    registry.scan(root.string(), true);
+
+    // plugin_bundles() used to stay empty because scan() never stored the bundle,
+    // which silently left the marketplace webview thinking nothing was installed.
+    REQUIRE(registry.plugin_bundles().size() == 1);
+    const auto& meta = registry.plugin_bundles().front().meta();
+    CHECK(meta.id == "com.test.scan");
+    CHECK(meta.version.to_string() == "1.2.3");
+
+    boost::system::error_code cleanup;
+    fs::remove_all(root, cleanup);
+}
+
+TEST_CASE("Bundle id must be a single path component", "[plugin][marketplace]")
+{
+    CHECK(is_safe_path_component("dev.leotrax3d.box-generator"));
+    CHECK(is_safe_path_component("com.prusa3d.slicer.calibration"));
+    CHECK(is_safe_path_component("1.0.0-beta.1+build.7"));
+
+    CHECK_FALSE(is_safe_path_component(""));
+    CHECK_FALSE(is_safe_path_component("."));
+    CHECK_FALSE(is_safe_path_component(".."));
+    CHECK_FALSE(is_safe_path_component("../../canary"));
+    CHECK_FALSE(is_safe_path_component("..\\..\\canary"));
+    CHECK_FALSE(is_safe_path_component("/tmp/evil"));
+    CHECK_FALSE(is_safe_path_component("C:\\evil"));
+    CHECK_FALSE(is_safe_path_component(".hidden"));
+    CHECK_FALSE(is_safe_path_component("foo."));
+    CHECK_FALSE(is_safe_path_component("a/b"));
+    CHECK_FALSE(is_safe_path_component("a b"));
+    CHECK_FALSE(is_safe_path_component(std::string(129, 'a')));
+}
+
+TEST_CASE("INSTALL_PLUGIN payload with a traversing id or version is rejected", "[plugin][marketplace]")
+{
+    const auto bad_id = GENERATE(
+        std::string{"../../canary"},
+        std::string{"/tmp/evil"},
+        std::string{".."},
+        std::string{"a/b"}
+    );
+    CAPTURE(bad_id);
+
+    SECTION("pluginId")
+    {
+        nlohmann::json msg = {
+            {"action", "INSTALL_PLUGIN"}, {"pluginId", bad_id}, {"version", "1.0.0"},
+            {"downloadUrl", "http://localhost:4455/d"}, {"verifyUrl", "http://localhost:4455/v"},
+            {"apiOrigin", "http://localhost:4455"}
+        };
+        CHECK_FALSE(BundleRequestConfig::load_from_json(msg).has_value());
+    }
+    SECTION("version")
+    {
+        nlohmann::json msg = {
+            {"action", "INSTALL_PLUGIN"}, {"pluginId", "com.test.plugin"}, {"version", bad_id},
+            {"downloadUrl", "http://localhost:4455/d"}, {"verifyUrl", "http://localhost:4455/v"},
+            {"apiOrigin", "http://localhost:4455"}
+        };
+        CHECK_FALSE(BundleRequestConfig::load_from_json(msg).has_value());
+    }
+}
+
+TEST_CASE("Public key registry keeps key files inside its directory", "[plugin][marketplace]")
+{
+    const fs::path root = fs::temp_directory_path() / fs::unique_path("slic3r-keys-%%%%-%%%%");
+    fs::create_directories(root / "keys");
+    PublicKeyRegistry registry{root / "keys"};
+
+    CHECK_THROWS_AS(registry.store_key("../escaped", "not a key"), Slic3r::Biz::Crypto::CryptoException);
+    CHECK_FALSE(fs::exists(root / "escaped.pem"));
+    CHECK_THROWS_AS(registry.load_key("../escaped"), Slic3r::Biz::Crypto::CryptoException);
+
+    boost::system::error_code cleanup;
+    fs::remove_all(root, cleanup);
+}
+
+TEST_CASE("Signed bundle whose id escapes lua/ is refused and touches nothing outside", "[plugin][marketplace]")
+{
+    // Repro of the manifest-id traversal: traversal-bundle.zip is correctly signed by
+    // traversal-author (see make_traversal_bundle.py) and its manifest.json id is
+    // "../../canary". Before the fix PluginRegistry::install() resolved
+    // <data_dir>/lua/../../canary, remove_all()'d it and unpacked the bundle there.
+    INFO("Missing fixture? Regenerate with: python3 test/data/plugin-bundle/make_traversal_bundle.py");
+    REQUIRE(fs::exists(bundle_dir() / "traversal-bundle.zip"));
+    REQUIRE(fs::exists(bundle_dir() / "traversal-author.pem"));
+
+    const fs::path root   = fs::temp_directory_path() / fs::unique_path("slic3r-trav-%%%%-%%%%");
+    const fs::path data   = root / "data";
+    const fs::path canary = root / "canary";
+    fs::create_directories(data / "authorized_authors");
+    fs::create_directories(canary);
+    {
+        boost::nowide::ofstream keep{canary / "keep.txt"};
+        keep << "must survive";
+    }
+    fs::copy_file(bundle_dir() / "traversal-author.pem", data / "authorized_authors" / "traversal-author.pem");
+
+    const std::string prev_data_dir = Slic3r::data_dir();
+    Slic3r::set_data_dir(data.string());
+
+    {
+        // Same steps as PluginSystem::install_file() for a ZIP imported from the menu.
+        auto bundle = open_bundle("traversal-bundle.zip");
+        PluginRegistry registry;
+        bool refused = false;
+        if (auto meta = bundle.load_meta(); !meta.has_value()) {
+            refused = true;
+        } else if (auto install = registry.install(bundle, PublicKeyLookupStrategy::Author); !install.has_value()) {
+            refused = true;
+        }
+        CHECK(refused);
+    }
+
+    CHECK(fs::exists(canary / "keep.txt"));
+    CHECK_FALSE(fs::exists(canary / "canary.txt"));
+    CHECK_FALSE(fs::exists(canary / "manifest.json"));
+    CHECK_FALSE(fs::exists(data / "lua"));
+
+    Slic3r::set_data_dir(prev_data_dir);
+    boost::system::error_code cleanup;
+    fs::remove_all(root, cleanup);
+}

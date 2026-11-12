@@ -3,12 +3,23 @@
 #include <sstream>
 #include <fstream>
 
+#include "Slic3r/Biz/Algorithms/ModelObject.hpp"
+#include "Slic3r/Biz/Algorithms/ModelVolume.hpp"
+#include "Slic3r/Domain/Preset/HwConfig.hpp"
 #include "libslic3r/GCode.hpp"
 #include "test_data.hpp"
+#include "Slic3r/Biz/Slicing/BackgroundProcess.hpp"
 
 using namespace Slic3r;
 using namespace Test;
 using namespace Catch;
+
+using Biz::GCodeReader::GCodeReader;
+using Biz::Algorithms::ModelObject::add_volume;
+using Biz::Algorithms::ModelObject::ensure_on_bed;
+using Biz::Algorithms::ModelVolume::translate;
+using Biz::Slicing::SerializedConfig;
+using Domain::Preset::HwPrinterConfig;
 
 constexpr bool debug_files{false};
 
@@ -63,7 +74,7 @@ void check_retraction(const std::string &gcode, double offset = 0.0) {
 
     parser.parse_buffer(
         gcode,
-        [&](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+        [&](GCodeReader &self, const GCodeReader::GCodeLine &line) {
             INFO("Line number: " + std::to_string(++count));
             INFO("Extruder id: " + std::to_string(extruder_id));
             if (!line.raw().empty() && line.raw().front() == 'T') {
@@ -89,35 +100,32 @@ void check_retraction(const std::string &gcode, double offset = 0.0) {
 }
 
 void add_object(
-    Model &model, const std::string &name, const int extruder, const Vec3d &offset = Vec3d::Zero()
+    Domain::Model &model, const std::string &name, const int extruder, const Vec3d &offset = Vec3d::Zero()
 ) {
     std::string extruder_id{std::to_string(extruder)};
-    ModelObject *object = model.add_object();
+    Domain::ModelObject *object = model.add_object();
     object->name = name;
-    ModelVolume *volume = object->add_volume(Test::mesh(Test::TestMesh::cube_20x20x20));
-    volume->set_material_id("material" + extruder_id);
-    volume->translate(offset);
-    DynamicPrintConfig config;
-    config.set_deserialize_strict({
-        {"extruder", extruder_id},
-    });
-    volume->config.assign_config(config);
+    Domain::ModelVolume *volume = add_volume(object, Test::mesh(Test::TestMesh::cube_20x20x20));
+    translate(*volume, offset);
+
+    Domain::VolumeSettings volume_settings;
+    volume_settings.overrides.set("extruder", extruder);
+
+    volume->volume_settings = volume_settings;
     object->add_instance();
-    object->ensure_on_bed();
+    ensure_on_bed(*object);
 }
 
 class CancelObjectFixture
 {
 public:
     CancelObjectFixture() {
-        config.set_deserialize_strict({
-            {"gcode_flavor", "marlin2"},
-            {"gcode_label_objects", "firmware"},
-            {"gcode_comments", "1"},
-            {"use_relative_e_distances", "1"},
-            {"wipe", "0"},
-            {"skirts", "0"},
-        });
+        config.printer.items.opt("gcode_flavor").set(Domain::GCodeFlavor::gcfMarlinFirmware);
+        config.print.items.opt("gcode_label_objects").set(Domain::LabelObjectsStyle::Firmware);
+        config.print.items.opt("gcode_comments").set(true);
+        config.printer.items.opt("use_relative_e_distances").set(true);
+        config.print.items.opt("wipe").set(false);
+        config.print.items.opt("skirts").set(0);
 
         add_object(two_cubes, "no_offset_cube", 0);
         add_object(two_cubes, "offset_cube", 0, {30.0, 0.0, 0.0});
@@ -125,23 +133,41 @@ public:
         add_object(multimaterial_cubes, "no_offset_cube", 1);
         add_object(multimaterial_cubes, "offset_cube", 2, {30.0, 0.0, 0.0});
 
-        retract_length = config.option<ConfigOptionFloats>("retract_length")->get_at(0);
-        retract_length_toolchange = config.option<ConfigOptionFloats>("retract_length_toolchange")
-                                        ->get_at(0);
+        retract_length = config.print.items.opt("retract_length").get<double>();
+        retract_length_toolchange =
+            config.print.items.opt("retract_length_toolchange").get<double>();
+
     }
 
-    DynamicPrintConfig config{Slic3r::DynamicPrintConfig::full_print_config()};
+    TestConfig config;
+    Domain::Bed model_bed;
+    Domain::BedInstance bed_instance{model_bed};
 
-    Model two_cubes;
-    Model multimaterial_cubes;
+    Domain::Model two_cubes;
+    Domain::Model multimaterial_cubes;
 
     double retract_length{};
     double retract_length_toolchange{};
 };
 
 TEST_CASE_METHOD(CancelObjectFixture, "Single extruder", "[CancelObject]") {
+    for (const Domain::ModelObject* object : two_cubes.objects) {
+        for (Domain::ModelInstance* instance : object->instances) {
+            bed_instance.model_instances.push_back(instance);
+        }
+    }
+
     Print print;
-    print.apply(two_cubes, config);
+    auto preset_metadata = create_dummy_selected_preset_metadata(create_dummy_hw_config());
+    auto metadata = Biz::Slicing::build_gcode_metadata({}, preset_metadata, config);
+
+    print.update(
+        two_cubes,
+        config,
+        bed_instance,
+        preset_metadata,
+        Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, config)
+    );
     print.validate();
     const std::string gcode{Test::gcode(print)};
 
@@ -170,10 +196,25 @@ TEST_CASE_METHOD(CancelObjectFixture, "Single extruder", "[CancelObject]") {
 }
 
 TEST_CASE_METHOD(CancelObjectFixture, "Sequential print", "[CancelObject]") {
-    config.set_deserialize_strict({{"complete_objects", 1} });
+    config.print.items.opt("complete_objects").set(true);
+
+    for (const Domain::ModelObject* object : two_cubes.objects) {
+        for (Domain::ModelInstance* instance : object->instances) {
+            bed_instance.model_instances.push_back(instance);
+        }
+    }
 
     Print print;
-    print.apply(two_cubes, config);
+    auto preset_metadata = create_dummy_selected_preset_metadata(create_dummy_hw_config());
+    auto metadata        = Biz::Slicing::build_gcode_metadata({}, preset_metadata, config);
+
+    print.update(
+        two_cubes,
+        config,
+        bed_instance,
+        preset_metadata,
+        Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, config)
+    );
     print.validate();
     const std::string gcode{Test::gcode(print)};
 

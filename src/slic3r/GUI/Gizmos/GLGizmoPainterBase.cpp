@@ -15,7 +15,7 @@
 #include "slic3r/Utils/UndoRedo.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
-#include "libslic3r/TriangleMesh.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 
 #include <memory>
 #include <numeric>

@@ -1,12 +1,11 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Creator: CorelDRAW -->
-<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="128px" height="128px" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
-viewBox="0 0 128 128"
- xmlns:xlink="http://www.w3.org/1999/xlink"
- xmlns:xodm="http://www.corel.com/coreldraw/odm/2003">
-<g id="Layer_x0020_1">
-  <path fill="#ED6B21" d="M93.77 102.2l0 23.8 -3.54 0 0 -23.27 -8.48 -8.48c-0.69,-0.69 -0.69,-1.81 0,-2.5 0.69,-0.69 1.81,-0.69 2.5,0l7.48 7.47 7.5 -7.92 0 -16.16c0,-0.98 0.79,-1.77 1.77,-1.77 0.98,0 1.77,0.79 1.77,1.77l0 16.86c0,0.52 -0.22,0.98 -0.57,1.3l-8.43 8.9zm-59.54 0l-8.43 -8.9c-0.35,-0.32 -0.57,-0.78 -0.57,-1.3l0 -16.86c0,-0.98 0.79,-1.77 1.77,-1.77 0.98,0 1.77,0.79 1.77,1.77l0 16.16 7.3 7.7 7.72 -7.29c0.71,-0.67 1.83,-0.63 2.5,0.08 0.67,0.71 0.63,1.83 -0.08,2.5l-8.44 7.97 0 23.74 -3.54 0 0 -23.8zm28 9.53l-7.48 -7.48c-0.69,-0.69 -0.69,-1.81 0,-2.5 0.69,-0.69 1.81,-0.69 2.5,0l6.79 6.79 7.25 -6.83c0.71,-0.67 1.83,-0.63 2.5,0.08 0.67,0.71 0.63,1.83 -0.08,2.5l-7.94 7.47 0 14.24 -3.54 0 0 -14.27z"/>
-  <path fill="#FFFFFF" d="M14.49 50.45l46.94 -46.94c0.35,-0.34 0.75,-0.6 1.18,-0.78 0.45,-0.18 0.92,-0.28 1.39,-0.28 0.47,0 0.95,0.09 1.39,0.28 0.43,0.18 0.83,0.44 1.18,0.78l46.94 46.94c0.34,0.35 0.6,0.75 0.78,1.18 0.18,0.45 0.28,0.92 0.28,1.39 0,0.47 -0.09,0.95 -0.28,1.39 -0.18,0.43 -0.44,0.83 -0.78,1.18l-46.94 46.94c-0.35,0.34 -0.75,0.6 -1.18,0.78 -0.44,0.19 -0.92,0.28 -1.39,0.28 -0.92,0 -1.86,-0.36 -2.57,-1.07l-46.94 -46.93c-0.34,-0.35 -0.6,-0.75 -0.78,-1.18 -0.19,-0.44 -0.28,-0.92 -0.28,-1.39 0,-0.47 0.09,-0.94 0.28,-1.39 0.18,-0.43 0.44,-0.83 0.78,-1.18zm49.36 -44.51l-46.94 46.93 -0.04 0.06 -0.01 0.09 0.01 0.08 0.04 0.07 46.94 46.94 0.06 0.04 0.09 0.01 0.08 -0.01 0.07 -0.05 46.94 -46.93 0.04 -0.06 0.01 -0.09 -0.01 -0.09 -0.04 -0.06 -46.94 -46.93 -0.06 -0.05 -0.09 -0.01 -0.12 0.03 -0.03 0.03z"/>
- </g>
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M7.99981 1L2.30981 4.79V8.57V8.79V10.47L7.99981 14.25L13.6898 10.47V8.79V8.57V4.79L7.99981 1Z" stroke="#808080" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12.6899 14.9999V12.4399" stroke="white" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M13.8699 15V11.64" stroke="white" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M2.12988 15V11.64" stroke="white" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3.32983 14.9999V12.4399" stroke="white" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M4.50977 15V13.22" stroke="white" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M5.65991 15V14" stroke="white" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10.3398 15V14" stroke="white" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M11.5 15V13.22" stroke="white" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

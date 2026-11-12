@@ -1,0 +1,35 @@
+id: DVtD6lesSw6ioQFvSKx2wg
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: FunToDo
+  material_type: Tough
+  material_colour: '#F8F8F8'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: OMM/KermT6eJUEzkpracQg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: FunToDo Industrial Blend Unpigmented @SL1 0.05
+    id: 11NUus5ITwioBdC865kxPQ
+    values:
+      exposure_time: 4
+      initial_exposure_time: 35
+## SL1S
+- condition: printer.model == "SL1S"
+  id: RG59gTO7Q2K60MTFufOUeA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: FunToDo Industrial Blend Unpigmented @SL1S 0.05
+    id: GoHqfHENRDK2vsz2p1+vxg
+    values:
+      exposure_time: 1.3
+      initial_exposure_time: 28

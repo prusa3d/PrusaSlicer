@@ -3,18 +3,19 @@
 #include <libslic3r/InfillAboveBridges.hpp>
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
 using Catch::Approx;
 
 const ExPolygon square{
-    Point::new_scale(0, 0),
-    Point::new_scale(10, 0),
-    Point::new_scale(10, 10),
-    Point::new_scale(0, 10)
+    scaled(Vec2d{0, 0}),
+    scaled(Vec2d{10, 0}),
+    scaled(Vec2d{10, 10}),
+    scaled(Vec2d{0, 10})
 };
 
 ExPolygon translate(const ExPolygon &polygon, const Point &offset) {
     ExPolygons result{polygon};
-    translate(result, offset);
+    Algorithms::ExPolygon::translate(result, offset);
     return result.front();
 }
 
@@ -35,13 +36,13 @@ TEST_CASE("Separate infill above bridges", "[PrepareInfill]") {
         square
     };
     ExPolygons layer_0_region_0_internal{
-        translate(square, Point::new_scale(10, 0))
+        translate(square, scaled(Vec2d{10, 0}))
     };
     ExPolygons layer_0_region_1_internal{
-        translate(square, Point::new_scale(0, 10))
+        translate(square, scaled(Vec2d{0, 10}))
     };
     ExPolygons layer_0_region_1_bridge{
-        translate(square, Point::new_scale(10, 10))
+        translate(square, scaled(Vec2d{10, 10}))
     };
     SurfaceCollection layer_0_region_0;
     layer_0_region_0.append(layer_0_region_0_bridge, stBottomBridge);
@@ -53,7 +54,7 @@ TEST_CASE("Separate infill above bridges", "[PrepareInfill]") {
     PrepareInfill::SurfaceRefsByRegion layer_0{layer_0_region_0, layer_0_region_1};
 
     ExPolygons layer_1_region_0_solid{
-        translate(square, Point::new_scale(5, 5))
+        translate(square, scaled(Vec2d{5, 5}))
     };
     SurfaceCollection layer_1_region_0;
     layer_1_region_0.append(layer_1_region_0_solid, stInternalSolid);

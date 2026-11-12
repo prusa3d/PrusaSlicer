@@ -86,7 +86,7 @@ bool PrinterGeometry::convert_Geometry2PlateBounds(Slic3r::BoundingBox &plate_bo
 	    plate_bounding_polygon.points.insert(plate_bounding_polygon.points.begin() + i, Point(plate.points[i].x() / SEQ_SLICER_SCALE_FACTOR,
 												  plate.points[i].y() / SEQ_SLICER_SCALE_FACTOR));
 	}
-	plate_bounding_polygon.make_counter_clockwise();    	
+    Slic3r::Biz::Algorithms::Polygon::make_counter_clockwise(plate_bounding_polygon);
 	return false;
     }
     else
@@ -657,7 +657,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration        &solver_
 		else
 		{
 		    decimated_polygon = objects_to_print[i].pgns_at_height[j].second;
-		    decimated_polygon.make_counter_clockwise();
+            Slic3r::Biz::Algorithms::Polygon::make_counter_clockwise(decimated_polygon);
 		}
 		if (!check_PolygonSizeFitToPlate(solver_configuration, SEQ_SLICER_SCALE_FACTOR, decimated_polygon))
 		{
@@ -1107,7 +1107,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration                
 		else
 		{
 		    decimated_polygon = objects_to_print[i].pgns_at_height[j].second;
-		    decimated_polygon.make_counter_clockwise();
+            Slic3r::Biz::Algorithms::Polygon::make_counter_clockwise(decimated_polygon);
 		}
 		
 		if (!check_PolygonSizeFitToPlate(solver_configuration, SEQ_SLICER_SCALE_FACTOR, decimated_polygon))

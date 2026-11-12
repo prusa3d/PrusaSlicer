@@ -1,0 +1,11 @@
+kind: filament
+inherits:
+- '*PLASILK*'
+name: Generic PLA Silk
+id: Generic PLA Silk
+features:
+  generic: true
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI|COREONE_INDX)/ and ! ((printer.supports_mmu2s or printer.supports_mmu3_8bit) and ! feeder.single_mode)
+values:
+  filament_cost: '19.99'
+  filament_vendor: Generic

@@ -1,13 +1,16 @@
 #include "sla_test_utils.hpp"
-#include <libslic3r/SLA/SupportIslands/VoronoiGraphUtils.hpp>
-#include <libslic3r/Geometry/VoronoiVisualUtils.hpp>
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
+#include <Slic3r/Biz/CGAL/Algorithms/VoronoiGraphUtils.hpp>
+#include <Slic3r/Biz/CGAL/Algorithms/VoronoiVisualUtils.hpp>
 
 using namespace Slic3r;
-using namespace Slic3r::sla;
+using namespace Slic3r::Biz;
+
+using Slic3r::Biz::CGAL::Algorithms::VoronoiGraphUtils;
+using VD = Slic3r::Biz::CGAL::Algorithms::VoronoiDiagram;
 
 TEST_CASE("Convert coordinate datatype", "[Voronoi]")
 {
-    using VD                  = Slic3r::Geometry::VoronoiDiagram;
     VD::coordinate_type coord = 101197493902.64694;
     coord_t coord2 = VoronoiGraphUtils::to_coord(coord);
     CHECK(coord2 > 100);
@@ -34,14 +37,13 @@ TEST_CASE("Convert coordinate datatype", "[Voronoi]")
 }
 
 void check(Slic3r::Points points, double max_distance) {
-    using VD = Slic3r::Geometry::VoronoiDiagram;
     VD             vd;
     vd.construct_voronoi(points.begin(), points.end());    
     double max_area = M_PI * max_distance*max_distance; // circle = Pi * r^2
     for (const VD::cell_type &cell : vd.cells()) {
         Slic3r::Polygon polygon = VoronoiGraphUtils::to_polygon(cell, points, max_distance);
         CHECK(polygon.area() < max_area);
-        CHECK(polygon.contains(points[cell.source_index()]));
+        CHECK(Algorithms::Polygon::contains(polygon, points[cell.source_index()]));
     }
 }
 

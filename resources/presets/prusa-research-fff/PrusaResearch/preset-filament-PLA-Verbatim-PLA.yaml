@@ -1,0 +1,13 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Verbatim PLA
+id: Verbatim PLA
+features:
+  $.brand.uuid: 78375eb2-5656-5697-967f-9223fd575323
+  $.brand.slug: verbatim
+values:
+  filament_vendor: Verbatim
+  filament_density: 1.22
+  filament_cost: 42.99
+  filament_spool_weight: 235

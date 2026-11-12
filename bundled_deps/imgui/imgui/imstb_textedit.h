@@ -1,10 +1,15 @@
 // [DEAR IMGUI]
-// This is a slightly modified version of stb_textedit.h 1.13. 
+// This is a slightly modified version of stb_textedit.h 1.14.
 // Those changes would need to be pushed into nothings/stb:
 // - Fix in stb_textedit_discard_redo (see https://github.com/nothings/stb/issues/321)
-// Grep for [DEAR IMGUI] to find the changes.
+// - Fix in stb_textedit_find_charpos to handle last line (see https://github.com/ocornut/imgui/issues/6000 + #6783)
+// - Added name to struct or it may be forward declared in our code.
+// - Added UTF-8 support (see https://github.com/nothings/stb/issues/188 + https://github.com/ocornut/imgui/pull/7925)
+// - Changed STB_TEXTEDIT_INSERTCHARS() to return inserted count (instead of 0/1 bool), allowing partial insertion.
+// Grep for [DEAR IMGUI] to find some changes.
+// - Also renamed macros used or defined outside of IMSTB_TEXTEDIT_IMPLEMENTATION block from STB_TEXTEDIT_* to IMSTB_TEXTEDIT_*
 
-// stb_textedit.h - v1.13  - public domain - Sean Barrett
+// stb_textedit.h - v1.14  - public domain - Sean Barrett
 // Development of this library was sponsored by RAD Game Tools
 //
 // This C header file implements the guts of a multi-line text-editing
@@ -19,7 +24,7 @@
 // texts, as its performance does not scale and it has limited undo).
 //
 // Non-trivial behaviors are modelled after Windows text controls.
-// 
+//
 //
 // LICENSE
 //
@@ -29,16 +34,18 @@
 // DEPENDENCIES
 //
 // Uses the C runtime function 'memmove', which you can override
-// by defining STB_TEXTEDIT_memmove before the implementation.
+// by defining IMSTB_TEXTEDIT_memmove before the implementation.
 // Uses no other functions. Performs no runtime allocations.
 //
 //
 // VERSION HISTORY
 //
+//   !!!! (2025-10-23) changed STB_TEXTEDIT_INSERTCHARS() to return inserted count (instead of 0/1 bool), allowing partial insertion.
+//   1.14 (2021-07-11) page up/down, various fixes
 //   1.13 (2019-02-07) fix bug in undo size management
 //   1.12 (2018-01-29) user can change STB_TEXTEDIT_KEYTYPE, fix redo to avoid crash
 //   1.11 (2017-03-03) fix HOME on last line, dragging off single-line textfield
-//   1.10 (2016-10-25) supress warnings about casting away const with -Wcast-qual
+//   1.10 (2016-10-25) suppress warnings about casting away const with -Wcast-qual
 //   1.9  (2016-08-27) customizable move-by-word
 //   1.8  (2016-04-02) better keyboard handling when mouse button is down
 //   1.7  (2015-09-13) change y range handling in case baseline is non-0
@@ -58,6 +65,7 @@
 //   Ulf Winklemann: move-by-word in 1.1
 //   Fabian Giesen: secondary key inputs in 1.5
 //   Martins Mozeiko: STB_TEXTEDIT_memmove in 1.6
+//   Louis Schnellbach: page up/down in 1.14
 //
 //   Bugfixes:
 //      Scott Graham
@@ -93,8 +101,8 @@
 //   moderate sizes. The undo system does no memory allocations, so
 //   it grows STB_TexteditState by the worst-case storage which is (in bytes):
 //
-//        [4 + 3 * sizeof(STB_TEXTEDIT_POSITIONTYPE)] * STB_TEXTEDIT_UNDOSTATE_COUNT
-//      +          sizeof(STB_TEXTEDIT_CHARTYPE)      * STB_TEXTEDIT_UNDOCHAR_COUNT
+//        [4 + 3 * sizeof(STB_TEXTEDIT_POSITIONTYPE)] * STB_TEXTEDIT_UNDOSTATECOUNT
+//      +          sizeof(STB_TEXTEDIT_CHARTYPE)      * STB_TEXTEDIT_UNDOCHARCOUNT
 //
 //
 // Implementation mode:
@@ -135,12 +143,14 @@
 //                                        with previous char)
 //    STB_TEXTEDIT_KEYTOTEXT(k)         maps a keyboard input to an insertable character
 //                                        (return type is int, -1 means not valid to insert)
+//                                        (not supported if you want to use UTF-8, see below)
 //    STB_TEXTEDIT_GETCHAR(obj,i)       returns the i'th character of obj, 0-based
 //    STB_TEXTEDIT_NEWLINE              the character returned by _GETCHAR() we recognize
 //                                        as manually wordwrapping for end-of-line positioning
 //
 //    STB_TEXTEDIT_DELETECHARS(obj,i,n)      delete n characters starting at i
-//    STB_TEXTEDIT_INSERTCHARS(obj,i,c*,n)   insert n characters at i (pointed to by STB_TEXTEDIT_CHARTYPE*)
+//    STB_TEXTEDIT_INSERTCHARS(obj,i,c*,n)   try to insert n characters at i (pointed to by STB_TEXTEDIT_CHARTYPE*)
+//                                           returns number of characters actually inserted. [DEAR IMGUI]
 //
 //    STB_TEXTEDIT_K_SHIFT       a power of two that is or'd in to a keyboard input to represent the shift key
 //
@@ -171,6 +181,13 @@
 //    STB_TEXTEDIT_K_LINEEND2            secondary keyboard input to move cursor to end of line
 //    STB_TEXTEDIT_K_TEXTSTART2          secondary keyboard input to move cursor to start of text
 //    STB_TEXTEDIT_K_TEXTEND2            secondary keyboard input to move cursor to end of text
+//
+// To support UTF-8:
+//
+//    STB_TEXTEDIT_GETPREVCHARINDEX      returns index of previous character
+//    STB_TEXTEDIT_GETNEXTCHARINDEX      returns index of next character
+//    Do NOT define STB_TEXTEDIT_KEYTOTEXT.
+//    Instead, call stb_textedit_text() directly for text contents.
 //
 // Keyboard input must be encoded as a single integer value; e.g. a character code
 // and some bitflags that represent shift states. to simplify the interface, SHIFT must
@@ -205,6 +222,7 @@
 //    int  stb_textedit_cut(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
 //    int  stb_textedit_paste(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, STB_TEXTEDIT_CHARTYPE *text, int len)
 //    void stb_textedit_key(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, STB_TEXEDIT_KEYTYPE key)
+//    void stb_textedit_text(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, STB_TEXTEDIT_CHARTYPE *text, int text_len)
 //
 //    Each of these functions potentially updates the string and updates the
 //    state.
@@ -217,20 +235,20 @@
 //          call this with the mouse x,y on a mouse down; it will update the cursor
 //          and reset the selection start/end to the cursor point. the x,y must
 //          be relative to the text widget, with (0,0) being the top left.
-//     
+//
 //      drag:
 //          call this with the mouse x,y on a mouse drag/up; it will update the
 //          cursor and the selection end point
-//     
+//
 //      cut:
 //          call this to delete the current selection; returns true if there was
 //          one. you should FIRST copy the current selection to the system paste buffer.
 //          (To copy, just copy the current selection out of the string yourself.)
-//     
+//
 //      paste:
 //          call this to paste text at the current cursor point or over the current
 //          selection if there is one.
-//     
+//
 //      key:
 //          call this for keyboard inputs sent to the textfield. you can use it
 //          for "key down" events or for "translated" key events. if you need to
@@ -239,9 +257,16 @@
 //          various definitions like STB_TEXTEDIT_K_LEFT have the is-key-event bit
 //          set, and make STB_TEXTEDIT_KEYTOCHAR check that the is-key-event bit is
 //          clear. STB_TEXTEDIT_KEYTYPE defaults to int, but you can #define it to
-//          anything other type you wante before including.
+//          anything other type you want before including.
+//          if the STB_TEXTEDIT_KEYTOTEXT function is defined, selected keys are
+//          transformed into text and stb_textedit_text() is automatically called.
 //
-//     
+//      text: (added 2025)
+//          call this to directly send text input the textfield, which is required
+//          for UTF-8 support, because stb_textedit_key() + STB_TEXTEDIT_KEYTOTEXT()
+//          cannot infer text length.
+//
+//
 //   When rendering, you can read the cursor position and selection state from
 //   the STB_TexteditState.
 //
@@ -271,8 +296,8 @@
 ////
 ////
 
-#ifndef INCLUDE_STB_TEXTEDIT_H
-#define INCLUDE_STB_TEXTEDIT_H
+#ifndef INCLUDE_IMSTB_TEXTEDIT_H
+#define INCLUDE_IMSTB_TEXTEDIT_H
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -283,38 +308,38 @@
 // and undo state.
 //
 
-#ifndef STB_TEXTEDIT_UNDOSTATECOUNT
-#define STB_TEXTEDIT_UNDOSTATECOUNT   99
+#ifndef IMSTB_TEXTEDIT_UNDOSTATECOUNT
+#define IMSTB_TEXTEDIT_UNDOSTATECOUNT   99
 #endif
-#ifndef STB_TEXTEDIT_UNDOCHARCOUNT
-#define STB_TEXTEDIT_UNDOCHARCOUNT   999
+#ifndef IMSTB_TEXTEDIT_UNDOCHARCOUNT
+#define IMSTB_TEXTEDIT_UNDOCHARCOUNT   999
 #endif
-#ifndef STB_TEXTEDIT_CHARTYPE
-#define STB_TEXTEDIT_CHARTYPE        int
+#ifndef IMSTB_TEXTEDIT_CHARTYPE
+#define IMSTB_TEXTEDIT_CHARTYPE        int
 #endif
-#ifndef STB_TEXTEDIT_POSITIONTYPE
-#define STB_TEXTEDIT_POSITIONTYPE    int
+#ifndef IMSTB_TEXTEDIT_POSITIONTYPE
+#define IMSTB_TEXTEDIT_POSITIONTYPE    int
 #endif
 
 typedef struct
 {
    // private data
-   STB_TEXTEDIT_POSITIONTYPE  where;
-   STB_TEXTEDIT_POSITIONTYPE  insert_length;
-   STB_TEXTEDIT_POSITIONTYPE  delete_length;
+   IMSTB_TEXTEDIT_POSITIONTYPE  where;
+   IMSTB_TEXTEDIT_POSITIONTYPE  insert_length;
+   IMSTB_TEXTEDIT_POSITIONTYPE  delete_length;
    int                        char_storage;
 } StbUndoRecord;
 
 typedef struct
 {
    // private data
-   StbUndoRecord          undo_rec [STB_TEXTEDIT_UNDOSTATECOUNT];
-   STB_TEXTEDIT_CHARTYPE  undo_char[STB_TEXTEDIT_UNDOCHARCOUNT];
+   StbUndoRecord          undo_rec [IMSTB_TEXTEDIT_UNDOSTATECOUNT];
+   IMSTB_TEXTEDIT_CHARTYPE  undo_char[IMSTB_TEXTEDIT_UNDOCHARCOUNT];
    short undo_point, redo_point;
    int undo_char_point, redo_char_point;
 } StbUndoState;
 
-typedef struct
+typedef struct STB_TexteditState
 {
    /////////////////////
    //
@@ -368,7 +393,7 @@ typedef struct
    float ymin,ymax;         // height of row above and below baseline
    int num_chars;
 } StbTexteditRow;
-#endif //INCLUDE_STB_TEXTEDIT_H
+#endif //INCLUDE_IMSTB_TEXTEDIT_H
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -381,13 +406,23 @@ typedef struct
 
 // implementation isn't include-guarded, since it might have indirectly
 // included just the "header" portion
-#ifdef STB_TEXTEDIT_IMPLEMENTATION
+#ifdef IMSTB_TEXTEDIT_IMPLEMENTATION
 
-#ifndef STB_TEXTEDIT_memmove
+#ifndef IMSTB_TEXTEDIT_memmove
 #include <string.h>
-#define STB_TEXTEDIT_memmove memmove
+#define IMSTB_TEXTEDIT_memmove memmove
 #endif
 
+// [DEAR IMGUI]
+// Functions must be implemented for UTF8 support
+// Code in this file that uses those functions is modified for [DEAR IMGUI] and deviates from the original stb_textedit.
+// There is not necessarily a '[DEAR IMGUI]' at the usage sites.
+#ifndef IMSTB_TEXTEDIT_GETPREVCHARINDEX
+#define IMSTB_TEXTEDIT_GETPREVCHARINDEX(OBJ, IDX) ((IDX) - 1)
+#endif
+#ifndef IMSTB_TEXTEDIT_GETNEXTCHARINDEX
+#define IMSTB_TEXTEDIT_GETNEXTCHARINDEX(OBJ, IDX) ((IDX) + 1)
+#endif
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -395,7 +430,7 @@ typedef struct
 //
 
 // traverse the layout to locate the nearest character to a display position
-static int stb_text_locate_coord(STB_TEXTEDIT_STRING *str, float x, float y)
+static int stb_text_locate_coord(IMSTB_TEXTEDIT_STRING *str, float x, float y, int* out_side_on_line)
 {
    StbTexteditRow r;
    int n = STB_TEXTEDIT_STRINGLEN(str);
@@ -405,6 +440,7 @@ static int stb_text_locate_coord(STB_TEXTEDIT_STRING *str, float x, float y)
    r.x0 = r.x1 = 0;
    r.ymin = r.ymax = 0;
    r.num_chars = 0;
+   *out_side_on_line = 0;
 
    // search rows to find one that straddles 'y'
    while (i < n) {
@@ -424,7 +460,10 @@ static int stb_text_locate_coord(STB_TEXTEDIT_STRING *str, float x, float y)
 
    // below all text, return 'after' last character
    if (i >= n)
+   {
+      *out_side_on_line = 1;
       return n;
+   }
 
    // check if it's before the beginning of the line
    if (x < r.x0)
@@ -434,13 +473,14 @@ static int stb_text_locate_coord(STB_TEXTEDIT_STRING *str, float x, float y)
    if (x < r.x1) {
       // search characters in row for one that straddles 'x'
       prev_x = r.x0;
-      for (k=0; k < r.num_chars; ++k) {
+      for (k=0; k < r.num_chars; k = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, i + k) - i) {
          float w = STB_TEXTEDIT_GETWIDTH(str, i, k);
          if (x < prev_x+w) {
+            *out_side_on_line = (k == 0) ? 0 : 1;
             if (x < prev_x+w/2)
                return k+i;
             else
-               return k+i+1;
+               return IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, i + k);
          }
          prev_x += w;
       }
@@ -448,6 +488,7 @@ static int stb_text_locate_coord(STB_TEXTEDIT_STRING *str, float x, float y)
    }
 
    // if the last character is a newline, return that. otherwise return 'after' the last character
+   *out_side_on_line = 1;
    if (STB_TEXTEDIT_GETCHAR(str, i+r.num_chars-1) == STB_TEXTEDIT_NEWLINE)
       return i+r.num_chars-1;
    else
@@ -455,10 +496,11 @@ static int stb_text_locate_coord(STB_TEXTEDIT_STRING *str, float x, float y)
 }
 
 // API click: on mouse down, move the cursor to the clicked location, and reset the selection
-static void stb_textedit_click(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, float x, float y)
+static void stb_textedit_click(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, float x, float y)
 {
    // In single-line mode, just always make y = 0. This lets the drag keep working if the mouse
    // goes off the top or bottom of the text
+   int side_on_line;
    if( state->single_line )
    {
       StbTexteditRow r;
@@ -466,16 +508,18 @@ static void stb_textedit_click(STB_TEXTEDIT_STRING *str, STB_TexteditState *stat
       y = r.ymin;
    }
 
-   state->cursor = stb_text_locate_coord(str, x, y);
+   state->cursor = stb_text_locate_coord(str, x, y, &side_on_line);
    state->select_start = state->cursor;
    state->select_end = state->cursor;
    state->has_preferred_x = 0;
+   str->LastMoveDirectionLR = (ImS8)(side_on_line ? ImGuiDir_Right : ImGuiDir_Left);
 }
 
 // API drag: on mouse drag, move the cursor and selection endpoint to the clicked location
-static void stb_textedit_drag(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, float x, float y)
+static void stb_textedit_drag(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, float x, float y)
 {
    int p = 0;
+   int side_on_line;
 
    // In single-line mode, just always make y = 0. This lets the drag keep working if the mouse
    // goes off the top or bottom of the text
@@ -489,8 +533,9 @@ static void stb_textedit_drag(STB_TEXTEDIT_STRING *str, STB_TexteditState *state
    if (state->select_start == state->select_end)
       state->select_start = state->cursor;
 
-   p = stb_text_locate_coord(str, x, y);
+   p = stb_text_locate_coord(str, x, y, &side_on_line);
    state->cursor = state->select_end = p;
+   str->LastMoveDirectionLR = (ImS8)(side_on_line ? ImGuiDir_Right : ImGuiDir_Left);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -499,11 +544,11 @@ static void stb_textedit_drag(STB_TEXTEDIT_STRING *str, STB_TexteditState *state
 //
 
 // forward declarations
-static void stb_text_undo(STB_TEXTEDIT_STRING *str, STB_TexteditState *state);
-static void stb_text_redo(STB_TEXTEDIT_STRING *str, STB_TexteditState *state);
-static void stb_text_makeundo_delete(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, int where, int length);
+static void stb_text_undo(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state);
+static void stb_text_redo(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state);
+static void stb_text_makeundo_delete(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, int where, int length);
 static void stb_text_makeundo_insert(STB_TexteditState *state, int where, int length);
-static void stb_text_makeundo_replace(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, int where, int old_length, int new_length);
+static void stb_text_makeundo_replace(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, int where, int old_length, int new_length);
 
 typedef struct
 {
@@ -515,36 +560,21 @@ typedef struct
 
 // find the x/y location of a character, and remember info about the previous row in
 // case we get a move-up event (for page up, we'll have to rescan)
-static void stb_textedit_find_charpos(StbFindState *find, STB_TEXTEDIT_STRING *str, int n, int single_line)
+static void stb_textedit_find_charpos(StbFindState *find, IMSTB_TEXTEDIT_STRING *str, int n, int single_line)
 {
    StbTexteditRow r;
    int prev_start = 0;
    int z = STB_TEXTEDIT_STRINGLEN(str);
    int i=0, first;
 
-   if (n == z) {
-      // if it's at the end, then find the last line -- simpler than trying to
-      // explicitly handle this case in the regular code
-      if (single_line) {
-         STB_TEXTEDIT_LAYOUTROW(&r, str, 0);
-         find->y = 0;
-         find->first_char = 0;
-         find->length = z;
-         find->height = r.ymax - r.ymin;
-         find->x = r.x1;
-      } else {
-         find->y = 0;
-         find->x = 0;
-         find->height = 1;
-         while (i < z) {
-            STB_TEXTEDIT_LAYOUTROW(&r, str, i);
-            prev_start = i;
-            i += r.num_chars;
-         }
-         find->first_char = i;
-         find->length = 0;
-         find->prev_first = prev_start;
-      }
+   if (n == z && single_line) {
+      // special case if it's at the end (may not be needed?)
+      STB_TEXTEDIT_LAYOUTROW(&r, str, 0);
+      find->y = 0;
+      find->first_char = 0;
+      find->length = z;
+      find->height = r.ymax - r.ymin;
+      find->x = r.x1;
       return;
    }
 
@@ -555,9 +585,18 @@ static void stb_textedit_find_charpos(StbFindState *find, STB_TEXTEDIT_STRING *s
       STB_TEXTEDIT_LAYOUTROW(&r, str, i);
       if (n < i + r.num_chars)
          break;
+      if (str->LastMoveDirectionLR == ImGuiDir_Right && str->Stb->cursor > 0 && str->Stb->cursor == i + r.num_chars && STB_TEXTEDIT_GETCHAR(str, i + r.num_chars - 1) != STB_TEXTEDIT_NEWLINE) // [DEAR IMGUI] Wrapping point handling
+         break;
+      if (i + r.num_chars == z && z > 0 && STB_TEXTEDIT_GETCHAR(str, z - 1) != STB_TEXTEDIT_NEWLINE)  // [DEAR IMGUI] special handling for last line
+         break;   // [DEAR IMGUI]
       prev_start = i;
       i += r.num_chars;
       find->y += r.baseline_y_delta;
+      if (i == z) // [DEAR IMGUI]
+      {
+         r.num_chars = 0; // [DEAR IMGUI]
+         break;   // [DEAR IMGUI]
+      }
    }
 
    find->first_char = first = i;
@@ -567,14 +606,14 @@ static void stb_textedit_find_charpos(StbFindState *find, STB_TEXTEDIT_STRING *s
 
    // now scan to find xpos
    find->x = r.x0;
-   for (i=0; first+i < n; ++i)
+   for (i=0; first+i < n; i = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, first + i) - first)
       find->x += STB_TEXTEDIT_GETWIDTH(str, first, i);
 }
 
 #define STB_TEXT_HAS_SELECTION(s)   ((s)->select_start != (s)->select_end)
 
 // make the selection/cursor state valid if client altered the string
-static void stb_textedit_clamp(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
+static void stb_textedit_clamp(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state)
 {
    int n = STB_TEXTEDIT_STRINGLEN(str);
    if (STB_TEXT_HAS_SELECTION(state)) {
@@ -588,7 +627,7 @@ static void stb_textedit_clamp(STB_TEXTEDIT_STRING *str, STB_TexteditState *stat
 }
 
 // delete characters while updating undo
-static void stb_textedit_delete(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, int where, int len)
+static void stb_textedit_delete(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, int where, int len)
 {
    stb_text_makeundo_delete(str, state, where, len);
    STB_TEXTEDIT_DELETECHARS(str, where, len);
@@ -596,7 +635,7 @@ static void stb_textedit_delete(STB_TEXTEDIT_STRING *str, STB_TexteditState *sta
 }
 
 // delete the section
-static void stb_textedit_delete_selection(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
+static void stb_textedit_delete_selection(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state)
 {
    stb_textedit_clamp(str, state);
    if (STB_TEXT_HAS_SELECTION(state)) {
@@ -633,7 +672,7 @@ static void stb_textedit_move_to_first(STB_TexteditState *state)
 }
 
 // move cursor to last character of selection
-static void stb_textedit_move_to_last(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
+static void stb_textedit_move_to_last(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state)
 {
    if (STB_TEXT_HAS_SELECTION(state)) {
       stb_textedit_sortselection(state);
@@ -644,18 +683,47 @@ static void stb_textedit_move_to_last(STB_TEXTEDIT_STRING *str, STB_TexteditStat
    }
 }
 
+// [DEAR IMGUI] Extracted this function so we can more easily add support for word-wrapping.
+#ifndef STB_TEXTEDIT_MOVELINESTART
+static int stb_textedit_move_line_start(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, int cursor)
+{
+   if (state->single_line)
+      return 0;
+   while (cursor > 0) {
+      int prev = IMSTB_TEXTEDIT_GETPREVCHARINDEX(str, cursor);
+      if (STB_TEXTEDIT_GETCHAR(str, prev) == STB_TEXTEDIT_NEWLINE)
+         break;
+      cursor = prev;
+   }
+   return cursor;
+}
+#define STB_TEXTEDIT_MOVELINESTART stb_textedit_move_line_start
+#endif
+#ifndef STB_TEXTEDIT_MOVELINEEND
+static int stb_textedit_move_line_end(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, int cursor)
+{
+   int n = STB_TEXTEDIT_STRINGLEN(str);
+   if (state->single_line)
+      return n;
+   while (cursor < n && STB_TEXTEDIT_GETCHAR(str, cursor) != STB_TEXTEDIT_NEWLINE)
+      cursor = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, cursor);
+   return cursor;
+}
+#define STB_TEXTEDIT_MOVELINEEND stb_textedit_move_line_end
+#endif
+
 #ifdef STB_TEXTEDIT_IS_SPACE
-static int is_word_boundary( STB_TEXTEDIT_STRING *str, int idx )
+static int is_word_boundary( IMSTB_TEXTEDIT_STRING *str, int idx )
 {
    return idx > 0 ? (STB_TEXTEDIT_IS_SPACE( STB_TEXTEDIT_GETCHAR(str,idx-1) ) && !STB_TEXTEDIT_IS_SPACE( STB_TEXTEDIT_GETCHAR(str, idx) ) ) : 1;
 }
 
 #ifndef STB_TEXTEDIT_MOVEWORDLEFT
-static int stb_textedit_move_to_word_previous( STB_TEXTEDIT_STRING *str, int c )
+static int stb_textedit_move_to_word_previous( IMSTB_TEXTEDIT_STRING *str, int c )
 {
-   --c; // always move at least one character
-   while( c >= 0 && !is_word_boundary( str, c ) )
-      --c;
+   c = IMSTB_TEXTEDIT_GETPREVCHARINDEX( str, c ); // always move at least one character
+   while (c >= 0 && !is_word_boundary(str, c))
+      c = IMSTB_TEXTEDIT_GETPREVCHARINDEX(str, c);
 
    if( c < 0 )
       c = 0;
@@ -666,12 +734,12 @@ static int stb_textedit_move_to_word_previous( STB_TEXTEDIT_STRING *str, int c )
 #endif
 
 #ifndef STB_TEXTEDIT_MOVEWORDRIGHT
-static int stb_textedit_move_to_word_next( STB_TEXTEDIT_STRING *str, int c )
+static int stb_textedit_move_to_word_next( IMSTB_TEXTEDIT_STRING *str, int c )
 {
    const int len = STB_TEXTEDIT_STRINGLEN(str);
-   ++c; // always move at least one character
+   c = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, c); // always move at least one character
    while( c < len && !is_word_boundary( str, c ) )
-      ++c;
+      c = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, c);
 
    if( c > len )
       c = len;
@@ -693,7 +761,7 @@ static void stb_textedit_prep_selection_at_cursor(STB_TexteditState *state)
 }
 
 // API cut: delete selection
-static int stb_textedit_cut(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
+static int stb_textedit_cut(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state)
 {
    if (STB_TEXT_HAS_SELECTION(state)) {
       stb_textedit_delete_selection(str,state); // implicitly clamps
@@ -704,21 +772,20 @@ static int stb_textedit_cut(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
 }
 
 // API paste: replace existing selection with passed-in text
-static int stb_textedit_paste_internal(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, STB_TEXTEDIT_CHARTYPE *text, int len)
+static int stb_textedit_paste_internal(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, IMSTB_TEXTEDIT_CHARTYPE *text, int len)
 {
    // if there's a selection, the paste should delete it
    stb_textedit_clamp(str, state);
    stb_textedit_delete_selection(str,state);
    // try to insert the characters
-   if (STB_TEXTEDIT_INSERTCHARS(str, state->cursor, text, len)) {
+   len = STB_TEXTEDIT_INSERTCHARS(str, state->cursor, text, len);
+   if (len) {
       stb_text_makeundo_insert(state, state->cursor, len);
       state->cursor += len;
       state->has_preferred_x = 0;
       return 1;
    }
-   // remove the undo since we didn't actually insert the characters
-   if (state->undostate.undo_point)
-      --state->undostate.undo_point;
+   // note: paste failure will leave deleted selection, may be restored with an undo (see https://github.com/nothings/stb/issues/734 for details)
    return 0;
 }
 
@@ -726,36 +793,47 @@ static int stb_textedit_paste_internal(STB_TEXTEDIT_STRING *str, STB_TexteditSta
 #define STB_TEXTEDIT_KEYTYPE int
 #endif
 
+// API key: process text input
+// [DEAR IMGUI] Added stb_textedit_text(), extracted out and called by stb_textedit_key() for backward compatibility.
+static void stb_textedit_text(IMSTB_TEXTEDIT_STRING* str, STB_TexteditState* state, const IMSTB_TEXTEDIT_CHARTYPE* text, int text_len)
+{
+   // can't add newline in single-line mode
+   if (text[0] == '\n' && state->single_line)
+      return;
+
+   if (state->insert_mode && !STB_TEXT_HAS_SELECTION(state) && state->cursor < STB_TEXTEDIT_STRINGLEN(str)) {
+      stb_text_makeundo_replace(str, state, state->cursor, 1, 1);
+      STB_TEXTEDIT_DELETECHARS(str, state->cursor, 1);
+      text_len = STB_TEXTEDIT_INSERTCHARS(str, state->cursor, text, text_len);
+      if (text_len) {
+         state->cursor += text_len;
+         state->has_preferred_x = 0;
+      }
+   } else {
+      stb_textedit_delete_selection(str, state); // implicitly clamps
+      text_len = STB_TEXTEDIT_INSERTCHARS(str, state->cursor, text, text_len);
+      if (text_len) {
+         stb_text_makeundo_insert(state, state->cursor, text_len);
+         state->cursor += text_len;
+         state->has_preferred_x = 0;
+      }
+   }
+}
+
 // API key: process a keyboard input
-static void stb_textedit_key(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, STB_TEXTEDIT_KEYTYPE key)
+static void stb_textedit_key(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, STB_TEXTEDIT_KEYTYPE key)
 {
 retry:
    switch (key) {
       default: {
+#ifdef STB_TEXTEDIT_KEYTOTEXT
+         // This is not suitable for UTF-8 support.
          int c = STB_TEXTEDIT_KEYTOTEXT(key);
          if (c > 0) {
-            STB_TEXTEDIT_CHARTYPE ch = (STB_TEXTEDIT_CHARTYPE) c;
-
-            // can't add newline in single-line mode
-            if (c == '\n' && state->single_line)
-               break;
-
-            if (state->insert_mode && !STB_TEXT_HAS_SELECTION(state) && state->cursor < STB_TEXTEDIT_STRINGLEN(str)) {
-               stb_text_makeundo_replace(str, state, state->cursor, 1, 1);
-               STB_TEXTEDIT_DELETECHARS(str, state->cursor, 1);
-               if (STB_TEXTEDIT_INSERTCHARS(str, state->cursor, &ch, 1)) {
-                  ++state->cursor;
-                  state->has_preferred_x = 0;
-               }
-            } else {
-               stb_textedit_delete_selection(str,state); // implicitly clamps
-               if (STB_TEXTEDIT_INSERTCHARS(str, state->cursor, &ch, 1)) {
-                  stb_text_makeundo_insert(state, state->cursor, 1);
-                  ++state->cursor;
-                  state->has_preferred_x = 0;
-               }
-            }
+            IMSTB_TEXTEDIT_CHARTYPE ch = (IMSTB_TEXTEDIT_CHARTYPE)c;
+            stb_textedit_text(str, state, &ch, 1);
          }
+#endif
          break;
       }
 
@@ -764,7 +842,7 @@ retry:
          state->insert_mode = !state->insert_mode;
          break;
 #endif
-         
+
       case STB_TEXTEDIT_K_UNDO:
          stb_text_undo(str, state);
          state->has_preferred_x = 0;
@@ -779,9 +857,9 @@ retry:
          // if currently there's a selection, move cursor to start of selection
          if (STB_TEXT_HAS_SELECTION(state))
             stb_textedit_move_to_first(state);
-         else 
+         else
             if (state->cursor > 0)
-               --state->cursor;
+               state->cursor = IMSTB_TEXTEDIT_GETPREVCHARINDEX(str, state->cursor);
          state->has_preferred_x = 0;
          break;
 
@@ -790,7 +868,7 @@ retry:
          if (STB_TEXT_HAS_SELECTION(state))
             stb_textedit_move_to_last(str, state);
          else
-            ++state->cursor;
+            state->cursor = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state->cursor);
          stb_textedit_clamp(str, state);
          state->has_preferred_x = 0;
          break;
@@ -800,7 +878,7 @@ retry:
          stb_textedit_prep_selection_at_cursor(state);
          // move selection left
          if (state->select_end > 0)
-            --state->select_end;
+            state->select_end = IMSTB_TEXTEDIT_GETPREVCHARINDEX(str, state->select_end);
          state->cursor = state->select_end;
          state->has_preferred_x = 0;
          break;
@@ -828,7 +906,7 @@ retry:
 
 #ifdef STB_TEXTEDIT_MOVEWORDRIGHT
       case STB_TEXTEDIT_K_WORDRIGHT:
-         if (STB_TEXT_HAS_SELECTION(state)) 
+         if (STB_TEXT_HAS_SELECTION(state))
             stb_textedit_move_to_last(str, state);
          else {
             state->cursor = STB_TEXTEDIT_MOVEWORDRIGHT(str, state->cursor);
@@ -850,7 +928,7 @@ retry:
       case STB_TEXTEDIT_K_RIGHT | STB_TEXTEDIT_K_SHIFT:
          stb_textedit_prep_selection_at_cursor(state);
          // move selection right
-         ++state->select_end;
+         state->select_end = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state->select_end);
          stb_textedit_clamp(str, state);
          state->cursor = state->select_end;
          state->has_preferred_x = 0;
@@ -890,26 +968,30 @@ retry:
 
             // [DEAR IMGUI]
             // going down while being on the last line shouldn't bring us to that line end
-            if (STB_TEXTEDIT_GETCHAR(str, find.first_char + find.length - 1) != STB_TEXTEDIT_NEWLINE)
-               break;
+            //if (STB_TEXTEDIT_GETCHAR(str, find.first_char + find.length - 1) != STB_TEXTEDIT_NEWLINE)
+            //   break;
 
             // now find character position down a row
             state->cursor = start;
             STB_TEXTEDIT_LAYOUTROW(&row, str, state->cursor);
             x = row.x0;
-            for (i=0; i < row.num_chars; ++i) {
+            for (i=0; i < row.num_chars; ) {
                float dx = STB_TEXTEDIT_GETWIDTH(str, start, i);
-               #ifdef STB_TEXTEDIT_GETWIDTH_NEWLINE
-               if (dx == STB_TEXTEDIT_GETWIDTH_NEWLINE)
+               int next = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state->cursor);
+               #ifdef IMSTB_TEXTEDIT_GETWIDTH_NEWLINE
+               if (dx == IMSTB_TEXTEDIT_GETWIDTH_NEWLINE)
                   break;
                #endif
                x += dx;
                if (x > goal_x)
                   break;
-               ++state->cursor;
+               i += next - state->cursor;
+               state->cursor = next;
             }
             stb_textedit_clamp(str, state);
 
+            if (state->cursor == find.first_char + find.length)
+               str->LastMoveDirectionLR = ImGuiDir_Left;
             state->has_preferred_x = 1;
             state->preferred_x = goal_x;
 
@@ -922,7 +1004,7 @@ retry:
          }
          break;
       }
-         
+
       case STB_TEXTEDIT_K_UP:
       case STB_TEXTEDIT_K_UP | STB_TEXTEDIT_K_SHIFT:
       case STB_TEXTEDIT_K_PGUP:
@@ -959,19 +1041,25 @@ retry:
             state->cursor = find.prev_first;
             STB_TEXTEDIT_LAYOUTROW(&row, str, state->cursor);
             x = row.x0;
-            for (i=0; i < row.num_chars; ++i) {
+            for (i=0; i < row.num_chars; ) {
                float dx = STB_TEXTEDIT_GETWIDTH(str, find.prev_first, i);
-               #ifdef STB_TEXTEDIT_GETWIDTH_NEWLINE
-               if (dx == STB_TEXTEDIT_GETWIDTH_NEWLINE)
+               int next = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state->cursor);
+               #ifdef IMSTB_TEXTEDIT_GETWIDTH_NEWLINE
+               if (dx == IMSTB_TEXTEDIT_GETWIDTH_NEWLINE)
                   break;
                #endif
                x += dx;
                if (x > goal_x)
                   break;
-               ++state->cursor;
+               i += next - state->cursor;
+               state->cursor = next;
             }
             stb_textedit_clamp(str, state);
 
+            if (state->cursor == find.first_char)
+               str->LastMoveDirectionLR = ImGuiDir_Right;
+            else if (state->cursor == find.prev_first)
+               str->LastMoveDirectionLR = ImGuiDir_Left;
             state->has_preferred_x = 1;
             state->preferred_x = goal_x;
 
@@ -981,10 +1069,15 @@ retry:
             // go to previous line
             // (we need to scan previous line the hard way. maybe we could expose this as a new API function?)
             prev_scan = find.prev_first > 0 ? find.prev_first - 1 : 0;
-            while (prev_scan > 0 && STB_TEXTEDIT_GETCHAR(str, prev_scan - 1) != STB_TEXTEDIT_NEWLINE)
-               --prev_scan;
+            while (prev_scan > 0)
+            {
+               int prev = IMSTB_TEXTEDIT_GETPREVCHARINDEX(str, prev_scan);
+               if (STB_TEXTEDIT_GETCHAR(str, prev) == STB_TEXTEDIT_NEWLINE)
+                  break;
+               prev_scan = prev;
+            }
             find.first_char = find.prev_first;
-            find.prev_first = prev_scan;
+            find.prev_first = STB_TEXTEDIT_MOVELINESTART(str, state, prev_scan);
          }
          break;
       }
@@ -996,7 +1089,7 @@ retry:
          else {
             int n = STB_TEXTEDIT_STRINGLEN(str);
             if (state->cursor < n)
-               stb_textedit_delete(str, state, state->cursor, 1);
+               stb_textedit_delete(str, state, state->cursor, IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state->cursor) - state->cursor);
          }
          state->has_preferred_x = 0;
          break;
@@ -1008,13 +1101,14 @@ retry:
          else {
             stb_textedit_clamp(str, state);
             if (state->cursor > 0) {
-               stb_textedit_delete(str, state, state->cursor-1, 1);
-               --state->cursor;
+               int prev = IMSTB_TEXTEDIT_GETPREVCHARINDEX(str, state->cursor);
+               stb_textedit_delete(str, state, prev, state->cursor - prev);
+               state->cursor = prev;
             }
          }
          state->has_preferred_x = 0;
          break;
-         
+
 #ifdef STB_TEXTEDIT_K_TEXTSTART2
       case STB_TEXTEDIT_K_TEXTSTART2:
 #endif
@@ -1031,7 +1125,7 @@ retry:
          state->select_start = state->select_end = 0;
          state->has_preferred_x = 0;
          break;
-        
+
 #ifdef STB_TEXTEDIT_K_TEXTSTART2
       case STB_TEXTEDIT_K_TEXTSTART2 | STB_TEXTEDIT_K_SHIFT:
 #endif
@@ -1057,10 +1151,7 @@ retry:
       case STB_TEXTEDIT_K_LINESTART:
          stb_textedit_clamp(str, state);
          stb_textedit_move_to_first(state);
-         if (state->single_line)
-            state->cursor = 0;
-         else while (state->cursor > 0 && STB_TEXTEDIT_GETCHAR(str, state->cursor-1) != STB_TEXTEDIT_NEWLINE)
-            --state->cursor;
+         state->cursor = STB_TEXTEDIT_MOVELINESTART(str, state, state->cursor);
          state->has_preferred_x = 0;
          break;
 
@@ -1068,13 +1159,9 @@ retry:
       case STB_TEXTEDIT_K_LINEEND2:
 #endif
       case STB_TEXTEDIT_K_LINEEND: {
-         int n = STB_TEXTEDIT_STRINGLEN(str);
          stb_textedit_clamp(str, state);
-         stb_textedit_move_to_first(state);
-         if (state->single_line)
-             state->cursor = n;
-         else while (state->cursor < n && STB_TEXTEDIT_GETCHAR(str, state->cursor) != STB_TEXTEDIT_NEWLINE)
-             ++state->cursor;
+         stb_textedit_move_to_last(str, state);
+         state->cursor = STB_TEXTEDIT_MOVELINEEND(str, state, state->cursor);
          state->has_preferred_x = 0;
          break;
       }
@@ -1085,10 +1172,7 @@ retry:
       case STB_TEXTEDIT_K_LINESTART | STB_TEXTEDIT_K_SHIFT:
          stb_textedit_clamp(str, state);
          stb_textedit_prep_selection_at_cursor(state);
-         if (state->single_line)
-            state->cursor = 0;
-         else while (state->cursor > 0 && STB_TEXTEDIT_GETCHAR(str, state->cursor-1) != STB_TEXTEDIT_NEWLINE)
-            --state->cursor;
+         state->cursor = STB_TEXTEDIT_MOVELINESTART(str, state, state->cursor);
          state->select_end = state->cursor;
          state->has_preferred_x = 0;
          break;
@@ -1097,13 +1181,9 @@ retry:
       case STB_TEXTEDIT_K_LINEEND2 | STB_TEXTEDIT_K_SHIFT:
 #endif
       case STB_TEXTEDIT_K_LINEEND | STB_TEXTEDIT_K_SHIFT: {
-         int n = STB_TEXTEDIT_STRINGLEN(str);
          stb_textedit_clamp(str, state);
          stb_textedit_prep_selection_at_cursor(state);
-         if (state->single_line)
-             state->cursor = n;
-         else while (state->cursor < n && STB_TEXTEDIT_GETCHAR(str, state->cursor) != STB_TEXTEDIT_NEWLINE)
-            ++state->cursor;
+         state->cursor = STB_TEXTEDIT_MOVELINEEND(str, state, state->cursor);
          state->select_end = state->cursor;
          state->has_preferred_x = 0;
          break;
@@ -1119,8 +1199,8 @@ retry:
 
 static void stb_textedit_flush_redo(StbUndoState *state)
 {
-   state->redo_point = STB_TEXTEDIT_UNDOSTATECOUNT;
-   state->redo_char_point = STB_TEXTEDIT_UNDOCHARCOUNT;
+   state->redo_point = IMSTB_TEXTEDIT_UNDOSTATECOUNT;
+   state->redo_char_point = IMSTB_TEXTEDIT_UNDOCHARCOUNT;
 }
 
 // discard the oldest entry in the undo list
@@ -1132,13 +1212,13 @@ static void stb_textedit_discard_undo(StbUndoState *state)
          int n = state->undo_rec[0].insert_length, i;
          // delete n characters from all other records
          state->undo_char_point -= n;
-         STB_TEXTEDIT_memmove(state->undo_char, state->undo_char + n, (size_t) (state->undo_char_point*sizeof(STB_TEXTEDIT_CHARTYPE)));
+         IMSTB_TEXTEDIT_memmove(state->undo_char, state->undo_char + n, (size_t) (state->undo_char_point*sizeof(IMSTB_TEXTEDIT_CHARTYPE)));
          for (i=0; i < state->undo_point; ++i)
             if (state->undo_rec[i].char_storage >= 0)
                state->undo_rec[i].char_storage -= n; // @OPTIMIZE: get rid of char_storage and infer it
       }
       --state->undo_point;
-      STB_TEXTEDIT_memmove(state->undo_rec, state->undo_rec+1, (size_t) (state->undo_point*sizeof(state->undo_rec[0])));
+      IMSTB_TEXTEDIT_memmove(state->undo_rec, state->undo_rec+1, (size_t) (state->undo_point*sizeof(state->undo_rec[0])));
    }
 }
 
@@ -1148,7 +1228,7 @@ static void stb_textedit_discard_undo(StbUndoState *state)
 // fill up even though the undo buffer didn't
 static void stb_textedit_discard_redo(StbUndoState *state)
 {
-   int k = STB_TEXTEDIT_UNDOSTATECOUNT-1;
+   int k = IMSTB_TEXTEDIT_UNDOSTATECOUNT-1;
 
    if (state->redo_point <= k) {
       // if the k'th undo state has characters, clean those up
@@ -1156,7 +1236,7 @@ static void stb_textedit_discard_redo(StbUndoState *state)
          int n = state->undo_rec[k].insert_length, i;
          // move the remaining redo character data to the end of the buffer
          state->redo_char_point += n;
-         STB_TEXTEDIT_memmove(state->undo_char + state->redo_char_point, state->undo_char + state->redo_char_point-n, (size_t) ((STB_TEXTEDIT_UNDOCHARCOUNT - state->redo_char_point)*sizeof(STB_TEXTEDIT_CHARTYPE)));
+         IMSTB_TEXTEDIT_memmove(state->undo_char + state->redo_char_point, state->undo_char + state->redo_char_point-n, (size_t) ((IMSTB_TEXTEDIT_UNDOCHARCOUNT - state->redo_char_point)*sizeof(IMSTB_TEXTEDIT_CHARTYPE)));
          // adjust the position of all the other records to account for above memmove
          for (i=state->redo_point; i < k; ++i)
             if (state->undo_rec[i].char_storage >= 0)
@@ -1164,12 +1244,12 @@ static void stb_textedit_discard_redo(StbUndoState *state)
       }
       // now move all the redo records towards the end of the buffer; the first one is at 'redo_point'
       // [DEAR IMGUI]
-      size_t move_size = (size_t)((STB_TEXTEDIT_UNDOSTATECOUNT - state->redo_point - 1) * sizeof(state->undo_rec[0]));
+      size_t move_size = (size_t)((IMSTB_TEXTEDIT_UNDOSTATECOUNT - state->redo_point - 1) * sizeof(state->undo_rec[0]));
       const char* buf_begin = (char*)state->undo_rec; (void)buf_begin;
       const char* buf_end   = (char*)state->undo_rec + sizeof(state->undo_rec); (void)buf_end;
       IM_ASSERT(((char*)(state->undo_rec + state->redo_point)) >= buf_begin);
       IM_ASSERT(((char*)(state->undo_rec + state->redo_point + 1) + move_size) <= buf_end);
-      STB_TEXTEDIT_memmove(state->undo_rec + state->redo_point+1, state->undo_rec + state->redo_point, move_size);
+      IMSTB_TEXTEDIT_memmove(state->undo_rec + state->redo_point+1, state->undo_rec + state->redo_point, move_size);
 
       // now move redo_point to point to the new one
       ++state->redo_point;
@@ -1183,32 +1263,32 @@ static StbUndoRecord *stb_text_create_undo_record(StbUndoState *state, int numch
 
    // if we have no free records, we have to make room, by sliding the
    // existing records down
-   if (state->undo_point == STB_TEXTEDIT_UNDOSTATECOUNT)
+   if (state->undo_point == IMSTB_TEXTEDIT_UNDOSTATECOUNT)
       stb_textedit_discard_undo(state);
 
    // if the characters to store won't possibly fit in the buffer, we can't undo
-   if (numchars > STB_TEXTEDIT_UNDOCHARCOUNT) {
+   if (numchars > IMSTB_TEXTEDIT_UNDOCHARCOUNT) {
       state->undo_point = 0;
       state->undo_char_point = 0;
       return NULL;
    }
 
    // if we don't have enough free characters in the buffer, we have to make room
-   while (state->undo_char_point + numchars > STB_TEXTEDIT_UNDOCHARCOUNT)
+   while (state->undo_char_point + numchars > IMSTB_TEXTEDIT_UNDOCHARCOUNT)
       stb_textedit_discard_undo(state);
 
    return &state->undo_rec[state->undo_point++];
 }
 
-static STB_TEXTEDIT_CHARTYPE *stb_text_createundo(StbUndoState *state, int pos, int insert_len, int delete_len)
+static IMSTB_TEXTEDIT_CHARTYPE *stb_text_createundo(StbUndoState *state, int pos, int insert_len, int delete_len)
 {
    StbUndoRecord *r = stb_text_create_undo_record(state, insert_len);
    if (r == NULL)
       return NULL;
 
    r->where = pos;
-   r->insert_length = (STB_TEXTEDIT_POSITIONTYPE) insert_len;
-   r->delete_length = (STB_TEXTEDIT_POSITIONTYPE) delete_len;
+   r->insert_length = (IMSTB_TEXTEDIT_POSITIONTYPE) insert_len;
+   r->delete_length = (IMSTB_TEXTEDIT_POSITIONTYPE) delete_len;
 
    if (insert_len == 0) {
       r->char_storage = -1;
@@ -1220,7 +1300,7 @@ static STB_TEXTEDIT_CHARTYPE *stb_text_createundo(StbUndoState *state, int pos, 
    }
 }
 
-static void stb_text_undo(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
+static void stb_text_undo(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state)
 {
    StbUndoState *s = &state->undostate;
    StbUndoRecord u, *r;
@@ -1247,7 +1327,7 @@ static void stb_text_undo(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
       //    characters stored for *undoing* don't leave room for redo
       // if the last is true, we have to bail
 
-      if (s->undo_char_point + u.delete_length >= STB_TEXTEDIT_UNDOCHARCOUNT) {
+      if (s->undo_char_point + u.delete_length >= IMSTB_TEXTEDIT_UNDOCHARCOUNT) {
          // the undo records take up too much character space; there's no space to store the redo characters
          r->insert_length = 0;
       } else {
@@ -1256,7 +1336,7 @@ static void stb_text_undo(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
          // there's definitely room to store the characters eventually
          while (s->undo_char_point + u.delete_length > s->redo_char_point) {
             // should never happen:
-            if (s->redo_point == STB_TEXTEDIT_UNDOSTATECOUNT)
+            if (s->redo_point == IMSTB_TEXTEDIT_UNDOSTATECOUNT)
                return;
             // there's currently not enough room, so discard a redo record
             stb_textedit_discard_redo(s);
@@ -1278,7 +1358,7 @@ static void stb_text_undo(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
    // check type of recorded action:
    if (u.insert_length) {
       // easy case: was a deletion, so we need to insert n characters
-      STB_TEXTEDIT_INSERTCHARS(str, u.where, &s->undo_char[u.char_storage], u.insert_length);
+      u.insert_length = STB_TEXTEDIT_INSERTCHARS(str, u.where, &s->undo_char[u.char_storage], u.insert_length);
       s->undo_char_point -= u.insert_length;
    }
 
@@ -1288,11 +1368,11 @@ static void stb_text_undo(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
    s->redo_point--;
 }
 
-static void stb_text_redo(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
+static void stb_text_redo(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state)
 {
    StbUndoState *s = &state->undostate;
    StbUndoRecord *u, r;
-   if (s->redo_point == STB_TEXTEDIT_UNDOSTATECOUNT)
+   if (s->redo_point == IMSTB_TEXTEDIT_UNDOSTATECOUNT)
       return;
 
    // we need to do two things: apply the redo record, and create an undo record
@@ -1329,7 +1409,7 @@ static void stb_text_redo(STB_TEXTEDIT_STRING *str, STB_TexteditState *state)
 
    if (r.insert_length) {
       // easy case: need to insert n characters
-      STB_TEXTEDIT_INSERTCHARS(str, r.where, &s->undo_char[r.char_storage], r.insert_length);
+      r.insert_length = STB_TEXTEDIT_INSERTCHARS(str, r.where, &s->undo_char[r.char_storage], r.insert_length);
       s->redo_char_point += r.insert_length;
    }
 
@@ -1344,20 +1424,20 @@ static void stb_text_makeundo_insert(STB_TexteditState *state, int where, int le
    stb_text_createundo(&state->undostate, where, 0, length);
 }
 
-static void stb_text_makeundo_delete(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, int where, int length)
+static void stb_text_makeundo_delete(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, int where, int length)
 {
    int i;
-   STB_TEXTEDIT_CHARTYPE *p = stb_text_createundo(&state->undostate, where, length, 0);
+   IMSTB_TEXTEDIT_CHARTYPE *p = stb_text_createundo(&state->undostate, where, length, 0);
    if (p) {
       for (i=0; i < length; ++i)
          p[i] = STB_TEXTEDIT_GETCHAR(str, where+i);
    }
 }
 
-static void stb_text_makeundo_replace(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, int where, int old_length, int new_length)
+static void stb_text_makeundo_replace(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, int where, int old_length, int new_length)
 {
    int i;
-   STB_TEXTEDIT_CHARTYPE *p = stb_text_createundo(&state->undostate, where, old_length, new_length);
+   IMSTB_TEXTEDIT_CHARTYPE *p = stb_text_createundo(&state->undostate, where, old_length, new_length);
    if (p) {
       for (i=0; i < old_length; ++i)
          p[i] = STB_TEXTEDIT_GETCHAR(str, where+i);
@@ -1369,8 +1449,8 @@ static void stb_textedit_clear_state(STB_TexteditState *state, int is_single_lin
 {
    state->undostate.undo_point = 0;
    state->undostate.undo_char_point = 0;
-   state->undostate.redo_point = STB_TEXTEDIT_UNDOSTATECOUNT;
-   state->undostate.redo_char_point = STB_TEXTEDIT_UNDOCHARCOUNT;
+   state->undostate.redo_point = IMSTB_TEXTEDIT_UNDOSTATECOUNT;
+   state->undostate.redo_char_point = IMSTB_TEXTEDIT_UNDOCHARCOUNT;
    state->select_end = state->select_start = 0;
    state->cursor = 0;
    state->has_preferred_x = 0;
@@ -1393,16 +1473,16 @@ static void stb_textedit_initialize_state(STB_TexteditState *state, int is_singl
 #pragma GCC diagnostic ignored "-Wcast-qual"
 #endif
 
-static int stb_textedit_paste(STB_TEXTEDIT_STRING *str, STB_TexteditState *state, STB_TEXTEDIT_CHARTYPE const *ctext, int len)
+static int stb_textedit_paste(IMSTB_TEXTEDIT_STRING *str, STB_TexteditState *state, IMSTB_TEXTEDIT_CHARTYPE const *ctext, int len)
 {
-   return stb_textedit_paste_internal(str, state, (STB_TEXTEDIT_CHARTYPE *) ctext, len);
+   return stb_textedit_paste_internal(str, state, (IMSTB_TEXTEDIT_CHARTYPE *) ctext, len);
 }
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
 
-#endif//STB_TEXTEDIT_IMPLEMENTATION
+#endif//IMSTB_TEXTEDIT_IMPLEMENTATION
 
 /*
 ------------------------------------------------------------------------------
@@ -1410,38 +1490,38 @@ This software is available under 2 licenses -- choose whichever you prefer.
 ------------------------------------------------------------------------------
 ALTERNATIVE A - MIT License
 Copyright (c) 2017 Sean Barrett
-Permission is hereby granted, free of charge, to any person obtaining a copy of 
-this software and associated documentation files (the "Software"), to deal in 
-the Software without restriction, including without limitation the rights to 
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
-of the Software, and to permit persons to whom the Software is furnished to do 
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
 so, subject to the following conditions:
-The above copyright notice and this permission notice shall be included in all 
+The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ------------------------------------------------------------------------------
 ALTERNATIVE B - Public Domain (www.unlicense.org)
 This is free and unencumbered software released into the public domain.
-Anyone is free to copy, modify, publish, use, compile, sell, or distribute this 
-software, either in source code form or as a compiled binary, for any purpose, 
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
 commercial or non-commercial, and by any means.
-In jurisdictions that recognize copyright laws, the author or authors of this 
-software dedicate any and all copyright interest in the software to the public 
-domain. We make this dedication for the benefit of the public at large and to 
-the detriment of our heirs and successors. We intend this dedication to be an 
-overt act of relinquishment in perpetuity of all present and future rights to 
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
 this software under copyright law.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN 
-ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */

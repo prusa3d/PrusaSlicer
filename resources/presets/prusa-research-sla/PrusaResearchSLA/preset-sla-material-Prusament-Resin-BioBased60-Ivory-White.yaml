@@ -1,0 +1,66 @@
+id: Prusament Resin BioBased60 Ivory White
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Tough
+  material_colour: '#E3D99F'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: kvzw2D4VQyalstyOstpBKg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin BioBased60 Ivory White @SL1 0.025
+    id: nW2S3HGtQoWcrjqOrYhn/g
+    values:
+      exposure_time: 7.5
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin BioBased60 Ivory White @SL1 0.05
+    id: wlqZt8BYTR+sm9qoIRqREA
+    values:
+      exposure_time: 9.5
+      initial_exposure_time: 35
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin BioBased60 Ivory White @SL1 0.1
+    id: XJ2L0PRSQC2BPQNkpHMUbQ
+    values:
+      exposure_time: 12
+      initial_exposure_time: 45
+## SL1S
+- condition: printer.model == "SL1S"
+  id: lr1dzz5KT8abjxlM0DmTbw
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [2, 15]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin BioBased60 Ivory White @SL1S 0.025
+    id: FmVHYwdcR/S/gflCi7Srhw
+    values:
+      exposure_time: 3.2
+      initial_exposure_time: 12
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin BioBased60 Ivory White @SL1S 0.05
+    id: wnFbGB8GQNaJO5Yc9U9O5Q
+    values:
+      exposure_time: 3.7
+      initial_exposure_time: 12
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin BioBased60 Ivory White @SL1S 0.1
+    id: WDCwWO1pStCugeTZoOPCWA
+    values:
+      exposure_time: 4.7
+      initial_exposure_time: 15

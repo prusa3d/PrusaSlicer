@@ -7,7 +7,7 @@
 
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Geometry.hpp"
-#include "libslic3r/TriangleMesh.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "libslic3r/AABBMesh.hpp"
 #include "libslic3r/CSGMesh/TriangleMeshAdapter.hpp"
 #include "libslic3r/CSGMesh/CSGMeshCopy.hpp"

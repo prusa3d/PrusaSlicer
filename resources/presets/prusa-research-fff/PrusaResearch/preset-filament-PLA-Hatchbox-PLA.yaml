@@ -1,0 +1,13 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Hatchbox PLA
+id: Hatchbox PLA
+features:
+  $.brand.uuid: 110154ad-c944-5b94-9a9c-47797de61efa
+  $.brand.slug: hatchbox
+values:
+  filament_cost: '27.82'
+  filament_vendor: Hatchbox
+  filament_spool_weight: 245
+  filament_density: 1.27

@@ -5,22 +5,34 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 
+#include <algorithm>
 #include <memory>
 #include <regex>
 #include <fstream>
+#include <span>
+#include <vector>
 
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
 #include "libslic3r/GCode.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "test_data.hpp"
+#include <boost/lexical_cast.hpp>
 
 using namespace Slic3r;
 using namespace Test;
 using namespace Catch;
+using Domain::FloatOrPercentage;
+using Domain::Percentage;
+
+using Biz::GCodeReader::GCodeReader;
 
 constexpr bool debug_files = false;
 
-SCENARIO("Origin manipulation", "[GCode]") {
-	Slic3r::GCodeGenerator gcodegen;
+TEST_CASE("Origin manipulation", "[GCode]") {
+    Print print;
+    TestConfig test_config;
+    print.set_config(test_config.get_view());
+	Slic3r::GCodeGenerator gcodegen{&print};
 	WHEN("set_origin to (10,0)") {
     	gcodegen.set_origin(Vec2d(10,0));
     	REQUIRE(gcodegen.origin() == Vec2d(10, 0));
@@ -36,11 +48,11 @@ SCENARIO("Origin manipulation", "[GCode]") {
 
 
 TEST_CASE("Wiping speeds", "[GCode]") {
-    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
-    config.set_deserialize_strict({
-	    { "wipe", "1" },
-        { "retract_layer_change", "0" },
-    });
+
+    TestConfig config;
+    config.print.items.opt("wipe").set(true);
+    config.print.items.opt("retract_layer_change").set(false);
+
     bool have_wipe = false;
     std::vector<double> retract_speeds;
     bool extruded_on_this_layer = false;
@@ -48,7 +60,7 @@ TEST_CASE("Wiping speeds", "[GCode]") {
 
 	GCodeReader parser;
     std::string gcode = Slic3r::Test::slice({TestMesh::cube_20x20x20}, config);
-    parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+    parser.parse_buffer(gcode, [&] (GCodeReader &self, const GCodeReader::GCodeLine &line) {
         if (line.travel() && line.dist_Z(self) != 0) {
             extruded_on_this_layer = false;
         } else if (line.extruding(self) && line.dist_XY(self) > 0) {
@@ -62,7 +74,7 @@ TEST_CASE("Wiping speeds", "[GCode]") {
         }
     });
     CHECK(have_wipe);
-    double expected_retract_speed = config.option<ConfigOptionFloats>("retract_speed")->get_at(0) * 60;
+    double expected_retract_speed = config.print.items.opt("retract_speed").get<double>() * 60;
     for (const double retract_speed : retract_speeds) {
         INFO("Wipe moves don\'t retract faster than configured speed");
         CHECK(retract_speed < expected_retract_speed);
@@ -71,13 +83,13 @@ TEST_CASE("Wiping speeds", "[GCode]") {
     CHECK(!wiping_on_new_layer);
 }
 
-bool has_moves_below_z_offset(const DynamicPrintConfig& config) {
+bool has_moves_below_z_offset(const TestConfig& config) {
 	GCodeReader parser;
     std::string gcode = Slic3r::Test::slice({TestMesh::cube_20x20x20}, config);
 
     unsigned moves_below_z_offset{};
-    double configured_offset = config.opt_float("z_offset");
-    parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+    double configured_offset = config.printer.items.opt("z_offset").get<double>();
+    parser.parse_buffer(gcode, [&] (GCodeReader &self, const GCodeReader::GCodeLine &line) {
         if (line.travel() && line.has_z() && line.z() < configured_offset) {
             moves_below_z_offset++;
         }
@@ -86,20 +98,18 @@ bool has_moves_below_z_offset(const DynamicPrintConfig& config) {
 }
 
 TEST_CASE("Z moves with offset", "[GCode]") {
-    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
-    config.set_deserialize_strict({
-	    { "z_offset", 5 },
-        { "start_gcode", "" },
-    });
+    TestConfig config;
+    config.printer.items.opt("z_offset").set(5.0);
+    config.printer.items.opt("start_gcode").set("");
 
     INFO("No lift");
     CHECK(!has_moves_below_z_offset(config));
 
-    config.set_deserialize_strict({{ "retract_lift", "3" }});
+    config.print.items.opt("retract_lift").set(3.0);
     INFO("Lift < z offset");
     CHECK(!has_moves_below_z_offset(config));
 
-    config.set_deserialize_strict({{ "retract_lift", "6" }});
+    config.print.items.opt("retract_lift").set(6.0);
     INFO("Lift > z offset");
     CHECK(!has_moves_below_z_offset(config));
 }
@@ -122,18 +132,15 @@ std::optional<double> parse_axis(const std::string& line, const std::string& axi
 * - temperatures are set correctly
 */
 TEST_CASE("Extrusion, travels, temperatures", "[GCode]") {
-    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
-    config.set_deserialize_strict({
-        { "gcode_comments", 1 },
-        { "complete_objects", 1 },
-        { "extrusion_axis", "A" },
-        { "start_gcode", "" },  // prevent any default extra Z move
-        { "layer_height", 0.4 },
-        { "first_layer_height", 0.4 },
-        { "temperature", "200" },
-        { "first_layer_temperature", "210" },
-        { "retract_length", "0" }
-    });
+    TestConfig config;
+    config.print.items.opt("gcode_comments").set(true);
+    config.print.items.opt("complete_objects").set(true );
+    config.printer.items.opt("start_gcode").set("");
+    config.print.items.opt("layer_height").set(0.4);
+    config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.4});
+    config.filament.at(0).items.opt("temperature").set(200);
+    config.filament.at(0).items.opt("first_layer_temperature").set(210);
+    config.print.items.opt("retract_length").set(0.0);
 
     std::vector<double> z_moves;
     Points travel_moves;
@@ -143,8 +150,8 @@ TEST_CASE("Extrusion, travels, temperatures", "[GCode]") {
 	GCodeReader parser;
 
     Print print;
-    Model model;
-    Test::init_print({TestMesh::cube_20x20x20}, print, model, config, false, 2);
+    Domain::Model model;
+    Test::init_print({TestMesh::cube_20x20x20}, print, model, config, 2);
     std::string gcode = Test::gcode(print);
 
     if constexpr (debug_files) {
@@ -152,15 +159,12 @@ TEST_CASE("Extrusion, travels, temperatures", "[GCode]") {
         gcode_file << gcode;
     }
 
-    parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
-        INFO("Unexpected E argument");
-        CHECK(!line.has_e());
-
+    parser.parse_buffer(gcode, [&] (GCodeReader &self, const GCodeReader::GCodeLine &line) {
         if (line.has_z() && std::abs(line.dist_Z(self)) > 0) {
             z_moves.emplace_back(line.z());
         }
         if (line.has_x() || line.has_y()) {
-            if (line.extruding(self) || line.has_unknown_axis()) {
+            if (line.extruding(self)) {
                 extrusions.emplace_back(scaled(line.x()), scaled(line.y()));
             } else if (!extrusions.empty()){ // skip initial travel move to first skirt point
                 travel_moves.emplace_back(scaled(line.x()), scaled(line.y()));
@@ -184,45 +188,57 @@ TEST_CASE("Extrusion, travels, temperatures", "[GCode]") {
     const unsigned layer_count = 20 / 0.4;
     INFO("Complete_objects generates the correct number of Z moves.");
     CHECK(z_moves.size() == layer_count * 2);
-    auto first_moves = tcb::span{z_moves}.subspan(0, layer_count);
-    auto second_moves = tcb::span{z_moves}.subspan(layer_count);
+    auto first_moves = std::span{z_moves}.subspan(0, layer_count);
+    auto second_moves = std::span{z_moves}.subspan(layer_count);
 
     CHECK( std::vector(first_moves.begin(), first_moves.end()) == std::vector(second_moves.begin(), second_moves.end()));
     const Polygon convex_hull{Geometry::convex_hull(extrusions)};
     INFO("All travel moves happen within skirt.");
     for (const Point& travel_move : travel_moves) {
-        CHECK(convex_hull.contains(travel_move));
+        CHECK(Slic3r::Biz::Algorithms::Polygon::contains(convex_hull, travel_move));
     }
     INFO("Expected temperature changes");
     CHECK(temps == std::vector<double>{210, 200, 210, 200, 0});
 }
 
+std::optional<float> parse_option_from_gcode(
+    const std::string& key,
+    const std::string& gcode
+) {
+    std::regex re("; " + key + R"(.*= (\d+(\.\d+)?))");
+    std::smatch match;
+    if (!std::regex_search(gcode, match, re)) {
+        return std::nullopt;
+    }
+    return boost::lexical_cast<float>(match[1].str());
+}
+
 
 TEST_CASE("Used filament", "[GCode]") {
-    DynamicPrintConfig config1 = Slic3r::DynamicPrintConfig::full_print_config();
-    config1.set_deserialize_strict({
-        { "retract_length", "0" },
-        { "use_relative_e_distances", 1 },
-        { "layer_gcode", "G92 E0\n" },
-    });
+    TestConfig config1;
+    config1.print.items.opt("retract_length").set(0.0);
+    config1.printer.items.opt("use_relative_e_distances").set(true);
+    config1.printer.items.opt("layer_gcode").set("G92 E0\n");
     Print print1;
-    Model model1;
+    Domain::Model model1;
     Test::init_print({TestMesh::cube_20x20x20}, print1, model1, config1);
-    Test::gcode(print1);
+    std::string gcode1{Test::gcode(print1)};
 
-    DynamicPrintConfig config2 = Slic3r::DynamicPrintConfig::full_print_config();
-    config2.set_deserialize_strict({
-        { "retract_length", "999" },
-        { "use_relative_e_distances", 1 },
-        { "layer_gcode", "G92 E0\n" },
-    });
+    TestConfig config2;
+    config2.print.items.opt("retract_length").set(999.0);
+    config2.printer.items.opt("use_relative_e_distances").set(true);
+    config2.printer.items.opt("layer_gcode").set("G92 E0\n");
     Print print2;
-    Model model2;
+    Domain::Model model2;
     Test::init_print({TestMesh::cube_20x20x20}, print2, model2, config2);
-    Test::gcode(print2);
+    std::string gcode2{Test::gcode(print2)};
 
     INFO("Final retraction is not considered in total used filament");
-    CHECK(print1.print_statistics().total_used_filament == print2.print_statistics().total_used_filament);
+    const auto total_used_filament1{parse_option_from_gcode("total filament used \\[g\\]", gcode1)};
+    const auto total_used_filament2{parse_option_from_gcode("total filament used", gcode2)};
+    REQUIRE(total_used_filament1);
+    REQUIRE(total_used_filament2);
+    REQUIRE(total_used_filament1 == total_used_filament2);
 }
 
 void check_m73s(Print& print){
@@ -232,7 +248,7 @@ void check_m73s(Print& print){
 
 	GCodeReader parser;
     std::string gcode = Slic3r::Test::gcode(print);
-    parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+    parser.parse_buffer(gcode, [&] (GCodeReader &self, const GCodeReader::GCodeLine &line) {
 
         if (line.cmd_is("M73")) {
             std::optional<double> p = parse_axis(line.raw(), "P");
@@ -256,28 +272,24 @@ void check_m73s(Print& print){
 
 
 TEST_CASE("M73s have correct percent values", "[GCode]") {
-    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
+    TestConfig config;
 
     SECTION("Single object") {
-        config.set_deserialize_strict({
-            {" gcode_flavor", "sailfish" },
-            {" raft_layers", 3 },
-        });
+        config.printer.items.opt("gcode_flavor").set(Domain::GCodeFlavor::gcfSailfish);
+        config.print.items.opt("raft_layers").set(3);
 
         Print print;
-        Model model;
+        Domain::Model model;
         Test::init_print({TestMesh::cube_20x20x20}, print, model, config);
         check_m73s(print);
     }
 
     SECTION("Two copies of single object") {
-        config.set_deserialize_strict({
-            {" gcode_flavor", "sailfish" },
-        });
+        config.printer.items.opt("gcode_flavor").set(Domain::GCodeFlavor::gcfSailfish);
         Print print;
-        Model model;
+        Domain::Model model;
 
-        Test::init_print({TestMesh::cube_20x20x20}, print, model, config, false, 2);
+        Test::init_print({TestMesh::cube_20x20x20}, print, model, config, 2);
         check_m73s(print);
 
         if constexpr (debug_files) {
@@ -287,23 +299,19 @@ TEST_CASE("M73s have correct percent values", "[GCode]") {
     }
 
     SECTION("Two objects") {
-        config.set_deserialize_strict({
-            {" gcode_flavor", "sailfish" },
-        });
+        config.printer.items.opt("gcode_flavor").set(Domain::GCodeFlavor::gcfSailfish);
         Print print;
-        Model model;
+        Domain::Model model;
         Test::init_print({TestMesh::cube_20x20x20, TestMesh::cube_20x20x20}, print, model, config);
         check_m73s(print);
     }
 
     SECTION("One layer object") {
-        config.set_deserialize_strict({
-            {" gcode_flavor", "sailfish" },
-        });
+        config.printer.items.opt("gcode_flavor").set(Domain::GCodeFlavor::gcfSailfish);
         Print print;
-        Model model;
-        TriangleMesh test_mesh{mesh(TestMesh::cube_20x20x20)};
-        const auto layer_height = static_cast<float>(config.opt_float("layer_height"));
+        Domain::Model model;
+        Domain::TriangleMesh test_mesh{mesh(TestMesh::cube_20x20x20)};
+        const auto layer_height = static_cast<float>(config.print.items.opt("layer_height").get<double>());
         test_mesh.scale(Vec3f{1.0F, 1.0F, layer_height/20.0F});
         Test::init_print({test_mesh}, print, model, config);
         check_m73s(print);
@@ -317,11 +325,9 @@ TEST_CASE("M73s have correct percent values", "[GCode]") {
 
 
 TEST_CASE("M201 for acceleation reset", "[GCode]") {
-    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
-    config.set_deserialize_strict({
-	    { "gcode_flavor", "repetier" },
-        { "default_acceleration", 1337 },
-    });
+    TestConfig config;
+    config.printer.items.opt("gcode_flavor").set(Domain::GCodeFlavor::gcfRepetier);
+    config.print.items.opt("default_acceleration").set(1337.0);
 
 	GCodeReader parser;
     std::string gcode = Slic3r::Test::slice({TestMesh::cube_with_hole}, config);
@@ -329,7 +335,7 @@ TEST_CASE("M201 for acceleation reset", "[GCode]") {
     bool has_accel = false;
     bool has_m204 = false;
 
-    parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+    parser.parse_buffer(gcode, [&] (GCodeReader &self, const GCodeReader::GCodeLine &line) {
         if (line.cmd_is("M201") && line.has_x() && line.has_y()) {
             if (line.x() == 1337 && line.y() == 1337) {
                 has_accel = true;
@@ -344,4 +350,73 @@ TEST_CASE("M201 for acceleation reset", "[GCode]") {
     CHECK(has_accel);
     INFO("M204 is not generated for repetier firmware");
     CHECK(!has_m204);
+}
+
+namespace {
+std::vector<int> collect_emitted_travel_accelerations(const std::string& gcode)
+{
+    std::vector<int> emitted_travel_accelerations;
+
+    GCodeReader parser;
+    parser.parse_buffer(
+        gcode,
+        [&emitted_travel_accelerations](GCodeReader& self, const GCodeReader::GCodeLine& line)
+        {
+            int travel_acceleration = 0;
+            if (line.cmd_is("M204") && line.has_value('T', travel_acceleration)) {
+                emitted_travel_accelerations.emplace_back(travel_acceleration);
+            }
+        }
+    );
+
+    return emitted_travel_accelerations;
+}
+} // namespace
+
+TEST_CASE(
+    "Travel short distance acceleration is not emitted when travel acceleration is disabled",
+    "[GCode]"
+)
+{
+    constexpr int travel_short_distance_acceleration = 250;
+
+    TestConfig config;
+    config.printer.items.opt("gcode_flavor").set(Domain::GCodeFlavor::gcfMarlinFirmware);
+    config.print.items.opt("retract_before_travel").set(5.0);
+    config.print.items.opt("travel_short_distance_acceleration")
+        .set(static_cast<double>(travel_short_distance_acceleration));
+
+    WHEN("travel acceleration is enabled")
+    {
+        config.print.items.opt("travel_acceleration").set(1000.0);
+
+        const std::vector<int> emitted_travel_accelerations{
+            collect_emitted_travel_accelerations(slice({TestMesh::cube_with_hole}, config))
+        };
+
+        THEN("travel short distance acceleration is emitted")
+        {
+            CHECK(
+                std::ranges::find(emitted_travel_accelerations, travel_short_distance_acceleration)
+                != emitted_travel_accelerations.end()
+            );
+        }
+    }
+
+    WHEN("travel acceleration is disabled")
+    {
+        config.print.items.opt("travel_acceleration").set(0.0);
+
+        const std::vector<int> emitted_travel_accelerations{
+            collect_emitted_travel_accelerations(slice({TestMesh::cube_with_hole}, config))
+        };
+
+        THEN("travel short distance acceleration is never emitted")
+        {
+            CHECK(
+                std::ranges::find(emitted_travel_accelerations, travel_short_distance_acceleration)
+                == emitted_travel_accelerations.end()
+            );
+        }
+    }
 }

@@ -1,22 +1,33 @@
 #include <catch2/catch_test_macros.hpp>
 #include <test_utils.hpp>
 
+#include "Slic3r/Biz/Algorithms/ExPolygon.hpp"
 #include <libslic3r/ExPolygon.hpp>
-#include <libslic3r/BoundingBox.hpp>
 #include <libslic3r/SLA/SpatIndex.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/TriangleMeshSlicer.hpp>
 
 #include <libslic3r/SLA/SupportIslands/SampleConfigFactory.hpp>
 #include <libslic3r/SLA/SupportIslands/SampleConfig.hpp>
-#include <libslic3r/SLA/SupportIslands/VoronoiGraphUtils.hpp>
+#include <Slic3r/Biz/CGAL/Algorithms/VoronoiGraphUtils.hpp>
 #include <libslic3r/SLA/SupportIslands/UniformSupportIsland.hpp>
-#include <libslic3r/SLA/SupportIslands/PolygonUtils.hpp>
+#include <Slic3r/Biz/Algorithms/PolygonUtils.hpp>
+#include "libslic3r/Utils.hpp"
 #include "nanosvg/nanosvg.h"    // load SVG file
 #include "sla_test_utils.hpp"
+#include "Slic3r/Biz/Algorithms/Point.hpp"
+#include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
 using namespace Slic3r::sla;
+using Domain::TriangleMesh;
+using Domain::SLA::SupportPoints;
+using Domain::SLA::SupportPoint;
+using Slic3r::Biz::Algorithms::PolygonUtils;
+namespace triangle_mesh = Biz::Algorithms::TriangleMesh;
+
+namespace BB = Biz::Algorithms::BoundingBox;
 
 //#define STORE_SAMPLE_INTO_SVG_FILES "C:/data/temp/test_islands/sample_"
 //#define STORE_ISLAND_ISSUES "C:/data/temp/issues/"
@@ -24,11 +35,11 @@ using namespace Slic3r::sla;
 TEST_CASE("Overhanging point should be supported", "[SupGen]") {
 
     // Pyramid with 45 deg slope
-    TriangleMesh mesh = make_pyramid(10.f, 10.f);
-    mesh.rotate_y(float(PI));
-    //mesh.WriteOBJFile("Pyramid.obj");
+    TriangleMesh mesh = triangle_mesh::make_pyramid(10.f, 10.f);
+    mesh.rotate(float(PI), Domain::Axis::Y);
+    //mesh.write_obj_file("Pyramid.obj");
 
-    sla::SupportPoints pts = calc_support_pts(mesh);
+    SupportPoints pts = calc_support_pts(mesh);
 
     // The overhang, which is the upside-down pyramid's edge
     Vec3f overh{0., 0., -10.};
@@ -45,7 +56,7 @@ TEST_CASE("Overhanging point should be supported", "[SupGen]") {
     REQUIRE(dist < 1.f);
 }
 
-double min_point_distance(const sla::SupportPoints &pts)
+double min_point_distance(const SupportPoints &pts)
 {
     sla::PointIndex index;
 
@@ -66,17 +77,17 @@ double min_point_distance(const sla::SupportPoints &pts)
 TEST_CASE("Overhanging horizontal surface should be supported", "[SupGen]") {
     double width = 10., depth = 10., height = 1.;
 
-    TriangleMesh mesh = make_cube(width, depth, height); 
-    mesh.translate(0., 0., 5.); // lift up
-    // mesh.WriteOBJFile("Cuboid.obj");
-    sla::SupportPoints pts = calc_support_pts(mesh);
+    TriangleMesh mesh = triangle_mesh::make_cube(width, depth, height); 
+    mesh.translate(Vec3f{0., 0., 5.}); // lift up
+    // mesh.write_obj_file("Cuboid.obj");
+    SupportPoints pts = calc_support_pts(mesh);
     REQUIRE(!pts.empty());
 }
 
 template<class M> auto&& center_around_bb(M &&mesh)
 {
     auto bb = mesh.bounding_box();
-    mesh.translate(-bb.center().template cast<float>());
+    mesh.translate(-BB::center(bb).template cast<float>());
 
     return std::forward<M>(mesh);
 }
@@ -84,21 +95,21 @@ template<class M> auto&& center_around_bb(M &&mesh)
 TEST_CASE("Overhanging edge should be supported", "[SupGen]") {
     float width = 10.f, depth = 10.f, height = 5.f;
 
-    TriangleMesh mesh = make_prism(width, depth, height);
-    mesh.rotate_y(float(PI)); // rotate on its back
-    mesh.translate(0., 0., height);
-    mesh.WriteOBJFile("Prism.obj");
+    TriangleMesh mesh = triangle_mesh::make_prism(width, depth, height);
+    mesh.rotate(float(PI), Domain::Axis::Y); // rotate on its back
+    mesh.translate(Vec3f{0., 0., height});
+    triangle_mesh::write_obj_file(mesh, "Prism.obj");
 
-    sla::SupportPoints pts = calc_support_pts(mesh);
+    SupportPoints pts = calc_support_pts(mesh);
 
     Linef3 overh{ {0.f, -depth / 2.f, 0.f}, {0.f, depth / 2.f, 0.f}};
 
     // Get all the points closer that 1 mm to the overhanging edge:
-    sla::SupportPoints overh_pts; overh_pts.reserve(pts.size());
+    SupportPoints overh_pts; overh_pts.reserve(pts.size());
 
     std::copy_if(pts.begin(), pts.end(), std::back_inserter(overh_pts),
-                 [&overh](const sla::SupportPoint &pt){
-                     return line_alg::distance_to(overh, Vec3d{pt.pos.cast<double>()}) < 1.;
+                 [&overh](const SupportPoint &pt){
+                     return Biz::Algorithms::Line::line_alg::distance_to(overh, Vec3d{pt.pos.cast<double>()}) < 1.;
                  });
 
     //double ddiff = min_point_distance(pts) - cfg.minimal_distance;
@@ -106,18 +117,18 @@ TEST_CASE("Overhanging edge should be supported", "[SupGen]") {
 }
 
 TEST_CASE("Hollowed cube should be supported from the inside", "[SupGen][Hollowed]") {
-    TriangleMesh mesh = make_cube(20., 20., 20.);
+    TriangleMesh mesh = triangle_mesh::make_cube(20., 20., 20.);
 
     hollow_mesh(mesh, HollowingConfig{});
 
-    mesh.WriteOBJFile("cube_hollowed.obj");
+    triangle_mesh::write_obj_file(mesh, "cube_hollowed.obj");
 
     auto bb = mesh.bounding_box();
     auto h  = float(bb.max.z() - bb.min.z());
-    Vec3f mv = bb.center().cast<float>() - Vec3f{0.f, 0.f, 0.5f * h};
+    Vec3f mv = BB::center(bb).cast<float>() - Vec3f{0.f, 0.f, 0.5f * h};
     mesh.translate(-mv);
 
-    sla::SupportPoints pts = calc_support_pts(mesh);
+    SupportPoints pts = calc_support_pts(mesh);
     //sla::remove_bottom_points(pts, mesh.bounding_box().min.z() + EPSILON);
 
     REQUIRE(!pts.empty());
@@ -127,14 +138,14 @@ TEST_CASE("Two parallel plates should be supported", "[SupGen][Hollowed]")
 {
     double width = 20., depth = 20., height = 1.;
 
-    TriangleMesh mesh = center_around_bb(make_cube(width + 5., depth + 5., height));
-    TriangleMesh mesh_high = center_around_bb(make_cube(width, depth, height));
-    mesh_high.translate(0., 0., 10.); // lift up
+    TriangleMesh mesh = center_around_bb(triangle_mesh::make_cube(width + 5., depth + 5., height));
+    TriangleMesh mesh_high = center_around_bb(triangle_mesh::make_cube(width, depth, height));
+    mesh_high.translate(Vec3f{0., 0., 10.}); // lift up
     mesh.merge(mesh_high);
 
-    mesh.WriteOBJFile("parallel_plates.obj");
+    triangle_mesh::write_obj_file(mesh, "parallel_plates.obj");
 
-    sla::SupportPoints pts = calc_support_pts(mesh);
+    SupportPoints pts = calc_support_pts(mesh);
     //sla::remove_bottom_points(pts, mesh.bounding_box().min.z() + EPSILON);
 
     REQUIRE(!pts.empty());
@@ -290,23 +301,25 @@ ExPolygon create_tiny_between_holes(double wide, double tiny)
     return result;
 }
 
+using Slic3r::Biz::Algorithms::Point::round;
+
 // stress test for longest path
 // needs reshape
 ExPolygon create_mountains(double size) {
-    return ExPolygon({{0., 0.},
-                      {size, 0.},
-                      {5 * size / 6, size},
-                      {4 * size / 6, size / 6},
-                      {3 * size / 7, 2 * size},
-                      {2 * size / 7, size / 6},
-                      {size / 7, size}});
+    return ExPolygon({round(Vec2d{0., 0.}).cast<coord_t>(),
+                      round(Vec2d{size, 0.}).cast<coord_t>(),
+                      round(Vec2d{5 * size / 6, size}).cast<coord_t>(),
+                      round(Vec2d{4 * size / 6, size / 6}).cast<coord_t>(),
+                      round(Vec2d{3 * size / 7, 2 * size}).cast<coord_t>(),
+                      round(Vec2d{2 * size / 7, size / 6}).cast<coord_t>(),
+                      round(Vec2d{size / 7, size}).cast<coord_t>()});
 }
 
 /// Neighbor points create trouble for voronoi - test of neccessary offseting(closing) of contour
 ExPolygon create_cylinder_bottom_slice() {
-    indexed_triangle_set its_cylinder = its_make_cylinder(6.6551999999999998, 11.800000000000001);
+    indexed_triangle_set its_cylinder = triangle_mesh::its_make_cylinder(6.6551999999999998, 11.800000000000001);
     MeshSlicingParams param;
-    Polygons polygons = slice_mesh(its_cylinder, 0.0125000002, param);
+    Polygons polygons = slice_mesh(its_cylinder, 0.0125000002f, param);
     return ExPolygon{polygons.front()};
 }
 
@@ -324,7 +337,7 @@ ExPolygon load_svg(const std::string& svg_filepath) {
         Polygon r;
         r.points.reserve(path->npts);
         for (int i = 0; i < path->npts; i++)
-            r.points.push_back(Point(path->pts[2 * i], path->pts[2 * i + 1]));
+            r.points.push_back(Point(round(Vec2d{path->pts[2 * i], path->pts[2 * i + 1]}).cast<coord_t>()));
         return r;
     };
 
@@ -407,7 +420,7 @@ ExPolygons createTestIslands(double size)
 
 Points createNet(const BoundingBox& bounding_box, double distance)
 { 
-    Point  size       = bounding_box.size();
+    Point  size       = BB::sizes(bounding_box);
     double distance_2 = distance / 2;
     int    cols1 = static_cast<int>(floor(size.x() / distance))+1;
     int    cols2 = static_cast<int>(floor((size.x() - distance_2) / distance))+1;
@@ -438,12 +451,12 @@ Points createNet(const BoundingBox& bounding_box, double distance)
 // create uniform triangle net and return points laying inside island
 Points rasterize(const ExPolygon &island, double distance) {
     BoundingBox bb;
-    for (const Point &pt : island.contour.points) bb.merge(pt);
+    for (const Point &pt : island.contour.points) bb = BB::merge(bb, pt);
     Points      fullNet = createNet(bb, distance);
     Points result;
     result.reserve(fullNet.size());
     std::copy_if(fullNet.begin(), fullNet.end(), std::back_inserter(result),
-                 [&island](const Point &p) { return island.contains(p); });
+                 [&island](const Point &p) { return Algorithms::ExPolygon::contains(island, p); });
     return result;
 }
 
@@ -462,8 +475,10 @@ SupportIslandPoints test_island_sampling(const ExPolygon &   island,
         bool         exist_close_support_point = false;
         for (const auto &island_point : points) {
             const Point& p = island_point->point;
-            Point abs_diff(fabs(p.x() - chck_point.x()),
-                           fabs(p.y() - chck_point.y()));
+            Point abs_diff(round(Vec2d{
+                fabs(p.x() - chck_point.x()),
+                fabs(p.y() - chck_point.y())
+            }).cast<coord_t>());
             if (abs_diff.x() < min_distance && abs_diff.y() < min_distance) {
                 double distance = sqrt((double) abs_diff.x() * abs_diff.x() +
                                        (double) abs_diff.y() * abs_diff.y());
@@ -478,7 +493,7 @@ SupportIslandPoints test_island_sampling(const ExPolygon &   island,
 
     bool is_all_points_inside_island = true;
     for (const auto &point : points)
-        if (!island.contains(point->point))
+        if (!Algorithms::ExPolygon::contains(island, point->point))
             is_all_points_inside_island = false;
     
 #ifdef STORE_ISLAND_ISSUES

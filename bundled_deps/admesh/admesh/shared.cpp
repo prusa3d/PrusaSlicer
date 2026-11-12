@@ -25,7 +25,7 @@
 
 #include <vector>
 
-#include <boost/log/trivial.hpp>
+#include <Slic3r/Log.hpp>
 #include <boost/nowide/cstdio.hpp>
 
 #include "stl.h"
@@ -35,7 +35,7 @@
 void stl_generate_shared_vertices(stl_file *stl, indexed_triangle_set &its)
 {
 	// 3 indices to vertex per face
-	its.indices.assign(stl->stats.number_of_facets, stl_triangle_vertex_indices(-1, -1, -1));
+	its.indices.assign(stl->stats.number_of_facets, stl_triangle_vertex_indices{-1, -1, -1});
 	// Shared vertices (3D coordinates)
 	its.vertices.clear();
 	its.vertices.reserve(stl->stats.number_of_facets / 2);
@@ -54,7 +54,7 @@ void stl_generate_shared_vertices(stl_file *stl, indexed_triangle_set &its)
 			// Create a new shared vertex.
 			its.vertices.emplace_back(stl->facet_start[facet_idx].vertex[j]);
 			// Traverse the fan around the j-th vertex of the i-th face, assign the newly created shared vertex index to all the neighboring triangles in the triangle fan.
-			int  facet_in_fan_idx 	= facet_idx;
+			uint32_t  facet_in_fan_idx 	= facet_idx;
 			bool edge_direction 	= false;
 			bool traversal_reversed = false;
 			int  vnot      			= (j + 2) % 3;
@@ -103,7 +103,7 @@ void stl_generate_shared_vertices(stl_file *stl, indexed_triangle_set &its)
 					    traversal_reversed    = true;
 				    	facet_in_fan_idx      = facet_idx;
 					}
-				} else if (next_facet == facet_idx) {
+				} else if (next_facet == int(facet_idx)) {
 					// Traversed a closed fan all around.
 //					assert(! traversal_reversed);
 					break;
@@ -133,13 +133,13 @@ bool its_write_off(const indexed_triangle_set &its, const char *file)
 	/* Open the file */
 	FILE *fp = boost::nowide::fopen(file, "w");
 	if (fp == nullptr) {
-		BOOST_LOG_TRIVIAL(error) << "stl_write_ascii: Couldn't open " << file << " for writing";
+		SPDLOG_ERROR("stl_write_ascii: Couldn't open {} for writing", file);
 		return false;
 	}
 
 	fprintf(fp, "OFF\n");
 	fprintf(fp, "%d %d 0\n", (int)its.vertices.size(), (int)its.indices.size());
-	for (int i = 0; i < its.vertices.size(); ++ i)
+	for (size_t i = 0; i < its.vertices.size(); ++ i)
 		fprintf(fp, "\t%f %f %f\n", its.vertices[i](0), its.vertices[i](1), its.vertices[i](2));
 	for (uint32_t i = 0; i < its.indices.size(); ++ i)
 		fprintf(fp, "\t3 %d %d %d\n", its.indices[i][0], its.indices[i][1], its.indices[i][2]);
@@ -153,7 +153,7 @@ bool its_write_vrml(const indexed_triangle_set &its, const char *file)
 	/* Open the file */
   	FILE *fp = boost::nowide::fopen(file, "w");
 	if (fp == nullptr) {
-		BOOST_LOG_TRIVIAL(error) << "stl_write_vrml: Couldn't open " << file << " for writing";
+		SPDLOG_ERROR("stl_write_vrml: Couldn't open {} for writing", file);
 		return false;
 	}
 
@@ -172,7 +172,7 @@ bool its_write_vrml(const indexed_triangle_set &its, const char *file)
 	fprintf(fp, "\t\tDEF STLVertices Coordinate3 {\n");
 	fprintf(fp, "\t\t\tpoint [\n");
 
-	int i = 0;
+	size_t i = 0;
 	for (; i + 1 < its.vertices.size(); ++ i)
 		fprintf(fp, "\t\t\t\t%f %f %f,\n", its.vertices[i](0), its.vertices[i](1), its.vertices[i](2));
 	fprintf(fp, "\t\t\t\t%f %f %f]\n", its.vertices[i](0), its.vertices[i](1), its.vertices[i](2));
@@ -195,7 +195,7 @@ bool its_write_obj(const indexed_triangle_set &its, const char *file)
     Slic3r::CNumericLocalesSetter locales_setter;
   	FILE *fp = boost::nowide::fopen(file, "w");
   	if (fp == nullptr) {
-		BOOST_LOG_TRIVIAL(error) << "stl_write_obj: Couldn't open " << file << " for writing";
+		SPDLOG_ERROR("stl_write_obj: Couldn't open {} for writing", file);
     	return false;
   	}
 
@@ -212,7 +212,7 @@ bool its_write_obj(const indexed_triangle_set& its, const std::vector<obj_color>
     Slic3r::CNumericLocalesSetter locales_setter;
     FILE* fp = boost::nowide::fopen(file, "w");
     if (fp == nullptr) {
-        BOOST_LOG_TRIVIAL(error) << "stl_write_obj: Couldn't open " << file << " for writing";
+        SPDLOG_ERROR("stl_write_obj: Couldn't open {} for writing", file);
         return false;
     }
 

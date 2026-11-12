@@ -1,0 +1,17 @@
+[{
+    "name": "Prusa FFF",
+    "description": "Prusa FFF printers",
+    "visibility": "",
+    "id": "prusa-research-fff",
+    "url": "http://localhost:8000/prusa-research-fff/",
+    "index_url": "http://localhost:8000/prusa-research-fff/vendor_indices.zip",
+    "selected": true
+}, {
+    "name": "Prusa SLA",
+    "description": "Prusa SLA printers",
+    "visibility": "",
+    "id": "prusa-research-sla",
+    "url": "http://localhost:8000/prusa-research-sla/",
+    "index_url": "http://localhost:8000/prusa-research-sla/vendor_indices.zip",
+    "selected": true
+}]

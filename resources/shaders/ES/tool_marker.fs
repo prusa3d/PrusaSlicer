@@ -1,19 +1,12 @@
-#version 100
+#version 300 es
 
 precision highp float;
 
-const vec2 ZERO = vec2(0.0, 0.0);
+in vec4 color;
 
-uniform vec4 uniform_color;
-
-// x = diffuse, y = specular;
-varying vec2 intensity;
-varying vec2 clipping_planes_dots;
+out vec4 out_color;
 
 void main()
 {
-    if (any(lessThan(clipping_planes_dots, ZERO)))
-        discard;
-
-    gl_FragColor = vec4(vec3(intensity.y) + uniform_color.rgb * intensity.x, uniform_color.a);
+    out_color = color;
 }

@@ -1,0 +1,16 @@
+kind: filament
+inherits:
+- '*PLAFILL*'
+name: colorFabb woodFill
+id: colorFabb woodFill
+features:
+  $.brand.uuid: 55dde84a-3fa4-51ad-b456-7d95b1a15622
+  $.brand.slug: colorfabb
+values:
+  filament_vendor: colorFabb
+  extrusion_multiplier: 1.1
+  filament_cost: '64.98'
+  filament_density: 1.15
+  filament_spool_weight: 236
+  first_layer_temperature: 200
+  temperature: 200

@@ -6,16 +6,14 @@ else()
     set(_build_static ON)
 endif()
 
-# Platform-specific arguments
-if(APPLE)
-    # SSE2 support is dropped in Clang of newer Xcode (16.3+) versions
-    list(APPEND _blosc_cmake_args -DDEACTIVATE_SSE2=ON)
-endif()
+if (EMSCRIPTEN)
+    set(_extra_cmake_args --use-port=zlib)
+else ()
+    set(DEP_Blosc_DEPENDS ZLIB zstd)
+endif ()
 
-add_cmake_project(Blosc
-    URL https://github.com/Blosc/c-blosc/archive/8724c06e3da90f10986a253814af18ca081d8de0.zip
-    URL_HASH SHA256=53986fd04210b3d94124b7967c857f9766353e576a69595a9393999e0712c035
-    CMAKE_ARGS
+# Common CMake arguments for Blosc
+set(_blosc_cmake_args
         -DCMAKE_C_FLAGS="-std=gnu17"
         -DCMAKE_CXX_FLAGS="-std=gnu++17"
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
@@ -24,6 +22,20 @@ add_cmake_project(Blosc
         -DBUILD_TESTS=OFF
         -DBUILD_BENCHMARKS=OFF
         -DPREFER_EXTERNAL_ZLIB=ON
+        -DPREFER_EXTERNAL_ZSTD=ON
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 )
 
-set(DEP_Blosc_DEPENDS ZLIB)
+# Platform-specific arguments
+if(APPLE)
+    # SSE2 support is dropped in Clang of newer Xcode (16.3+) versions
+    list(APPEND _blosc_cmake_args -DDEACTIVATE_SSE2=ON)
+endif()
+
+add_cmake_project(Blosc
+        URL https://github.com/Blosc/c-blosc/archive/refs/tags/v1.21.6.zip
+        URL_HASH SHA256=1919c97d55023c04aa8771ea8235b63e9da3c22e3d2a68340b33710d19c2a2eb
+        EMSCRIPTEN_EXCLUDED OFF
+        CMAKE_ARGS
+        ${_blosc_cmake_args}
+)

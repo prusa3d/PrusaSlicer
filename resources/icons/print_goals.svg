@@ -1,0 +1,16 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!--
+  Print Goals — návrh prototypu (16. 10. 2026), ve Figmě zatím není.
+  Šipka zapíchnutá ve středu terče (opeření venku): uživatel řekne cíl,
+  nastavení se dopočítá. Obrysový styl
+  jako ikony jednotlivých cílů ve Figmě (PrusaSlicer `3361:12818`).
+  Tah 1 px a barva #F7F7F7 jako ostatní ikony 16×16 z Figmy.
+-->
+<g id="Icon 16x16">
+<circle id="Outer ring" cx="7.5" cy="8.5" r="6" stroke="#F7F7F7" stroke-linecap="round" stroke-linejoin="round"/>
+<circle id="Inner ring" cx="7.5" cy="8.5" r="3" stroke="#F7F7F7" stroke-linecap="round" stroke-linejoin="round"/>
+<circle id="Bullseye" cx="7.5" cy="8.5" r="1" fill="#F7F7F7"/>
+<path id="Arrow shaft" d="M7.5 8.5L14.5 1.5" stroke="#F7F7F7" stroke-linecap="round"/>
+<path id="Fletching" d="M12.5 1V3.5H15M11 2.5V5H13.5" stroke="#F7F7F7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

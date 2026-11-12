@@ -1,0 +1,11 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Floreon3D PLA
+id: Floreon3D PLA
+features:
+  $.brand.uuid: c5839b49-6215-5689-b958-bae884307798
+  $.brand.slug: floreon3d
+values:
+  filament_cost: '23.5'
+  filament_vendor: Floreon3D

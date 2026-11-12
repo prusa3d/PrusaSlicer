@@ -1,0 +1,63 @@
+id: PrimaCreator Tough Light Grey
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: PrimaCreator
+  material_type: Tough
+  material_colour: '#C0C0C0'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: 1B58KwXPSdOjDAZsFW8p+A
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: PrimaCreator Tough Light Grey @SL1 0.025
+    id: YloW+6kkTA+ni3HlEhl60A
+    values:
+      exposure_time: 6
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: PrimaCreator Tough Light Grey @SL1 0.05
+    id: 3NZQykm6R+mKPpYjcpVopg
+    values:
+      exposure_time: 8.5
+      initial_exposure_time: 35
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: PrimaCreator Tough Light Grey @SL1 0.1
+    id: CHd4U8FLStinL5gYQp+IAw
+    values:
+      exposure_time: 14
+      initial_exposure_time: 45
+## SL1S
+- condition: printer.model == "SL1S"
+  id: j+nNb2G8To2WQThRnrawRA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: PrimaCreator Tough Light Grey @SL1S 0.025
+    id: 7Rp221haQq2fevy38oXRag
+    values:
+      exposure_time: 1.8
+      initial_exposure_time: 25
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: PrimaCreator Tough Light Grey @SL1S 0.05
+    id: xXDZfcFmTA6C+wby4QF9rw
+    values:
+      exposure_time: 2.4
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: PrimaCreator Tough Light Grey @SL1S 0.1
+    id: u92vq9INTvWpZRtf4xsviQ
+    values:
+      exposure_time: 3
+      initial_exposure_time: 25

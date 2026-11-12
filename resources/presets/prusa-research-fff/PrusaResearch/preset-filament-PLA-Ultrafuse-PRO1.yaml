@@ -1,0 +1,13 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Forward AM Ultrafuse PRO1
+id: Forward AM Ultrafuse PRO1
+features:
+  $.brand.uuid: 0d5d4a94-c898-5b83-9be9-90037a821e23
+  $.brand.slug: forward-am
+values:
+  filament_cost: '19.99'
+  filament_density: 1.25
+  filament_vendor: Forward AM
+  retract_lift: 0

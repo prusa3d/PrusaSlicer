@@ -1,0 +1,72 @@
+id: Prusament Resin Model Neutral Beige
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Tough
+  material_colour: '#BF9C87'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: FEmS9aIjQ8CPaV7wL2UYjQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Model Neutral Beige @SL1 0.025
+    id: fuAlZ1e6SHmJoMe9PihLYA
+    values:
+      exposure_time: 4.8
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Model Neutral Beige @SL1 0.05
+    id: 5yK/rxAkQjSaGnMHCY0HRA
+    values:
+      exposure_time: 5.5
+      initial_exposure_time: 35
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Model Neutral Beige @SL1 0.1
+    id: QYSOe7r3SfmI2ZdXlZ01/Q
+    values:
+      exposure_time: 7
+      initial_exposure_time: 45
+## SL1S
+- condition: printer.model == "SL1S"
+  id: +w21rXzwTOWW3uaSYA8nRg
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [1, 10]
+    tilt_down_initial_speed: [layer1750, layer1750]
+    tilt_down_offset_steps: [0, 1200]
+    tilt_down_finish_speed: [move8000, move5120]
+    tilt_up_initial_speed: [move8000, move8000]
+    tilt_up_offset_steps: [600, 600]
+    tilt_up_finish_speed: [layer1750, layer1750]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Model Neutral Beige @SL1S 0.025
+    id: lBT4VbR2T9WENfYDvTrf4Q
+    values:
+      exposure_time: 2.2
+      initial_exposure_time: 5
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Model Neutral Beige @SL1S 0.05
+    id: CCslwoceToCh2wVTDbkTjA
+    values:
+      exposure_time: 2.4
+      initial_exposure_time: 6
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Model Neutral Beige @SL1S 0.1
+    id: wvKg2nk1QVKP+w5rmd9EqA
+    values:
+      exposure_time: 3.1
+      initial_exposure_time: 8

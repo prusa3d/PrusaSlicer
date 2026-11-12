@@ -1,0 +1,43 @@
+id: Liqcreate Wax Castable
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Liqcreate
+  material_type: Casting
+  material_colour: '#007EFD'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: zb7z5xIyRuS5IEt5d71pog
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  values:
+    material_correction_x: 1.02
+    material_correction_y: 1.02
+    support_pillar_diameter: 1
+    support_head_front_diameter: 0.5
+    support_head_penetration: 0.5
+    support_head_width: 3
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Liqcreate Wax Castable @SL1S 0.025
+    id: 2GoR133cT1WBnlGqikWshw
+    values:
+      exposure_time: 3.5
+      initial_exposure_time: 20
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Liqcreate Wax Castable @SL1S 0.05
+    id: RMae3c/FS+SuVxRuNqj/fw
+    values:
+      exposure_time: 4.5
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Liqcreate Wax Castable @SL1S 0.1
+    id: qK/OcduxSLKbtxHl5LrZQg
+    values:
+      exposure_time: 5.5
+      initial_exposure_time: 30

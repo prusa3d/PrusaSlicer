@@ -1,0 +1,36 @@
+id: Forward AM Ultracur3D EL 150 Black
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Forward AM
+  material_type: Flexible
+  material_colour: '#595959'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: 58+argPERDWgLReQdsVJug
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Forward AM Ultracur3D EL 150 Black @SL1S 0.025
+    id: bqDmk7YARJadDRLkL0hfsA
+    values:
+      exposure_time: 2
+      initial_exposure_time: 25
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Forward AM Ultracur3D EL 150 Black @SL1S 0.05
+    id: 8hegm20CRHqf6o6yOeR8ig
+    values:
+      exposure_time: 3.8
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Forward AM Ultracur3D EL 150 Black @SL1S 0.1
+    id: DYgiQcoiQLabm+g4SYMSHg
+    values:
+      exposure_time: 5
+      initial_exposure_time: 25

@@ -1,0 +1,139 @@
+kind: vendor
+id: 'prusa-fff'
+name: 'Prusa FFF'
+version: '1.0.0'
+features:
+  printer:
+    input_shaper:
+      default: false
+      user_editable: false
+  tool:
+    nozzle_diameter:
+      default: 0.4
+      user_editable: false
+    nozzle_high_flow:
+      default: false
+      user_editable: false
+  sheet:
+    cold:
+      default: false
+      user_editable: false
+---
+kind: printer
+technology: fff
+id: C1
+name: Core ONE
+model:
+  base_model: 'C1'
+  model: 'C1'
+visual:
+  bed_model: coreone_bed.stl
+  bed_texture: coreone.svg
+  thumbnail: COREONE_thumbnail.png
+---
+kind: printer
+technology: fff
+id: 'MK4S'
+name: MK4S
+model:
+  base_model: 'MK4'
+  model: 'MK4S'
+features:
+  input_shaper:
+    default: true
+visual:
+  bed_model: mk4s_bed.stl
+  bed_texture: mk4s.svg
+  thumbnail: MK4S_thumbnail.png
+---
+kind: tool
+technology: fff
+id: '0.4'
+name: '0.4'
+features:
+  nozzle_diameter:
+    default: 0.4
+---
+kind: tool
+technology: fff
+id: '0.4HF'
+name: '0.4 High Flow'
+condition: 'printer.base_model == "C1"'
+features:
+  nozzle_diameter:
+    default: 0.4
+  nozzle_high_flow:
+    default: true
+---
+kind: feeder
+technology: fff
+id: 'MMU3S @ MK4'
+name: 'MMU3S'
+condition: 'printer.base_model == "MK4"'
+slot_count: 4
+model:
+  base_model: MMU3
+  model: MMU3S
+---
+kind: feeder
+technology: fff
+id: 'MMU3S @ C1'
+name: 'MMU3S'
+condition: 'printer.base_model == "C1"'
+slot_count: 4
+model:
+  base_model: MMU3
+  model: MMU3S
+---
+kind: sheet
+id: 'pei_smooth'
+name: 'PEI Smooth'
+type: 'pei_smooth'
+---
+kind: printer_config
+id: MK4S
+printer: MK4S
+name: MK4S
+tool_count: 1
+tools:
+  - tool: '0.4'
+sheet: 'pei_smooth'
+---
+kind: printer_config
+id: MK4S MMU3S
+printer: MK4S
+name: MK4S MMU3S
+tool_count: 1
+tools:
+  - tool: '0.4'
+feeders:
+  - feeder: 'MMU3S @ MK4'
+    address: [0]
+sheet: 'pei_smooth'
+visual:
+  thumbnail: MK4S_MMU_thumbnail.png
+---
+kind: printer_config
+id: C1
+printer: C1
+name: Core One
+tool_count: 1
+tools:
+  - tool: '0.4HF'
+sheet: 'pei_smooth'
+visual:
+  bed_texture: my_coreone.svg
+---
+kind: printer_config
+id: C1 MMU3S
+printer: C1
+name: Core One MMU3S
+tool_count: 1
+tools:
+  - tool: '0.4HF'
+feeders:
+  - feeder: 'MMU3S @ C1'
+    address: [0]
+sheet: 'pei_smooth'
+
+

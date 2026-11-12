@@ -1,0 +1,72 @@
+id: Prusament Resin Model Ultra Violet
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Tough
+  material_colour: '#413A7A'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: Z1VYz1vlR5eRFNqOECxmpA
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Model Ultra Violet @SL1 0.025
+    id: ZGIXIM6MQLqk3Nuvq7REbA
+    values:
+      exposure_time: 5
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Model Ultra Violet @SL1 0.05
+    id: n20xt+E/RQueZduRGvxTQg
+    values:
+      exposure_time: 6
+      initial_exposure_time: 35
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Model Ultra Violet @SL1 0.1
+    id: KPjICbs+Ryyl7YD6OnTS6g
+    values:
+      exposure_time: 7
+      initial_exposure_time: 35
+## SL1S
+- condition: printer.model == "SL1S"
+  id: ypQmu3FJTse9p6xQMLgoaA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [1, 10]
+    tilt_down_initial_speed: [layer1750, layer1750]
+    tilt_down_offset_steps: [0, 1200]
+    tilt_down_finish_speed: [move8000, move5120]
+    tilt_up_initial_speed: [move8000, move8000]
+    tilt_up_offset_steps: [600, 600]
+    tilt_up_finish_speed: [layer1750, layer1750]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Model Ultra Violet @SL1S 0.025
+    id: /NICLGx/REWQVc/5bi6raQ
+    values:
+      exposure_time: 2.2
+      initial_exposure_time: 5
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Model Ultra Violet @SL1S 0.05
+    id: v2KBaut8RT2N3n/F7ZFcvA
+    values:
+      exposure_time: 2.4
+      initial_exposure_time: 6
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Model Ultra Violet @SL1S 0.1
+    id: 6t2WgZ3RSGCfHVkAXvQ0gw
+    values:
+      exposure_time: 2.9
+      initial_exposure_time: 8

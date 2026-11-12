@@ -21,7 +21,8 @@
 #include <vector>
 #include "libslic3r/ExPolygon.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
-#include "libslic3r/SVG.hpp"
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
+#include "Slic3r/Biz/Algorithms/Point.hpp"
 
 #include <z3++.h>
 
@@ -71,9 +72,12 @@ static Polygon scale_UP(const Polygon &polygon, double x_pos, double y_pos)
     Polygon poly = polygon;
 
     for (unsigned int i = 0; i < poly.points.size(); ++i)
-    {	
-	poly.points[i] = Point(poly.points[i].x() * SCALE_FACTOR + x_pos * SCALE_FACTOR,
-			       poly.points[i].y() * SCALE_FACTOR + y_pos * SCALE_FACTOR);
+    {
+        using Slic3r::Biz::Algorithms::Point::round;
+        poly.points[i] = Point(round(Vec2d{
+            poly.points[i].x() * SCALE_FACTOR + x_pos * SCALE_FACTOR,
+            poly.points[i].y() * SCALE_FACTOR + y_pos * SCALE_FACTOR
+        }).cast<coord_t>());
     }
 
     return poly;
@@ -1393,7 +1397,7 @@ void sequential_test_4(void)
     }
     #endif
     
-    SVG preview_svg("sequential_test_4.svg");
+    Biz::Algorithms::SVG::SVG preview_svg("sequential_test_4.svg");
 
     Polygon display_pro_polygon_1 = scale_UP(unreachable_polygons[0], _poly_1_pos_x, _poly_1_pos_y);
     Polygon display_pro_polygon_2 = scale_UP(unreachable_polygons[1], _poly_2_pos_x, _poly_2_pos_y);
@@ -1918,7 +1922,7 @@ void sequential_test_5(void)
     #endif
     
     
-    SVG preview_svg("sequential_test_5.svg");
+    Biz::Algorithms::SVG::SVG preview_svg("sequential_test_5.svg");
 
     for (unsigned int i = 0; i < unreachable_polygons[0].size(); ++i)
     {
@@ -2092,7 +2096,7 @@ TEST_CASE("Sequential test 6", "[Sequential Arrangement Core]")
 	    }
 	    #endif
 	
-	    SVG preview_svg("sequential_test_6.svg");
+	    Biz::Algorithms::SVG::SVG preview_svg("sequential_test_6.svg");
 
 	    if (!unreachable_polygons.empty())
 	    {
@@ -2358,7 +2362,7 @@ TEST_CASE("Sequential test 7", "[Sequential Arrangement Core]")
 	    }
 	    #endif
 	
-	    SVG preview_svg("sequential_test_7.svg");
+	    Biz::Algorithms::SVG::SVG preview_svg("sequential_test_7.svg");
 
 	    if (!unreachable_polygons.empty())
 	    {

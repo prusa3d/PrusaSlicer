@@ -1,0 +1,35 @@
+id: 3DM-DENT
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: 3DM
+  material_type: Medical
+  material_colour: '#FFEEE6'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: Tul+klthSJqDZGj1Wyygnw
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-DENT @SL1 0.05
+    id: 6Rtm4HOMSsm2c9w46LPvIw
+    values:
+      exposure_time: 7
+      initial_exposure_time: 45
+## SL1S
+- condition: printer.model == "SL1S"
+  id: osJ0wfgNR+amrUwlXItgYA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-DENT @SL1S 0.05
+    id: p6OtrzJEQ56Naqp8q2X7vA
+    values:
+      exposure_time: 2.3
+      initial_exposure_time: 36

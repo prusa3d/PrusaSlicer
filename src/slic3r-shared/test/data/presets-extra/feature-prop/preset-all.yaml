@@ -1,0 +1,50 @@
+kind: printer
+id: printer_no_feat
+name: printer_no_feat
+---
+kind: printer
+id: printer_with_feat
+name: printer_with_feat
+features:
+  printer_feat: true
+---
+kind: print
+id: print_no_feat
+name: print_no_feat
+---
+kind: print
+id: print_feat
+name: print_feat
+condition: printer.printer_feat
+features:
+  print_feat: true
+---
+kind: tool_print
+id: '*notool*'
+name: '*notool*'
+---
+kind: filament
+id: filament_no_req
+name: filament_no_req
+---
+kind: filament
+id: filament_req_printer_feat
+name: filament_req_printer_feat
+condition: printer.printer_feat
+---
+kind: filament
+id: filament_req_print_feat
+name: filament_req_print_feat
+condition: print.print_feat
+---
+kind: filament
+id: filament_forb_printer_feat
+name: filament_forb_printer_feat
+condition: not printer.printer_feat
+---
+kind: filament
+id: filament_forb_print_feat
+name: filament_forb_print_feat
+condition: not print.print_feat
+
+

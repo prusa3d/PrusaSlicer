@@ -7,7 +7,7 @@
 
 #include <memory> // unique_ptr
 #include <optional>
-#include "libslic3r/AABBMesh.hpp" // Structure to cast rays
+#include "Slic3r/Biz/Algorithms/AABBMesh.hpp" // Structure to cast rays
 #include "libslic3r/Point.hpp" // Transform3d
 #include "libslic3r/ObjectID.hpp"
 #include "libslic3r/Model.hpp" // ModelObjectPtrs, ModelObject, ModelInstance, ModelVolume

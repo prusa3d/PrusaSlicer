@@ -1,0 +1,35 @@
+id: Dragon Resin Metalshine Dark Brass
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Dragon Resin
+  material_type: Tough
+  material_colour: '#B0B000'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: ITkZCfMIQEeT32JWU8Egsg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Dragon Resin Metalshine Dark Brass @SL1 0.05
+    id: nquG4XeqTMi7Pjb/qN7mNQ
+    values:
+      exposure_time: 30
+      initial_exposure_time: 50
+## SL1S
+- condition: printer.model == "SL1S"
+  id: d5Wrz2vUTMO/OzhAI6lmKw
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Dragon Resin Metalshine Dark Brass @SL1S 0.05
+    id: HU6h0XrsQ2a140YxzDJmgA
+    values:
+      exposure_time: 10
+      initial_exposure_time: 40

@@ -26,7 +26,7 @@
 #include <math.h>
 #include <assert.h>
 
-#include <boost/log/trivial.hpp>
+#include <spdlog/spdlog.h>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/predef/other/endian.h>
 
@@ -47,7 +47,7 @@ static FILE* stl_open_count_facets(stl_file *stl, const char *file)
   	// Open the file in binary mode first.
   	FILE *fp = boost::nowide::fopen(file, "rb");
   	if (fp == nullptr) {
-		BOOST_LOG_TRIVIAL(error) << "stl_open_count_facets: Couldn't open " << file << " for reading";
+		SPDLOG_ERROR("stl_open_count_facets: Couldn't open {} for reading", file);
     	return nullptr;
   	}
   	// Find size of file.
@@ -58,7 +58,7 @@ static FILE* stl_open_count_facets(stl_file *stl, const char *file)
   	fseek(fp, HEADER_SIZE, SEEK_SET);
 	unsigned char chtest[128];
   	if (! fread(chtest, sizeof(chtest), 1, fp)) {
-		BOOST_LOG_TRIVIAL(error) << "stl_open_count_facets: The input is an empty file: " << file;
+		SPDLOG_ERROR("stl_open_count_facets: The input is an empty file: {}", file);
     	fclose(fp);
     	return nullptr;
   	}
@@ -78,7 +78,7 @@ static FILE* stl_open_count_facets(stl_file *stl, const char *file)
   	if (stl->stats.type == binary) {
     	// Test if the STL file has the right size.
     	if (((file_size - HEADER_SIZE) % SIZEOF_STL_FACET != 0) || (file_size < STL_MIN_FILE_SIZE)) {
-			BOOST_LOG_TRIVIAL(error) << "stl_open_count_facets: The file " << file << " has the wrong size.";
+			SPDLOG_ERROR("stl_open_count_facets: The file {} has the wrong size.", file);
       		fclose(fp);
       		return nullptr;
     	}
@@ -96,7 +96,7 @@ static FILE* stl_open_count_facets(stl_file *stl, const char *file)
     	stl_internal_reverse_quads((char*)&header_num_facets, 4);
 #endif /* BOOST_ENDIAN_BIG_BYTE */
     	if (! header_num_faces_read || num_facets != header_num_facets)
-			BOOST_LOG_TRIVIAL(info) << "stl_open_count_facets: Warning: File size doesn't match number of facets in the header: " << file;
+			SPDLOG_INFO("stl_open_count_facets: Warning: File size doesn't match number of facets in the header: {}", file);
   	}
   	// Otherwise, if the .STL file is ASCII, then do the following:
   	else
@@ -108,8 +108,7 @@ static FILE* stl_open_count_facets(stl_file *stl, const char *file)
 
 		// do another null check to be safe
     	if (fp == nullptr) {
-			BOOST_LOG_TRIVIAL(error) << "stl_open_count_facets: Couldn't open " << file << " for reading";
-      		fclose(fp);
+			SPDLOG_ERROR("stl_open_count_facets: Couldn't open {} for reading", file);
       		return nullptr;
     	}
     
@@ -168,8 +167,8 @@ static bool stl_read(stl_file *stl, FILE *fp, int first_facet, bool first)
 			// Read a single facet from an ASCII .STL file
 			// skip solid/endsolid
 			// (in this order, otherwise it won't work when they are paired in the middle of a file)
-			fscanf(fp, " endsolid%*[^\n]\n");
-			fscanf(fp, " solid%*[^\n]\n");  // name might contain spaces so %*s doesn't work and it also can be empty (just "solid")
+			(void)fscanf(fp, " endsolid%*[^\n]\n");
+			(void)fscanf(fp, " solid%*[^\n]\n");  // name might contain spaces so %*s doesn't work and it also can be empty (just "solid")
 			// Leading space in the fscanf format skips all leading white spaces including numerous new lines and tabs.
 			int res_normal     = fscanf(fp, " facet normal %31s %31s %31s", normal_buf[0], normal_buf[1], normal_buf[2]);
 			assert(res_normal == 3);
@@ -184,16 +183,16 @@ static bool stl_read(stl_file *stl, FILE *fp, int first_facet, bool first)
 			assert(res_vertex3 == 3);
 			// Some G-code generators tend to produce text after "endloop" and "endfacet". Just ignore it.
 			char buf[2048];
-			fgets(buf, 2047, fp);
+			(void)fgets(buf, 2047, fp);
 			bool endloop_ok = strncmp(buf, "endloop", 7) == 0 && (buf[7] == '\r' || buf[7] == '\n' || buf[7] == ' ' || buf[7] == '\t');
 			assert(endloop_ok);
 			// Skip the trailing whitespaces and empty lines.
-			fscanf(fp, " ");
-			fgets(buf, 2047, fp);
+			(void)fscanf(fp, " ");
+			(void)fgets(buf, 2047, fp);
 			bool endfacet_ok = strncmp(buf, "endfacet", 8) == 0 && (buf[8] == '\r' || buf[8] == '\n' || buf[8] == ' ' || buf[8] == '\t');
 			assert(endfacet_ok);
 			if (res_normal != 3 || res_outer_loop != 0 || res_vertex1 != 3 || res_vertex2 != 3 || res_vertex3 != 3 || ! endloop_ok || ! endfacet_ok) {
-				BOOST_LOG_TRIVIAL(error) << "Something is syntactically very wrong with this ASCII STL! ";
+				SPDLOG_ERROR("Something is syntactically very wrong with this ASCII STL! ");
 				return false;
 			}
 
@@ -203,7 +202,7 @@ static bool stl_read(stl_file *stl, FILE *fp, int first_facet, bool first)
 			    sscanf(normal_buf[2], "%f", &facet.normal(2)) != 1) {
 			    // Normal was mangled. Maybe denormals or "not a number" were stored?
 			  	// Just reset the normal and silently ignore it.
-			  	memset(&facet.normal, 0, sizeof(facet.normal));
+			  	facet.normal = stl_normal::Zero();
 			}
 		}
 
@@ -225,7 +224,7 @@ static bool stl_read(stl_file *stl, FILE *fp, int first_facet, bool first)
 		for (int j = 0; j < 3; ++j) {
 			for (int u = 0; u < 3; ++u) {
 				if (std::isnan(facet.vertex[j](u)) || std::isinf(facet.vertex[j](u))) {
-					BOOST_LOG_TRIVIAL(error) << "stl_read: facet " << i << ": vertex " << j << "contains invalid coordinate";
+					SPDLOG_ERROR("stl_read: facet {}: vertex {} contains invalid coordinate", i, j);
 					return false;
 				}
 			}

@@ -10,7 +10,7 @@
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/IconManager.hpp"
 
-#include "libslic3r/SLA/SupportPoint.hpp"
+#include "Slic3r/Domain/SLA/SupportPoint.hpp"
 #include "libslic3r/ObjectID.hpp"
 #include <wx/dialog.h>
 

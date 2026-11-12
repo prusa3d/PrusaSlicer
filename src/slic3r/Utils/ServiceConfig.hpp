@@ -32,7 +32,6 @@ public:
     void set_webdev_enabled(bool enabled) { m_webdev_enabled = enabled; }
 
     const std::string& printables_url() const { return m_printables_url; }
-    std::string printables_get_secret_token_url() const { return m_printables_url + "/auth/get-secret-token"; }
 
     static ServiceConfig& instance();
 private:

@@ -1,0 +1,9 @@
+kind: filament
+inherits:
+- '*PPCF*'
+name: Generic PPCF
+id: Generic PPCF
+features:
+  generic: true
+values:
+  filament_vendor: Generic

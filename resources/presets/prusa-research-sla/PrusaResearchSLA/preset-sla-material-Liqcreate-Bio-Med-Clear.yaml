@@ -1,0 +1,35 @@
+id: Liqcreate Bio-Med Clear
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Liqcreate
+  material_type: Medical
+  material_colour: '#F8F8F8'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: fEQRQBjqTNmrX2Wg1QeIrQ
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Liqcreate Bio-Med Clear @SL1S 0.05
+    id: etKOMuFmQxmX5iBOHl/1ug
+    values:
+      exposure_time: 5
+      initial_exposure_time: 40
+      material_correction_x: 1.02
+      material_correction_y: 1.02
+      support_pillar_diameter: 1
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+      support_head_width: 3
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Liqcreate Bio-Med Clear @SL1S 0.1
+    id: 95osRpcRQn6IhHbD8mqpFQ
+    values:
+      exposure_time: 8
+      initial_exposure_time: 60

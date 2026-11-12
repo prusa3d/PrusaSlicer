@@ -26,6 +26,8 @@
 cmake_minimum_required(VERSION 3.12)
 project(PrusaSlicer_deps)
 
+add_definitions("-D_WIN32_WINNT=0x0601")
+
 # Redefine BUILD_SHARED_LIBS with default being OFF
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static (experimental)" OFF)
 
@@ -54,6 +56,7 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
 endif ()
 
 include(${PROJECT_SOURCE_DIR}/../cmake/modules/AddCMakeProject.cmake)
+include(${PROJECT_SOURCE_DIR}/../cmake/modules/OSXDeploymentTarget.cmake)
 
 macro(list_projects result curdir)
   file(GLOB children RELATIVE ${curdir} ${curdir}/*)
@@ -133,11 +136,6 @@ set(SYSTEM_PROVIDED_PACKAGES OpenGL)
 if (UNIX)
     # On UNIX systems (including Apple) ZLIB should be available
     list(APPEND SYSTEM_PROVIDED_PACKAGES ZLIB)
-    if (APPLE)
-        # Deal with CURL on Apple (See issue #5984 on GH):
-        # Mac SDK should include CURL from at least version 10.12
-        list(APPEND SYSTEM_PROVIDED_PACKAGES CURL)
-    endif ()
 endif ()
 
 list(APPEND SYSTEM_PROVIDED_PACKAGES ${${PROJECT_NAME}_PLATFORM_PACKAGES})
@@ -186,6 +184,8 @@ foreach (pkg ${FOUND_PACKAGES})
             list(APPEND DEPS_TO_BUILD ${pkg})
           endif ()
         endif ()
+    else()
+        message(STATUS "Skipping package ${pkg}")
     endif ()
 endforeach()
 
@@ -223,12 +223,15 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 
   # Exclude the libraries which have no problem to link to Debug builds in
   # Release mode (mostly C libraries)
-  set(DEP_DEBUG_EXCLUDES GMP MPFR OpenSSL NanoSVG TIFF JPEG ZLIB heatshrink)
+  set(DEP_DEBUG_EXCLUDES GMP MPFR OpenSSL NanoSVG TIFF JPEG ZLIB PNG heatshrink matdb)
   if (UNIX)
     # Making a separate debug build on Unix of wx is a nightmare
     list(APPEND DEP_DEBUG_EXCLUDES wxWidgets)
   endif ()
-  
+  # sentry does not build in debug mode, but it is only linked when used.
+  # Do not build the debug version on the assumption that it is only used in release mode anyway.
+  list(APPEND DEP_DEBUG_EXCLUDES sentry)
+
   # Create the list of targets needed in debug mode
   set(_build_list_dbg "")
   set(_build_list_filt ${_build_list})
@@ -244,7 +247,6 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   execute_process(
     COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR} -G${CMAKE_GENERATOR} 
       -DCMAKE_BUILD_TYPE=Debug
-      -DDEP_WX_GTK3=${DEP_WX_GTK3}
       -D${PROJECT_NAME}_DEP_DOWNLOAD_DIR=${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}
       -D${PROJECT_NAME}_DEP_INSTALL_PREFIX=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}
       -D${PROJECT_NAME}_PACKAGE_EXCLUDES="${_excl_regexp}"

@@ -1,0 +1,22 @@
+id: 3DM-HTR140 (high temperature)
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: 3DM
+  material_type: Tough
+  material_colour: '#EC0000'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: vE+Q9/DZQvC98jx7jZiPYQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-HTR140 (high temperature) @SL1 0.05
+    id: Bc79PPD1RJyk09O6kCsxRQ
+    values:
+      exposure_time: 12
+      initial_exposure_time: 45

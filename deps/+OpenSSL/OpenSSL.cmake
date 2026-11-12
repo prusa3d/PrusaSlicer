@@ -1,11 +1,76 @@
-
 include(ProcessorCount)
 ProcessorCount(NPROC)
 
 set(_conf_cmd "./config")
 set(_cross_arch "")
 set(_cross_comp_prefix_line "")
-if (CMAKE_CROSSCOMPILING)
+set(_apple_target_flags "")
+set(_extra_conf_flags -Wa,--noexecstack)
+set(_bld_cmd make depend && make "-j${NPROC}")
+set(_ins_cmd make install_sw)
+
+if (WIN32)
+    set(_exclude_from_all ON)
+else ()
+    set(_exclude_from_all OFF)
+endif ()
+
+set(_openssl_depends "")
+
+if (WIN32)
+    # OpenSSL is not needed by PrusaSlicer itself on Windows, but Paho MQTT links it on every
+    # platform, so the Windows build (Perl Configure + nmake) has to be available here.
+    #
+    # OpenSSL's Configure needs a native Windows Perl. It is fetched as a pinned portable
+    # Strawberry Perl by StrawberryPerl.cmake. It lives in a separate file on purpose: the
+    # flatpak manifest generator in PrusaSlicer-Actions takes the first URL it finds in
+    # OpenSSL.cmake as the OpenSSL source archive, so this file must contain only that one.
+    include(${CMAKE_CURRENT_LIST_DIR}/StrawberryPerl.cmake)
+    set(_openssl_depends dep_Perl)
+
+    set(_conf_cmd ${_perl_exe} Configure)
+    if (CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(_cross_arch "VC-WIN64A")
+    else ()
+        set(_cross_arch "VC-WIN32")
+    endif ()
+    # Explicitly set the tools, so they match the other deps.
+    set(_extra_conf_flags no-asm no-module no-apps no-tests
+        "CC=${CMAKE_C_COMPILER}"
+        "LD=${CMAKE_LINKER}"
+        "AR=${CMAKE_AR}"
+    )
+    set(_bld_cmd nmake)
+    set(_ins_cmd nmake install_sw)
+elseif (APPLE)
+    # OpenSSL's own ./config/./Configure has no notion of CMAKE_OSX_ARCHITECTURES - unlike
+    # the CMake-based deps (add_cmake_project forwards it automatically), this is a raw
+    # ExternalProject driving OpenSSL's Perl Configure script directly. Left to plain
+    # "./config" with no target argument, it auto-detects the architecture of the machine
+    # actually running the build (uname -m) rather than the one CMAKE_OSX_ARCHITECTURES
+    # asks for, which silently produces a wrong-arch static library whenever the build
+    # machine's native arch differs from the target (e.g. cross-building arm64 on an Intel
+    # CI runner). Map the target explicitly instead.
+    set(_conf_cmd "./Configure")
+    set(_target_arch "${CMAKE_OSX_ARCHITECTURES}")
+    if (NOT _target_arch)
+        set(_target_arch "${CMAKE_SYSTEM_PROCESSOR}")
+    endif ()
+
+    if (_target_arch MATCHES "arm64")
+        set(_cross_arch "darwin64-arm64-cc")
+    elseif (_target_arch MATCHES "x86_64" OR _target_arch MATCHES "AMD64")
+        set(_cross_arch "darwin64-x86_64-cc")
+    else ()
+        message(FATAL_ERROR "OpenSSL: unsupported target architecture: '${_target_arch}'")
+    endif ()
+    if (CMAKE_OSX_DEPLOYMENT_TARGET)
+        list(APPEND _apple_target_flags "-mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    endif ()
+    if (CMAKE_OSX_SYSROOT)
+        list(APPEND _apple_target_flags "-isysroot" "${CMAKE_OSX_SYSROOT}")
+    endif ()
+elseif (CMAKE_CROSSCOMPILING)
     set(_conf_cmd "./Configure")
     set(_cross_comp_prefix_line "--cross-compile-prefix=${TOOLCHAIN_PREFIX}-")
 
@@ -18,18 +83,19 @@ if (CMAKE_CROSSCOMPILING)
 endif ()
 
 ExternalProject_Add(dep_OpenSSL
-    EXCLUDE_FROM_ALL ON
-    URL "https://github.com/openssl/openssl/archive/OpenSSL_1_1_0l.tar.gz"
-    URL_HASH SHA256=e2acf0cf58d9bff2b42f2dc0aee79340c8ffe2c5e45d3ca4533dd5d4f5775b1d
+    EXCLUDE_FROM_ALL ${_exclude_from_all}
+    URL "https://github.com/openssl/openssl/releases/download/openssl-4.0.1/openssl-4.0.1.tar.gz"
+    URL_HASH SHA256=2db3f3a0d6ea4b59e1f094ace2c8cd536dffb87cdc39084c5afa1e6f7f37dd09
     DOWNLOAD_DIR ${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}/OpenSSL
     BUILD_IN_SOURCE ON
     CONFIGURE_COMMAND ${_conf_cmd} ${_cross_arch}
         "--prefix=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}"
+        --libdir=lib
         ${_cross_comp_prefix_line}
         no-shared
-        no-ssl3-method
-        no-dynamic-engine
-        -Wa,--noexecstack
-    BUILD_COMMAND make depend && make "-j${NPROC}"
-    INSTALL_COMMAND make install_sw
+        ${_extra_conf_flags}
+        ${_apple_target_flags}
+    BUILD_COMMAND ${_bld_cmd}
+    INSTALL_COMMAND ${_ins_cmd}
+    DEPENDS ${_openssl_depends}
 )

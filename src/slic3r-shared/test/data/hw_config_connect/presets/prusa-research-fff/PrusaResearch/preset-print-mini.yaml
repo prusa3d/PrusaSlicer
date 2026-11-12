@@ -1,0 +1,722 @@
+kind: print
+id: '*common MINI*'
+values:
+  default_material: Prusament PLA
+variants:
+- condition: printer.model == "MINI"
+  id: BhKWPNNQT3i/e8H1nswvIg
+  values:
+    retract_layer_change: 1
+    retract_length_toolchange: 0
+    retract_lift_above: 0
+    retract_lift_below: 179
+    retract_restart_extra: 0
+    retract_restart_extra_toolchange: 0
+    travel_ramping_lift: 0
+    travel_slope: 1
+    travel_max_lift: 1.5
+    wipe: 0
+    retract_speed: 70
+    deretract_speed: 40
+    retract_length: 2.5
+    retract_before_travel: 1.5
+  variants:
+# 0.25    
+  - condition: tool.nozzle_diameter == 0.25
+    id: s80jhmmESsOBe/lTqGTeAQ
+    values:
+      max_layer_height: 0.15
+      min_layer_height: 0.05
+      retract_lift: 0.15
+      retract_before_travel: 1
+# 0.4    
+  - condition: tool.nozzle_diameter == 0.4
+    id: p9RuWxfLRx2bfXM8c0I+Ww
+    values:
+      max_layer_height: 0.25
+      min_layer_height: 0.07
+      retract_lift: 0.2
+      retract_before_travel: 1.5
+# 0.6    
+  - condition: tool.nozzle_diameter == 0.6
+    id: LkgoFmZyQQ2EmZRIYkLrtA
+    values:
+      max_layer_height: 0.40
+      min_layer_height: 0.15
+      retract_length: 2.8
+      retract_lift: 0.2
+
+# 0.8    
+  - condition: tool.nozzle_diameter == 0.8
+    id: IWmR3TsKSsWweUsNA9rKMg
+    values:
+      deretract_speed: 20
+      max_layer_height: 0.55
+      min_layer_height: 0.2
+      retract_length: 0.6
+      retract_lift: 0.25
+      retract_speed: 45
+---
+id: xEHHa+8wRIeR4S0FTC6RjA
+kind: print
+inherits:
+- '*common*'
+- '*common MINI*'
+variants:
+- condition: printer.model == "MINI"
+  id: Ylwe2RZqTSyimiINLxCHYA
+  values:
+    bottom_solid_layers: 4
+    bridge_acceleration: 1500
+    bridge_flow_ratio: 1
+    bridge_speed: 50
+    brim_separation: 0.1
+    default_acceleration: 2000
+    dont_support_bridges: 0
+    elefant_foot_compensation: 0.2
+    enable_dynamic_overhang_speeds: 1
+    external_perimeter_acceleration: 2000
+    external_perimeter_extrusion_width: 0.45
+    external_perimeter_speed: 140
+    extrusion_width: 0.45
+    fill_density: 15%
+    fill_pattern: grid
+    first_layer_acceleration: 500
+    first_layer_acceleration_over_raft: 0
+    first_layer_extrusion_width: 0.5
+    first_layer_speed: 30
+    first_layer_solid_infill_speed: 45
+    first_layer_speed_over_raft: 30
+    gap_fill_enabled: 1
+    gap_fill_speed: 80
+    gcode_resolution: 0.008
+    infill_acceleration: 4000
+    infill_anchor: 2.5
+    infill_anchor_max: 12
+    infill_every_layers: 1
+    infill_extrusion_width: 0.45
+    infill_overlap: 15%
+    infill_speed: 140
+    max_print_speed: 200
+    max_volumetric_extrusion_rate_slope_negative: 0
+    max_volumetric_extrusion_rate_slope_positive: 0
+    max_volumetric_speed: 0
+    min_bead_width: 85%
+    min_feature_size: 25%
+    only_retract_when_crossing_perimeters: 0
+    overhang_speed_0: 15
+    overhang_speed_1: 20
+    overhang_speed_2: 25
+    overhang_speed_3: 60
+    overhangs: 1
+    perimeter_acceleration: 2500
+    perimeter_extrusion_width: 0.45
+    perimeter_speed: 140
+    perimeters: 2
+    raft_contact_distance: 0.15
+    raft_expansion: 1.5
+    raft_first_layer_density: 80%
+    raft_first_layer_expansion: 3
+    support_material_first_layer_density: 80%
+    support_material_first_layer_expansion: 3
+    seam_position: aligned
+    small_perimeter_speed: 140
+    solid_infill_acceleration: 4000
+    solid_infill_extrusion_width: 0.45
+    solid_infill_speed: 140
+    over_bridge_speed: 50%
+    support_material: enforcers_only
+    support_material_angle: 0
+    support_material_bottom_contact_distance: 0
+    support_material_bottom_interface_layers: 0
+    support_material_buildplate_only: 0
+    support_material_closing_radius: 2
+    support_material_contact_distance: 0.2
+    support_material_enforce_layers: 0
+    support_material_extruder: 0
+    support_material_extrusion_width: 0.4
+    support_material_interface_contact_loops: 0
+    support_material_interface_extruder: 0
+    support_material_interface_layers: 3
+    support_material_interface_pattern: auto
+    support_material_interface_spacing: 0.2
+    support_material_interface_speed: 50%
+    support_material_pattern: rectilinear
+    support_material_spacing: 2
+    support_material_speed: 100
+    support_material_style: snug
+    support_material_synchronize_layers: 0
+    support_material_threshold: 40
+    support_material_with_sheath: 0
+    support_material_xy_spacing: 80%
+    support_tree_angle: 40
+    support_tree_angle_slow: 25
+    support_tree_branch_diameter: 2
+    support_tree_branch_diameter_angle: 5
+    support_tree_branch_diameter_double_wall: 8
+    support_tree_branch_distance: 1
+    support_tree_tip_diameter: 0.8
+    support_tree_top_rate: 30%
+    top_infill_extrusion_width: 0.42
+    top_solid_infill_acceleration: 1200
+    top_solid_infill_speed: 80
+    top_solid_layers: 5
+    travel_acceleration: 4000
+    travel_speed: 400
+    travel_speed_z: 12
+    thick_bridges: 0
+    top_solid_min_thickness: 0.7
+    bottom_solid_min_thickness: 0.5
+    wipe_tower_extra_spacing: 110%
+    wipe_tower_extra_flow: 250%
+    travel_short_distance_acceleration: 250
+  variants:
+  - name: '*non-MMU branch*'
+    id: XhHJUfWPQRGAW0wfz4Zf/g
+    variants:
+# 0.25 nozzle
+    - condition: tool.nozzle_diameter == 0.25
+      id: 7mJL+2JrRBKS4QoH4NXEdg
+      values:
+        extrusion_width: 0.27
+        first_layer_extrusion_width: 0.32
+        perimeter_extrusion_width: 0.27
+        external_perimeter_extrusion_width: 0.27
+        infill_extrusion_width: 0.27
+        solid_infill_extrusion_width: 0.27
+        top_infill_extrusion_width: 0.27
+        support_material_extrusion_width: 0.25
+        first_layer_speed: 20
+        first_layer_solid_infill_speed: 35
+        gcode_resolution: 0.008
+        elefant_foot_compensation: 0
+        brim_separation: 0
+        bottom_solid_layers: 6
+        top_solid_layers: 9
+        support_material_speed: 70
+        support_material_interface_speed: 75%
+        infill_overlap: 10%
+        default_acceleration: 2000
+        travel_acceleration: 3000
+        infill_acceleration: 3000
+        solid_infill_acceleration: 2500
+        top_solid_infill_acceleration: 1000
+        bridge_speed: 30
+        bridge_flow_ratio: 1
+        infill_speed: 100
+        solid_infill_speed: 140
+        top_solid_infill_speed: 60
+        perimeters: 3
+        infill_anchor: 1
+        support_material_contact_distance: 0.15
+        support_material_spacing: 1
+        support_material_xy_spacing: 150%
+        support_tree_tip_diameter: 0.5
+        raft_contact_distance: 0.15
+        raft_first_layer_density: 95%
+        support_material_first_layer_density: 95%
+        gap_fill_speed: 50
+        overhang_speed_1: 25
+        overhang_speed_2: 30
+        overhang_speed_3: 80%
+# 0.25n/0.05mm layer
+      variants:
+      - name: 0.05mm DETAIL @MINI 0.25
+        id: IU33uEg+R9qhZExx0kHpnA
+        values:
+          layer_height: 0.05
+          bottom_solid_layers: 10
+          top_solid_layers: 13
+          top_solid_infill_speed: 60
+          support_material_contact_distance: 0.11
+          perimeter_speed: 60
+          small_perimeter_speed: 40
+          external_perimeter_speed: 40
+          gap_fill_speed: 40
+          support_material_speed: 60
+          external_perimeter_acceleration: 1000
+          perimeter_acceleration: 1200
+          top_solid_infill_acceleration: 1000
+          solid_infill_acceleration: 2000
+          infill_acceleration: 2000
+          bridge_acceleration: 1000
+          default_acceleration: 1500
+          perimeter_extrusion_width: 0.25
+          external_perimeter_extrusion_width: 0.25
+          infill_extrusion_width: 0.25
+          solid_infill_extrusion_width: 0.25
+          solid_infill_speed: 100
+          bridge_speed: 25
+          raft_contact_distance: 0.1
+# 0.25n/0.07mm layer
+      - name: 0.07mm DETAIL @MINI 0.25
+        id: CMP/YAy4S2ClQDFrd59H6Q
+        values:
+          layer_height: 0.07
+          bottom_solid_layers: 9
+          top_solid_layers: 11
+          top_solid_infill_speed: 60
+          support_material_contact_distance: 0.11
+          perimeter_speed: 60
+          small_perimeter_speed: 40
+          external_perimeter_speed: 40
+          gap_fill_speed: 40
+          support_material_speed: 60
+          external_perimeter_acceleration: 1000
+          perimeter_acceleration: 1200
+          top_solid_infill_acceleration: 1000
+          solid_infill_acceleration: 2000
+          infill_acceleration: 2000
+          bridge_acceleration: 1000
+          default_acceleration: 1500
+          perimeter_extrusion_width: 0.25
+          external_perimeter_extrusion_width: 0.25
+          infill_extrusion_width: 0.25
+          solid_infill_extrusion_width: 0.25
+          solid_infill_speed: 140
+          bridge_speed: 30
+          raft_contact_distance: 0.1
+# 0.25n/0.12mm layer
+      - name: 0.12mm STRUCTURAL @MINI 0.25
+        id: VWwXakG/TtC+aGzcLYn1CQ
+        values:
+          layer_height: 0.12
+          bottom_solid_layers: 6
+          top_solid_layers: 9
+          support_material_contact_distance: 0.11
+          raft_contact_distance: 0.1
+          perimeter_speed: 70
+          external_perimeter_speed: 40
+          small_perimeter_speed: 40
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          infill_acceleration: 3000
+          solid_infill_acceleration: 2500
+      - name: 0.12mm SPEED @MINI 0.25
+        id: zPRGeg3+Qd26l9JjVSjKig
+        values:
+          layer_height: 0.12
+          bottom_solid_layers: 6
+          top_solid_layers: 9
+          support_material_contact_distance: 0.11
+          raft_contact_distance: 0.1
+          infill_acceleration: 2500
+          perimeter_speed: 120
+          external_perimeter_speed: 120
+          small_perimeter_speed: 120
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          solid_infill_acceleration: 2500
+# 0.25n/0.15mm layer
+      - name: 0.15mm STRUCTURAL @MINI 0.25
+        id: 4/h/Y2erTeCI9cbdun9WNA
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 6
+          top_solid_layers: 7
+          support_material_contact_distance: 0.12
+          raft_contact_distance: 0.1
+          infill_acceleration: 2500
+          solid_infill_acceleration: 2000
+          perimeter_speed: 70
+          external_perimeter_speed: 40
+          small_perimeter_speed: 40
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+      - name: 0.15mm SPEED @MINI 0.25
+        id: 1iN6RXZUT6us/fj+wYC4Rw
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 6
+          top_solid_layers: 7
+          support_material_contact_distance: 0.12
+          raft_contact_distance: 0.1
+          infill_acceleration: 2500
+          solid_infill_acceleration: 2000
+          perimeter_speed: 120
+          external_perimeter_speed: 120
+          small_perimeter_speed: 120
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+# 0.4 nozzle
+    - condition: tool.nozzle_diameter == 0.4
+# 0.4n/0.10mm layer
+      id: dl8UawrfT4WqaJKN98jDhg
+      variants:
+      - name: 0.10mm FAST DETAIL @MINI 0.4
+        id: 25KAliaPST6/ARVN/VL9Lw
+        values:
+          layer_height: 0.1
+          bottom_solid_layers: 6
+          top_solid_layers: 7
+          support_material_contact_distance: 0.17
+          raft_contact_distance: 0.15
+          perimeter_speed: 140
+          external_perimeter_speed: 140
+          small_perimeter_speed: 140
+          gap_fill_speed: 80
+          support_material_speed: 100
+          support_material_interface_speed: 50
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          solid_infill_acceleration: 3000
+          top_solid_infill_acceleration: 1000
+          default_acceleration: 2000
+          infill_speed: 140
+          infill_acceleration: 3000
+          perimeters: 3
+          top_infill_extrusion_width: 0.4
+          bridge_speed: 35
+# 0.4n/0.15mm layer
+      - name: 0.15mm STRUCTURAL @MINI 0.4
+        id: XD7pK1dWTqGLrdFRZNkbYg
+        values:
+          layer_height: 0.15
+          top_solid_layers: 6
+          support_material_contact_distance: 0.17
+          raft_contact_distance: 0.15
+          bridge_speed: 50
+          support_material_interface_speed: 50
+          bottom_solid_layers: 5
+          perimeter_speed: 80
+          external_perimeter_speed: 45
+          small_perimeter_speed: 45
+          infill_speed: 110
+          solid_infill_speed: 120
+          gap_fill_speed: 60
+          top_solid_infill_speed: 80
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          solid_infill_acceleration: 3000
+          overhang_speed_3: 80%
+          support_material_speed: 100
+      - name: 0.15mm SPEED @MINI 0.4
+        id: H1I9enlMTxaeAqIkJStejg
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 4
+          top_solid_layers: 6
+          support_material_contact_distance: 0.17
+          raft_contact_distance: 0.15
+          bridge_speed: 50
+          support_material_speed: 100
+          support_material_interface_speed: 50
+          perimeter_speed: 140
+          external_perimeter_speed: 140
+          small_perimeter_speed: 140
+          gap_fill_speed: 80
+          external_perimeter_acceleration: 2000
+          perimeter_acceleration: 2500
+          solid_infill_acceleration: 3500
+          top_solid_infill_acceleration: 1000
+# 0.4n/0.20mm layer
+      - name: 0.20mm STRUCTURAL @MINI 0.4
+        id: PEycG6CiQvK+MEx5iet4YA
+        values:
+          layer_height: 0.2
+          bottom_solid_layers: 4
+          top_solid_layers: 5
+          support_material_contact_distance: 0.2
+          raft_contact_distance: 0.2
+          top_solid_infill_acceleration: 1000
+          perimeter_speed: 80
+          small_perimeter_speed: 45
+          external_perimeter_speed: 45
+          infill_speed: 115
+          solid_infill_speed: 120
+          gap_fill_speed: 60
+          top_solid_infill_speed: 80
+          support_material_speed: 100
+          support_material_interface_speed: 50
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          solid_infill_acceleration: 3000
+          overhang_speed_3: 90%
+      - name: 0.20mm SPEED @MINI 0.4
+        id: 48Q1Bh/jSA+BcgHsuL/zrw
+        values:
+          layer_height: 0.2
+          bottom_solid_layers: 4
+          top_solid_layers: 5
+          support_material_contact_distance: 0.2
+          raft_contact_distance: 0.2
+          top_solid_infill_acceleration: 1000
+# 0.6 nozzle
+    - condition: tool.nozzle_diameter == 0.6
+      id: BPmZZFgETHmmW0kdSgE+kw
+      values:
+        extrusion_width: 0.68
+        first_layer_extrusion_width: 0.68
+        perimeter_extrusion_width: 0.68
+        external_perimeter_extrusion_width: 0.68
+        infill_extrusion_width: 0.68
+        solid_infill_extrusion_width: 0.68
+        top_infill_extrusion_width: 0.55
+        support_material_extrusion_width: 0.5
+        gcode_resolution: 0.0125
+        bottom_solid_layers: 3
+        top_solid_layers: 4
+        support_material_contact_distance: 0.15
+        support_material_xy_spacing: 80%
+        support_material_interface_spacing: 0.25
+        support_material_interface_speed: 75%
+        support_tree_tip_diameter: 1.2
+        raft_contact_distance: 0.25
+        gap_fill_speed: 60
+        overhang_speed_0: 15
+        overhang_speed_1: 20
+        overhang_speed_2: 25
+        overhang_speed_3: 45
+        top_solid_min_thickness: 0.9
+        bottom_solid_min_thickness: 0.6
+        infill_anchor: 2.5
+        infill_anchor_max: 20
+        support_material_speed: 80
+        fill_density: 20%
+        first_layer_speed: 40
+        first_layer_solid_infill_speed: 70
+        over_bridge_speed: 0
+        bridge_speed: 30
+        seam_position: nearest
+      variants:
+# 0.6n/0.15mm layer
+      - name: 0.15mm STRUCTURAL @MINI 0.6
+        id: t6e9I6pySPaSd2FLGKz9XQ
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 5
+          top_solid_layers: 6
+          perimeter_speed: 70
+          external_perimeter_speed: 45
+          small_perimeter_speed: 45
+          solid_infill_speed: 140
+          infill_speed: 100
+          top_solid_infill_speed: 70
+          bridge_speed: 40
+          gap_fill_speed: 80
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2500
+          top_solid_infill_acceleration: 1500
+          solid_infill_acceleration: 2500
+          infill_acceleration: 4000
+          bridge_acceleration: 1500
+          support_material_contact_distance: 0.22
+          extrusion_width: 0.68
+          perimeter_extrusion_width: 0.6
+          external_perimeter_extrusion_width: 0.6
+          infill_extrusion_width: 0.6
+          solid_infill_extrusion_width: 0.6
+          top_infill_extrusion_width: 0.5
+          overhang_speed_3: 80%
+# 0.6n/0.20mm layer
+      - name: 0.20mm SPEED @MINI 0.6
+        id: ucXfweqiTi+k66WxsH89WQ
+        values:
+          layer_height: 0.2
+          bottom_solid_layers: 4
+          top_solid_layers: 5
+          support_material_contact_distance: 0.22
+          raft_contact_distance: 0.2
+          infill_acceleration: 4000
+          top_solid_infill_speed: 70
+          bridge_acceleration: 1500
+          extrusion_width: 0.68
+          perimeter_extrusion_width: 0.62
+          external_perimeter_extrusion_width: 0.62
+          infill_extrusion_width: 0.62
+          solid_infill_extrusion_width: 0.62
+          top_infill_extrusion_width: 0.5
+          top_solid_infill_acceleration: 1500
+          perimeter_speed: 115
+          external_perimeter_speed: 115
+          small_perimeter_speed: 115
+          solid_infill_speed: 100
+          infill_speed: 110
+          bridge_speed: 40
+          gap_fill_speed: 80
+          external_perimeter_acceleration: 2000
+          perimeter_acceleration: 2500
+          solid_infill_acceleration: 3000
+          support_material_speed: 90
+# 0.6n/0.25mm layer
+      - name: 0.25mm STRUCTURAL @MINI 0.6
+        id: NqkfjvUJQwyPl+xPqSpP4g
+        values:
+          layer_height: 0.25
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.25
+          raft_contact_distance: 0.25
+          infill_acceleration: 4000
+          default_acceleration: 2000
+          top_solid_infill_acceleration: 1500
+          solid_infill_acceleration: 3000
+          top_solid_infill_speed: 60
+          support_material_speed: 80
+          bridge_acceleration: 1500
+          perimeter_speed: 80
+          small_perimeter_speed: 45
+          external_perimeter_speed: 45
+          infill_speed: 90
+          solid_infill_speed: 80
+          bridge_speed: 30
+          external_perimeter_acceleration: 2000
+          perimeter_acceleration: 2000
+          gap_fill_speed: 60
+          overhang_speed_3: 80%
+      - name: 0.25mm SPEED @MINI 0.6
+        id: rmj2s06IT8OrEESdDe4Sog
+        values:
+          layer_height: 0.25
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.25
+          raft_contact_distance: 0.25
+          infill_acceleration: 4000
+          default_acceleration: 2000
+          top_solid_infill_acceleration: 1500
+          solid_infill_acceleration: 3000
+          top_solid_infill_speed: 60
+          support_material_speed: 80
+          perimeter_speed: 80
+          external_perimeter_speed: 70
+          small_perimeter_speed: 70
+          infill_speed: 90
+          solid_infill_speed: 80
+          external_perimeter_acceleration: 2000
+          perimeter_acceleration: 2500
+          bridge_acceleration: 1500
+          overhang_speed_3: 45
+          gap_fill_speed: 60
+# 0.6n/0.35mm layer
+      - name: 0.35mm STRUCTURAL @MINI 0.6
+        id: 0tdmU/+gQSSEitCYKx77Eg
+        values:
+          layer_height: 0.35
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          support_material_contact_distance: 0.28
+          raft_contact_distance: 0.25
+          support_material_speed: 70
+          top_solid_infill_acceleration: 1500
+          solid_infill_acceleration: 3000
+          bridge_acceleration: 1500
+          infill_acceleration: 4000
+          default_acceleration: 2000
+          perimeter_speed: 60
+          external_perimeter_speed: 45
+          small_perimeter_speed: 45
+          infill_speed: 70
+          solid_infill_speed: 60
+          top_solid_infill_speed: 50
+          gap_fill_speed: 45
+          bridge_speed: 30
+          external_perimeter_acceleration: 2000
+          perimeter_acceleration: 2000
+          overhang_speed_3: 80%
+# 0.8 nozzle
+    - condition: tool.nozzle_diameter == 0.8
+      id: eCmMaRbaT6KJyWTDIINqYQ
+      values:
+        fill_pattern: rectilinear
+        thick_bridges: 1
+        extrusion_width: 0.9
+        first_layer_extrusion_width: 1
+        perimeter_extrusion_width: 0.9
+        external_perimeter_extrusion_width: 0.9
+        infill_extrusion_width: 0.9
+        solid_infill_extrusion_width: 0.9
+        top_infill_extrusion_width: 0.8
+        support_material_extrusion_width: 0.65
+        gcode_resolution: 0.0125
+        bottom_solid_layers: 3
+        top_solid_layers: 4
+        support_material_contact_distance: 0.25
+        support_material_xy_spacing: 80%
+        support_material_interface_spacing: 0.35
+        support_material_interface_speed: 85%
+        support_tree_tip_diameter: 1.6
+        raft_contact_distance: 0.2
+        gap_fill_speed: 35
+        top_solid_min_thickness: 1.2
+        bottom_solid_min_thickness: 0.8
+        seam_position: nearest
+        infill_anchor: 3
+        infill_anchor_max: 20
+        overhang_speed_1: 20
+        overhang_speed_2: 25
+        overhang_speed_3: 80%
+        first_layer_solid_infill_speed: 55
+        over_bridge_speed: 0
+        bridge_speed: 22
+      variants:
+# 0.8n/0.30mm layer
+      - name: 0.30mm DETAIL @MINI 0.8
+        id: 6YiJJvM7QsGzLO3+JWxkdw
+        values:
+          layer_height: 0.3
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          first_layer_speed: 40
+          perimeter_speed: 60
+          external_perimeter_speed: 45
+          small_perimeter_speed: 45
+          infill_speed: 70
+          solid_infill_speed: 50
+          top_solid_infill_speed: 35
+          support_material_speed: 55
+          gap_fill_speed: 40
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          top_solid_infill_acceleration: 1000
+          solid_infill_acceleration: 3000
+          infill_acceleration: 4000
+          bridge_acceleration: 1000
+          top_infill_extrusion_width: 0.7
+# 0.8n/0.40mm layer
+      - name: 0.40mm QUALITY @MINI 0.8
+        id: vXakd3u/TyOZdHczEA/cwg
+        values:
+          layer_height: 0.4
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          perimeter_speed: 40
+          external_perimeter_speed: 40
+          small_perimeter_speed: 40
+          infill_speed: 50
+          solid_infill_speed: 40
+          top_solid_infill_speed: 35
+          support_material_speed: 40
+          gap_fill_speed: 35
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          top_solid_infill_acceleration: 1000
+          solid_infill_acceleration: 3000
+          infill_acceleration: 4000
+          bridge_acceleration: 1000
+          top_infill_extrusion_width: 0.75
+# 0.8n/0.50mm layer
+      - name: 0.50mm DRAFT @MINI 0.8
+        id: cwV+h8u7QyCSz6fKsdz68w
+        values:
+          layer_height: 0.5
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          perimeter_speed: 35
+          external_perimeter_speed: 30
+          small_perimeter_speed: 30
+          infill_speed: 45
+          solid_infill_speed: 35
+          top_solid_infill_speed: 30
+          support_material_speed: 35
+          gap_fill_speed: 30
+          external_perimeter_acceleration: 1500
+          perimeter_acceleration: 2000
+          top_solid_infill_acceleration: 1000
+          solid_infill_acceleration: 3000
+          infill_acceleration: 4000
+          bridge_acceleration: 1000
+          default_acceleration: 2000
+          top_infill_extrusion_width: 0.75
+          perimeter_extrusion_width: 1
+          external_perimeter_extrusion_width: 1

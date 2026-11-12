@@ -5,5 +5,6 @@ add_cmake_project(ZLIB
   CMAKE_ARGS
     -DSKIP_INSTALL_FILES=ON         # Prevent installation of man pages et al.
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 )
 

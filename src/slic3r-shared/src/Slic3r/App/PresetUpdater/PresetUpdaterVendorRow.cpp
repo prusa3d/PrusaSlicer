@@ -1,0 +1,460 @@
+#include "Slic3r/App/PresetUpdater/PresetUpdaterVendorRow.hpp"
+
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/IDialogManager.hpp"
+#include "Slic3r/App/Yoga/Icon.hpp"
+#include "Slic3r/App/Yoga/LayoutButton.hpp"
+#include "Slic3r/App/Yoga/StackLayout.hpp"
+#include "Slic3r/App/Yoga/Text.hpp"
+
+#include "Slic3r/Biz/I18N/I18N.hpp"
+
+#include <fmt/format.h>
+
+using namespace Slic3r::App::Yoga;
+
+namespace Slic3r::App {
+
+namespace {
+
+using namespace PresetUpdaterRowLayout;
+
+using Biz::PresetUpdater::VendorReconfigurationState;
+
+std::string change_label(VendorReconfigurationState state)
+{
+    switch (state) {
+    case VendorReconfigurationState::Update:
+        // TRN Preset updater vendor row. Change kind, noun: a newer version exists.
+        return Biz::_u8L("Update");
+    case VendorReconfigurationState::NewVendor:
+        // TRN Preset updater vendor row. Change kind, noun: not installed yet.
+        return Biz::_u8L("New presets");
+    case VendorReconfigurationState::ForcedUpdate:
+        // TRN Preset updater vendor row. Change kind, noun: installed version too old.
+        return Biz::_u8L("Required update");
+    case VendorReconfigurationState::ForcedDowngrade:
+        // TRN Preset updater vendor row. Change kind, noun: installed version too new.
+        return Biz::_u8L("Required downgrade");
+    case VendorReconfigurationState::NotInIndex:
+        // TRN Preset updater vendor row. Change kind, noun: version not listed.
+        return Biz::_u8L("Unknown version");
+    case VendorReconfigurationState::RemoveVendor:
+        // TRN Preset updater vendor row. Change kind, noun: no source can repair these.
+        return Biz::_u8L("Unusable presets");
+    }
+    return {};
+}
+
+std::string action_label(VendorReconfigurationState state)
+{
+    switch (state) {
+    case VendorReconfigurationState::Update:
+    case VendorReconfigurationState::ForcedUpdate:
+        // TRN Preset updater vendor row button. Installs a newer version.
+        return Biz::_u8L("Update");
+    case VendorReconfigurationState::NewVendor:
+        // TRN Preset updater vendor row button. Installs presets not on this computer.
+        return Biz::_u8L("Install");
+    case VendorReconfigurationState::ForcedDowngrade:
+        // TRN Preset updater vendor row button. Installs an older version.
+        return Biz::_u8L("Downgrade");
+    case VendorReconfigurationState::NotInIndex:
+        // TRN Preset updater vendor row button. Installs a version the source lists.
+        return Biz::_u8L("Repair");
+    case VendorReconfigurationState::RemoveVendor:
+        // TRN Preset updater vendor row button. Deletes the installed presets.
+        return Biz::_u8L("Remove");
+    }
+    return {};
+}
+
+std::string done_label(VendorReconfigurationState state, bool removing)
+{
+    if (removing || state == VendorReconfigurationState::RemoveVendor) {
+        // TRN Preset updater vendor row. The presets were deleted.
+        return Biz::_u8L("Removed");
+    }
+    // TRN Preset updater vendor row. Install finished.
+    return Biz::_u8L("Updated");
+}
+
+std::string running_label(bool removing)
+{
+    if (removing) {
+        // TRN Preset updater vendor row. Deletion running.
+        return Biz::_u8L("Removing...");
+    }
+    // TRN Preset updater vendor row. Install running.
+    return Biz::_u8L("Installing...");
+}
+
+std::string failure_label(const std::optional<Biz::PresetUpdater::PresetUpdaterReason>& reason)
+{
+    using Biz::PresetUpdater::PresetUpdaterReason;
+    if (!reason) {
+        // TRN Preset updater vendor row. Line under the vendor name after a failure of unknown cause.
+        return Biz::_u8L("An unexpected error occurred.");
+    }
+    switch (*reason) {
+    case PresetUpdaterReason::NoUsableVersion:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The source offers no version of these presets usable by this application.");
+    case PresetUpdaterReason::SourceNotFound:
+    case PresetUpdaterReason::SourceDropped:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install or removal.
+        return Biz::_u8L("The preset source is no longer available.");
+    case PresetUpdaterReason::SourceListUnavailable:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The list of preset sources could not be downloaded.");
+    case PresetUpdaterReason::ManifestUnusable:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install or removal.
+        return Biz::_u8L("The list of preset sources on this computer could not be read.");
+    case PresetUpdaterReason::ArchiveInvalid:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The selected archive is not a usable preset source.");
+    case PresetUpdaterReason::IndexUnreadable:
+    case PresetUpdaterReason::DataUnreadable:
+    case PresetUpdaterReason::SourceUnreachable:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The presets could not be downloaded.");
+    case PresetUpdaterReason::DataCorrupted:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The downloaded presets are damaged.");
+    case PresetUpdaterReason::DataInconsistent:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The downloaded presets are not the version that was offered.");
+    case PresetUpdaterReason::LocalStorageFailed:
+    case PresetUpdaterReason::DataDirUnusable:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install or removal.
+        return Biz::_u8L("The preset files on this computer could not be changed.");
+    case PresetUpdaterReason::InstallFailed:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The presets were not installed. Nothing was changed.");
+    case PresetUpdaterReason::Internal:
+        break;
+    }
+    // TRN Preset updater vendor row. Line under the vendor name after a failure of unknown cause.
+    return Biz::_u8L("An unexpected error occurred.");
+}
+
+bool has_warning_icon(VendorReconfigurationState state)
+{
+    return state == VendorReconfigurationState::ForcedUpdate
+        || state == VendorReconfigurationState::ForcedDowngrade
+        || state == VendorReconfigurationState::NotInIndex
+        || state == VendorReconfigurationState::RemoveVendor;
+}
+
+std::string version_label(const Slic3r::Semver& version)
+{
+    return version.valid() ? version.to_string() : "--";
+}
+
+/**
+ * Fills its cell and elides. A NoWrap text publishes its full width as a minimum, which in the
+ * action slot pushes whatever follows it out past the right edge of the slot.
+ */
+Text* add_elided_text(Item* parent, const std::string& text)
+{
+    Text* item = parent->emplace_back<Text>(text);
+    item->set_wrap_mode(Text::WrapMode::WrapElide);
+    item->set_flex_grow(1);
+    return item;
+}
+
+} // namespace
+
+namespace PresetUpdaterRowLayout {
+
+void apply_button_size(LayoutButton* button)
+{
+    button->set_content_padding(button_padding);
+    button->set_height(button_height);
+}
+
+} // namespace PresetUpdaterRowLayout
+
+PresetUpdaterVendorRow::PresetUpdaterVendorRow(
+    size_t index,
+    const PresetUpdater::VendorRowState& data,
+    PresetUpdater::PresetUpdaterController& controller
+) :
+    Biz::DataObserver<PresetUpdater::VendorRowState>(index, data),
+    m_controller(controller)
+{
+    set_orientation(Orientation::Vertical);
+    set_flex_shrink(0);
+
+    Item* header = emplace_back<Item>();
+    header->set_orientation(Orientation::Horizontal);
+    header->set_align_items(YGAlignCenter);
+    header->set_gap(column_gap);
+    header->set_height(vendor_row_height);
+    header->set_flex_shrink(0);
+
+    Item* lead_slot = header->emplace_back<Item>();
+    lead_slot->set_orientation(Orientation::Horizontal);
+    lead_slot->set_align_items(YGAlignCenter);
+    lead_slot->set_justify_content(YGJustifyFlexEnd);
+    lead_slot->set_width(lead_slot_width);
+    lead_slot->set_flex_shrink(0);
+
+    m_state_icon = lead_slot->emplace_back<Icon>(Render::Icon::WarningMarker);
+    m_state_icon->set_width(icon_size);
+    m_state_icon->set_height(icon_size);
+    m_state_icon->set_flex_shrink(0);
+    m_state_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
+
+    m_name = header->emplace_back<Text>(std::string(), Render::ImguiFontType::Bold);
+    m_name->set_wrap_mode(Text::WrapMode::WrapElide);
+    m_name->set_min_width(name_min_width);
+    m_name->set_flex_grow(1);
+    m_name->set_flex_shrink(1);
+
+    m_change = header->emplace_back<Text>(std::string());
+    m_change->set_width(change_width);
+    m_change->set_flex_shrink(0);
+    m_change->set_wrap_mode(Text::WrapMode::WrapElide);
+
+    m_skipped_text = header->emplace_back<Text>(std::string());
+    m_skipped_text->set_wrap_mode(Text::WrapMode::WrapElide);
+    m_skipped_text->set_flex_grow(1);
+    m_skipped_text->set_visible(false);
+
+    m_remove_slot = header->emplace_back<Item>();
+    m_remove_slot->set_orientation(Orientation::Horizontal);
+    m_remove_slot->set_align_items(YGAlignCenter);
+    m_remove_slot->set_justify_content(YGJustifyFlexEnd);
+    m_remove_slot->set_width(icon_slot_width);
+    m_remove_slot->set_flex_shrink(0);
+
+    // TRN Preset updater vendor row. Tooltip of the button deleting the installed presets.
+    const std::string remove_tooltip = Biz::_u8L("Remove presets");
+    m_remove_button = m_remove_slot->emplace_back<LayoutButton>(
+        std::string(),
+        Render::Icon::RemoveTick,
+        remove_tooltip
+    );
+    m_remove_button->set_width(icon_button_size);
+    m_remove_button->set_height(icon_button_size);
+    m_remove_button->callbacks().action = [this]() { confirm_removal(); };
+
+    m_version_group = header->emplace_back<Item>();
+    m_version_group->set_orientation(Orientation::Horizontal);
+    m_version_group->set_align_items(YGAlignCenter);
+    m_version_group->set_gap(column_gap);
+    m_version_group->set_width(status_width);
+    m_version_group->set_flex_shrink(0);
+
+    m_current_version = m_version_group->emplace_back<Text>(std::string());
+    m_current_version->set_flex_shrink(0);
+
+    m_version_arrow = m_version_group->emplace_back<Text>("->");
+    m_version_arrow->set_flex_shrink(0);
+
+    m_recommended_version = m_version_group->emplace_back<Text>(std::string());
+    m_recommended_version->set_wrap_mode(Text::WrapMode::WrapElide);
+    m_recommended_version->set_flex_grow(1);
+
+    build_action_slot(header);
+
+    m_comment = emplace_back<Text>(std::string());
+    m_comment->set_wrap_mode(Text::WrapMode::Wrap);
+    m_comment->set_flex_shrink(0);
+    m_comment->set_margin(Margins{comment_indent, 0_fpx, column_gap, comment_bottom_margin});
+    m_comment->set_text_color(
+        m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)
+    );
+
+    on_data_update();
+}
+
+void PresetUpdaterVendorRow::build_action_slot(Item* header)
+{
+    m_action = header->emplace_back<StackLayout>();
+    m_action->set_width(action_slot_width);
+    m_action->set_flex_shrink(0);
+
+    m_action_button = m_action->emplace_back<LayoutButton>(std::string());
+    apply_button_size(m_action_button);
+    m_action_button->set_flex_grow(1);
+    m_action_button->callbacks().action = [this]()
+    {
+        const PresetUpdater::VendorRowState* row = state();
+        m_controller.update_vendor(row->repo_id, row->vendor_id);
+    };
+
+    // TRN Preset updater vendor row. Install not started yet, another one is running.
+    add_elided_text(m_action, Biz::_u8L("Waiting..."));
+
+    m_running_text = add_elided_text(m_action, std::string());
+
+    Item* done = m_action->emplace_back<Item>();
+    done->set_flex_grow(1);
+    done->set_orientation(Orientation::Horizontal);
+    done->set_align_items(YGAlignCenter);
+    done->set_gap(4_fpx);
+    Icon* done_icon = done->emplace_back<Icon>(Render::Icon::CheckMark);
+    done_icon->set_width(icon_size);
+    done_icon->set_height(icon_size);
+    done_icon->set_flex_shrink(0);
+    m_done_text = add_elided_text(done, std::string());
+
+    Item* failed = m_action->emplace_back<Item>();
+    failed->set_flex_grow(1);
+    failed->set_orientation(Orientation::Horizontal);
+    failed->set_align_items(YGAlignCenter);
+    // TRN Preset updater vendor row button. Runs a failed install again.
+    m_retry_button = failed->emplace_back<LayoutButton>(Biz::_u8L("Retry"));
+    apply_button_size(m_retry_button);
+    m_retry_button->set_flex_grow(1);
+    m_retry_button->callbacks().action = [this]()
+    {
+        const PresetUpdater::VendorRowState* row = state();
+        if (row == nullptr) {
+            return;
+        }
+        if (row->removing) {
+            m_controller.remove_vendor(row->repo_id, row->vendor_id);
+            return;
+        }
+        m_controller.update_vendor(row->repo_id, row->vendor_id);
+    };
+
+    m_action->emplace_back<Item>();
+}
+
+void PresetUpdaterVendorRow::confirm_removal()
+{
+    const PresetUpdater::VendorRowState* row = state();
+    if (row == nullptr) {
+        return;
+    }
+
+    PresetUpdater::PresetUpdaterController* controller = &m_controller;
+    const std::string repo_id   = row->repo_id;
+    const std::string vendor_id = row->vendor_id;
+
+    // TRN Preset updater vendor row. Title of the dialog confirming a deletion.
+    const std::string title = Biz::_u8L("Remove presets?");
+    // TRN Preset updater vendor row. {} is the vendor name.
+    const std::string format = Biz::_u8L("Delete the installed presets of {}?");
+
+    AppServices::instance().dialog_manager().show_yesno_dialog(
+        title,
+        fmt::format(fmt::runtime(format), vendor_id),
+        [controller, repo_id, vendor_id](bool confirmed)
+        {
+            if (confirmed) {
+                controller->remove_vendor(repo_id, vendor_id);
+            }
+        }
+    );
+}
+
+void PresetUpdaterVendorRow::on_data_update()
+{
+    const PresetUpdater::VendorRowState* row = state();
+    if (row == nullptr) {
+        return;
+    }
+
+    const bool failed    = row->install_state == PresetUpdater::InstallState::Failed;
+    const bool has_error = row->skipped || failed;
+    m_state_icon->set_icon(has_error ? Render::Icon::ErrorMarker : Render::Icon::WarningMarker);
+    m_state_icon->set_tint(
+        has_error ? m_theme->color_imgui(Platform::Color::Error) : ImColor(1.0f, 1.0f, 1.0f)
+    );
+    m_state_icon->set_visible(has_error || has_warning_icon(row->state));
+
+    const std::string failure_text =
+        failed && !row->skipped ? failure_label(row->failure_reason) : std::string{};
+    m_comment->set_text_color(
+        !failure_text.empty()
+            ? m_theme->color_imgui(Platform::Color::Error)
+            : m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)
+    );
+
+    m_name->set_text(row->vendor_id);
+
+    m_change->set_visible(!row->skipped);
+    m_version_group->set_visible(!row->skipped);
+    m_action->set_visible(!row->skipped);
+    m_remove_slot->set_visible(!row->skipped);
+    m_skipped_text->set_visible(row->skipped);
+    if (row->skipped) {
+        // TRN Preset updater vendor row. Line under the vendor name.
+        m_comment->set_text(Biz::_u8L("Unusable data"));
+        m_comment->set_visible(true);
+        // TRN Preset updater vendor row. Shown instead of the change kind.
+        m_skipped_text->set_text(Biz::_u8L("Skipped"));
+        return;
+    }
+
+    m_version_arrow->set_visible(!row->up_to_date);
+    m_recommended_version->set_visible(!row->up_to_date);
+    m_current_version->set_text(version_label(row->current_version));
+
+    const bool idle = row->install_state == PresetUpdater::InstallState::Idle;
+    m_remove_button->set_visible(
+        !PresetUpdater::is_protected_vendor(row->vendor_id)
+        && row->state != VendorReconfigurationState::NewVendor
+    );
+    m_remove_button->set_enabled(
+        !row->install_locked
+        && (idle || row->install_state == PresetUpdater::InstallState::Failed)
+    );
+
+    if (row->up_to_date) {
+        // TRN Preset updater vendor row. This vendor needs no change.
+        m_change->set_text(Biz::_u8L("Up to date"));
+        m_comment->set_visible(false);
+    } else {
+        m_comment->set_text(row->comment);
+        m_comment->set_visible(!row->comment.empty());
+
+        m_change->set_text(change_label(row->state));
+        m_recommended_version->set_text(version_label(row->recommended_version));
+        m_recommended_version->set_font_type(
+            row->recommended_version != row->current_version ? Render::ImguiFontType::Bold :
+                                                               Render::ImguiFontType::Regular
+        );
+        m_action_button->set_label(action_label(row->state));
+    }
+
+    if (!failure_text.empty()) {
+        m_comment->set_text(failure_text);
+        m_comment->set_visible(true);
+    }
+
+    m_running_text->set_text(running_label(row->removing));
+    m_done_text->set_text(done_label(row->state, row->removing));
+    m_retry_button->set_tooltip(failure_text);
+    m_retry_button->set_visible(!row->install_locked);
+
+    if (row->up_to_date && idle) {
+        m_action->set_current_index(ActionNone);
+        return;
+    }
+
+    switch (row->install_state) {
+    case PresetUpdater::InstallState::Idle:
+        m_action->set_current_index(row->install_locked ? ActionNone : ActionIdle);
+        break;
+    case PresetUpdater::InstallState::Queued:
+        m_action->set_current_index(ActionQueued);
+        break;
+    case PresetUpdater::InstallState::Running:
+        m_action->set_current_index(ActionRunning);
+        break;
+    case PresetUpdater::InstallState::Done:
+        m_action->set_current_index(ActionDone);
+        break;
+    case PresetUpdater::InstallState::Failed:
+        m_action->set_current_index(ActionFailed);
+        break;
+    }
+}
+
+} // namespace Slic3r::App

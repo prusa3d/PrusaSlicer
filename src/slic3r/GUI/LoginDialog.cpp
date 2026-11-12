@@ -18,7 +18,7 @@ LoginDialog::LoginDialog(wxWindow* parent, UserAccount* user_account)
     bool logged = p_user_account->is_logged();
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
     // sizer with black border
-    wxStaticBoxSizer* static_box_sizer = new wxStaticBoxSizer(wxVERTICAL, this, ("Log into your Prusa Account"));
+    wxStaticBoxSizer* static_box_sizer = new wxStaticBoxSizer(wxVERTICAL, this, ("Sign in to your Prusa Account"));
     static_box_sizer->SetMinSize(wxSize(em * 30, em * 15));
     // avatar
     boost::filesystem::path path = p_user_account->get_avatar_path(logged);
@@ -32,7 +32,7 @@ LoginDialog::LoginDialog(wxWindow* parent, UserAccount* user_account)
     static_box_sizer->Add(m_username_label, 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
     // login button
     m_login_button_id = NewControlId();
-    m_login_button = new wxButton(this, m_login_button_id, logged ? ("Log out") : ("Log in"));
+    m_login_button = new wxButton(this, m_login_button_id, logged ? ("Sign out") : ("Sign in"));
     static_box_sizer->Add(m_login_button, 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 10);
     // TODO: why is m_login_button always hovered?
     main_sizer->Add(static_box_sizer, 1, wxEXPAND | wxALL, 10);
@@ -71,7 +71,7 @@ void LoginDialog::update_account()
         m_avatar_bitmap->SetBitmap(logo.bmp());
     }
 
-    m_login_button->SetLabel(logged ? ("Log out") : ("Log in"));
+    m_login_button->SetLabel(logged ? ("Sign out") : ("Sign in"));
     m_continue_button->SetLabel(logged ? ("Continue") : ("Continue without Prusa Account"));
     // TODO: resize correctly m_continue_button 
     //m_continue_button->Fit();

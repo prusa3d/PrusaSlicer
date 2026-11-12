@@ -1,0 +1,11 @@
+--- a/include/wx/osx/app.h
++++ b/include/wx/osx/app.h
+@@ -162,7 +162,7 @@ private:
+ 
+ public:
+     bool                OSXInitWasCalled() { return m_inited; }
+-    void                OSXStoreOpenFiles(const wxArrayString &files ) { m_openFiles = files ; }
++    virtual void        OSXStoreOpenFiles(const wxArrayString &files ) { m_openFiles = files ; }
+     void                OSXStorePrintFiles(const wxArrayString &files ) { m_printFiles = files ; }
+     void                OSXStoreOpenURL(const wxString &url ) { m_getURL = url ; }
+ #endif

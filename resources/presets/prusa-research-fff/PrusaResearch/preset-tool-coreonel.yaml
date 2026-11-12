@@ -1,0 +1,6 @@
+kind: tool_print
+id: 'common COREONEL'
+variants:
+- condition: printer.model == "COREONEL"
+  name: 'no tool'
+  id: Hff5xh21R5KlxTpnSOzLyA

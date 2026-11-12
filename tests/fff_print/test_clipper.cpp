@@ -2,7 +2,7 @@
 
 #include "test_data.hpp"
 #include "libslic3r/ClipperZUtils.hpp"
-#include "libslic3r/clipper.hpp"
+#include "clipper/clipper.hpp"
 
 using namespace Slic3r;
 

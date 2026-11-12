@@ -1,0 +1,20 @@
+kind: vendor
+id: 'prusa-fff'
+name: 'Prusa FFF'
+version: '1.0.0'
+features:
+  printer:
+    input_shaper:
+      default: false
+      user_editable: false
+  tool:
+    nozzle_diameter:
+      default: 0.4
+      user_editable: false
+printer_families:
+- label: "M K 4"
+  base_model: 'MK4'
+  printer_configs_order: ['MK4S', 'MK4S MMU3S']
+- label: "Core ONE"
+  base_model: 'C1'
+  printer_configs_order: ['C1', 'C1 MMU3S']

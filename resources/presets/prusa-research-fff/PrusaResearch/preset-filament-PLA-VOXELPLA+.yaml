@@ -1,0 +1,13 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: VOXELPLA+
+id: VOXELPLA+
+features:
+  $.brand.uuid: d06017e1-9523-57d3-8ff9-151a300b17f0
+  $.brand.slug: voxelpla
+values:
+  filament_vendor: VOXELPLA
+  filament_density: 1.23
+  filament_cost: 21
+  filament_spool_weight: 235

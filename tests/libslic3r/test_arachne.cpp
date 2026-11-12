@@ -1,19 +1,28 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include "Slic3r/TestUtils/HwConfigUtils.hpp"
 #include "libslic3r/Arachne/WallToolPaths.hpp"
 #include "libslic3r/ClipperUtils.hpp"
-#include "libslic3r/SVG.hpp"
+#include "Slic3r/Biz/Algorithms/ExPolygon.hpp"
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
+#include "libslic3r/SlicingInput.hpp"
 #include "libslic3r/Utils.hpp"
+
+#include <algorithm>
 
 using namespace Slic3r;
 using namespace Slic3r::Arachne;
+using Domain::FullConfigFDM;
+using Domain::ObjectSettings;
+using Domain::FloatOrPercentage;
+using Domain::VolumeSettings;
 
 //#define ARACHNE_DEBUG_OUT
 
 #ifdef ARACHNE_DEBUG_OUT
 static void export_perimeters_to_svg(const std::string &path, const Polygons &contours, const std::vector<Arachne::VariableWidthLines> &perimeters, const ExPolygons &infill_area)
 {
-    coordf_t    stroke_width = scale_(0.03);
+    double    stroke_width = scale_(0.03);
     BoundingBox bbox         = get_extents(contours);
     bbox.offset(scale_(1.));
     ::Slic3r::SVG svg(path.c_str(), bbox);
@@ -31,6 +40,30 @@ static void export_perimeters_to_svg(const std::string &path, const Polygons &co
 }
 #endif
 
+namespace {
+
+PrintRegionConfigView get_region_config_view(const ObjectSettings& object_settings)
+{
+    const auto full_config{
+        *prepare_slicing_input(Domain::ConfigPackFDM{}, {}, Test::create_dummy_hw_config())
+    };
+
+    const VolumeSettings volume_settings{};
+    PrintRegionConfigView result{
+        full_config,
+        Domain::PartialConfig{
+            {object_settings},
+            full_config->hw_config(),
+        },
+        {Domain::PartialConfig{
+            {volume_settings},
+            full_config->hw_config(),
+        }}};
+    result.finalize();
+    return result;
+}
+} // namespace
+
 TEST_CASE("Arachne - Closed ExtrusionLine", "[ArachneClosedExtrusionLine]") {
     Polygon poly = {
         Point(-40000000, 10000000),
@@ -47,7 +80,7 @@ TEST_CASE("Arachne - Closed ExtrusionLine", "[ArachneClosedExtrusionLine]") {
     coord_t  spacing     = 407079;
     coord_t  inset_count = 5;
 
-    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, get_region_config_view({}), 0);
     wallToolPaths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
@@ -77,10 +110,10 @@ TEST_CASE("Arachne - Missing perimeter - #8472", "[ArachneMissingPerimeter8472]"
     coord_t  spacing     = 437079;
     coord_t  inset_count = 3;
 
-    PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
-    print_object_config.wall_distribution_count.setInt(3);
+    ObjectSettings object_settings;
+    object_settings.overrides.set("wall_distribution_count", 3);
 
-    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, print_object_config, PrintConfig::defaults());
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, get_region_config_view(object_settings), 0);
     wallToolPaths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
@@ -108,11 +141,10 @@ TEST_CASE("Arachne - #8593 - Missing a part of the extrusion", "[ArachneMissingP
     coord_t  spacing     = 377079;
     coord_t  inset_count = 3;
 
-    PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
-    print_object_config.min_bead_width         = ConfigOptionFloatOrPercent(0.315, false);
-    print_object_config.wall_transition_angle  = ConfigOptionFloat(40.);
-    print_object_config.wall_transition_length = ConfigOptionFloatOrPercent(1., false);
-
+    ObjectSettings object_settings;
+    object_settings.overrides.set("min_bead_width", FloatOrPercentage{0.315});
+    object_settings.overrides.set("wall_transition_angle", 40.0);
+    object_settings.overrides.set("wall_transition_length", Domain::FloatOrPercentage{1.0});
 
     // This behavior seems to be related to the rotation of the input polygon.
     // There are specific angles in which this behavior is always triggered.
@@ -122,7 +154,7 @@ TEST_CASE("Arachne - #8593 - Missing a part of the extrusion", "[ArachneMissingP
             poly.rotate(angle);
 
         Polygons polygons    = {poly};
-        Arachne::WallToolPaths wall_tool_paths(polygons, spacing, spacing, inset_count, 0, 0.2, print_object_config, PrintConfig::defaults());
+        Arachne::WallToolPaths wall_tool_paths(polygons, spacing, spacing, inset_count, 0, 0.2, get_region_config_view(object_settings), 0);
         wall_tool_paths.generate();
         std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
@@ -155,10 +187,9 @@ TEST_CASE("Arachne - #8573 - A gap in the perimeter - 1", "[ArachneGapInPerimete
     coord_t  spacing     = 407079;
     coord_t  inset_count = 2;
 
-    PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
 //    print_object_config.wall_transition_angle = ConfigOptionFloat(20.);
 
-    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, print_object_config, PrintConfig::defaults());
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, get_region_config_view({}), 0);
     wallToolPaths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
@@ -198,10 +229,9 @@ TEST_CASE("Arachne - #8444 - A gap in the perimeter - 2", "[ArachneGapInPerimete
     coord_t  spacing     = 594159;
     coord_t  inset_count = 2;
 
-    PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
     //    print_object_config.wall_transition_angle = ConfigOptionFloat(20.);
 
-    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.4, print_object_config, PrintConfig::defaults());
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.4, get_region_config_view({}), 0);
     wallToolPaths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
@@ -237,13 +267,14 @@ TEST_CASE("Arachne - #8528 - A hole when number of perimeters is changing", "[Ar
     coord_t  spacing     = 814159;
     coord_t  inset_count = 5;
 
-    PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
-    print_object_config.min_bead_width = ConfigOptionFloatOrPercent(0.68, false);
+
+    ObjectSettings object_settings;
+    object_settings.overrides.set("min_bead_width", FloatOrPercentage{0.68});
 
     // Changing min_bead_width to 0.66 seems that resolve this issue, at least in this case.
-    print_object_config.min_bead_width = ConfigOptionFloatOrPercent(0.66, false);
+    object_settings.overrides.set("min_bead_width", FloatOrPercentage{0.66});
 
-    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.4, print_object_config, PrintConfig::defaults());
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.4, get_region_config_view(object_settings), 0);
     wallToolPaths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
@@ -312,7 +343,7 @@ TEST_CASE("Arachne - #8555 - Inconsistent single perimeter", "[ArachneInconsiste
 
     for (size_t poly_idx = 0; poly_idx < polygons.size(); ++poly_idx) {
         Polygons input_polygons{polygons[poly_idx]};
-        Arachne::WallToolPaths wallToolPaths(input_polygons, spacing, spacing, inset_count, 0, 0.15, PrintObjectConfig::defaults(), PrintConfig::defaults());
+        Arachne::WallToolPaths wallToolPaths(input_polygons, spacing, spacing, inset_count, 0, 0.15, get_region_config_view({}), 0);
         wallToolPaths.generate();
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
@@ -363,14 +394,14 @@ TEST_CASE("Arachne - #8633 - Shorter open perimeter", "[ArachneShorterOpenPerime
     coord_t  spacing     = 617809;
     coord_t  inset_count = 1;
 
-    PrintObjectConfig print_object_config = PrintObjectConfig::defaults();
-    print_object_config.min_bead_width         = ConfigOptionFloatOrPercent(0.51, false);
-    print_object_config.min_feature_size       = ConfigOptionFloatOrPercent(0.15, false);
-    print_object_config.wall_transition_length = ConfigOptionFloatOrPercent(0.6, false);
+    ObjectSettings object_settings;
+    object_settings.overrides.set("min_bead_width", FloatOrPercentage{0.51});
+    object_settings.overrides.set("min_feature_size", FloatOrPercentage{0.15});
+    object_settings.overrides.set("wall_transition_length", Domain::FloatOrPercentage{0.6});
 
     for (size_t poly_idx = 0; poly_idx < polygons.size(); ++poly_idx) {
         Polygons input_polygons{polygons[poly_idx]};
-        Arachne::WallToolPaths wallToolPaths(input_polygons, spacing, spacing, inset_count, 0, 0.15, print_object_config, PrintConfig::defaults());
+        Arachne::WallToolPaths wallToolPaths(input_polygons, spacing, spacing, inset_count, 0, 0.15, get_region_config_view(object_settings), 0);
         wallToolPaths.generate();
         std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
@@ -404,7 +435,7 @@ TEST_CASE("Arachne - #8597 - removeSmallAreas", "[ArachneRemoveSmallAreas8597]")
     coord_t  spacing     = 407079;
     coord_t  inset_count = 2;
 
-    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, get_region_config_view({}), 0);
     wallToolPaths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
@@ -441,7 +472,7 @@ TEST_CASE("Arachne - Missing infill", "[ArachneMissingInfill]") {
     coord_t  spacing     = 357079;
     coord_t  inset_count = 2;
 
-    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wallToolPaths(polygons, spacing, spacing, inset_count, 0, 0.2, get_region_config_view({}), 0);
     wallToolPaths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wallToolPaths.getToolPaths();
 
@@ -470,7 +501,7 @@ TEST_CASE("Arachne - #8849 - Missing part of model", "[ArachneMissingPart8849]")
     coord_t  perimeter_spacing     = 757079;
     coord_t  inset_count           = 2;
 
-    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.32, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.32, get_region_config_view({}), 0);
     wall_tool_paths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
@@ -511,7 +542,7 @@ TEST_CASE("Arachne - #8446 - Degenerated Voronoi diagram - Linear edges", "[Arac
     coord_t  perimeter_spacing     = 407079;
     coord_t  inset_count           = 1;
 
-    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, get_region_config_view({}), 0);
     wall_tool_paths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
@@ -526,6 +557,74 @@ TEST_CASE("Arachne - #8446 - Degenerated Voronoi diagram - Linear edges", "[Arac
 
     // Total extrusion length should be around 211.2mm when the part is ok and 212.1mm when it has perimeters in places where they shouldn't be.
     REQUIRE(total_extrusion_length <= scaled<int64_t>(211.5));
+}
+
+// This case is extracted from GH issue #8446, where Arachne generated perimeters in places where they shouldn't be.
+// Without the repair of the Voronoi diagram, some perimeters are generated outside of the input polygon.
+TEST_CASE(
+    "Arachne - #8446 - Degenerated Voronoi diagram - Perimeters outside of the input polygon",
+    "[ArachneDegeneratedDiagram8446PerimetersOutside]"
+)
+{
+    Polygons polygons{
+        Polygon{
+            {28641817, -31810029},  {16783179, -15488019},  {18098941, -13928796},
+            {19266221, -12259975},  {19828087, -11332706},  {20954186, -9056293},
+            {21187496, -8524843},   {22151917, -5556671},   {22236592, -5206546},
+            {22702465, -2486270},   {22792930, -1405888},   {22829495, 630357},
+            {22681513, 2665168},    {41869187, 8899620},    {39103950, 17410146},
+            {19916268, 11175694},   {18839928, 12908925},   {17750190, 14361887},
+            {16905209, 15355690},   {15088243, 17130081},   {14654922, 17516166},
+            {12130015, 19350631},   {11823235, 19539328},   {9380034, 20823027},
+            {8380476, 21242930},    {6455198, 21906927},    {4474249, 22394979},
+            {4474249, 42570094},    {-4474247, 42570094},   {-4474247, 22394979},
+            {-6455200, 21906925},   {-8380470, 21242930},   {-9380039, 20823023},
+            {-11629203, 19643225},  {-12130262, 19350447},  {-14655143, 17516010},
+            {-14929445, 17282524},  {-16905267, 15355630},  {-17613525, 14534713},
+            {-18839951, 12908885},  {-19916267, 11175694},  {-39103942, 17410146},
+            {-41869183, 8899620},   {-22681506, 2665168},   {-22829491, 630352},
+            {-22792925, -1405887},  {-22702459, -2486280},  {-22236586, -5206556},
+            {-22151911, -5556674},  {-21187404, -8525116},  {-21050103, -8858162},
+            {-19828076, -11332723}, {-19266218, -12259973}, {-18098937, -13928796},
+            {-16783179, -15488019}, {-28641812, -31810029}, {-21402329, -37069822},
+            {-9543694, -20747808},  {-7654198, -21517345},  {-5706315, -22111809},
+            {-4650842, -22359626},  {-1919753, -22757162},  {-1560608, -22784828},
+            {1560608, -22784828},   {1919765, -22757162},   {4650848, -22359625},
+            {5706326, -22111807},   {7654210, -21517342},   {9543696, -20747809},
+            {21402331, -37069822},
+        },
+    };
+
+    coord_t ext_perimeter_spacing = 398496;
+    coord_t perimeter_spacing     = 398496;
+    coord_t inset_count           = 2;
+
+    Arachne::WallToolPaths wall_tool_paths(
+        polygons,
+        ext_perimeter_spacing,
+        perimeter_spacing,
+        inset_count,
+        0,
+        0.24,
+        get_region_config_view({}),
+        0
+    );
+    wall_tool_paths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
+
+    const ExPolygons input_expolygons = union_ex(polygons);
+    size_t junctions_outside          = 0;
+    for (const Arachne::VariableWidthLines& perimeter : perimeters) {
+        for (const Arachne::ExtrusionLine& extrusion_line : perimeter) {
+            junctions_outside += std::ranges::count_if(
+                extrusion_line.junctions,
+                [&input_expolygons](const Arachne::ExtrusionJunction& junction)
+                { return !Biz::Algorithms::ExPolygon::contains(input_expolygons, junction.p); }
+            );
+        }
+    }
+
+    REQUIRE(junctions_outside == 0);
 }
 
 // This test case was distilled from GitHub issue #8846.
@@ -586,7 +685,7 @@ TEST_CASE("Arachne - #8846 - Degenerated Voronoi diagram - One Parabola", "[Arac
     coord_t  perimeter_spacing     = 607079;
     coord_t  inset_count           = 1;
 
-    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, get_region_config_view({}), 0);
     wall_tool_paths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
@@ -634,7 +733,7 @@ TEST_CASE("Arachne - #9357 - Degenerated Voronoi diagram - Two parabolas", "[Ara
     coord_t  perimeter_spacing     = 407079;
     coord_t  inset_count           = 1;
 
-    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, get_region_config_view({}), 0);
     wall_tool_paths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
@@ -674,7 +773,7 @@ TEST_CASE("Arachne - #8846 - Degenerated Voronoi diagram - Voronoi edges interse
     coord_t  perimeter_spacing     = 407079;
     coord_t  inset_count           = 1;
 
-    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.32, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.32, get_region_config_view({}), 0);
     wall_tool_paths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
@@ -736,7 +835,7 @@ TEST_CASE("Arachne - #10034 - Degenerated Voronoi diagram - That wasn't fixed by
     coord_t  perimeter_spacing     = 407079;
     coord_t  inset_count           = 1;
 
-    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, get_region_config_view({}), 0);
     wall_tool_paths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
@@ -758,7 +857,7 @@ TEST_CASE("Arachne - SPE-1837 - No perimeters generated", "[ArachneNoPerimetersG
     coord_t  perimeter_spacing     = 700000;
     coord_t  inset_count           = 1;
 
-    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2,  get_region_config_view({}), 0);
     wall_tool_paths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
@@ -794,7 +893,7 @@ TEST_CASE("Arachne - SPE-2298 - Missing twin edge", "[ArachneMissingTwinEdgeSPE2
     coord_t  perimeter_spacing     = 407079;
     coord_t  inset_count           = 1;
 
-    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, get_region_config_view({}), 0);
     wall_tool_paths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
@@ -841,7 +940,7 @@ TEST_CASE("Arachne - SPE-2298 - Missing twin edge - 2", "[ArachneMissingTwinEdge
     coord_t  perimeter_spacing     = 407079;
     coord_t  inset_count           = 1;
 
-    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, get_region_config_view({}), 0);
     wall_tool_paths.generate();
     std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
@@ -881,10 +980,10 @@ TEST_CASE("Arachne - SPE-2496 - Negative extrusion width", "[Arachne_Negative_Ex
     coord_t  perimeter_spacing     = 407079;
     coord_t  inset_count           = 3;
 
-    PrintObjectConfig print_object_config      = PrintObjectConfig::defaults();
-    print_object_config.min_bead_width         = ConfigOptionFloatOrPercent(0.1, false);
+    ObjectSettings object_settings;
+    object_settings.overrides.set("min_bead_width", FloatOrPercentage{0.1});
 
-    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, print_object_config, PrintConfig::defaults());
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, get_region_config_view(object_settings), 0);
     wall_tool_paths.generate();
     Arachne::Perimeters perimeters = wall_tool_paths.getToolPaths();
 

@@ -1,0 +1,12 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Devil Design PLA
+id: Devil Design PLA
+features:
+  $.brand.uuid: 530c7397-83dd-5c1a-aa7d-fe995b46607b
+  $.brand.slug: devil-design
+values:
+  filament_cost: '20.99'
+  filament_vendor: Devil Design
+  filament_spool_weight: 250

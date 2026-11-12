@@ -51,28 +51,16 @@
 //   v1.01  - (stb) fix bug converting to RGB that messed up quality, thanks ryg & cbloom
 //   v1.00  - (stb) first release
 
+// PrusaSlicer v3 changes: All custom detected code were removed from this dependency
+// It should be possible without issues to replace this with the latest version of stb_dxt library
+
 #ifndef STB_INCLUDE_STB_DXT_H
 #define STB_INCLUDE_STB_DXT_H
-
-
-//*******************************************************************
-// Enable custom Optimisations
-// Comment this define if you want to revert to ryg's original code
-#define NEW_OPTIMISATIONS
-//*******************************************************************
 
 // compression mode (bitflags)
 #define STB_DXT_NORMAL    0
 #define STB_DXT_DITHER    1   // use dithering. dubious win. never use for normal maps and the like!
 #define STB_DXT_HIGHQUAL  2   // high quality mode, does two refinement steps instead of 1. ~30-40% slower.
-
-// The original signature has been modified by adding the parameter compressed_size which returns
-// the size in bytes of the compressed data contained into dst
-void rygCompress(unsigned char *dst, unsigned char *src, int w, int h, int isDxt5, int& compressed_size);
-
-// TODO remove these, not working properly..
-void rygCompressYCoCg( unsigned char *dst, unsigned char *src, int w, int h );
-void linearize( unsigned char * dst, const unsigned char * src, int n );
 
 void stb_compress_dxt_block(unsigned char *dest, const unsigned char *src, int alpha, int mode);
 #define STB_COMPRESS_DXT_BLOCK
@@ -780,63 +768,6 @@ void stb_compress_dxt_block(unsigned char *dest, const unsigned char *src, int a
 
 int imin(int x, int y) { return (x < y) ? x : y; }
 
-
-
-
-
-static void extractBlock(const unsigned char *src, int x, int y,
-                          int w, int h, unsigned char *block)
-{
-   int i, j;
-
-#ifdef NEW_OPTIMISATIONS
-   if ((w-x >=4) && (h-y >=4))
-   {
-	   // Full Square shortcut
-	   src += x*4;
-	   src += y*w*4;
-	   for (i=0; i < 4; ++i)
-	   {
-		   *(unsigned int*)block = *(unsigned int*) src; block += 4; src += 4;
-		   *(unsigned int*)block = *(unsigned int*) src; block += 4; src += 4;
-		   *(unsigned int*)block = *(unsigned int*) src; block += 4; src += 4;
-		   *(unsigned int*)block = *(unsigned int*) src; block += 4; 
-		   src += (w*4) - 12;
-	   }
-	   return;
-   }
-#endif
-
-   int bw = imin(w - x, 4);
-   int bh = imin(h - y, 4);
-   int bx, by;
-   
-   const int rem[] =
-   {
-      0, 0, 0, 0,
-      0, 1, 0, 1,
-      0, 1, 2, 0,
-      0, 1, 2, 3
-   };
-   
-   for(i = 0; i < 4; ++i)
-   {
-      by = rem[(bh - 1) * 4 + i] + y;
-      for(j = 0; j < 4; ++j)
-      {
-         bx = rem[(bw - 1) * 4 + j] + x;
-         block[(i * 4 * 4) + (j * 4) + 0] =
-            src[(by * (w * 4)) + (bx * 4) + 0];
-         block[(i * 4 * 4) + (j * 4) + 1] =
-            src[(by * (w * 4)) + (bx * 4) + 1];
-         block[(i * 4 * 4) + (j * 4) + 2] =
-            src[(by * (w * 4)) + (bx * 4) + 2];
-         block[(i * 4 * 4) + (j * 4) + 3] =
-            src[(by * (w * 4)) + (bx * 4) + 3];
-      }
-   }
-}
-
  // should be a pretty optimized 0-255 clamper
 inline static unsigned char clamp255( int n )
 {
@@ -937,112 +868,6 @@ void rgbToYCoCgBlock( unsigned char * dst, const unsigned char * src )
     }
 
 }
-
-
-void rygCompress(unsigned char *dst, unsigned char *src, int w, int h, int isDxt5, int& compressed_size)
-{
-   
-   unsigned char block[64];
-   int x, y;
-   
-   unsigned char* initial_dst = dst;
-
-   for (y = 0; y < h; y += 4)
-   {
-      for(x = 0; x < w; x += 4)
-      {
-         extractBlock(src, x, y, w, h, block);
-         stb_compress_dxt_block(dst, block, isDxt5, STB_DXT_NORMAL);
-         dst += isDxt5 ? 16 : 8;
-      }
-   }
-
-   compressed_size = dst - initial_dst;
-}
-
-void rygCompressYCoCg( unsigned char *dst, unsigned char *src, int w, int h )
-{
-    unsigned char block[64];
-   unsigned char ycocgblock[64];
-   int x, y;
-   
-   for(y = 0; y < h; y += 4)
-   {
-      for(x = 0; x < w; x += 4)
-      {
-         extractBlock(src, x, y, w, h, block);
-         rgbToYCoCgBlock(ycocgblock,block);
-         stb_compress_dxt_block(dst, ycocgblock, 1, 10);
-         dst += 16;
-      }
-   }
-
-}
-
-static void stbgl__compress(unsigned char *p, unsigned char *rgba, int w, int h, int isDxt5)
-{
-   int i,j,y,y2;
-   int alpha = isDxt5;
-   
-   for (j=0; j < w; j += 4) {
-      int x=4;
-      for (i=0; i < h; i += 4) {
-         unsigned char block[16*4];
-         if (i+3 >= w) x = w-i;
-         for (y=0; y < 4; ++y) {
-            if (j+y >= h) break;
-            memcpy(block+y*16, rgba + w*4*(j+y) + i*4, x*4);
-         }
-         if (x < 4) {
-            switch (x) {
-               case 0: assert(0);
-               case 1:
-                  for (y2=0; y2 < y; ++y2) {
-                     memcpy(block+y2*16+1*4, block+y2*16+0*4, 4);
-                     memcpy(block+y2*16+2*4, block+y2*16+0*4, 8);
-                  }
-                  break;
-               case 2:
-                  for (y2=0; y2 < y; ++y2)
-                     memcpy(block+y2*16+2*4, block+y2*16+0*4, 8);
-                  break;
-               case 3:
-                  for (y2=0; y2 < y; ++y2)
-                     memcpy(block+y2*16+3*4, block+y2*16+1*4, 4);
-                  break;
-            }
-         }
-         y2 = 0;
-         for(; y<4; ++y,++y2)
-            memcpy(block+y*16, block+y2*16, 4*4);
-         stb_compress_dxt_block(p, block, alpha, 10);
-         p += alpha ? 16 : 8;
-      }
-   }
-  // assert(p <= end);
-}
-
-static inline unsigned char linearize(unsigned char inByte)
-{
-    float srgbVal = ((float)inByte) / 255.0f;
-    float linearVal;
-
-    if(srgbVal < 0.04045)
-        linearVal = srgbVal / 12.92f;
-    else
-        linearVal = pow( (srgbVal + 0.055f) / 1.055f, 2.4f);
-
-    return (unsigned char)(floor(sqrt(linearVal)* 255.0 + 0.5));
-}
-
-void linearize( unsigned char * dst, const unsigned char * src, int n )
-{
-  n*=4;
-  for( int i = 0; i < n; i++ )
-    dst[i] = linearize(src[i]);
-}
-
-
 
 #endif // STB_DXT_IMPLEMENTATION
 

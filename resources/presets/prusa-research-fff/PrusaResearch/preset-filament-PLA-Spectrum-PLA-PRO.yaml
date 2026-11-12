@@ -1,0 +1,11 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Spectrum PLA Pro
+id: Spectrum PLA Pro
+features:
+  $.brand.uuid: adef694b-7837-5a68-8de3-eee3027accd0
+  $.brand.slug: spectrum
+values:
+  filament_vendor: Spectrum
+  filament_density: 1.22

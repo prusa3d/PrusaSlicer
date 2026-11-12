@@ -2524,10 +2524,10 @@ const TestData PRUSA_STEGOSAUR_POLYGONS =
     },
 };
 
-using Slic3r::ExPolygon;
-using Slic3r::Polygon;
-using Slic3r::Polygons;
-using Slic3r::ExPolygons;
+using Slic3r::Domain::ExPolygon;
+using Slic3r::Domain::Polygon;
+using Slic3r::Domain::Polygons;
+using Slic3r::Domain::ExPolygons;
 
 struct MyPoly {
     ExPolygon poly;

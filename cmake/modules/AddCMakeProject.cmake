@@ -20,7 +20,7 @@ endif ()
 # The value of CMAKE_BUILD_TYPE will be used for building each dependency even if the 
 # generator is multi-config. Use this var to specify build type regardless of the generator. 
 function(add_cmake_project projectname)
-    cmake_parse_arguments(P_ARGS "" "INSTALL_DIR;BUILD_COMMAND;INSTALL_COMMAND" "CMAKE_ARGS" ${ARGN})
+    cmake_parse_arguments(P_ARGS "" "INSTALL_DIR;BUILD_COMMAND;INSTALL_COMMAND;EMSCRIPTEN_PORT;EMSCRIPTEN_EXCLUDED" "CMAKE_ARGS;EMSCRIPTEN_CMAKE_ARGS" ${ARGN})
 
     set(_pcount ${DEP_${projectname}_MAX_THREADS})
 
@@ -55,6 +55,20 @@ function(add_cmake_project projectname)
             set(_verbose_switch "-v:d")
         endif ()
     endif ()
+
+    if (EMSCRIPTEN)
+        if (P_ARGS_EMSCRIPTEN_PORT)
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --use-port=${P_ARGS_EMSCRIPTEN_PORT}")
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --use-port=${P_ARGS_EMSCRIPTEN_PORT}")
+            return()
+        endif()
+        if (P_ARGS_EMSCRIPTEN_EXCLUDED)
+            return()
+        endif ()
+        if (P_ARGS_EMSCRIPTEN_CMAKE_ARGS)
+            set(P_ARGS_CMAKE_ARGS ${P_ARGS_CMAKE_ARGS} ${P_ARGS_EMSCRIPTEN_CMAKE_ARGS})
+        endif ()
+    endif()
     
     ExternalProject_Add(
         dep_${projectname}
@@ -72,6 +86,8 @@ function(add_cmake_project projectname)
             -DCMAKE_C_FLAGS_${_build_type_upper}:STRING=${CMAKE_C_FLAGS_${_build_type_upper}}
             -DCMAKE_TOOLCHAIN_FILE:STRING=${CMAKE_TOOLCHAIN_FILE}
             -DBUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}
+            -DCMAKE_CROSSCOMPILING_EMULATOR:STRING=${CMAKE_CROSSCOMPILING_EMULATOR}
+            -DCMAKE_FIND_DEBUG_MODE=FALSE
             "${_configs_line}"
             ${DEP_CMAKE_OPTS}
             ${P_ARGS_CMAKE_ARGS}

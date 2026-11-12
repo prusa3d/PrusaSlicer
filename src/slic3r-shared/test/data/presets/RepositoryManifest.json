@@ -1,0 +1,9 @@
+[{
+    "name": "Test Repo",
+    "description": "Test purpose only.",
+    "visibility": "",
+    "id": "test_repo",
+    "url": "http://localhost:8000/test_repo",
+    "index_url": "http://localhost:8000/test_repo/vendor_indices.zip",
+    "selected": true
+}]

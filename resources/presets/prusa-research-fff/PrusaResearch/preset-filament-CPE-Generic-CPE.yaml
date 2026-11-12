@@ -1,0 +1,10 @@
+kind: filament
+inherits:
+- '*CPE*'
+name: Generic CPE
+id: Generic CPE
+features:
+  generic: true
+values:
+  filament_cost: '19.99'
+  filament_vendor: Generic

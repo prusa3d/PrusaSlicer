@@ -17,12 +17,20 @@ const vec3 LIGHT_FRONT_DIR = vec3(0.6985074, 0.1397015, 0.6985074);
 const vec3  ZERO    = vec3(0.0, 0.0, 0.0);
 const float EPSILON = 0.0001;
 
+struct OverhangDetection
+{
+    bool  enabled;
+    float max_normal_z;
+    mat3  world_normal_matrix;
+};
+
 uniform vec4 uniform_color;
 
 uniform bool volume_mirrored;
 
 uniform mat4 view_model_matrix;
 uniform mat3 view_normal_matrix;
+uniform OverhangDetection overhang;
 
 in vec3 clipping_planes_dots;
 in vec4 model_pos;
@@ -33,19 +41,26 @@ void main()
 {
     if (any(lessThan(clipping_planes_dots, ZERO)))
         discard;
+
     vec3  color = uniform_color.rgb;
     float alpha = uniform_color.a;
 
     vec3 triangle_normal = normalize(cross(dFdx(model_pos.xyz), dFdy(model_pos.xyz)));
-#ifdef FLIP_TRIANGLE_NORMALS
-    triangle_normal = -triangle_normal;
-#endif
 
     if (volume_mirrored)
         triangle_normal = -triangle_normal;
 
     // First transform the normal into camera space and normalize the result.
     vec3 eye_normal = normalize(view_normal_matrix * triangle_normal);
+
+    // Z component of normal vector in world coordinate used for overhang detection.
+    float world_normal_z = overhang.enabled ? (normalize(overhang.world_normal_matrix * triangle_normal)).z : 0.0;
+
+    // Apply a different color for detected overhangs.
+    if (overhang.enabled && world_normal_z < overhang.max_normal_z - EPSILON) {
+        color = vec3(0.7, 0.7, 1.0);
+        alpha = 1.0;
+    }
 
     // Compute the cos of the angle between the normal and lights direction. The light is directional so the direction is constant for every vertex.
     // Since these two are normalized the cosine is the dot product. We also need to clamp the result to the [0,1] range.

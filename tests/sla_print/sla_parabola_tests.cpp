@@ -1,9 +1,14 @@
 #include "sla_test_utils.hpp"
 
-#include <libslic3r/SLA/SupportIslands/ParabolaUtils.hpp>
+#include "Slic3r/Biz/Algorithms/Parabola.hpp"
+#include "Slic3r/Biz/CGAL/Algorithms/ParabolaUtils.hpp"
+#include "Slic3r/Biz/Algorithms/Point.hpp"
 
 using namespace Slic3r;
-using namespace Slic3r::sla;
+
+using Slic3r::Biz::CGAL::Algorithms::ParabolaUtils;
+using Slic3r::Biz::Algorithms::ParabolaSegment;
+using Slic3r::Biz::Algorithms::Parabola;
 
 void parabola_check_length(const ParabolaSegment &parabola)
 {
@@ -33,16 +38,18 @@ double getParabolaY(const Parabola &parabola, double x)
 TEST_CASE("Parabola length", "[SupGen][Voronoi][Parabola]")
 {
     using namespace Slic3r::sla;
+    using Slic3r::Biz::Algorithms::Point::round;
+
     double scale = 1e6;
     // U shape parabola
-    Parabola parabola_x2(Line({-1. * scale, -.25 * scale},
-                              {1. * scale, -.25 * scale}),
-                         Point(0. * scale, .25 * scale));
+    Parabola parabola_x2(Line(round(Vec2d{-1. * scale, -.25 * scale}).cast<coord_t>(),
+                              round(Vec2d{1. * scale, -.25 * scale}).cast<coord_t>()),
+                         Point(round(Vec2d{0. * scale, .25 * scale}).cast<coord_t>()));
 
     double from_x = 1 * scale;
     double to_x   = 3 * scale;
-    Point  from(from_x, getParabolaY(parabola_x2, from_x));
-    Point  to(to_x, getParabolaY(parabola_x2, to_x));
+    Point  from(round(Vec2d{from_x, getParabolaY(parabola_x2, from_x)}).cast<coord_t>());
+    Point  to(round(Vec2d{to_x, getParabolaY(parabola_x2, to_x)}).cast<coord_t>());
     ParabolaSegment parabola_segment(parabola_x2, from, to);
     parabola_check_length(parabola_segment);
 } 

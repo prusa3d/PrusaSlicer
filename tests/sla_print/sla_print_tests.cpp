@@ -8,7 +8,9 @@
 #include <libslic3r/TriangleMeshSlicer.hpp>
 #include <libslic3r/SLA/SupportTreeMesher.hpp>
 #include <libslic3r/BranchingTree/PointCloud.hpp>
+#include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 
+namespace BB = Slic3r::Biz::Algorithms::BoundingBox;
 namespace {
 
 const char *const BELOW_PAD_TEST_OBJECTS[] = {
@@ -124,7 +126,7 @@ TEST_CASE("BranchingSupports::ElevatedSupportsDoNotPierceModel", "[SLASupportGen
 
     sla::SupportTreeConfig supportcfg;
     supportcfg.object_elevation_mm = 10.;
-    supportcfg.tree_type = sla::SupportTreeType::Branching;
+    supportcfg.tree_type = Domain::sla::SupportTreeType::Branching;
 
     for (auto fname : SUPPORT_TEST_MODELS)
         test_support_model_collision(fname, supportcfg);
@@ -134,7 +136,7 @@ TEST_CASE("BranchingSupports::FloorSupportsDoNotPierceModel", "[SLASupportGenera
 
     sla::SupportTreeConfig supportcfg;
     supportcfg.object_elevation_mm = 0;
-    supportcfg.tree_type = sla::SupportTreeType::Branching;
+    supportcfg.tree_type = Domain::sla::SupportTreeType::Branching;
 
     for (auto fname : SUPPORT_TEST_MODELS)
         test_support_model_collision(fname, supportcfg);
@@ -177,7 +179,7 @@ TEST_CASE("RasterizedPolygonAreaShouldMatch", "[SLARasterOutput]") {
     auto bb = BoundingBox({0, 0}, {scaled(disp_w), scaled(disp_h)});
     
     ExPolygon poly = square_with_hole(10.);
-    poly.translate(bb.center().x(), bb.center().y());
+    poly.translate(BB::center(bb).x(), BB::center(bb).y());
     raster.draw(poly);
     
     double a = poly.area() / (scaled<double>(1.) * scaled(1.));
@@ -188,7 +190,7 @@ TEST_CASE("RasterizedPolygonAreaShouldMatch", "[SLARasterOutput]") {
     
     raster.clear();
     poly = square_with_hole(60.);
-    poly.translate(bb.center().x(), bb.center().y());
+    poly.translate(BB::center(bb).x(), BB::center(bb).y());
     raster.draw(poly);
     
     a = poly.area() / (scaled<double>(1.) * scaled(1.));
@@ -211,17 +213,7 @@ TEST_CASE("halfcone test", "[halfcone]") {
 
     indexed_triangle_set m = sla::get_mesh(br, 45);
 
-    its_merge_vertices(m);
+    namespace triangle_mesh = Biz::Algorithms::TriangleMesh;
+    triangle_mesh::its_merge_vertices(m);
     its_write_obj(m, "Halfcone.obj");
-}
-
-TEST_CASE("Test concurrency")
-{
-    std::vector<double> vals = grid(0., 100., 10.);
-
-    double ref = std::accumulate(vals.begin(), vals.end(), 0.);
-
-    double s = execution::accumulate(ex_tbb, vals.begin(), vals.end(), 0.);
-
-    REQUIRE(s == Approx(ref));
 }

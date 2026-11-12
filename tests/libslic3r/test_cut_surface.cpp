@@ -1,9 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <libslic3r/CutSurface.hpp>
-#include <libslic3r/TriangleMesh.hpp> // its_make_cube + its_merge
+#include <Slic3r/Biz/CGAL/Algorithms/CutSurface.hpp>
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp" // its_make_cube + its_merge
+#include "Slic3r/Biz/Emboss/Emboss.hpp"
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
+using namespace Slic3r::Domain;
 TEST_CASE("Cut character from surface", "[Emboss]")
 {
     std::string font_path = std::string(TEST_DATA_DIR) +
@@ -27,15 +30,16 @@ TEST_CASE("Cut character from surface", "[Emboss]")
     tr.scale(text_shape_scale);
     Emboss::OrthoProject cut_projection(tr, Vec3d(0., 0., z_depth));
 
-    auto object = its_make_cube(782 - 49 + 50, 724 + 10 + 50, 5);
+    namespace triangle_mesh = Biz::Algorithms::TriangleMesh;
+    auto object = triangle_mesh::its_make_cube(782 - 49 + 50, 724 + 10 + 50, 5);
     its_translate(object, Vec3f(49 - 25, -10 - 25, -40));
     auto cube2 = object; // copy
     its_translate(cube2, Vec3f(100, -40, 7.5));
-    its_merge(object, std::move(cube2));
+    Domain::its_merge(object, std::move(cube2));
 
     std::vector<indexed_triangle_set> objects{object};
     // Call core function for cut surface
-    auto surfaces = cut_surface(shapes, objects, cut_projection, 0.5);
+    auto surfaces = Biz::CGAL::Algorithms::cut_surface(shapes, objects, cut_projection, 0.5);
     CHECK(!surfaces.empty());
 
     Emboss::OrthoProject projection(Transform3d::Identity(),
@@ -151,7 +155,7 @@ TEST_CASE("CutSurface in 3mf", "[Emboss]")
     BoundingBoxf3 bb;
     for (auto &i : its) bb.merge(Slic3r::bounding_box(i));
 
-    Transform3d cut_projection_tr = mv_text->get_matrix() * tc.fix_3mf_tr->inverse();
+    Transform3d cut_projection_tr = mv_text->get_matrix() * tc.legacy_fix_3mf_tr->inverse();
     Transform3d emboss_tr = cut_projection_tr.inverse();
     BoundingBoxf3 mesh_bb_tr = bb.transformed(emboss_tr);
 

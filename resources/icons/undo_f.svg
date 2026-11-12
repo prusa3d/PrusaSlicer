@@ -1,12 +1,61 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!-- Generator: Adobe Illustrator 23.0.3, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<svg version="1.0" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 viewBox="0 0 16 16" enable-background="new 0 0 16 16" xml:space="preserve">
-<g id="undo">
-	<path fill="none" stroke="#ED6B21" stroke-width="2.5" stroke-linecap="round" stroke-miterlimit="10" d="M3,11
-		c0.91,1.78,2.76,3,4.89,3c3.04,0,5.5-2.46,5.5-5.5c0-3.04-2.46-5.5-5.5-5.5c-0.17,0-0.34,0.01-0.5,0.03"/>
+
+<svg
+   version="1.0"
+   id="Layer_1"
+   x="0px"
+   y="0px"
+   viewBox="0 0 16 16"
+   enable-background="new 0 0 16 16"
+   xml:space="preserve"
+   sodipodi:docname="undo_f.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs1" /><sodipodi:namedview
+   id="namedview1"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   inkscape:zoom="53.4375"
+   inkscape:cx="8"
+   inkscape:cy="8"
+   inkscape:window-width="1920"
+   inkscape:window-height="1111"
+   inkscape:window-x="3831"
+   inkscape:window-y="-9"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="g1" />
+<g
+   id="undo">
 	
-		<polygon fill="#ED6B21" stroke="#ED6B21" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" points="
-		7.39,1 7.39,5 4.39,3 	"/>
+	
+		<g
+   id="g1"><path
+     fill="none"
+     stroke="#ed6b21"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-miterlimit="10"
+     d="m 2.805,11.499957 c 0.91,1.78 2.76,3 4.89,3 3.04,0 5.5,-2.46 5.5,-5.5000004 0,-3.04 -2.46,-5.5 -5.5,-5.5 -0.17,0 -0.34,0.01 -0.5,0.03"
+     id="path1"
+     style="stroke:#ed6b21;stroke-opacity:1" /><polygon
+     fill="#ed6b21"
+     stroke="#ed6b21"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     stroke-miterlimit="10"
+     points="4.39,3 7.39,1 7.39,5 "
+     id="polygon1"
+     transform="translate(-0.195,0.49995659)"
+     style="fill:#ffffff;fill-opacity:1;stroke:#ed6b21;stroke-opacity:1" /></g>
 </g>
 </svg>

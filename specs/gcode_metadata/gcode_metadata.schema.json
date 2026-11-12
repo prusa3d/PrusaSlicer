@@ -1,0 +1,295 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PrusaSlicer Project Configuration",
+  "description": "Schema for PrusaSlicer configuration and project files",
+  "type": "object",
+  "required": [
+    "config"
+  ],
+  "properties": {
+    "general": {
+      "type": "object",
+      "properties": {
+        "producer": {
+          "type": "string"
+        },
+        "producer_version": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "required": ["printer"],
+      "properties": {
+        "presets": {
+          "type": "object",
+          "properties": {
+            "vendor": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "repo_id": {
+              "type": "string"
+            }
+          }
+        },
+        "printer": {
+          "type": "object",
+          "properties": {
+            "config_id": {
+              "type": "string"
+            },
+            "printer_id": {
+              "type": "string"
+            },
+            "vendor_id": {
+              "type": "string"
+            },
+            "repo_id": {
+              "type": "string"
+            },
+            "repo_version": {
+              "type": "string"
+            },
+            "config_name": {
+              "type": "string"
+            },
+            "technology": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "base_model": {
+              "type": "string"
+            },
+            "tool_count": {
+              "type": "integer"
+            },
+            "features": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["boolean", "string", "number", "array", "object"]
+              }
+            },
+            "tools": {
+              "type": "object",
+              "patternProperties": {
+                "^[0-9]+(\\.[0-9]+)*$": {
+                  "$ref": "#/$defs/toolDefinition"
+                }
+              },
+              "additionalProperties": false
+            },
+            "sheet": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "features": {
+                  "type": "object",
+                  "properties": {
+                    "cold": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            },
+            "bed_model": {
+              "type": "string"
+            },
+            "bed_texture": {
+              "type": "string"
+            },
+            "thumbnail": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "presets": {
+      "type": "object",
+      "properties": {
+        "printer_settings": {
+          "type": "object"
+        },
+        "toolprint_settings": {
+          "type": "object"
+        },
+        "print_settings": {
+          "type": "object"
+        },
+        "filament_settings": {
+          "type": "object"
+        },
+        "material": {
+          "type": "object"
+        },
+        "tool_print": {
+          "type": "object"
+        },
+        "project_settings": {
+          "type": "object"
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "uuid": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      }
+    },
+    "stats": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "string"
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "toolDefinition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "print_head",
+            "cutter",
+            "marker"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "features": {
+          "type": "object",
+          "properties": {
+            "nozzle_diameter": {
+              "type": "number"
+            },
+            "nozzle_high_flow": {
+              "type": "boolean"
+            },
+            "nozzle_hardened": {
+              "type": "boolean"
+            },
+            "blade_thickness": {
+              "type": "number"
+            },
+            "tip_diameter": {
+              "type": "number"
+            }
+          }
+        },
+        "slicer_material": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "features": {
+              "type": "object"
+            }
+          }
+        },
+        "material": {
+          "description": "This structure follows MaterialDB's Material entity",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "properties": {
+              "type": "object",
+              "properties": {
+                "min_nozzle_diameter": {
+                  "type": "number"
+                }
+              }
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "examples": [
+                  "abrasive",
+                  "contains_carbon_fiber"
+                ]
+              }
+            }
+          }
+        },
+        "feeder": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "mmu",
+                "manual"
+              ]
+            },
+            "model": {
+              "type": "string"
+            },
+            "base_model": {
+              "type": "string"
+            },
+            "num_slots": {
+              "type": "integer"
+            },
+            "in_slot": {
+              "type": "integer"
+            },
+            "feeder": {
+              "$ref": "#/$defs/toolDefinition"
+            }
+          }
+        }
+      },
+      "patternProperties": {
+        "^[0-9]+(\\.[0-9]+)*$": {
+          "$ref": "#/$defs/toolDefinition"
+        }
+      }
+    }
+  }
+}

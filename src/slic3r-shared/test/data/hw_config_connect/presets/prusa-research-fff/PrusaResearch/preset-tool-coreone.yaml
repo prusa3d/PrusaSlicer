@@ -1,0 +1,6 @@
+kind: tool_print
+id: 'common COREONE'
+variants:
+- condition: printer.model=~/(COREONE|COREONEOAK)/
+  id: N+crXA1SSmC9VuVxwSiJxQ
+  name: 'no tool'

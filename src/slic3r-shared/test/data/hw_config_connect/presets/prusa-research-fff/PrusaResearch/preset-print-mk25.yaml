@@ -1,0 +1,665 @@
+kind: print
+id: '*common MK25*'
+values:
+  default_material: Prusament PLA
+variants:
+- condition: printer.model=~/(MK2.5|MK2.5S)/
+  id: glz2CaUwRLWxDEmWqqjM1A
+  values:
+    retract_layer_change: 1
+    retract_length_toolchange: 0
+    retract_lift_above: 0
+    retract_lift_below: 199
+    retract_restart_extra: 0
+    retract_restart_extra_toolchange: 0
+    travel_ramping_lift: 0
+    travel_slope: 1
+    travel_max_lift: 1.5
+    wipe: 1
+    retract_speed: 35
+    deretract_speed: 0
+    retract_length: 0.8
+    retract_before_travel: 1.5
+  variants:
+# 0.25    
+  - condition: tool.nozzle_diameter == 0.25
+    id: KNoVwGbIR+S9f2zorspf/w
+    values:
+      max_layer_height: 0.15
+      min_layer_height: 0.05
+      retract_lift: 0.15
+# 0.4    
+  - condition: tool.nozzle_diameter == 0.4
+    id: eURnlJ0eSI27mQniqkYJxA
+    values:
+      max_layer_height: 0.30
+      min_layer_height: 0.07
+      retract_lift: 0.4
+      retract_before_travel: 1.5
+# 0.6    
+  - condition: tool.nozzle_diameter == 0.6
+    id: ewIrBWUoSWSHb8ylYB7lkQ
+    values:
+      max_layer_height: 0.40
+      min_layer_height: 0.15
+      retract_length: 0.8
+      retract_lift: 0.4
+      deretract_speed: 25
+
+# 0.8    
+  - condition: tool.nozzle_diameter == 0.8
+    id: gQ9qmsJFSC6S9fUzDUlDkA
+    values:
+      deretract_speed: 20
+      max_layer_height: 0.6
+      min_layer_height: 0.2
+      retract_length: 0.7
+      retract_lift: 0.25
+---
+id: l39DV1FmQ+SaT75hsCAYnA
+kind: print
+inherits:
+- '*common*'
+- '*common MK25*'
+variants:
+- condition: printer.model=~/(MK2.5|MK2.5S)/
+  id: hYgYCsxvSL6K3s7Oz+PcpQ
+  values:
+    bottom_solid_layers: 4
+    bridge_acceleration: 1000
+    bridge_flow_ratio: 0.95
+    bridge_speed: 25
+    brim_separation: 0.1
+    default_acceleration: 1000
+    dont_support_bridges: 0
+    elefant_foot_compensation: 0.2
+    enable_dynamic_overhang_speeds: 1
+    external_perimeter_acceleration: 800
+    external_perimeter_extrusion_width: 0.45
+    external_perimeter_speed: 40
+    extrusion_width: 0.45
+    fill_density: 15%
+    fill_pattern: cubic
+    first_layer_acceleration: 800
+    first_layer_acceleration_over_raft: 0
+    first_layer_extrusion_width: 0.42
+    first_layer_speed: 20
+    first_layer_solid_infill_speed: 25
+    first_layer_speed_over_raft: 30
+    gap_fill_enabled: 1
+    gap_fill_speed: 40
+    gcode_resolution: 0.0125
+    infill_acceleration: 2000
+    infill_anchor: 2.5
+    infill_anchor_max: 12
+    infill_every_layers: 1
+    infill_extrusion_width: 0.45
+    infill_overlap: 15%
+    infill_speed: 60
+    max_print_speed: 100
+    max_volumetric_extrusion_rate_slope_negative: 0
+    max_volumetric_extrusion_rate_slope_positive: 0
+    max_volumetric_speed: 0
+    min_bead_width: 85%
+    min_feature_size: 25%
+    only_retract_when_crossing_perimeters: 0
+    overhang_speed_0: 15
+    overhang_speed_1: 15
+    overhang_speed_2: 20
+    overhang_speed_3: 25
+    overhangs: 1
+    perimeter_acceleration: 800
+    perimeter_extrusion_width: 0.45
+    perimeter_speed: 50
+    perimeters: 2
+    raft_contact_distance: 0.15
+    raft_expansion: 1.5
+    raft_first_layer_density: 80%
+    raft_first_layer_expansion: 3
+    support_material_first_layer_density: 80%
+    support_material_first_layer_expansion: 3
+    seam_position: aligned
+    small_perimeter_speed: 25
+    solid_infill_acceleration: 1000
+    solid_infill_extrusion_width: 0.45
+    solid_infill_speed: 80
+    over_bridge_speed: 0
+    skirt_height: 3
+    support_material: enforcers_only
+    support_material_angle: 0
+    support_material_bottom_contact_distance: 0
+    support_material_bottom_interface_layers: 0
+    support_material_buildplate_only: 0
+    support_material_closing_radius: 2
+    support_material_contact_distance: 0.2
+    support_material_enforce_layers: 0
+    support_material_extruder: 0
+    support_material_extrusion_width: 0.35
+    support_material_interface_contact_loops: 0
+    support_material_interface_extruder: 0
+    support_material_interface_layers: 2
+    support_material_interface_pattern: auto
+    support_material_interface_spacing: 0.2
+    support_material_interface_speed: 80%
+    support_material_pattern: rectilinear
+    support_material_spacing: 2
+    support_material_speed: 50
+    support_material_style: snug
+    support_material_synchronize_layers: 0
+    support_material_threshold: 50
+    support_material_with_sheath: 0
+    support_material_xy_spacing: 80%
+    support_tree_angle: 40
+    support_tree_angle_slow: 30
+    support_tree_branch_diameter: 2
+    support_tree_branch_diameter_angle: 3
+    support_tree_branch_diameter_double_wall: 8
+    support_tree_branch_distance: 1
+    support_tree_tip_diameter: 0.8
+    support_tree_top_rate: 30%
+    top_infill_extrusion_width: 0.45
+    top_solid_infill_acceleration: 1200
+    top_solid_infill_speed: 40
+    top_solid_layers: 5
+    travel_acceleration: 1000
+    travel_speed: 180
+    travel_speed_z: 12
+    thick_bridges: 0
+    top_solid_min_thickness: 0.7
+    bottom_solid_min_thickness: 0.5
+    wipe_tower_extra_spacing: 100%
+    wipe_tower_extra_flow: 100%
+  variants:
+  - name: '*non-MMU branch*'
+    id: dacY1d7CTMCx4ZpTAEwWIQ
+    variants:
+# 0.25 nozzle
+    - condition: tool.nozzle_diameter == 0.25
+      id: GZliKoQuRlKccprmBYJALA
+      values:
+        extrusion_width: 0.25
+        first_layer_extrusion_width: 0.3
+        perimeter_extrusion_width: 0.25
+        external_perimeter_extrusion_width: 0.25
+        infill_extrusion_width: 0.25
+        solid_infill_extrusion_width: 0.25
+        top_infill_extrusion_width: 0.25
+        support_material_extrusion_width: 0.25
+        first_layer_speed: 20
+        first_layer_solid_infill_speed: 20
+        elefant_foot_compensation: 0
+        brim_separation: 0
+        bottom_solid_layers: 7
+        top_solid_layers: 8
+        support_material_speed: 50
+        support_material_interface_speed: 80%
+        infill_overlap: 10%
+        default_acceleration: 1000
+        travel_acceleration: 1000
+        infill_acceleration: 1000
+        solid_infill_acceleration: 1000
+        top_solid_infill_acceleration: 1000
+        bridge_acceleration: 600
+        perimeter_acceleration: 600
+        bridge_speed: 20
+        bridge_flow_ratio: 1
+        infill_speed: 40
+        solid_infill_speed: 40
+        top_solid_infill_speed: 30
+        perimeters: 2
+        infill_anchor: 2.5
+        support_material_contact_distance: 0.11
+        support_material_spacing: 1
+        support_material_xy_spacing: 150%
+        support_tree_tip_diameter: 0.5
+        raft_contact_distance: 0.07
+        raft_first_layer_density: 95%
+        support_material_first_layer_density: 95%
+        gap_fill_speed: 40
+        support_material_interface_layers: 0
+        support_material_interface_spacing: 0.15
+        external_perimeter_speed: 20
+        perimeter_speed: 25
+        small_perimeter_speed: 15
+# 0.25n/0.05mm layer
+      variants:
+      - name: 0.05mm ULTRADETAIL @MK2.5 0.25
+        id: f9SdpvgRTyuR4K5zHiMrEw
+        values:
+          layer_height: 0.05
+          bottom_solid_layers: 10
+          top_solid_layers: 14
+          perimeters: 3
+          bridge_acceleration: 300
+          infill_acceleration: 800
+          perimeter_acceleration: 300
+          external_perimeter_acceleration: 300
+          gap_fill_speed: 20
+          infill_speed: 20
+          solid_infill_speed: 20
+          support_material_speed: 20
+          top_solid_infill_speed: 20
+# 0.25n/0.1mm layer
+      - name: 0.10mm DETAIL @MK2.5 0.25
+        id: 0Gln7gQbQ1SPAwT7akGcBg
+        values:
+          layer_height: 0.1
+# 0.25n/0.15mm layer
+      - name: 0.15mm OPTIMAL @MK2.5 0.25
+        id: QUMObXGWQXKlytCoS9dIcA
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 5
+          top_solid_layers: 6
+          bridge_flow_ratio: 0.8
+          support_material_contact_distance: 0.12
+          extrusion_width: 0.27
+          perimeter_extrusion_width: 0.27
+          external_perimeter_extrusion_width: 0.27
+          infill_extrusion_width: 0.27
+          solid_infill_extrusion_width: 0.27
+          top_infill_extrusion_width: 0.27
+          support_material_extrusion_width: 0.27
+# 0.4 nozzle
+    - condition: tool.nozzle_diameter == 0.4
+# 0.4n/0.05mm layer
+      id: E25hjmuNTsWJsxAG+4RGcQ
+      variants:
+      - name: 0.05mm ULTRADETAIL @MK2.5 0.4
+        id: Lupnp8baRdGfY+M+O1GO1g
+        values:
+          layer_height: 0.05
+          bottom_solid_layers: 10
+          top_solid_layers: 14
+          support_material_contact_distance: 0.1
+          raft_contact_distance: 0.1
+          perimeters: 3
+          thick_bridges: 1
+          bridge_acceleration: 300
+          infill_acceleration: 800
+          perimeter_acceleration: 300
+          external_perimeter_acceleration: 300
+          external_perimeter_speed: 20
+          gap_fill_speed: 20
+          infill_speed: 30
+          perimeter_speed: 30
+          small_perimeter_speed: 20
+          solid_infill_speed: 30
+          support_material_speed: 30
+          top_solid_infill_speed: 20
+          max_print_speed: 80
+          bridge_flow_ratio: 0.6
+          support_material_extrusion_width: 0.33
+          infill_extrusion_width: 0.5
+          support_material_spacing: 1.5
+          fill_density: 20%
+# 0.4n/0.10mm layer
+      - name: 0.10mm DETAIL @MK2.5 0.4
+        id: m98Ppq+NQsK7ePh77MUvPA
+        values:
+          layer_height: 0.1
+          bottom_solid_layers: 7
+          top_solid_layers: 8
+          support_material_contact_distance: 0.17
+          raft_contact_distance: 0.15
+          perimeters: 3
+          bridge_acceleration: 800
+          perimeter_acceleration: 600
+          external_perimeter_acceleration: 600
+          bridge_speed: 20
+          wipe_tower_bridging: 5
+# 0.4n/0.15mm layer
+      - name: 0.15mm OPTIMAL @MK2.5 0.4
+        id: 1vn2COArSh+2t2DbbxOjhg
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 5
+          top_solid_layers: 6
+          support_material_contact_distance: 0.2
+          raft_contact_distance: 0.15
+      - name: 0.15mm 100mms LA @MK2.5 0.4
+        id: KI7If1kLRVaHzDT2iBthVg
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 5
+          top_solid_layers: 6
+          support_material_contact_distance: 0.2
+          raft_contact_distance: 0.15
+          external_perimeter_speed: 50
+          infill_speed: 100
+          perimeter_speed: 60
+          small_perimeter_speed: 30
+          solid_infill_speed: 100
+          support_material_speed: 60
+          top_solid_infill_speed: 70
+          max_print_speed: 150
+          top_infill_extrusion_width: 0.4
+# 0.4n/0.20mm layer
+      - name: 0.20mm NORMAL @MK2.5 0.4
+        id: n7WjHxZvQ5C13M8Qvt489g
+        values:
+          layer_height: 0.2
+          raft_contact_distance: 0.2
+          bottom_solid_layers: 4
+          top_solid_layers: 5
+          bridge_flow_ratio: 0.95
+          top_infill_extrusion_width: 0.4
+      - name: 0.20mm 100mms LA @MK2.5 0.4
+        id: NYy34bobTTSBbpaq40Q5BA
+        values:
+          layer_height: 0.2
+          raft_contact_distance: 0.2
+          bottom_solid_layers: 4
+          top_solid_layers: 5
+          bridge_flow_ratio: 0.95
+          top_infill_extrusion_width: 0.4
+          external_perimeter_speed: 50
+          infill_speed: 100
+          perimeter_speed: 60
+          small_perimeter_speed: 30
+          solid_infill_speed: 100
+          support_material_speed: 60
+          top_solid_infill_speed: 70
+          max_print_speed: 150
+# 0.4n/0.35mm layer
+      - name: 0.35mm FAST @MK2.5 0.4
+        id: xTP57hOQSweRkE9jrmEiRg
+        values:
+          layer_height: 0.35
+          raft_contact_distance: 0.2
+          support_material_contact_distance: 0.1
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          overhangs: false
+          thick_bridges: true
+          bridge_flow_ratio: 0.95
+          external_perimeter_extrusion_width: 0.6
+          perimeter_extrusion_width: 0.43
+          solid_infill_extrusion_width: 0.7
+          support_material_extrusion_width: 0.37
+          bridge_speed: 30
+          solid_infill_speed: 60
+# 0.6 nozzle
+    - condition: tool.nozzle_diameter == 0.6
+      id: duLgSb9qQDifTPWPPhfzug
+      values:
+        bottom_solid_min_thickness: 0.6
+        top_solid_min_thickness: 0.9
+        top_solid_layers: 4
+        bottom_solid_layers: 3
+        bridge_flow_ratio: 0.95
+        external_perimeter_extrusion_width: 0.61
+        extrusion_width: 0.67
+        first_layer_extrusion_width: 0.65
+        infill_extrusion_width: 0.7
+        perimeter_extrusion_width: 0.65
+        solid_infill_extrusion_width: 0.65
+        support_material_extrusion_width: 0.55
+        top_infill_extrusion_width: 0.6
+        infill_overlap: 15%
+        external_perimeter_speed: 40
+        perimeter_speed: 50
+        infill_speed: 60
+        solid_infill_speed: 50
+        top_solid_infill_speed: 40
+        max_print_speed: 100
+        infill_anchor_max: 15
+        raft_contact_distance: 0.25
+        support_material_spacing: 2
+        support_material_interface_spacing: 0.3
+        support_material_xy_spacing: 80%
+        support_tree_branch_diameter_double_wall: 5
+        support_tree_tip_diameter: 1.2
+        infill_acceleration: 2000
+        support_material_contact_distance: 0.15
+        thick_bridges: true
+      variants:
+# 0.6n/0.15mm layer
+      - name: 0.15mm OPTIMAL @MK2.5 0.6
+        id: 9nVnXkeBQsiHSTrf3FsaNA
+        values:
+          layer_height: 0.15
+          bottom_solid_layers: 5
+          top_solid_layers: 6
+# 0.6n/0.20mm layer
+      - name: 0.20mm NORMAL @MK2.5 0.6
+        id: WwQq/J2oTxaDJdKXGL4t8w
+        values:
+          layer_height: 0.2
+# 0.6n/0.35mm layer
+      - name: 0.35mm FAST @MK2.5 0.6
+        id: f/gC8lawSaObMgwSZn9NEw
+        values:
+          layer_height: 0.35
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          solid_infill_speed: 60
+          top_solid_infill_speed: 50
+# 0.8 nozzle
+    - condition: tool.nozzle_diameter == 0.8
+      id: hGl7Ya7gTIeKW+7YoveuzQ
+      values:
+        first_layer_height: 0.3
+        bottom_solid_layers: 3
+        top_solid_layers: 4
+        bottom_solid_min_thickness: 0.8
+        top_solid_min_thickness: 1.2
+        overhangs: 0
+        thick_bridges: 1
+        bridge_flow_ratio: 0.9
+        extrusion_width: 0.9
+        external_perimeter_extrusion_width: 0.9
+        first_layer_extrusion_width: 0.9
+        infill_extrusion_width: 0.9
+        perimeter_extrusion_width: 0.9
+        solid_infill_extrusion_width: 0.9
+        support_material_extrusion_width: 0.7
+        top_infill_extrusion_width: 0.8
+        infill_overlap: 15%
+        bridge_speed: 22
+        gap_fill_speed: 30
+        infill_speed: 50
+        perimeter_speed: 35
+        solid_infill_speed: 45
+        support_material_interface_speed: 100%
+        support_material_speed: 40
+        top_solid_infill_speed: 35
+        max_print_speed: 50
+        infill_anchor_max: 20
+        skirt_distance: 3
+        skirt_height: 2
+        support_material_contact_distance: 0.25
+        support_material_interface_spacing: 0.4
+        support_material_xy_spacing: 80%
+        support_tree_branch_diameter_double_wall: 0
+        support_tree_tip_diameter: 1.6
+        fill_pattern: rectilinear
+        seam_position: nearest
+        raft_contact_distance: 0.2
+      variants:
+# 0.8n/0.30mm layer
+      - name: 0.30mm DETAIL @MK2.5 0.8
+        id: oWzFq1SJQ8G3BW8FkA/x0A
+        values:
+          layer_height: 0.3
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          max_print_speed: 80
+          solid_infill_speed: 50
+# 0.8n/0.40mm layer
+      - name: 0.40mm QUALITY @MK2.5 0.8
+        id: yzZsU7L7R52KkpfZvk1v/A
+        values:
+          layer_height: 0.4
+# 0.8n/0.55mm layer
+      - name: 0.55mm DRAFT @MK2.5 0.8
+        id: pg6i7VDVS6CN4WhXmxy1Dw
+        values:
+          layer_height: 0.55
+          bottom_solid_layers: 3
+          top_solid_layers: 4
+          external_perimeter_extrusion_width: 1
+          perimeter_extrusion_width: 1
+          perimeter_speed: 30
+          solid_infill_speed: 40
+          support_material_speed: 35
+          top_solid_infill_speed: 30
+# # MMU branch
+  # - name: '*MMU branch*'
+    # id: MR1e3RdlTBOnC5o9369UsQ
+    # variants:
+    # - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      # id: HkhOiWzqTK2agWf9uWYXrg
+      # variants:
+      # - condition: tool.nozzle_diameter == 0.4
+        # id: KQq+fuziSv6nF9IeqSjZrA
+        # variants:
+# # 0.4n/0.20mm/MMU SOLUBLE
+        # - name: 0.20mm SOLUBLE FULL @MK2.5 0.4
+          # id: sFwwwOhjR16IaCqvVVWGiQ
+          # values:
+            # layer_height: 0.2
+            # bridge_speed: 30
+            # external_perimeter_speed: 35
+            # perimeter_speed: 40
+            # solid_infill_speed: 40
+            # support_material_speed: 45
+            # top_solid_infill_speed: 30
+            # fill_pattern: grid
+            # skirts: 0
+            # support_material: everywhere
+            # support_material_threshold: 80
+            # support_material_bottom_interface_layers: -1
+            # support_material_contact_distance: 0
+            # support_material_interface_pattern: auto
+            # support_material_interface_spacing: 0.1
+            # support_material_synchronize_layers: 1
+            # support_material_with_sheath: 1
+            # support_material_xy_spacing: 40%
+            # support_material_extruder: 5
+            # support_material_interface_extruder: 5
+            # wipe_tower_bridging: 6
+            # support_material_extrusion_width: 0.45
+            # top_infill_extrusion_width: 0.45
+            # thick_bridges: 1
+            # raft_contact_distance: 0.2
+        # - name: 0.20mm SOLUBLE INTERFACE @MK2.5 0.4
+          # id: IN4SPgqVTPiB4GcIP1v4Ww
+          # values:
+            # layer_height: 0.2
+            # bridge_speed: 30
+            # external_perimeter_speed: 35
+            # perimeter_speed: 40
+            # solid_infill_speed: 40
+            # support_material_speed: 45
+            # top_solid_infill_speed: 30
+            # fill_pattern: grid
+            # skirts: 0
+            # support_material: everywhere
+            # support_material_threshold: 80
+            # support_material_bottom_interface_layers: -1
+            # support_material_contact_distance: 0
+            # support_material_interface_pattern: auto
+            # support_material_interface_spacing: 0.1
+            # support_material_synchronize_layers: 1
+            # support_material_xy_spacing: 40%
+            # support_material_interface_extruder: 5
+            # wipe_tower_bridging: 6
+            # support_material_extrusion_width: 0.45
+            # top_infill_extrusion_width: 0.45
+            # thick_bridges: 1
+            # raft_contact_distance: 0.2
+            # support_material_extruder: 0
+            # support_material_interface_layers: 3
+            # support_material_with_sheath: 0
+      # - condition: tool.nozzle_diameter == 0.6
+        # id: 56uMilIaTJuuBUkLtxId3g
+        # variants:
+# # 0.6n/0.30mm/MMU SOLUBLE
+        # - name: 0.30mm SOLUBLE FULL @MK2.5 0.6
+          # id: J3INb/MNRfqjfGj94jYV6Q
+          # values:
+            # layer_height: 0.3
+            # top_solid_layers: 4
+            # bridge_speed: 25
+            # external_perimeter_speed: 35
+            # perimeter_speed: 40
+            # solid_infill_speed: 40
+            # support_material_speed: 40
+            # top_solid_infill_speed: 30
+            # fill_pattern: grid
+            # skirts: 0
+            # support_material: everywhere
+            # support_material_threshold: 80
+            # support_material_bottom_interface_layers: -1
+            # support_material_contact_distance: 0
+            # support_material_interface_pattern: auto
+            # support_material_interface_spacing: 0.1
+            # support_material_synchronize_layers: 1
+            # support_material_with_sheath: 1
+            # support_material_xy_spacing: 40%
+            # support_material_extruder: 5
+            # support_material_interface_extruder: 5
+            # support_tree_branch_diameter_double_wall: 5
+            # wipe_tower_bridging: 6
+            # thick_bridges: 1
+            # infill_speed: 70
+            # infill_anchor_max: 15
+            # support_tree_tip_diameter: 1.2
+            # first_layer_extrusion_width: 0.65
+            # support_material_extrusion_width: 0.6
+            # extrusion_width: 0.65
+            # infill_extrusion_width: 0.65
+            # solid_infill_extrusion_width: 0.65
+            # external_perimeter_extrusion_width: 0.65
+            # top_infill_extrusion_width: 0.6
+            # perimeter_extrusion_width: 0.65
+            # bottom_solid_min_thickness: 0.6
+            # top_solid_min_thickness: 0.9
+            # raft_contact_distance: 0.25
+            # max_print_speed: 100
+            # bridge_flow_ratio: 1
+        # - name: 0.30mm SOLUBLE INTERFACE @MK2.5 0.6
+          # id: FlWknt+nTR6xtJHriPPRWw
+          # values:
+            # layer_height: 0.3
+            # top_solid_layers: 4
+            # bridge_speed: 25
+            # external_perimeter_speed: 35
+            # perimeter_speed: 40
+            # solid_infill_speed: 40
+            # support_material_speed: 40
+            # top_solid_infill_speed: 30
+            # fill_pattern: grid
+            # skirts: 0
+            # support_material: everywhere
+            # support_material_threshold: 80
+            # support_material_bottom_interface_layers: -1
+            # support_material_contact_distance: 0
+            # support_material_interface_pattern: auto
+            # support_material_interface_spacing: 0.1
+            # support_material_synchronize_layers: 1
+            # support_material_xy_spacing: 40%
+            # support_material_interface_extruder: 5
+            # support_tree_branch_diameter_double_wall: 5
+            # wipe_tower_bridging: 6
+            # thick_bridges: 1
+            # infill_speed: 70
+            # infill_anchor_max: 15
+            # support_tree_tip_diameter: 1.2
+            # first_layer_extrusion_width: 0.65
+            # support_material_extrusion_width: 0.6
+            # extrusion_width: 0.65
+            # infill_extrusion_width: 0.65
+            # solid_infill_extrusion_width: 0.65
+            # external_perimeter_extrusion_width: 0.65
+            # top_infill_extrusion_width: 0.6
+            # perimeter_extrusion_width: 0.65
+            # bottom_solid_min_thickness: 0.6
+            # top_solid_min_thickness: 0.9
+            # raft_contact_distance: 0.25
+            # max_print_speed: 100
+            # bridge_flow_ratio: 1
+            # support_material_extruder: 0
+            # support_material_interface_layers: 3
+            # support_material_with_sheath: 0

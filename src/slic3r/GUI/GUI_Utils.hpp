@@ -51,8 +51,6 @@ wxDECLARE_EVENT(EVT_VOLUME_DETACHED, VolumeDetachedEvent);
 
 wxTopLevelWindow* find_toplevel_parent(wxWindow *window);
 
-void on_window_geometry(wxTopLevelWindow *tlw, std::function<void()> callback);
-
 enum { DPI_DEFAULT = 96 };
 
 int get_dpi_for_window(const wxWindow *window);
@@ -389,26 +387,7 @@ private:
     wxString checkbox_label;
 };
 
-
-class WindowMetrics
-{
-private:
-    wxRect rect;
-    bool maximized;
-
-    WindowMetrics() : maximized(false) {}
-public:
-    static WindowMetrics from_window(wxTopLevelWindow *window);
-    static boost::optional<WindowMetrics> deserialize(const std::string &str);
-
-    const wxRect& get_rect() const { return rect; }
-    bool get_maximized() const { return maximized; }
-
-    void sanitize_for_display(const wxRect &screen_rect);
-    std::string serialize() const;
-};
-
-std::ostream& operator<<(std::ostream &os, const WindowMetrics& metrics);
+//std::ostream& operator<<(std::ostream &os, const WindowMetrics& metrics);
 
 class TaskTimer
 {

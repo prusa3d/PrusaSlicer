@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "libslic3r/Time.hpp"
+#include "Slic3r/Time.hpp"
 
 #include <sstream>
 #include <iomanip>

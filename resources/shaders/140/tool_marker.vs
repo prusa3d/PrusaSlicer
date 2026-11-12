@@ -1,58 +1,56 @@
-#version 140
+#version 150
 
-#define INTENSITY_CORRECTION 0.6
+#define MAX_LIGHTS 4
 
-// normalized values for (-0.6/1.31, 0.6/1.31, 1./1.31)
-const vec3 LIGHT_TOP_DIR = vec3(-0.4574957, 0.4574957, 0.7624929);
-#define LIGHT_TOP_DIFFUSE    (0.8 * INTENSITY_CORRECTION)
-#define LIGHT_TOP_SPECULAR   (0.125 * INTENSITY_CORRECTION)
-#define LIGHT_TOP_SHININESS  20.0
+struct Light
+{
+    int system; 
+    vec3 direction;
+    float ambient;
+    float diffuse;
+    float specular;
+    float shininess;
+};
 
-// normalized values for (1./1.43, 0.2/1.43, 1./1.43)
-const vec3 LIGHT_FRONT_DIR = vec3(0.6985074, 0.1397015, 0.6985074);
-#define LIGHT_FRONT_DIFFUSE  (0.3 * INTENSITY_CORRECTION)
-//#define LIGHT_FRONT_SPECULAR (0.0 * INTENSITY_CORRECTION)
-//#define LIGHT_FRONT_SHININESS 5.0
-
-#define INTENSITY_AMBIENT    0.3
-
+uniform mat4 view_matrix;
 uniform mat4 view_model_matrix;
 uniform mat4 projection_matrix;
 uniform mat3 view_normal_matrix;
-uniform mat4 volume_world_matrix;
-
-// Clipping planes used to clip the tool marker model.
-uniform vec4 clipping_planes[2];
+uniform vec4 uniform_color;
+uniform int num_lights;
+uniform Light lights[MAX_LIGHTS];
 
 in vec3 v_position;
 in vec3 v_normal;
 
-// x = diffuse, y = specular;
-out vec2 intensity;
-out vec2 clipping_planes_dots;
+out vec4 color;
 
-void main()
+vec3 light_direction(Light light)
 {
-	// First transform the normal into camera space and normalize the result.
+    // return light direction in eye coordinates
+    return (light.system == 0) ? (view_matrix * vec4(-light.direction, 0.0)).xyz : -light.direction;
+}
+
+float lighting(vec3 eye_position, vec3 eye_normal)
+{
+    float ambient = 0.0;
+    float diffuse = 0.0;
+    float specular = 0.0;
+    vec3 v = -normalize(eye_position);
+    for (int i = 0; i < MAX_LIGHTS; ++i) {
+        if (i >= num_lights)
+            break;
+        vec3 dir = light_direction(lights[i]);
+        ambient += lights[i].ambient;
+        diffuse += lights[i].diffuse * max(dot(eye_normal, dir), 0.0);
+        specular += lights[i].specular * pow(max(dot(v, reflect(-dir, eye_normal)), 0.0), lights[i].shininess);
+    }
+    return ambient + diffuse + specular;
+}
+
+void main() {
+    vec3 eye_position = (view_model_matrix * vec4(v_position, 1.0)).xyz;
     vec3 eye_normal = normalize(view_normal_matrix * v_normal);
-
-	// Compute the cos of the angle between the normal and lights direction. The light is directional so the direction is constant for every vertex.
-	// Since these two are normalized the cosine is the dot product. We also need to clamp the result to the [0,1] range.
-	float NdotL = max(dot(eye_normal, LIGHT_TOP_DIR), 0.0);
-
-	intensity.x = INTENSITY_AMBIENT + NdotL * LIGHT_TOP_DIFFUSE;
-    vec4 position = view_model_matrix * vec4(v_position, 1.0);
-    intensity.y = LIGHT_TOP_SPECULAR * pow(max(dot(-normalize(position.xyz), reflect(-LIGHT_TOP_DIR, eye_normal)), 0.0), LIGHT_TOP_SHININESS);
-
-	// Perform the same lighting calculation for the 2nd light source (no specular applied).
-	NdotL = max(dot(eye_normal, LIGHT_FRONT_DIR), 0.0);
-	intensity.x += NdotL * LIGHT_FRONT_DIFFUSE;
-
-    // Point in homogenous coordinates.
-    vec4 world_pos = volume_world_matrix * vec4(v_position, 1.0);
-    // Fill in the scalars for fragment shader clipping. Fragments with any of these components lower than zero are discarded.
-    clipping_planes_dots.x = dot(world_pos, clipping_planes[0]);
-    clipping_planes_dots.y = dot(world_pos, clipping_planes[1]);
-
-    gl_Position = projection_matrix * position;
+    color = vec4(uniform_color.rgb * lighting(eye_position, eye_normal), uniform_color.a);
+    gl_Position = projection_matrix * vec4(eye_position, 1.0);
 }

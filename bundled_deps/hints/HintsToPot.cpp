@@ -51,6 +51,9 @@ bool read_hints_ini(boost::filesystem::path path, std::vector<std::pair<std::str
 
 int main(int argc, char* argv[])
 {
+	//	HINTS_TO_POT temporary ignored;
+    return 0;
+
 	std::vector<std::pair<std::string, std::string>> data;
 	boost::filesystem::path path_to_ini;
 	boost::filesystem::path path_to_pot;
@@ -66,7 +69,7 @@ int main(int argc, char* argv[])
 		std::cout << "HINTS_TO_POT FAILED: BOOST CANNONICAL" << std::endl;
 		return -1;
 	}
-	
+
 	if (!boost::filesystem::exists(path_to_ini)){
 		std::cout << "HINTS_TO_POT FAILED: PATH TO INI DOES NOT EXISTS" << std::endl;
 		std::cout << path_to_ini.string() << std::endl;

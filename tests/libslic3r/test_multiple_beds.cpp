@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <libslic3r/libslic3r.h>
 #include <libslic3r/MultipleBeds.hpp>
 #include <numeric>
 

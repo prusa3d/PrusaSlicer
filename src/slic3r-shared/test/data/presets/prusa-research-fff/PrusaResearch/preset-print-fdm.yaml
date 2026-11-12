@@ -1,0 +1,494 @@
+id: DcJzA9UiRD2Yf2EvrRoysw
+kind: print
+inherits:
+- '*common*'
+# C1
+variants:
+- condition: printer.base_model == "COREONE" or printer.base_model == "MK4" or printer.base_model == "XL" or printer.base_model == "MK3.5"
+  id: AMBC6UyUQSKpCKVeqMgsag
+  variants:
+  - condition: tool.nozzle_high_flow
+    id: IxpRM6BkQEanh9hPwd1cuQ
+    variants:
+# C1 0.4HF
+    - condition: tool.nozzle_diameter == 0.4
+      id: iw8s/7+zS1amyk1pHRpcvw
+      variants:
+      - name: 0.10mm
+        id: 8fkyjGzCRzKCmhm4nLaWPA
+        values:
+          layer_height: 0.10
+      - name: 0.15mm
+        id: kGhQHdTPT0C2AbKAs+uHMw
+        values:
+          layer_height: 0.15
+      - name: 0.20mm
+        id: 2o62eWpTRAOgfhTt4UNtUg
+        values:
+          layer_height: 0.20
+      - name: 0.25mm
+        id: saDBTX6XTZe1DVv4lVQKcQ
+        values:
+          layer_height: 0.25
+      - name: 0.28mm
+        id: F00mziw2REq6M4eLKjzcyQ
+        values:
+          layer_height: 0.28
+# C1 0.5HF
+    - condition: tool.nozzle_diameter == 0.5
+      id: ge+R4At5QsmDevFJ75jCgg
+      variants:
+      - name: 0.10mm
+        id: XNCVYi5STPq3YzGNliqRCQ
+        values:
+          layer_height: 0.10
+      - name: 0.15mm
+        id: hQyId+29TKWM1LIXLygPIA
+        values:
+          layer_height: 0.15
+      - name: 0.20mm
+        id: MPs9QABzSzGfep5x4p2BaA
+        values:
+          layer_height: 0.20
+      - name: 0.25mm
+        id: FA2uw2c6TyGwtmpFYNX5tw
+        values:
+          layer_height: 0.25
+      - name: 0.32mm
+        id: AxUw/jAcQCuD0XL8XlNZSw
+        values:
+          layer_height: 0.32
+# C1 0.6HF
+    - condition: tool.nozzle_diameter == 0.6
+      id: gPur0wHmT3Gc7cvZTlTSeA
+      variants:
+      - name: 0.15mm
+        id: rNas4OIvTDO1EsT0X88jVg
+        values:
+          layer_height: 0.15
+      - name: 0.20mm
+        id: MwDeWT1PRZGoQewkjaCDTQ
+        values:
+          layer_height: 0.20
+      - name: 0.25mm
+        id: 8zDNe5ygS86BHDbEFbiWQA
+        values:
+          layer_height: 0.25
+      - name: 0.32mm
+        id: tL7oweU2RI6rL+dHjPCfNw
+        values:
+          layer_height: 0.32
+      - name: 0.40mm
+        id: t531IUAqTT2P0lsKahBd9A
+        values:
+          layer_height: 0.40
+# C1 0.8HF
+    - condition: tool.nozzle_diameter == 0.8
+      id: 8XiODvUnSfScRhdrgM92bA
+      variants:
+      - name: 0.30mm
+        id: fk7sPac7QrKrOW3G6Es5xQ
+        values:
+          layer_height: 0.30
+      - name: 0.40mm
+        id: Tg/oOvlASdmPEIjaqji9XQ
+        values:
+          layer_height: 0.40
+      - name: 0.55mm
+        id: gBt5Db5LStO8aco0zgaRyA
+        values:
+          layer_height: 0.55
+# C1 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: OlFaGKPTRUCBFmcFnd/Jkg
+    variants:
+    - name: 0.05mm
+      id: IDjVRbClRjO0Lp1B66sylg
+      values:
+        layer_height: 0.05
+    - name: 0.07mm
+      id: 8SWqnbGbT06QYMCtFWnO1g
+      values:
+        layer_height: 0.07
+    - name: 0.10mm
+      id: r8p7nqgZR4qs+Qe9jZCf8Q
+      values:
+        layer_height: 0.10
+    - name: 0.12mm
+      id: maRrevapTl+nzjRrQ86X8A
+      values:
+        layer_height: 0.12
+    - name: 0.15mm
+      id: KteCxkmHRWCcFeinq4Ad+A
+      values:
+        layer_height: 0.15
+# C1 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: zdcNCCjKRM6HgrX37DhlqQ
+    variants:
+    - name: 0.12mm
+      id: 7RTsgY9oSpCDzmTuWl5/1w
+      values:
+        layer_height: 0.12
+    - name: 0.16mm
+      id: bnVtYVdUQwSA6OuG9JAjwA
+      values:
+        layer_height: 0.16
+    - name: 0.20mm
+      id: AAbzslziTE2Rb+hV1ioyaQ
+      values:
+        layer_height: 0.20
+# C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: NbPd89YrTGCazODFIYKNBw
+    variants:
+    - name: 0.10mm
+      id: UqEstYWtQnKtiinEXFR5jg
+      values:
+        layer_height: 0.10
+    - name: 0.15mm
+      id: HaRFg+4lSl+iJgSM85kzlg
+      values:
+        layer_height: 0.15
+    - name: 0.20mm
+      id: khl/VWrPRk28zzGB9WQ0Ow
+      values:
+        layer_height: 0.20
+# C1 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: lXmrvR2kRYuQNOKZ/NmHSg
+    variants:
+    - name: 0.10mm
+      id: rOgBh4t8SoqhTXGT/Bmqcw
+      values:
+        layer_height: 0.10
+    - name: 0.15mm
+      id: zYOv10q1SB+zznCG2z5exA
+      values:
+        layer_height: 0.15
+    - name: 0.20mm
+      id: MuLxS1IgSHiHhgKnPE5ISw
+      values:
+        layer_height: 0.20
+    - name: 0.25mm
+      id: UuGrxpVwTFSrIH0nfFhA4A
+      values:
+        layer_height: 0.25
+# C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: wgLJxca2TwiCWTeYiIC61w
+    variants:
+    - name: 0.15mm
+      id: n9e2F2BNRbqsCKkRvzNg6A
+      values:
+        layer_height: 0.15
+    - name: 0.20mm
+      id: UEGqq5rFQTS+E9O1/EawMA
+      values:
+        layer_height: 0.20
+    - name: 0.25mm
+      id: VeNQKrwoSF+TNeM7Y4ve5w
+      values:
+        layer_height: 0.25
+    - name: 0.32mm
+      id: NpHYGd49QFiXFzT8MapThg
+      values:
+        layer_height: 0.32
+# C1 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: uATdixZZRnigNdn75IF2vA
+    variants:
+    - name: 0.30mm
+      id: wPplowx3SBSRpX++h/tL1A
+      values:
+        layer_height: 0.30
+    - name: 0.40mm
+      id: exqoT1fKT9W0QH49dbuMEw
+      values:
+        layer_height: 0.40
+    - name: 0.55mm
+      id: Uqu1+QutTHe2LlzPOZmT2Q
+      values:
+        layer_height: 0.55
+# MK3             
+- condition: printer.base_model == "MK3"
+  id: UjiCS2c2RCCavJrtJK/ApA
+  variants:
+# MK3 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: lJj3ThGYQuWHL5ie+CGpEQ
+    variants:
+    - name: 0.05mm
+      id: fGV9XAP7RVqHzheRGZsDkA
+      values:
+        layer_height: 0.05
+    - name: 0.07mm
+      id: pu3J5lcESG62QziFzgIzYg
+      values:
+        layer_height: 0.07
+    - name: 0.10mm
+      id: AzAANz2wQ2KtFYsMslMZdg
+      values:
+        layer_height: 0.10
+    - name: 0.15mm
+      id: vP/fBGDYQ8qlZR+sf83Uvg
+      values:
+        layer_height: 0.15
+# MK3 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 7mFfqsTBRpG1N6EjdwuQWg
+    variants:
+    - name: 0.05mm
+      id: niq9mX+fTQW5MYuTHwObWA
+      values:
+        layer_height: 0.05
+    - name: 0.07mm
+      id: C33VXnbJRr2qVlCiEQ8vtQ
+      values:
+        layer_height: 0.07
+    - name: 0.10mm
+      id: +lxpB9HzTW636mqVtb2RAA
+      values:
+        layer_height: 0.10
+    - name: 0.15mm
+      id: ER3mkjLpSZG4yeOtB8qNAA
+      values:
+        layer_height: 0.15
+    - name: 0.20mm
+      id: 4lTuPg+vT3SZehYvVgB3Fw
+      values:
+        layer_height: 0.20
+    - name: 0.30mm
+      id: bdmo20EQQ6eotDThcXf5SA
+      values:
+        layer_height: 0.30
+# MK3 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: hiVKvCeURq+U/V304HnQlw
+    variants:
+    - name: 0.15mm
+      id: dXf0B5pjRxSnCs3BxJ6nAg
+      values:
+        layer_height: 0.15
+    - name: 0.20mm
+      id: qJ/R7jrxSLWFG7gvNdsgbA
+      values:
+        layer_height: 0.20
+    - name: 0.30mm
+      id: I9K3etZ8THKrTQZQpnRRSQ
+      values:
+        layer_height: 0.30
+    - name: 0.35mm
+      id: YxCOZM7CSPSUdwtS8Y8cCg
+      values:
+        layer_height: 0.35
+    - name: 0.40mm
+      id: 0gKlV6coTF2t0Cx6r1BQWA
+      values:
+        layer_height: 0.40
+# MK3 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: /3jbG+Z5QXevdvNyYJwKEw
+    variants:
+    - name: 0.30mm
+      id: 2lc9r7xrRP28WbGYHyi9hA
+      values:
+        layer_height: 0.30
+    - name: 0.40mm
+      id: EF6nTYHlTO6i6kCoTB8Krw
+      values:
+        layer_height: 0.40
+    - name: 0.55mm
+      id: FFrj+KHjTeOsvlACNxaTUw
+      values:
+        layer_height: 0.55
+# MINI            
+- condition: printer.base_model == "MINI"
+  id: PZAoMhp1T3+eJNCzXfswOw
+  variants:
+# MINI 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: zhoHldVpSJuS6eHn01Pzhw
+    variants:
+    - name: 0.05mm
+      id: GygvHGWbQ4O7Lh286LrFHw
+      values:
+        layer_height: 0.05
+    - name: 0.07mm
+      id: K/d2tjCrTKitIsBRMY/Lnw
+      values:
+        layer_height: 0.07
+    - name: 0.10mm
+      id: 5nQz5gSNTVWt30+7pY4KVQ
+      values:
+        layer_height: 0.12
+    - name: 0.12mm
+      id: Z6aMyvS1TqC3H2KjMBgPbg
+      values:
+        layer_height: 0.15
+# MINI 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: QScdVHuvRHqbdrIE5B0/kw
+    variants:
+    - name: 0.10mm
+      id: s7mK13U1R/W2yFOKQX0hrw
+      values:
+        layer_height: 0.10
+    - name: 0.15mm
+      id: 8LYzi/RhTNGMtpbkzl8z2Q
+      values:
+        layer_height: 0.15
+    - name: 0.20mm
+      id: mLE0N0lMTBKZkyYLZ61HBg
+      values:
+        layer_height: 0.20
+# MINI 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: XX9c9DqbSqqxGifsdKQWDw
+    variants:
+    - name: 0.15mm
+      id: ywAGgm28TAC9JVIBy5KrOw
+      values:
+        layer_height: 0.15
+    - name: 0.20mm
+      id: en3tvpVPT4aWmSS7h+bItw
+      values:
+        layer_height: 0.20
+    - name: 0.25mm
+      id: fKvIuWHjTWGY7nOZhdRkIQ
+      values:
+        layer_height: 0.25
+    - name: 0.35mm
+      id: wkEScfk5SKO10lVtscHOBA
+      values:
+        layer_height: 0.35
+# MINI 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: ryW+eAGfTsy9f5t107PNVQ
+    variants:
+    - name: 0.30mm
+      id: 1T7g1MTmReKfiFbYzUODnA
+      values:
+        layer_height: 0.30
+    - name: 0.40mm
+      id: 8+LRlU9wToeuyYAPcmXhQA
+      values:
+        layer_height: 0.40
+    - name: 0.50mm
+      id: /8hIVjCyQJiRkn2+63F8kg
+      values:
+        layer_height: 0.50
+
+# MK2 and MK2.5             
+- condition: printer.base_model == "MK2" or printer.base_model == "MK2.5"
+  id: k62piBhQSzWIdiSDy+jyAA
+  variants:
+# MK2 and MK2.5 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 9mMBj5PcS4iQ4AzvsEHqkQ
+    variants:
+    - name: 0.05mm
+      id: LW5xGJf/TT2jHozy+q6uHw
+      values:
+        layer_height: 0.05
+    - name: 0.10mm
+      id: vq4LRYzjSfuSMCJARmFXNg
+      values:
+        layer_height: 0.10
+    - name: 0.15mm
+      id: qawU6Q6lQbOW2+W3yRL35g
+      values:
+        layer_height: 0.15
+# MK2 and MK2.5 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 4v9iyyMZT2aaThr6jQbT6A
+    variants:
+    - name: 0.05mm
+      id: pvNu7Qd+TQans3xW9shkTA
+      values:
+        layer_height: 0.05
+    - name: 0.10mm
+      id: qORSq9rOTwaE2mosWxCmcQ
+      values:
+        layer_height: 0.10
+    - name: 0.15mm
+      id: rvitJuTST/yaddAuDMZX/A
+      values:
+        layer_height: 0.15
+    - name: 0.20mm
+      id: FNPlFtEgTj2jkFvYdG5xag
+      values:
+        layer_height: 0.20
+    - name: 0.35mm
+      id: mnHrwAjsSDul9gw0/7PPAw
+      values:
+        layer_height: 0.35
+# MK2 and MK2.5 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 3cxuoLRASrSH61+3teBo6g
+    variants:
+    - name: 0.15mm
+      id: 6vmy+9+wTz+7SYdnhOxkQg
+      values:
+        layer_height: 0.15
+    - name: 0.20mm
+      id: TJ18xyCbRfqLktlLdZY1nw
+      values:
+        layer_height: 0.20
+    - name: 0.35mm
+      id: 46LUVfy+RQSXXdKe4YLY4w
+      values:
+        layer_height: 0.35
+# MK2 and MK2.5 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: nb3ANqH9SGyC64p7JZNrRQ
+    variants:
+    - name: 0.30mm
+      id: hi7cGcf+T1mTmjAjNFhZIQ
+      values:
+        layer_height: 0.30
+    - name: 0.40mm
+      id: ikb6HSb5RTe9kfMoDTpivg
+      values:
+        layer_height: 0.40
+    - name: 0.55mm
+      id: 78Z5IE0VQGy5KKChOeWmfg
+      values:
+        layer_height: 0.55
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ---
+# kind: print
+# variants:
+  # - condition: 'printer.model == "COREONE"'
+    # name: '0.20mm'
+    # values:
+      # arc_fitting: emit_center
+      # extra_perimeters: 0
+      # interface_shells: 0
+      # layer_height: 0.2
+      # min_skirt_length: 4
+      # ooze_prevention: 1
+      # perimeter_extruder: 1
+      # seam_position: aligned
+      # single_extruder_multi_material_priming: 0
+      # skirts: 0
+      # solid_infill_below_area: 0
+      # solid_infill_every_layers: 0
+      # standby_temperature_delta: '-110'
+      # thin_walls: 0
+      # wipe_tower: 1
+      # wipe_tower_brim_width: 3
+      # wipe_tower_cone_angle: 25
+      # # wipe_tower_rotation_angle: 90

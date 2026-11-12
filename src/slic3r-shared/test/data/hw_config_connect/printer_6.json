@@ -1,0 +1,151 @@
+{
+  "uuid": "53722480-603c-4bc5-b901-9c35617a8c38",
+  "connect_state": "OFFLINE",
+  "supported_printer_models": [
+    "MK4",
+    "MK4IS",
+    "MK3.9",
+    "MK3",
+    "MK3S",
+    "MK3.9MMU3",
+    "MK3MMU3",
+    "MK3SMMU3"
+  ],
+  "model": "MK4",
+  "base_model": "MK4",
+  "tool_count": 1,
+  "legacy_printer_model": "MK4ISMMU3",
+  "tools": {
+    "0": {
+      "class": "FFF",
+      "type": "PRINT_HEAD",
+      "telemetry": {
+        "active": false,
+        "odometer_e": 0
+      },
+      "features": {
+        "nozzle_diameter": 0.4,
+        "nozzle_high_flow": false,
+        "nozzle_hardened": false,
+        "feeder": true
+      },
+      "feeder": {
+        "type": "MMU",
+        "model": "MMU3",
+        "base_model": "MMU3",
+        "num_slots": 5,
+        "enabled": true
+      }
+    },
+    "0.0": {
+      "class": "FFF",
+      "type": "FEEDER",
+      "material_package_instance": {
+        "class": "FFF",
+        "package": {
+          "material": {
+            "class": "FFF",
+            "type": "PLA",
+            "abbreviation": "PLA"
+          },
+          "class": "FFF",
+          "nominal_netto_full_weight": 1000,
+          "filament_diameter": 1750
+        },
+        "is_from_nfc": false
+      },
+      "telemetry": {
+        "active": false,
+        "odometer_e": 0
+      }
+    },
+    "0.1": {
+      "class": "FFF",
+      "type": "FEEDER",
+      "material_package_instance": {
+        "class": "FFF",
+        "package": {
+          "material": {
+            "class": "FFF",
+            "type": "PLA",
+            "abbreviation": "PLA"
+          },
+          "class": "FFF",
+          "nominal_netto_full_weight": 1000,
+          "filament_diameter": 1750
+        },
+        "is_from_nfc": false
+      },
+      "telemetry": {
+        "active": false,
+        "odometer_e": 0
+      }
+    },
+    "0.2": {
+      "class": "FFF",
+      "type": "FEEDER",
+      "material_package_instance": {
+        "class": "FFF",
+        "package": {
+          "material": {
+            "class": "FFF",
+            "type": "PLA",
+            "abbreviation": "PLA"
+          },
+          "class": "FFF",
+          "nominal_netto_full_weight": 1000,
+          "filament_diameter": 1750
+        },
+        "is_from_nfc": false
+      },
+      "telemetry": {
+        "active": false,
+        "odometer_e": 0
+      }
+    },
+    "0.3": {
+      "class": "FFF",
+      "type": "FEEDER",
+      "material_package_instance": {
+        "class": "FFF",
+        "package": {
+          "material": {
+            "class": "FFF",
+            "type": "PLA",
+            "abbreviation": "PLA"
+          },
+          "class": "FFF",
+          "nominal_netto_full_weight": 1000,
+          "filament_diameter": 1750
+        },
+        "is_from_nfc": false
+      },
+      "telemetry": {
+        "active": false,
+        "odometer_e": 0
+      }
+    },
+    "0.4": {
+      "class": "FFF",
+      "type": "FEEDER",
+      "material_package_instance": {
+        "class": "FFF",
+        "package": {
+          "material": {
+            "class": "FFF",
+            "type": "PLA",
+            "abbreviation": "PLA"
+          },
+          "class": "FFF",
+          "nominal_netto_full_weight": 1000,
+          "filament_diameter": 1750
+        },
+        "is_from_nfc": false
+      },
+      "telemetry": {
+        "active": false,
+        "odometer_e": 0
+      }
+    }
+  }
+}

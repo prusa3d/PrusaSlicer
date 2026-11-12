@@ -1,0 +1,22 @@
+id: BlueCast LCD-DLP Original
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: BlueCast
+  material_type: Tough
+  material_colour: '#007EFD'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: 9b6Z3t9gS365IZoty8Ou2w
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: BlueCast LCD-DLP Original @SL1 0.05
+    id: kPKSANyfQAuZu3zpg3mstQ
+    values:
+      exposure_time: 10
+      initial_exposure_time: 60

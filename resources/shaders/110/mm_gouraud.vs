@@ -1,8 +1,16 @@
 #version 110
 
+struct OverhangDetection
+{
+    bool  enabled;
+    float max_normal_z;
+    mat3  world_normal_matrix;
+};
+
 uniform mat4 view_model_matrix;
 uniform mat4 projection_matrix;
 uniform mat4 volume_world_matrix;
+uniform OverhangDetection overhang;
 
 // Clipping plane, x = min z, y = max z. Used by the FFF and SLA previews to clip with a top / bottom plane.
 uniform vec2 z_range;

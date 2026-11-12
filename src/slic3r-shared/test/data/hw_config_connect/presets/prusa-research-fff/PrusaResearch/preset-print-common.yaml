@@ -1,0 +1,48 @@
+kind: print
+id: '*common*'
+values:
+  arc_fitting: emit_center
+  external_perimeters_first: 0
+  extra_perimeters: 0
+  fill_angle: 45
+  first_layer_height: 0.2
+  gcode_comments: 0
+  gcode_label_objects: firmware
+  infill_extruder: 1
+  infill_first: 0
+  interface_shells: 0
+  ironing_type: top
+  min_skirt_length: 4
+  mmu_segmented_region_max_width: 0
+  ooze_prevention: 1
+  output_filename_format: '{input_filename_base}_{layer_height}mm_{printing_filament_types}_{printer_model}_{print_time}.gcode'
+  perimeter_extruder: 1
+  perimeter_generator: arachne
+  single_extruder_multi_material_priming: 0
+  skirts: 0
+  slice_closing_radius: 0.049
+  solid_infill_below_area: 0
+  solid_infill_every_layers: 0
+  solid_infill_extruder: 1
+  standby_temperature_delta: '-110'
+  thin_walls: 0
+  top_fill_pattern: monotoniclines
+  wipe_tower: 1
+  wipe_tower_brim_width: 3
+  wipe_tower_cone_angle: 25
+  # wipe_tower_rotation_angle: 90
+variants:
+- condition: printer.base_model != "XL"
+  id: 4Q2iSdXzQhKi32/XvDcJrQ
+  values:
+    ooze_prevention: 0
+  variants:
+  - condition: printer.base_model == "MK3"
+    id: vxQ+RPW8Q1KX9+WkGU7e0w
+    values:
+      skirts: 1
+      wipe_tower_cone_angle: 0
+  - id: MAV5tQDgSPW6cF/U/UIReA
+    values: {}
+- id: WaotVsmFQrqamsssfdNlbQ
+  values: {}

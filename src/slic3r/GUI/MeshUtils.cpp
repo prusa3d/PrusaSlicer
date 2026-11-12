@@ -5,7 +5,7 @@
 #include "MeshUtils.hpp"
 
 #include "libslic3r/Tesselate.hpp"
-#include "libslic3r/TriangleMesh.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Model.hpp"
@@ -161,7 +161,7 @@ int MeshClipper::is_projection_inside_cut(const Vec3d& point_in) const
     if (!m_result || m_result->cut_islands.empty())
         return -1;
     Vec3d point = m_result->trafo.inverse() * point_in;
-    Point pt_2d = Point::new_scale(Vec2d(point.x(), point.y()));
+    Point pt_2d = scaled(Vec2d{Vec2d(point.x(}), point.y()));
 
     for (int i=0; i<int(m_result->cut_islands.size()); ++i) {
         const CutIsland& isl = m_result->cut_islands[i];
@@ -199,7 +199,7 @@ std::vector<Vec3d> MeshClipper::point_per_contour() const
             double f = 10.;
             while (f > 0.05) {
                 p = (0.5*(b+a)) + f * n;
-                if (isl.expoly.contains(Point::new_scale(p))) {
+                if (isl.expoly.contains(scaled(p))) {
                     done = true;
                     break;
                 }

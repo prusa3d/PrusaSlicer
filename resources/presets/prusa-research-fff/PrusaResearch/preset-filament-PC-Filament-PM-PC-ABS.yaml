@@ -1,0 +1,14 @@
+kind: filament
+inherits:
+- '*PC*'
+name: Filament PM PC-ABS
+id: Filament PM PC-ABS
+features:
+  $.brand.uuid: d14b3a61-a841-5f76-8adc-0c5b1c9ecbe4
+  $.brand.slug: filamentpm
+values:
+  filament_vendor: Filament PM
+  filament_cost: 49.9
+  cooling: false
+  filament_density: 1.19
+  filament_spool_weight: 0

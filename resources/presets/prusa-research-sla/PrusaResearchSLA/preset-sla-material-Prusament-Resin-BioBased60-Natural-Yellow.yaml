@@ -1,0 +1,66 @@
+id: Prusament Resin BioBased60 Natural Yellow
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Tough
+  material_colour: '#ECDE05'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: ijf+kslXStGBaXpXoeNpuw
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin BioBased60 Natural Yellow @SL1 0.025
+    id: ot1xoa3BTJi65oy1GaGnYw
+    values:
+      exposure_time: 6
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin BioBased60 Natural Yellow @SL1 0.05
+    id: sbzOKadWSDKQszTY4FWVcQ
+    values:
+      exposure_time: 7
+      initial_exposure_time: 35
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin BioBased60 Natural Yellow @SL1 0.1
+    id: RmGwzVBpTred75y70PWdlA
+    values:
+      exposure_time: 8
+      initial_exposure_time: 35
+## SL1S
+- condition: printer.model == "SL1S"
+  id: Bgeg2/awQfSAp+th4M9EBg
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [2, 15]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin BioBased60 Natural Yellow @SL1S 0.025
+    id: ZThTOELiRW2e3xycgnyj3A
+    values:
+      exposure_time: 3
+      initial_exposure_time: 10
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin BioBased60 Natural Yellow @SL1S 0.05
+    id: lXsyVMSMSpWv0iQu3ZzmjQ
+    values:
+      exposure_time: 3.2
+      initial_exposure_time: 10
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin BioBased60 Natural Yellow @SL1S 0.1
+    id: xd9M1CV2RLiWpO4UmYf5LA
+    values:
+      exposure_time: 4.2
+      initial_exposure_time: 13

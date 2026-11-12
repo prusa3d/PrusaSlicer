@@ -11,8 +11,11 @@
 
 #include "seq_defs.hpp"
 
+#include "Slic3r/Biz/Algorithms/DouglasPeucker.hpp"
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/ClipperUtils.hpp"
+#include "Slic3r/Biz/Algorithms/Point.hpp"
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
 
 #include "seq_preprocess.hpp"
 #include "libseqarrange/seq_interface.hpp"
@@ -22,6 +25,7 @@
 
 using namespace std;
 using namespace Slic3r;
+using namespace Slic3r::Biz;
 //using namespace ClipperLib;
 
 
@@ -375,7 +379,7 @@ void scaleDown_PolygonForSequentialSolver(coord_t                scale_factor,
     {
 	scale_down_polygon.points.insert(scale_down_polygon.points.begin() + i, Point(polygon.points[i].x() / scale_factor, polygon.points[i].y() / scale_factor));
     }
-    scale_down_polygon.make_counter_clockwise();    
+    Algorithms::Polygon::make_counter_clockwise(scale_down_polygon);
 }
 
 
@@ -387,7 +391,7 @@ Slic3r::Polygon scaleDown_PolygonForSequentialSolver(coord_t scale_factor, const
     {
 	scale_down_polygon.points.insert(scale_down_polygon.points.begin() + i, Point(polygon.points[i].x() / scale_factor, polygon.points[i].y() / scale_factor));
     }
-    scale_down_polygon.make_counter_clockwise();
+    Algorithms::Polygon::make_counter_clockwise(scale_down_polygon);
 
     return scale_down_polygon;
 }
@@ -455,15 +459,17 @@ Slic3r::Polygon scaleUp_PolygonForSlicer(const Polygon &polygon, double x_pos, d
     return scaleUp_PolygonForSlicer(SEQ_SLICER_SCALE_FACTOR, polygon, x_pos, y_pos);
 }
 
-
 Slic3r::Polygon scaleUp_PolygonForSlicer(coord_t scale_factor, const Polygon &polygon, double x_pos, double y_pos)
 {
     Slic3r::Polygon poly = polygon;
 
     for (unsigned int i = 0; i < poly.points.size(); ++i)
-    {	
-	poly.points[i] = Point(poly.points[i].x() * scale_factor + x_pos * scale_factor,
-			       poly.points[i].y() * scale_factor + y_pos * scale_factor);
+    {
+        using Slic3r::Biz::Algorithms::Point::round;
+        poly.points[i] = Point(round(Vec2d{
+            poly.points[i].x() * scale_factor + x_pos * scale_factor,
+            poly.points[i].y() * scale_factor + y_pos * scale_factor
+        }).cast<coord_t>());
     }
 
     return poly;
@@ -590,9 +596,9 @@ void decimate_PolygonForSequentialSolver(double                 DP_tolerance,
 					 bool                   extra_safety)
 {
     decimated_polygon = polygon;
-    decimated_polygon.make_counter_clockwise();
+    Algorithms::Polygon::make_counter_clockwise(decimated_polygon);
 
-    decimated_polygon.douglas_peucker(DP_tolerance);
+    Algorithms::DouglasPeucker::douglas_peucker(decimated_polygon, DP_tolerance);
 
     BoundingBox polygon_box = get_extents(polygon);
     
@@ -608,7 +614,7 @@ void decimate_PolygonForSequentialSolver(double                 DP_tolerance,
 	    bool contains = true;
 	    for (unsigned int i = 0; i < polygon.points.size(); ++i)
 	    {
-		if (!decimated_polygon.contains(polygon.points[i]))
+		if (!Algorithms::Polygon::contains(decimated_polygon, polygon.points[i]))
 		{
 		    contains = false;
 		    break;
@@ -629,7 +635,7 @@ void decimate_PolygonForSequentialSolver(double                 DP_tolerance,
 			bool trunc_contains = true;		    
 			for (unsigned int i = 0; i < prefinal_polygon.points.size(); ++i)
 			{
-			    if (!Slic3r::contains(truncated_polygon, prefinal_polygon.points[i], false))
+			    if (!Slic3r::Biz::Algorithms::Polygon::contains(truncated_polygon, prefinal_polygon.points[i], false))
 			    {
 				trunc_contains = false;
 				break;
@@ -671,7 +677,7 @@ void extend_PolygonConvexUnreachableZone(const SolverConfiguration          &SEQ
 {
     if (!polygon.points.empty())
     {
-	Slic3r::ClipperLib::Paths paths;
+	ClipperLib::Paths paths;
 	
 	for (unsigned int i = 0; i < extruder_polygons.size(); ++i)
 	{
@@ -741,7 +747,7 @@ void prepare_ExtruderPolygons(const SolverConfiguration                  &solver
 	    else
 	    {
 		decimated_polygon = object_to_print.pgns_at_height[j].second;
-		decimated_polygon.make_counter_clockwise();
+        Algorithms::Polygon::make_counter_clockwise(decimated_polygon);
 	    }
 	    
 	    if (!check_PolygonSizeFitToPlate(solver_configuration, SEQ_SLICER_SCALE_FACTOR, decimated_polygon))
@@ -799,7 +805,7 @@ void prepare_ObjectPolygons(const SolverConfiguration                        &so
 
     scaleDown_PolygonForSequentialSolver(raw_polygon,
 					 object_polygon);
-    object_polygon.make_counter_clockwise();    
+    Algorithms::Polygon::make_counter_clockwise(object_polygon);
 }
 
 
@@ -840,7 +846,7 @@ void prepare_UnreachableZonePolygons(const SolverConfiguration                  
 	
 	    scaleDown_PolygonForSequentialSolver(scaled_unreachable_polygons[i][j],
 						 scale_down_polygon);
-	    scale_down_polygon.make_counter_clockwise();
+        Algorithms::Polygon::make_counter_clockwise(scale_down_polygon);
 	    unreachable_polygons.push_back(scale_down_polygon);
 	}
     }    
@@ -887,7 +893,7 @@ void prepare_UnreachableZonePolygons(const SolverConfiguration                  
 	    
 	    scaleDown_PolygonForSequentialSolver(scaled_unreachable_polygons[i][j],
 						 scale_down_polygon);
-	    scale_down_polygon.make_counter_clockwise();	
+        Algorithms::Polygon::make_counter_clockwise(scale_down_polygon);
 	    unreachable_polygons.push_back(scale_down_polygon);
 	}
     }

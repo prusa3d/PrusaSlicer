@@ -80,7 +80,7 @@ using enable_if_t = typename std::enable_if<B, T>::type;
 
 template<class F, class...Args>
 struct invoke_result {
-    using type = typename std::result_of<F(Args...)>::type;
+    using type = typename std::invoke_result<F(Args...)>::type;
 };
 
 template<class F, class...Args>
