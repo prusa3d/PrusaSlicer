@@ -1526,7 +1526,7 @@ endif ()
 find_package(magic_enum REQUIRED)
 find_package(libdeflate CONFIG REQUIRED)
 
-slic3r_remap_configs("pugixml::static;yoga::yogacore;${YAML_LIB}" RelWithDebInfo Release)
+slic3r_remap_configs("pugixml::static;yoga::yogacore;PahoMqttCpp::paho-mqttpp3-static;${YAML_LIB}" RelWithDebInfo Release)
 
 add_library(slic3r-shared STATIC ${SLIC3R_SHARED_FILES})
 
