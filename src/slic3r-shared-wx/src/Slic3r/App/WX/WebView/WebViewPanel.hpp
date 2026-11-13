@@ -45,6 +45,11 @@ public:
         browser_logic()->set_next_show_url(url);
     }
 
+    void reload_default_page() override
+    {
+        load_default_url();
+    }
+
 private:
     std::unique_ptr<App::Browser::AbstractBrowserLogic> m_logic;
     WebViewHost m_host;

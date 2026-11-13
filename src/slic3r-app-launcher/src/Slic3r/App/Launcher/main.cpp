@@ -114,6 +114,8 @@ int main(int argc, char** argv)
 
     auto& app_services{Slic3r::App::AppServices::instance()};
     app_services.set_app_config(Slic3r::App::AppConfig::create_app_config());
+    // Online (cloud) or Offline (Connect Local) Account and Connect, before anything reads their URLs.
+    app_services.app_config().apply_service_mode();
 
     const std::optional<Slic3r::App::Launcher::SentryScope> sentry{
         app_services.app_config().is_sentry_enabled() ?

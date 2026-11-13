@@ -364,8 +364,9 @@ bool DesktopApp::OnInit()
 
     platform_services.set_secret_store(SecretStoreFactory::create_secret_store());
     // Reset Token store if Account not allowed in app_config
-    if (!app_services.app_config().is_prusa_account_enabled()) {
-        Biz::UserAccount::TokenStore::reset();
+    // (Offline mode without a valid server only makes the account unusable, its tokens are kept.)
+    if (!app_services.app_config().is_connect_tab_enabled()) {
+        Biz::UserAccount::TokenStore::reset_all_modes();
     }
     platform_services.set_job_manager(
         std::make_unique<JobManager>(platform_services.main_thread_dispatcher())

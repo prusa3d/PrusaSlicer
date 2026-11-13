@@ -35,6 +35,12 @@ public:
 
     virtual void set_next_show_url(const std::string url) {}
 
+    /**
+     * @brief Asks the logic for its start page and loads it (e.g. after the service it shows
+     * changed).
+     */
+    virtual void reload_default_page() {}
+
     virtual App::Browser::AbstractBrowserLogic* browser_logic() { return nullptr; }
 
     void set_switch_left_tab_fn(std::function<void(LeftBarTabs, const std::string&)> switch_left_tab_fn)

@@ -10,6 +10,7 @@
 #include <Slic3r/Biz/Platform/PlatformServices.hpp>
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Network/IHttp.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/FileDownloader/FileDownloaderJobData.hpp"
 #include "Slic3r/Assert.hpp"
 
@@ -37,6 +38,10 @@ BrowserLogicPrintables::BrowserLogicPrintables(Biz::ProjectInteractor& project_i
 
 std::string BrowserLogicPrintables::access_token()
 {
+    // In offline mode the access token belongs to the Connect Local server, not to Printables.
+    if (Biz::Network::ServiceConfig::instance().is_offline()) {
+        return {};
+    }
     return m_project_interactor.user_account_interactor().access_token();
 }
 
@@ -111,7 +116,8 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_load_default_url()
 
 std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_user_account_id_success(bool is_refresh, const std::string& current_url)
 {
-    if (m_load_default_url) {
+    // Offline the sign-in is the Connect Local one, Printables stays logged out (access_token()).
+    if (m_load_default_url || access_token().empty()) {
         return {};
     }
     SPDLOG_INFO("{}", __FUNCTION__);
@@ -217,7 +223,8 @@ BrowserLogicPrintables::on_printables_event_access_token_expired(const std::stri
     // { "event": "accessTokenExpired")
     // There seems to be a situation where we get accessTokenExpired when there is active token from Slicer POW
     // We need get new token and freeze webview until its not refreshed
-    if (m_refreshing_token) {
+    // Offline there is no Printables token to refresh, see access_token().
+    if (m_refreshing_token || Biz::Network::ServiceConfig::instance().is_offline()) {
         return {};
     }
     m_refreshing_token = true;
@@ -244,6 +251,18 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_pri
     }
     DEBUG_ASSERT(!download_url.empty() && !model_url.empty(), "Faulty printables message.");
 
+    if (Biz::Network::ServiceConfig::instance().is_offline()) {
+        SPDLOG_WARN("Printing from Printables to Connect is not available in offline mode.");
+        AppServices::instance().dialog_manager().show_info_dialog(
+            // TRN Shown when printing a Printables model while PrusaSlicer uses the self-hosted
+            // Prusa Connect Local server (offline mode).
+            Biz::_u8L(
+                "Printing from Printables to Prusa Connect is not available in offline mode. Download the model and slice it instead."
+            ),
+            Biz::_u8L("Print to Prusa Connect")
+        );
+        return {};
+    }
     std::string final_url = Biz::Network::ServiceConfig::instance().connect_printables_print_url() + "?url=" + Biz::Network::IHttp::escape_string(download_url);
     // TODO use final_url
 
@@ -367,16 +386,21 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_sli
 
 std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_required_login(const std::string& message_data)
 {
-    if (!m_project_interactor.user_account_interactor().is_logged_in()) {
-        AppServices::instance().dialog_manager().show_webview_dialog(
-            std::make_unique<Browser::BrowserLogicLogInRedirect>(
-                m_project_interactor.user_account_interactor()
+    if (Biz::Network::ServiceConfig::instance().is_offline()) {
+        // The offline sign-in is the one of the Connect Local server, it does not sign in to
+        // Printables.
+        AppServices::instance().dialog_manager().show_info_dialog(
+            // TRN Shown when Printables asks to sign in while PrusaSlicer uses the self-hosted
+            // Prusa Connect Local server (offline mode).
+            Biz::_u8L(
+                "Signing in to Printables is not available in offline mode. Switch to online Prusa Connect in Preferences to sign in."
             ),
-            &m_project_interactor
+            Biz::_u8L("Printables")
         );
-        if (m_project_interactor.raise_app_fn()) {
-            m_project_interactor.raise_app_fn()();
-        }
+        return {};
+    }
+    if (!m_project_interactor.user_account_interactor().is_logged_in()) {
+        show_log_in_dialog(m_project_interactor);
     }
     return {};
 }
@@ -670,7 +694,7 @@ void BrowserLogicPrintables::emplace_load_default_url_commands(std::vector<Brows
     m_styles_defined = false;
     std::string url_base = override_url.empty() ? Biz::Network::ServiceConfig::instance().printables_url()  + "/homepage" : override_url;
     std::string final_url = url_lang_theme(url_base);
-    const std::string access_token = m_project_interactor.user_account_interactor().access_token();
+    const std::string access_token = this->access_token();
     // in case of opening printables logged out - delete cookies and localstorage to get rid of last login
     //SPDLOG_INFO("{} {} {}", __FUNCTION__, override_url, !access_token.empty());
     if (access_token.empty()) {
