@@ -95,6 +95,11 @@ protected:
     bool handle_logic_command_EndModalCancel(const std::string& data) override;
     bool handle_logic_command_DeleteCookies(const std::string& data) override;
     bool handle_logic_command_DeleteCookiesWithCounter(const std::string& data) override;
+    bool handle_logic_command_DeleteCookie(const std::string& data) override;
+    bool handle_logic_command_SetCookie(
+        const std::string& data,
+        std::vector<App::Browser::BrowserLogicCommand> then
+    ) override;
     bool handle_logic_command_Veto(const std::string& data) override;
     bool handle_logic_command_DoReload(const std::string& data) override;
     bool handle_logic_command_AddUserScript(const std::string& data) override;

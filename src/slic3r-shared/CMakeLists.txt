@@ -450,6 +450,7 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/ThumbnailStoreUpdater.cpp
         
         include/Slic3r/App/Browser/BrowserLogicCommand.hpp
+        include/Slic3r/App/Browser/BrowserCookie.hpp
         include/Slic3r/App/Browser/AbstractBrowserLogicCommandHandler.hpp
         include/Slic3r/App/Browser/AbstractBrowserLogic.hpp
         include/Slic3r/App/Browser/AbstractUploadBrowserLogic.hpp
@@ -459,6 +460,7 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Browser/BrowserLogicConnectSelect.cpp
         include/Slic3r/App/Browser/AbstractConnectRequestHandler.hpp
         src/Slic3r/App/Browser/AbstractConnectRequestHandler.cpp
+        src/Slic3r/App/Browser/BrowserCookie.cpp
         include/Slic3r/App/Browser/BrowserLogicConnectPage.hpp
         src/Slic3r/App/Browser/BrowserLogicConnectPage.cpp
         include/Slic3r/App/Browser/BrowserLogicPrintables.hpp
@@ -1703,6 +1705,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/App/DialogNavigationTests.cpp
             test/Slic3r/App/LoadingProgressDialogTests.cpp
             test/Slic3r/App/AppSettingsAdvancedTests.cpp
+            test/Slic3r/App/Browser/BrowserCookieTests.cpp
             test/Slic3r/App/OpenFiles/OpenFilesDialogModelTests.cpp
 
             test/Slic3r/App/Lua/PluginBundleTests.cpp

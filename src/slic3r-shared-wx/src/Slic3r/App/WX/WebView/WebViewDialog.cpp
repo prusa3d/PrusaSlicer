@@ -597,6 +597,24 @@ bool WebViewDialog::handle_logic_command_DeleteCookiesWithCounter(const std::str
     return true;
 }
 
+bool WebViewDialog::handle_logic_command_DeleteCookie(const std::string& data)
+{
+    m_host.delete_cookie(data);
+    return true;
+}
+
+bool WebViewDialog::handle_logic_command_SetCookie(
+    const std::string& data,
+    std::vector<App::Browser::BrowserLogicCommand> then
+)
+{
+    m_host.set_cookie(
+        data,
+        [this, then]() mutable { process_logic_command_vector(std::move(then)); }
+    );
+    return true;
+}
+
 bool WebViewDialog::handle_logic_command_Veto(const std::string& data)
 {
     // veto is passed up as return value. Not all events can Veto.

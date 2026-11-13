@@ -3,6 +3,8 @@
 #include <wx/event.h>
 #include <wx/timer.h>
 
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -54,6 +56,21 @@ public:
         return m_state == State::Pending;
     }
 
+    /**
+     * @brief Runs fn once the web view is created (WebView2 creates its native web view
+     * asynchronously), right away when it is. Dropped if the web view never comes up.
+     */
+    void run_when_ready(std::function<void()> fn);
+
+    /**
+     * @brief Sets the cookie of a SetCookie command once the web view is created, then calls
+     * done, also when the cookie cannot be set. done is dropped when this host is gone.
+     */
+    void set_cookie(const std::string& command_data, std::function<void()> done);
+
+    /** @brief Deletes the cookie of a DeleteCookie command once the web view is created. */
+    void delete_cookie(const std::string& command_data);
+
 private:
     enum class State
     {
@@ -72,6 +89,9 @@ private:
     State m_state{State::Pending};
 
     wxTimer m_watchdog;
+    std::vector<std::function<void()>> m_when_ready;
+    /** @brief Expires with this host, late completions of cookie operations check it. */
+    std::shared_ptr<char> m_alive{std::make_shared<char>(0)};
 };
 
 } // namespace Slic3r::App::WX::WebView

@@ -160,6 +160,81 @@ void delete_cookies(wxWebView* web_view, const std::string& url)
     }];
 }
 
+void delete_cookie(wxWebView* web_view, const std::string& url, const std::string& name)
+{
+    WKWebView* backend = static_cast<WKWebView*>(web_view->GetNativeBackend());
+    NSURL* ns_url = [NSURL URLWithString:[NSString stringWithUTF8String:url.c_str()]];
+    NSString* host = ns_url.host.lowercaseString;
+    NSString* cookie_name = [NSString stringWithUTF8String:name.c_str()];
+    if (host == nil || cookie_name == nil) {
+        return;
+    }
+    // The cookie store is shared by the web views and retained by the blocks below, so the
+    // deletion finishes even if this web view is destroyed meanwhile.
+    WKHTTPCookieStore* store = backend.configuration.websiteDataStore.httpCookieStore;
+    [store getAllCookies:^(NSArray<NSHTTPCookie*>* cookies) {
+        for (NSHTTPCookie* cookie in cookies) {
+            NSString* domain = cookie.domain.lowercaseString;
+            if ([domain hasPrefix:@"."]) {
+                domain = [domain substringFromIndex:1];
+            }
+            if ([cookie.name isEqualToString:cookie_name] && [domain isEqualToString:host]) {
+                [store deleteCookie:cookie completionHandler:nil];
+            }
+        }
+    }];
+}
+
+void set_cookie(
+    wxWebView* web_view,
+    const App::Browser::BrowserCookie& cookie,
+    std::function<void()> done
+)
+{
+    WKWebView* backend = static_cast<WKWebView*>(web_view->GetNativeBackend());
+    NSURL* ns_url = [NSURL URLWithString:[NSString stringWithUTF8String:cookie.url.c_str()]];
+    NSString* name  = [NSString stringWithUTF8String:cookie.name.c_str()];
+    NSString* value = [NSString stringWithUTF8String:cookie.value.c_str()];
+    NSString* path  = [NSString stringWithUTF8String:(cookie.path.empty() ? "/" : cookie.path.c_str())];
+    if (backend == nil || ns_url == nil || ns_url.host == nil || name == nil || value == nil || path == nil) {
+        SPDLOG_ERROR("{}: the cookie cannot be built.", __FUNCTION__);
+        done();
+        return;
+    }
+    NSMutableDictionary* properties = [NSMutableDictionary dictionary];
+    // The origin, not a domain: a host-only cookie, like the one the server sets itself.
+    properties[NSHTTPCookieOriginURL] = ns_url;
+    properties[NSHTTPCookieName]      = name;
+    properties[NSHTTPCookieValue]     = value;
+    properties[NSHTTPCookiePath]      = path;
+    if (cookie.secure) {
+        properties[NSHTTPCookieSecure] = @"TRUE";
+    }
+    if (cookie.http_only) {
+        // NSHTTPCookie has no public property key for HttpOnly. "HttpOnly" is undocumented but
+        // read by NSHTTPCookie (isHTTPOnly is true then). Should it ever be ignored, the cookie
+        // would become readable by the page's scripts.
+        properties[@"HttpOnly"] = @"TRUE";
+    }
+    if (@available(macOS 10.15, *)) {
+        if (cookie.same_site == "Strict") {
+            properties[NSHTTPCookieSameSitePolicy] = NSHTTPCookieSameSiteStrict;
+        } else if (cookie.same_site == "Lax") {
+            properties[NSHTTPCookieSameSitePolicy] = NSHTTPCookieSameSiteLax;
+        }
+    }
+    NSHTTPCookie* ns_cookie = [NSHTTPCookie cookieWithProperties:properties];
+    if (ns_cookie == nil) {
+        SPDLOG_ERROR("{}: the cookie was refused.", __FUNCTION__);
+        done();
+        return;
+    }
+    WKHTTPCookieStore* store = backend.configuration.websiteDataStore.httpCookieStore;
+    [store setCookie:ns_cookie completionHandler:^{
+        done();
+    }];
+}
+
 void delete_cookies_with_counter(wxWebView* web_view, const std::string& url, std::atomic<size_t>& counter)
 {
     delete_cookies(web_view, url);

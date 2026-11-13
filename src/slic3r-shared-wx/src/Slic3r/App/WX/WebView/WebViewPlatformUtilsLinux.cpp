@@ -1,7 +1,12 @@
 #include "WebViewPlatformUtils.hpp"
 
+#include "Slic3r/Biz/Network/Url.hpp"
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Assert.hpp"
+
+#include <functional>
+#include <memory>
+#include <optional>
 
 #include <webkit2/webkit2.h>
 #include <wx/webview.h>
@@ -68,10 +73,16 @@ void delete_cookie_callback (GObject* source_object, GAsyncResult* result, void*
         SPDLOG_ERROR("Error deleting cookies: {}", err->message);
         g_error_free(err);
         return;
-    } 
+    }
 }
+
+/**
+ * @brief user_data: the name of the cookie to delete (std::string*, owned), nullptr deletes them
+ * all.
+ */
 void get_cookie_callback (GObject* source_object, GAsyncResult* result, void* user_data)
 {
+    const std::unique_ptr<std::string> name(static_cast<std::string*>(user_data));
     GError* err = nullptr;
     WebKitCookieManager *cookie_manager = WEBKIT_COOKIE_MANAGER(source_object);
     GList * cookies = webkit_cookie_manager_get_cookies_finish(cookie_manager, result, &err);
@@ -92,10 +103,29 @@ void get_cookie_callback (GObject* source_object, GAsyncResult* result, void* us
         printf("Secure: %s\n", cookie->secure ? "true" : "false");
         printf("HTTP Only: %s\n", cookie->http_only ? "true" : "false");
         */
-        webkit_cookie_manager_delete_cookie(cookie_manager, cookie, nullptr, (GAsyncReadyCallback)Slic3r::App::WX::WebView::delete_cookie_callback, nullptr);
+        if (!name || *name == soup_cookie_get_name(cookie)) {
+            webkit_cookie_manager_delete_cookie(
+                cookie_manager,
+                cookie,
+                nullptr,
+                (GAsyncReadyCallback) Slic3r::App::WX::WebView::delete_cookie_callback,
+                nullptr
+            );
+        }
         soup_cookie_free(cookie);
     }
     g_list_free(cookies);
+}
+
+WebKitCookieManager* cookie_manager_of(wxWebView* web_view)
+{
+    // The cookie manager belongs to the web context, which outlives this web view.
+    WebKitWebView* native_backend = static_cast<WebKitWebView*>(web_view->GetNativeBackend());
+    if (native_backend == nullptr) {
+        SPDLOG_ERROR("No native web view.");
+        return nullptr;
+    }
+    return webkit_web_context_get_cookie_manager(webkit_web_view_get_context(native_backend));
 }
 }
 void delete_cookies(wxWebView* web_view, const std::string& url)
@@ -109,6 +139,78 @@ void delete_cookies(wxWebView* web_view, const std::string& url)
     WebKitWebContext* context= webkit_web_view_get_context(native_backend);
     WebKitCookieManager* cookieManager = webkit_web_context_get_cookie_manager(context);
     webkit_cookie_manager_get_cookies(cookieManager, uri, nullptr, (GAsyncReadyCallback)Slic3r::App::WX::WebView::get_cookie_callback, nullptr);
+}
+
+void delete_cookie(wxWebView* web_view, const std::string& url, const std::string& name)
+{
+    if (WebKitCookieManager* cookie_manager = cookie_manager_of(web_view)) {
+        webkit_cookie_manager_get_cookies(
+            cookie_manager,
+            url.c_str(),
+            nullptr,
+            (GAsyncReadyCallback) get_cookie_callback,
+            new std::string(name)
+        );
+    }
+}
+
+namespace {
+void add_cookie_callback(GObject* source_object, GAsyncResult* result, void* user_data)
+{
+    std::unique_ptr<std::function<void()>> done(static_cast<std::function<void()>*>(user_data));
+    GError* err = nullptr;
+    webkit_cookie_manager_add_cookie_finish(WEBKIT_COOKIE_MANAGER(source_object), result, &err);
+    if (err) {
+        SPDLOG_ERROR("Error setting a cookie: {}", err->message);
+        g_error_free(err);
+    }
+    (*done)();
+}
+} // namespace
+
+void set_cookie(
+    wxWebView* web_view,
+    const App::Browser::BrowserCookie& cookie,
+    std::function<void()> done
+)
+{
+    const std::optional<Biz::Network::UrlParts> url = Biz::Network::parse_url(cookie.url);
+    // Without brackets and port: a host-only cookie.
+    const std::string host              = url ? url->host : std::string();
+    WebKitCookieManager* cookie_manager = cookie_manager_of(web_view);
+    if (host.empty() || cookie_manager == nullptr) {
+        SPDLOG_ERROR("{}: cannot set a cookie for {}", __FUNCTION__, cookie.url);
+        done();
+        return;
+    }
+    // A domain without a leading dot: host-only, like the one the server sets itself. Max age -1:
+    // a session cookie.
+    SoupCookie* soup_cookie = soup_cookie_new(
+        cookie.name.c_str(),
+        cookie.value.c_str(),
+        host.c_str(),
+        cookie.path.empty() ? "/" : cookie.path.c_str(),
+        -1
+    );
+    soup_cookie_set_http_only(soup_cookie, cookie.http_only);
+    soup_cookie_set_secure(soup_cookie, cookie.secure);
+#if SOUP_CHECK_VERSION(2, 70, 0)
+    if (cookie.same_site == "Strict") {
+        soup_cookie_set_same_site_policy(soup_cookie, SOUP_SAME_SITE_POLICY_STRICT);
+    } else if (cookie.same_site == "Lax") {
+        soup_cookie_set_same_site_policy(soup_cookie, SOUP_SAME_SITE_POLICY_LAX);
+    } else if (cookie.same_site == "None") {
+        soup_cookie_set_same_site_policy(soup_cookie, SOUP_SAME_SITE_POLICY_NONE);
+    }
+#endif
+    webkit_cookie_manager_add_cookie(
+        cookie_manager,
+        soup_cookie,
+        nullptr,
+        (GAsyncReadyCallback) add_cookie_callback,
+        new std::function<void()>(std::move(done))
+    );
+    soup_cookie_free(soup_cookie);
 }
 
 void delete_cookies_with_counter(wxWebView* web_view, const std::string& url, std::atomic<size_t>& counter)
@@ -177,4 +279,5 @@ void setup_webview_devtools(wxWebView* web_view)
     web_view->EnableContextMenu();
     web_view->EnableAccessToDevTools();
 }
-}
+
+} // namespace Slic3r::App::WX::WebView
