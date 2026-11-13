@@ -9,6 +9,7 @@
 
 #include <boost/filesystem/path.hpp>
 #include <algorithm>
+#include <cctype>
 
 namespace Slic3r::Biz::ExportNameParser {
 
@@ -213,6 +214,33 @@ ExportNameData parse_sla_export_name(
     // This line might throw PlaceholderParserError
     result.filename = parser.process(output_filename_format);
     return result;
+}
+
+std::string resolve_fdm_extension(
+    const std::string& remembered_ext,
+    const std::string& format_ext,
+    bool bgcode_allowed
+)
+{
+    const auto to_lower = [](std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+        return s;
+    };
+    const std::string remembered_lower = to_lower(remembered_ext);
+
+    std::string ext = format_ext;
+    if (remembered_lower == ".gcode" || remembered_lower == ".bgcode") {
+        ext = remembered_ext;
+    } else if (bgcode_allowed) {
+        // If we remember something unrelated but allow bgcode, use bgcode
+        ext = ".bgcode";
+    }
+
+    // If bgcode was remembered but is not enabled in this context
+    if (!bgcode_allowed && to_lower(ext) == ".bgcode") {
+        ext = ".gcode";
+    }
+    return ext;
 }
 
 ExportNameData parse_export_name(const Biz::ProjectInteractor& project_interactor)
