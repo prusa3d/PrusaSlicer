@@ -177,6 +177,35 @@ public:
         return account_url() + "/logout";
     }
 
+    // ---- Connect Local app pairing (Offline mode only, empty otherwise) ----
+
+    /**
+     * @brief Starts a pairing (POST, no auth).
+     */
+    std::string offline_pairing_url() const;
+
+    /**
+     * @brief Collects the credential of a pairing (POST, no auth).
+     */
+    std::string offline_pairing_token_url() const;
+
+    /**
+     * @brief Page where the person signs in and approves the pairing with the given user code.
+     * Built from the server URL, not taken from the server reply. Empty for a malformed code.
+     */
+    std::string offline_pairing_page_url(const std::string& user_code) const;
+
+    /**
+     * @brief A credential (DELETE revokes it). Empty for a malformed id.
+     */
+    std::string offline_credential_url(const std::string& credential_id) const;
+
+    /**
+     * @brief Trades the credential (bearer) for a short page session cookie of the server's
+     * web pages (POST), so that the pages never see the credential.
+     */
+    std::string offline_page_session_url() const;
+
     // ---- Other services (not affected by the mode) ----
 
     std::string printables_get_secret_token_url() const

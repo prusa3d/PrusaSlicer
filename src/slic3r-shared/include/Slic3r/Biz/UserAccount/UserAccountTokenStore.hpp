@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ctime>
+#include <optional>
 #include <string>
 
 namespace Slic3r::Biz::UserAccount::TokenStore {
@@ -31,4 +33,55 @@ bool load_tokens(StoreData& result);
  */
 void reset();
 
+/**
+ * @brief reset() and clear_offline_credential(): no account of either service mode is kept.
+ */
+void reset_all_modes();
+
+/**
+ * @brief The credential of a Connect Local app pairing (offline mode). Kept in its own store as
+ * token|credential_id|expires_at|server_url, apart from the Prusa Account tokens.
+ */
+struct OfflineCredential
+{
+    std::string token;
+    std::string credential_id;
+    /** @brief Unix time, 0 when unknown. */
+    std::time_t expires_at{0};
+    /** @brief The server that issued it, normalized (ServiceConfig::offline_server_url()). */
+    std::string server_url;
+};
+
+std::string serialize_offline_credential(const OfflineCredential& credential);
+
+/**
+ * @brief nullopt for an empty or broken record.
+ */
+std::optional<OfflineCredential> parse_offline_credential(const std::string& record);
+
+bool save_offline_credential(const OfflineCredential& credential);
+
+enum class StoreReadStatus
+{
+    /** @brief A usable record was read. */
+    Ok,
+    /** @brief The store holds no record (or a broken one). */
+    Empty,
+    /** @brief The store could not be read: nothing is known about its content. */
+    Error,
+};
+
+struct OfflineCredentialRead
+{
+    StoreReadStatus status{StoreReadStatus::Empty};
+    /** @brief Set exactly when status is Ok. */
+    std::optional<OfflineCredential> credential;
+};
+
+/**
+ * @brief Reads the offline store, telling an empty store from one that cannot be read.
+ */
+OfflineCredentialRead read_offline_credential();
+
+void clear_offline_credential();
 }

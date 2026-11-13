@@ -26,6 +26,9 @@ constexpr std::string_view OFFLINE_SELECT_PRINTER_PATH =
 constexpr std::string_view OFFLINE_CONNECT_PAGE_PATH = "/"; // S +
 constexpr std::string_view OFFLINE_ACCOUNT_API_PATH  = "/account"; // M +
 constexpr std::string_view OFFLINE_CONNECT_API_PATH  = "/connect"; // M +
+constexpr std::string_view OFFLINE_PAIRING_API_PATH  = "/api/v1/auth/app-pairings"; // S +
+constexpr std::string_view OFFLINE_CREDENTIALS_PATH  = "/api/v1/auth/credentials/"; // S +
+constexpr std::string_view OFFLINE_PAIRING_PAGE_PATH = "/pair?code="; // S +
 
 void update_from_env(std::string& dest, const char* env_name, bool remove_trailing_slash)
 {
@@ -64,6 +67,13 @@ void update_url_from_env(std::string& dest, const char* env_name, const std::vec
             dest
         );
     }
+}
+
+/** @brief Whether the text consists of ASCII letters, digits and the given characters only. */
+bool is_ascii_alnum_or(std::string_view text, const char* others)
+{
+    using namespace boost::algorithm;
+    return all(text, is_alnum(std::locale::classic()) || is_any_of(others));
 }
 }
 
@@ -239,6 +249,46 @@ std::string ServiceConfig::account_url() const
 std::string ServiceConfig::account_token_url() const
 {
     return mode_url(&ModeUrls::account_token);
+}
+
+// ---- Connect Local app pairing ----
+
+std::string ServiceConfig::offline_pairing_url() const
+{
+    const std::string server = offline_server_url();
+    return server.empty() ? std::string() : server + std::string(OFFLINE_PAIRING_API_PATH);
+}
+
+std::string ServiceConfig::offline_pairing_token_url() const
+{
+    const std::string url = offline_pairing_url();
+    return url.empty() ? std::string() : url + "/token";
+}
+
+std::string ServiceConfig::offline_pairing_page_url(const std::string& user_code) const
+{
+    // The code is the only part of the URL taken from the server, keep it to the characters a user
+    // code consists of, so it cannot add anything to the URL.
+    const std::string server = offline_server_url();
+    if (server.empty() || user_code.empty() || !is_ascii_alnum_or(user_code, "-")) {
+        return {};
+    }
+    return server + std::string(OFFLINE_PAIRING_PAGE_PATH) + user_code;
+}
+
+std::string ServiceConfig::offline_page_session_url() const
+{
+    const std::string url = offline_pairing_url();
+    return url.empty() ? std::string() : url + "/session";
+}
+
+std::string ServiceConfig::offline_credential_url(const std::string& credential_id) const
+{
+    const std::string server = offline_server_url();
+    if (server.empty() || credential_id.empty() || !is_ascii_alnum_or(credential_id, "-_")) {
+        return {};
+    }
+    return server + std::string(OFFLINE_CREDENTIALS_PATH) + credential_id;
 }
 
 } // namespace Slic3r::Biz::Network

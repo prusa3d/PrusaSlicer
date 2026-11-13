@@ -154,6 +154,9 @@ HttpCurl::HttpCurl(RequestMethod request_method, std::string&& url, RetryFn fn) 
     case IHttp::RequestMethod::Patch:
         curl_easy_setopt(m_curl.get(), CURLOPT_CUSTOMREQUEST, "PATCH");
         break;
+    case IHttp::RequestMethod::Delete:
+        curl_easy_setopt(m_curl.get(), CURLOPT_CUSTOMREQUEST, "DELETE");
+        break;
     case IHttp::RequestMethod::Get:
     default:
         break;
@@ -403,9 +406,16 @@ void HttpCurl::perform_sync(const HttpRetryOpt& retry_opts)
         ::curl_easy_setopt(m_curl.get(), CURLOPT_HTTPPOST, m_form.get());
     }
 
+    const bool has_body =
+        !m_post_fields.empty() || m_form || !m_mime_data.empty() || !m_upload_data.empty();
     if (!m_post_fields.empty()) {
         ::curl_easy_setopt(m_curl.get(), CURLOPT_POSTFIELDS, m_post_fields.c_str());
         ::curl_easy_setopt(m_curl.get(), CURLOPT_POSTFIELDSIZE_LARGE, m_post_fields.size());
+    } else if (m_request_method == IHttp::RequestMethod::Post && !has_body) {
+        // A POST without any body: without POSTFIELDS curl would read the body through the read
+        // callback from the default READDATA (stdin). Send an empty body, Content-Length: 0.
+        ::curl_easy_setopt(m_curl.get(), CURLOPT_POSTFIELDS, "");
+        ::curl_easy_setopt(m_curl.get(), CURLOPT_POSTFIELDSIZE_LARGE, curl_off_t{0});
     }
 
     if (!m_mime_data.empty()) {

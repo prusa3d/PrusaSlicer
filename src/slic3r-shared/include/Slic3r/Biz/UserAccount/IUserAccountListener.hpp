@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Slic3r/Biz/Network/IHttp.hpp"
+#include "Slic3r/Biz/UserAccount/IUserAccountActionCallbacks.hpp"
+
+#include <ctime>
 #include <string>
 #include <functional>
 
@@ -30,6 +33,27 @@ public:
     virtual void on_printables_secret_token(const std::string& body) {};
 
     virtual void on_user_account_enabled_state_changed(bool is_enabled) {};
+
+    /**
+     * @brief Connect Local app pairing started (or a waiting one is shown again): the person
+     * approves user_code on page_url.
+     */
+    virtual void
+    on_user_account_pairing_ready(const std::string& page_url, const std::string& user_code) {};
+    /**
+     * @brief Connect Local app pairing ended without signing in.
+     */
+    virtual void on_user_account_pairing_failed(PairingFailure failure) {};
+    /**
+     * @brief Connect Local app pairing approved and its credential collected. Comes before the
+     * account is loaded and on_user_account_id_success is announced.
+     */
+    virtual void on_user_account_pairing_approved() {};
+    /**
+     * @brief The Connect Local credential expires soon (unix time) and cannot be renewed: the
+     * person has to sign in again after it.
+     */
+    virtual void on_user_account_credential_expires_soon(std::time_t expires_at) {};
 };
 
 class IConnectHandlerListener 

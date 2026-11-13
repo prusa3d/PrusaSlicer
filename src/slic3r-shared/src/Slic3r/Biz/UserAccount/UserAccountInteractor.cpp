@@ -1,6 +1,8 @@
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountCommunicationDummy.hpp"
+#include "Slic3r/Biz/UserAccount/UserAccountCommunicationPairing.hpp"
+#include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Log.hpp"
 
 #include <nlohmann/json.hpp>
@@ -20,28 +22,64 @@ void UserAccountInteractor::init(bool app_config_enabled)
     bool was_enabled = is_enabled();
     if (app_config_enabled) {
         if (!is_enabled()) {
-            replace_communication(std::make_unique<UserAccountCommunication>(m_dispatcher));
-            m_communication->add_session_listener(this);
-            m_communication->init();
+            start_communication();
         }
     } else {
         if (is_enabled()) {
-            bool was_logged = is_logged_in();
-            do_log_out();
-            replace_communication(std::make_unique<UserAccountCommunicationDummy>());
-            m_communication->add_session_listener(this);
-
-            // This switch ends dispatching from UserAccountSessionDispatchBase before it can asynchrtonously dispatch loggout.
-            // We do it manually here (possible double dispatch is ok).
-            // Cut off of other messages is correct.
-            if (was_logged) {
-                invoke_listeners<IUserAccountListener>(
-                    [](auto* listener) { listener->on_user_account_logged_out(); }
-                );
-            }
+            stop_communication();
         }
     }
-    
+
+    notify_enabled_state_if_changed(was_enabled);
+}
+
+void UserAccountInteractor::restart(bool app_config_enabled, const std::function<void()>& between)
+{
+    const bool was_enabled = is_enabled();
+    if (was_enabled) {
+        stop_communication();
+    }
+    if (between) {
+        between();
+    }
+    if (app_config_enabled) {
+        start_communication();
+    }
+    notify_enabled_state_if_changed(was_enabled);
+}
+
+void UserAccountInteractor::start_communication()
+{
+    // Connect Local signs in by app pairing, Prusa Account by OAuth.
+    if (Network::ServiceConfig::instance().is_offline()) {
+        replace_communication(std::make_unique<UserAccountCommunicationPairing>(m_dispatcher));
+    } else {
+        replace_communication(std::make_unique<UserAccountCommunication>(m_dispatcher));
+    }
+    m_communication->add_session_listener(this);
+    m_communication->init();
+}
+
+void UserAccountInteractor::stop_communication()
+{
+    bool was_logged = is_logged_in();
+    // Not a logout the person asked for: nothing is revoked on a Connect Local server.
+    m_communication->log_out_locally(was_logged);
+    replace_communication(std::make_unique<UserAccountCommunicationDummy>());
+    m_communication->add_session_listener(this);
+
+    // This switch ends dispatching from UserAccountSessionDispatchBase before it can asynchrtonously dispatch loggout.
+    // We do it manually here (possible double dispatch is ok).
+    // Cut off of other messages is correct.
+    if (was_logged) {
+        invoke_listeners<IUserAccountListener>(
+            [](auto* listener) { listener->on_user_account_logged_out(); }
+        );
+    }
+}
+
+void UserAccountInteractor::notify_enabled_state_if_changed(bool was_enabled)
+{
     if (bool enabled = is_enabled(); enabled != was_enabled) {
         invoke_listeners<IUserAccountListener>(
             [enabled](auto* listener) { listener->on_user_account_enabled_state_changed(enabled); }
@@ -76,6 +114,11 @@ UserAccountInteractor::~UserAccountInteractor()
 void UserAccountInteractor::do_log_out()
 {
     m_communication->do_log_out(is_logged_in());
+}
+
+void UserAccountInteractor::log_out_locally()
+{
+    m_communication->log_out_locally(is_logged_in());
 }
 
 std::string
@@ -152,6 +195,58 @@ std::string UserAccountInteractor::user_id() const
 void UserAccountInteractor::request_printables_secret_token()
 {
     m_communication->request_printables_secret_token();
+}
+
+void UserAccountInteractor::start_pairing()
+{
+    m_communication->start_pairing();
+}
+
+void UserAccountInteractor::cancel_pairing()
+{
+    m_communication->cancel_pairing();
+}
+
+void UserAccountInteractor::on_unauthorized(const std::string& access_token)
+{
+    m_communication->on_unauthorized(access_token);
+}
+
+void UserAccountInteractor::
+    request_page_session(std::function<void(std::optional<std::string>)> done, bool fresh)
+{
+    m_communication->enqueue_page_session_action(std::move(done), fresh);
+}
+
+void
+UserAccountInteractor::on_pairing_ready(const std::string& page_url, const std::string& user_code)
+{
+    invoke_listeners<IUserAccountListener>(
+        [&page_url, &user_code](auto* listener)
+        { listener->on_user_account_pairing_ready(page_url, user_code); }
+    );
+}
+
+void UserAccountInteractor::on_pairing_failed(PairingFailure failure)
+{
+    invoke_listeners<IUserAccountListener>(
+        [failure](auto* listener) { listener->on_user_account_pairing_failed(failure); }
+    );
+}
+
+void UserAccountInteractor::on_pairing_approved()
+{
+    invoke_listeners<IUserAccountListener>(
+        [](auto* listener) { listener->on_user_account_pairing_approved(); }
+    );
+}
+
+void UserAccountInteractor::on_credential_expires_soon(std::time_t expires_at)
+{
+    invoke_listeners<IUserAccountListener>(
+        [expires_at](auto* listener)
+        { listener->on_user_account_credential_expires_soon(expires_at); }
+    );
 }
 
 void UserAccountInteractor::on_action_retry(const Network::IHttp::Retry& retry)
@@ -297,11 +392,13 @@ void UserAccountInteractor::on_user_id(const std::string& body)
         }
     } catch (const nlohmann::json::exception&) {
         SPDLOG_INFO("UserIDUserAction Could not parse server response.");
+        m_communication->on_user_id_unusable();
         return;
     }
 
     if (m_account_user_data.find("public_username") == m_account_user_data.end()) {
         SPDLOG_ERROR("User ID message from PrusaAuth did not contain public_username. Login failed. Keys received: [{}]", received_keys);
+        m_communication->on_user_id_unusable();
         return;
     }
     std::string public_username = m_account_user_data["public_username"];

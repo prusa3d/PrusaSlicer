@@ -1124,6 +1124,9 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/UserAccount/IUserAccountCommunication.hpp
         include/Slic3r/Biz/UserAccount/UserAccountCommunication.hpp
         include/Slic3r/Biz/UserAccount/UserAccountCommunicationDummy.hpp
+        include/Slic3r/Biz/UserAccount/UserAccountCommunicationPairing.hpp
+        include/Slic3r/Biz/UserAccount/UserAccountPairing.hpp
+        include/Slic3r/Biz/UserAccount/UserAccountBackgroundWorker.hpp
         include/Slic3r/Biz/UserAccount/UserAccountSession.hpp
         include/Slic3r/Biz/UserAccount/UserAccountSessionDispatchBase.hpp
         include/Slic3r/Biz/UserAccount/UserAccountAction.hpp
@@ -1137,6 +1140,8 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/UserAccount/ConnectUtils.hpp
         src/Slic3r/Biz/UserAccount/UserAccountInteractor.cpp
         src/Slic3r/Biz/UserAccount/UserAccountCommunication.cpp
+        src/Slic3r/Biz/UserAccount/UserAccountCommunicationPairing.cpp
+        src/Slic3r/Biz/UserAccount/UserAccountPairing.cpp
         src/Slic3r/Biz/UserAccount/UserAccountSession.cpp
         src/Slic3r/Biz/UserAccount/UserAccountSessionDispatchBase.cpp
         src/Slic3r/Biz/UserAccount/UserAccountAction.cpp
@@ -1762,6 +1767,7 @@ if(SLIC3R_BUILD_TESTS)
         test/Slic3r/TestUtils/AppInstanceMessageHandlerScope.hpp
         test/Slic3r/TestUtils/DispatchUtils.hpp
         test/Slic3r/TestUtils/JobManagerScope.hpp
+        test/Slic3r/TestUtils/MemorySecretStore.hpp
         test/Slic3r/TestUtils/ScopedThreadDispatcher.hpp
 
             test/Slic3r/Biz/Expr/ParserTests.cpp
@@ -1823,6 +1829,8 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/MainThreadDialogProviderTests.cpp
 
         test/Slic3r/Biz/UserAccount/UserAccountSessionTests.cpp
+        test/Slic3r/Biz/UserAccount/UserAccountPairingTests.cpp
+        test/Slic3r/Biz/UserAccount/UserAccountTokenStoreTests.cpp
         test/Slic3r/Biz/Network/ServiceConfigTests.cpp
         test/Slic3r/Biz/Network/ServerTrustTests.cpp
         test/Slic3r/Biz/Network/UrlTests.cpp

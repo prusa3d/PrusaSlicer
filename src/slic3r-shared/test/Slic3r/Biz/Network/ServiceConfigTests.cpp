@@ -127,6 +127,12 @@ TEST_CASE("Offline service URLs are derived from the Connect Local server", "[Se
     CHECK(sc.account_url() == M + "/account");
     CHECK(sc.account_me_url() == M + "/account/api/v1/me/");
 
+    CHECK(sc.offline_pairing_url() == S + "/api/v1/auth/app-pairings");
+    CHECK(sc.offline_pairing_token_url() == S + "/api/v1/auth/app-pairings/token");
+    CHECK(sc.offline_page_session_url() == S + "/api/v1/auth/app-pairings/session");
+    CHECK(sc.offline_pairing_page_url("BCDF-GHJK") == S + "/pair?code=BCDF-GHJK");
+    CHECK(sc.offline_credential_url("c0ffee-01") == S + "/api/v1/auth/credentials/c0ffee-01");
+
     CHECK(sc.connect_url() == M + "/connect");
     CHECK(sc.connect_page_url() == S + "/");
     CHECK(
@@ -139,6 +145,36 @@ TEST_CASE("Offline service URLs are derived from the Connect Local server", "[Se
     const std::string printables = sc.printables_url();
     sc.set_mode(ServiceMode::Offline, S);
     CHECK(sc.printables_url() == printables);
+}
+
+TEST_CASE(
+    "Pairing URLs exist only offline and take nothing unsafe from the server",
+    "[ServiceConfig][connect-local]"
+)
+{
+    ModeGuard guard;
+    ServiceConfig& sc = ServiceConfig::instance();
+
+    sc.set_mode(ServiceMode::Online);
+    CHECK(sc.offline_pairing_url().empty());
+    CHECK(sc.offline_pairing_token_url().empty());
+    CHECK(sc.offline_pairing_page_url("BCDF-GHJK").empty());
+    CHECK(sc.offline_credential_url("1").empty());
+    CHECK(sc.offline_page_session_url().empty());
+
+    sc.set_mode(ServiceMode::Offline, "https://pcl.local:8443/base/");
+    CHECK(
+        sc.offline_pairing_page_url("BCDF-GHJK")
+        == "https://pcl.local:8443/base/pair?code=BCDF-GHJK"
+    );
+    CHECK(sc.offline_pairing_page_url("").empty());
+    CHECK(sc.offline_pairing_page_url("AB&next=https://evil").empty());
+    CHECK(sc.offline_pairing_page_url("AB CD").empty());
+    CHECK(sc.offline_pairing_page_url("AB\xC3\x81").empty());
+    CHECK(sc.offline_credential_url("id\xE9").empty());
+    CHECK(sc.offline_credential_url("").empty());
+    CHECK(sc.offline_credential_url("../me").empty());
+    CHECK(sc.offline_credential_url("1?x=y").empty());
 }
 
 TEST_CASE("Offline mode without a valid server has no Account URLs", "[ServiceConfig]")
@@ -154,6 +190,10 @@ TEST_CASE("Offline mode without a valid server has no Account URLs", "[ServiceCo
     CHECK(sc.connect_url().empty());
     CHECK(sc.connect_page_url().empty());
     CHECK(sc.connect_select_printer_url().empty());
+    CHECK(sc.offline_pairing_url().empty());
+    CHECK(sc.offline_pairing_token_url().empty());
+    CHECK(sc.offline_pairing_page_url("BCDF-GHJK").empty());
+    CHECK(sc.offline_credential_url("1").empty());
 
     sc.set_mode(ServiceMode::Online, "http://192.168.1.10:8080");
     CHECK(sc.offline_server_url().empty());

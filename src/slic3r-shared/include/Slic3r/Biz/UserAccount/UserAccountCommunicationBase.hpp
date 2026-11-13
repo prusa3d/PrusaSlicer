@@ -96,6 +96,11 @@ protected:
     void init_session_thread();
 
     /**
+     * @brief Enqueues the download of the avatar at the absolute url; the file gets the extension.
+     */
+    void enqueue_avatar_download(const std::string& url, const std::string& extension);
+
+    /**
      * @brief Wakes up the session thread. Needs to be called if the session should start
      * processing its action queue.
      */

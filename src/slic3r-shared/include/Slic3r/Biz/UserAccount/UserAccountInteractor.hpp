@@ -12,6 +12,8 @@
 #include <functional>
 #include <mutex>
 #include <map>
+#include <optional>
+#include <string>
 #include <vector>
 
 namespace Slic3r::Biz {
@@ -38,6 +40,14 @@ public:
     void init(bool app_config_enabled);
 
     /**
+     * @brief Logs out and drops the current communication (if any), calls between(), then starts a
+     * new communication if enabled. Used when the Account server changes: the new session picks up
+     * the service URLs and token store applied in between. The enabled state is reported only if it
+     * ends up different from the start.
+     */
+    void restart(bool app_config_enabled, const std::function<void()>& between);
+
+    /**
      * @brief Returns true if communication was initilized.
      */
     bool is_enabled() const;
@@ -46,6 +56,12 @@ public:
      * @brief Logs out of User Account, tokens are thrown out, all other running apps gets message to log out.
      */
     void do_log_out();
+
+    /**
+     * @brief Ends the session without revoking anything on a Connect Local server and keeps its
+     * credential stored, e.g. when the person chooses to work without an account.
+     */
+    void log_out_locally();
 
     /**
      * @brief Returns url to be displayed in browser for logging in.
@@ -136,10 +152,37 @@ public:
 
     void request_printables_secret_token();
 
+    /**
+     * @brief Connect Local sign-in: starts an app pairing, replacing a running one.
+     * Results come as on_user_account_pairing_ready / _failed and on_user_account_id_success.
+     */
+    void start_pairing();
+    void cancel_pairing();
+
+    /**
+     * @brief The server answered access_token with HTTP 401 outside the session (printer list,
+     * upload). Offline this logs out, a Connect Local credential cannot be renewed. Main thread.
+     */
+    void on_unauthorized(const std::string& access_token);
+
+    /**
+     * @brief Offline: opens a page session for the Connect Local web pages, see
+     * IUserAccountCommunication::enqueue_page_session_action().
+     */
+    void request_page_session(std::function<void(std::optional<std::string>)> done, bool fresh);
+
+    void on_pairing_ready(const std::string& page_url, const std::string& user_code) override;
+    void on_pairing_failed(PairingFailure failure) override;
+    void on_pairing_approved() override;
+    void on_credential_expires_soon(std::time_t expires_at) override;
+
 private:
     void on_user_id(const std::string& body);
     void notify_action_retry_finished();
     void replace_communication(std::unique_ptr<IUserAccountCommunication> communication);
+    void start_communication();
+    void stop_communication();
+    void notify_enabled_state_if_changed(bool was_enabled);
 
     Platform::IMainThreadDispatcher& m_dispatcher;
     mutable std::mutex m_communication_mutex;

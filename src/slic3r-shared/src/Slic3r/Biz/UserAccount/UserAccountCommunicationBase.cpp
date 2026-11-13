@@ -82,9 +82,15 @@ boost::filesystem::path UserAccountCommunicationBase::avatar() const
 void UserAccountCommunicationBase::on_avatar_url(const std::string& data)
 {
     const boost::filesystem::path server_file(data);
-    m_avatar_extension = server_file.extension().string();
+    enqueue_avatar_download(data, server_file.extension().string());
+}
+
+void UserAccountCommunicationBase::
+    enqueue_avatar_download(const std::string& url, const std::string& extension)
+{
+    m_avatar_extension = extension;
     ASSERT(m_session.is_initialized());
-    m_session.enqueue_action({UserAccountActionID::Avatar, nullptr, nullptr, data, {}});
+    m_session.enqueue_action({UserAccountActionID::Avatar, nullptr, nullptr, url, {}});
     wakeup_session_thread();
 }
 

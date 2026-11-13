@@ -2,11 +2,11 @@
 #include "Slic3r/Biz/Network/MockHttpFactory.hpp"
 
 #include "Slic3r/App/Platform/StdMainThreadDispatcher.hpp"
-#include "Slic3r/Biz/Platform/ISecretStore.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountSession.hpp"
 #include "Slic3r/Biz/UserAccount/IUserAccountSessionListener.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountTokenStore.hpp"
+#include "Slic3r/TestUtils/MemorySecretStore.hpp"
 
 #include <boost/beast/core/detail/base64.hpp>
 #include <nlohmann/json.hpp>
@@ -28,30 +28,6 @@ using namespace Slic3r::Biz;
 using namespace Slic3r::Biz::UserAccount;
 
 namespace {
-
-class MemorySecretStore : public Platform::ISecretStore
-{
-public:
-    bool save_secret(const std::string& opt, const std::string& usr, const std::string& psswd) override
-    {
-        m_secrets[opt] = {usr, psswd};
-        return true;
-    }
-
-    bool load_secret(const std::string& opt, std::string& usr, std::string& psswd) override
-    {
-        const auto it = m_secrets.find(opt);
-        if (it == m_secrets.end()) {
-            return false;
-        }
-        usr    = it->second.first;
-        psswd  = it->second.second;
-        return true;
-    }
-
-private:
-    std::map<std::string, std::pair<std::string, std::string>> m_secrets;
-};
 
 class AccountMockHttp : public Network::MockHttp
 {
@@ -88,6 +64,14 @@ public:
     void on_new_refresh_time(long long) override {}
     void on_race_lost(const std::string&) override {}
     void on_printables_secret_token(const std::string&) override {}
+
+    void on_pairing_ready(const std::string&, const std::string&) override {}
+
+    void on_pairing_failed(PairingFailure) override {}
+
+    void on_pairing_approved() override {}
+
+    void on_credential_expires_soon(std::time_t) override {}
 
     void on_logged_out(bool notify_owner, bool was_logged_in) override
     {
@@ -126,7 +110,7 @@ struct SessionFixture
     {
         Network::configure_http_factory_with_mock();
 
-        auto store   = std::make_unique<MemorySecretStore>();
+        auto store   = std::make_unique<Tests::MemorySecretStore>();
         secret_store = store.get();
         Platform::PlatformServices::instance().set_secret_store(std::move(store));
 
@@ -164,7 +148,7 @@ struct SessionFixture
         return data;
     }
 
-    MemorySecretStore* secret_store{nullptr};
+    Tests::MemorySecretStore* secret_store{nullptr};
     bool token_store_available{false};
     std::vector<std::string> performed_urls;
     std::function<void(Network::MockHttp&)> on_perform;
@@ -279,6 +263,39 @@ TEST_CASE_METHOD(SessionFixture, "Cancel applies to the whole queue drain", "[us
 
     CHECK(performed_urls.size() == 2);
     CHECK(follow_up_was_cancelled);
+}
+
+TEST_CASE_METHOD(
+    SessionFixture,
+    "An action enqueued after a logout is not cancelled by it",
+    "[user_account]"
+)
+{
+    session.set_tokens("access-token", "refresh-token", "session-key", std::time(nullptr) + 3600);
+    session.enqueue_test_with_refresh();
+
+    bool second_cancelled = true;
+    on_perform            = [&](Network::MockHttp& http)
+    {
+        auto& mock = static_cast<AccountMockHttp&>(http);
+        if (performed_urls.size() == 1) {
+            // Logout while the first request runs, then a new request (e.g. a pairing).
+            session.do_clear(false);
+            session.enqueue_priority_action(
+                {UserAccountActionID::TestAccessToken, nullptr, nullptr, {}, {}}
+            );
+            CHECK(mock.poll_cancel());
+            http.invoke_error({}, "cancelled", 0);
+        } else {
+            second_cancelled = mock.poll_cancel();
+            http.invoke_error({}, "offline", 0);
+        }
+    };
+
+    session.process_action_queue();
+
+    CHECK(performed_urls.size() == 2);
+    CHECK_FALSE(second_cancelled);
 }
 
 TEST_CASE_METHOD(SessionFixture, "Logout reports whether a session was signed in", "[user_account]")

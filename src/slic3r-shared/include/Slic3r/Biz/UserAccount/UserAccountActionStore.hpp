@@ -27,6 +27,13 @@ public:
         //m_actions[UserAccountActionID::TestConnection] = std::make_unique<UserAccountActionGetWithEvent>("TEST_CONNECTION", sc.account_me_url(), ActionSuccessType::None, ActionFailType::Reset);
         m_actions[UserAccountActionID::Avatar] = std::make_unique<UserAccountActionGetWithEvent>("AVATAR", std::string(), ActionSuccessType::Avatar, ActionFailType::Fail, false);
         m_actions[UserAccountActionID::ConnectPrinterModels] = std::make_unique<UserAccountActionGetWithEvent>("CONNECT_PRINTER_MODELS", sc.connect_printer_list_url(), ActionSuccessType::ConnectPrinterModels, ActionFailType::Fail);
+        // Connect Local, empty URLs (never used) online.
+        m_actions[UserAccountActionID::PairingRequest] =
+            std::make_unique<UserAccountActionPost>("PAIRING_REQUEST", sc.offline_pairing_url());
+        m_actions[UserAccountActionID::PairingPoll] =
+            std::make_unique<UserAccountActionPost>("PAIRING_POLL", sc.offline_pairing_token_url());
+        m_actions[UserAccountActionID::PageSession] =
+            std::make_unique<UserAccountActionPost>("PAGE_SESSION", sc.offline_page_session_url());
         m_actions[UserAccountActionID::ConnectDataFromUuid] = std::make_unique<UserAccountActionGetWithEvent>("CONNECT_DATA_FROM_UUID", sc.connect_printers_url(), ActionSuccessType::PrinterData, ActionFailType::PrinterData);
 	}
 	~UserAccountActionStore() = default;
