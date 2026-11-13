@@ -903,6 +903,15 @@ Scene::GizmoActivationState CutGizmo::on_mouse(Scene::GizmoEventContext& ctx, bo
             return Scene::GizmoActivationState::Done;
         }
 
+        if (event_button == Platform::MouseButton::Left
+            && event_key_modifiers & Platform::KeyModifiers(Platform::KeyModifier::Shift))
+        {
+            m_is_cut_line_processing = true;
+            m_line_beg = ray_origin_on_near_z_plane(m_scene_presenter.scene().camera(), pick_ray);
+            m_line_end = m_line_beg;
+            return Scene::GizmoActivationState::Active;
+        }
+
         if (const Scene::Node* handle_node =
                 ctx.pick_result_node_with_tag_of_type<CutHandleNodeTag>())
         {
@@ -915,16 +924,6 @@ Scene::GizmoActivationState CutGizmo::on_mouse(Scene::GizmoEventContext& ctx, bo
         } else if (ctx.pick_result_node_with_tag_of_type<CutPlaneNodeTag>()) {
             m_is_plane_hovered          = true;
             m_translation_ray.direction = context().state.rotation_m * Vec3d::UnitZ();
-        } else if (
-            event_button == Platform::MouseButton::Left
-            && event_key_modifiers & Platform::KeyModifiers(Platform::KeyModifier::Shift)
-            && !m_is_cut_line_processing
-        )
-        {
-            m_is_cut_line_processing = true;
-            m_line_beg = ray_origin_on_near_z_plane(m_scene_presenter.scene().camera(), pick_ray);
-            m_line_end = m_line_beg;
-            return Scene::GizmoActivationState::Active;
         } else {
             on_stop_dragging();
             return Scene::GizmoActivationState::Inactive;
@@ -947,10 +946,6 @@ Scene::GizmoActivationState CutGizmo::on_mouse(Scene::GizmoEventContext& ctx, bo
         m_start_t          = t;
         m_start_dragging_m = context().state.rotation_m;
         m_can_flip_plane   = m_is_plane_hovered;
-        return Scene::GizmoActivationState::Active;
-    }
-
-    if (event_type == Platform::MouseEvent::Type::ButtonDown && m_is_cut_line_processing) {
         return Scene::GizmoActivationState::Active;
     }
 
