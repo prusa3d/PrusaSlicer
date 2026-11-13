@@ -1091,6 +1091,9 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/Network/Bonjour.hpp
         include/Slic3r/Biz/Network/TCPConsole.hpp
         include/Slic3r/Biz/Network/ServiceConfig.hpp
+        include/Slic3r/Biz/Network/ServerTrust.hpp
+        include/Slic3r/Biz/Network/ServerTrustProbe.hpp
+        include/Slic3r/Biz/Network/Tls.hpp
         include/Slic3r/Biz/Network/Url.hpp
         include/Slic3r/Biz/Network/Jwt.hpp
         include/Slic3r/Biz/Network/MqttSubscriber.hpp
@@ -1099,6 +1102,9 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Network/Bonjour.cpp
         src/Slic3r/Biz/Network/TCPConsole.cpp
         src/Slic3r/Biz/Network/ServiceConfig.cpp
+        src/Slic3r/Biz/Network/ServerTrust.cpp
+        src/Slic3r/Biz/Network/ServerTrustProbe.cpp
+        src/Slic3r/Biz/Network/Tls.cpp
         src/Slic3r/Biz/Network/Url.cpp
         src/Slic3r/Biz/Network/Jwt.cpp
         src/Slic3r/Biz/Network/HttpCurlFactory.cpp
@@ -1488,6 +1494,9 @@ find_package(nlohmann_json 3.11 REQUIRED)
 find_package(EXPAT CONFIG REQUIRED)
 find_package(pugixml CONFIG REQUIRED)
 find_package(PahoMqttCpp REQUIRED)
+# libcrypto parses and verifies the X.509 certificates of the Connect Local server for the web
+# views (Biz/Network/Tls.cpp). The deps build OpenSSL on every platform (Paho MQTT needs it too).
+find_package(OpenSSL REQUIRED)
 
 if (APPLE)
     set(USE_NATIVE_MENU_DEFINE "-DUSE_NATIVE_MENU")
@@ -1572,6 +1581,7 @@ target_link_libraries(slic3r-shared PUBLIC
         libcereal
         libdeflate::libdeflate_static
         PahoMqttCpp::paho-mqttpp3-static
+        OpenSSL::Crypto
 )
 target_compile_definitions(slic3r-shared PUBLIC ${SLIC3R_YAML_DEFINE} ${USE_NATIVE_MENU_DEFINE})
 if (SLIC3R_SENTRY_DSN)
@@ -1812,6 +1822,7 @@ if(SLIC3R_BUILD_TESTS)
 
         test/Slic3r/Biz/UserAccount/UserAccountSessionTests.cpp
         test/Slic3r/Biz/Network/ServiceConfigTests.cpp
+        test/Slic3r/Biz/Network/ServerTrustTests.cpp
         test/Slic3r/Biz/Network/UrlTests.cpp
 
         test/Slic3r/App/CustomGCodeMigrationTests.cpp

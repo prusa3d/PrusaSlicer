@@ -1,9 +1,12 @@
 #pragma once
 
 #include "Slic3r/Biz/Network/IHttp.hpp"
+#include "Slic3r/Biz/Network/ServerTrust.hpp"
 
 #include <curl/curl.h>
 #include <deque>
+#include <functional>
+#include <optional>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem.hpp>
 
@@ -177,10 +180,33 @@ public:
      */    
     static std::string tls_system_cert_store();
 
-private:
+    /**
+     * @brief Sets up the certificate check of a curl handle for a custom server trust.
+     *
+     * PinnedKey: CURLOPT_PINNEDPUBLICKEY, the pin replaces the chain and host name check
+     * (CURLOPT_SSL_VERIFYPEER/VERIFYHOST off); a different key aborts the handshake.
+     * Certificate: CURLOPT_CAINFO with the loaded certificates, full verification incl. host name.
+     * System: nothing changes.
+     */
+    static void apply_server_trust(CURL* curl, const ServerTrust& trust);
+
+    /**
+     * @brief Custom certificate trust of the server a URL belongs to, nullopt for the default
+     * verification against the system trust store.
+     */
+    using ServerTrustLookup = std::function<std::optional<ServerTrust>(const std::string& url)>;
+
+    /**
+     * @brief Sets the lookup asked by every new request for the trust of its URL (see
+     * apply_server_trust()). Thread safe. Without a lookup every request uses the system trust.
+     */
+    static void set_server_trust_lookup(ServerTrustLookup lookup);
+
     struct CurlDeleter {
         void operator()(CURL* ptr) const { if (ptr) curl_easy_cleanup(ptr); }
     };
+
+private:
     std::unique_ptr<CURL, CurlDeleter> m_curl;
 
     struct FormDeleter {
