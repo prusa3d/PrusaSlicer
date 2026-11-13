@@ -139,12 +139,9 @@ ExportNameData get_export_name_data(const Biz::ProjectInteractor& project_intera
         const auto* item = project_interactor.preset_interactor().selected_printer_preset().printer.config_box().find("binary_gcode").item;
         bool bgcode_allowed = item ? item->get<bool>() : true;
 
-        const std::string fdm_ext = Biz::ExportNameParser::resolve_fdm_extension(
+        apply_extension(Biz::ExportNameParser::resolve_fdm_extension(
             ext, name_data.preferred_extension, bgcode_allowed
-        );
-        if (fdm_ext != name_data.preferred_extension) {
-            apply_extension(fdm_ext);
-        }
+        ));
 
     } else if (last_used_ext_lower == ".sl1" || last_used_ext_lower == ".sl1s") { 
         apply_extension(ext);

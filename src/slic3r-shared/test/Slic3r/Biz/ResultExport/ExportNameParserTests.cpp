@@ -16,6 +16,7 @@ TEST_CASE("FDM export extension defaults to the printer's binary_gcode setting",
         CHECK(resolve_fdm_extension(".bgcode", ".gcode", true) == ".bgcode");
         CHECK(resolve_fdm_extension(".BGCODE", ".gcode", true) == ".BGCODE");
         CHECK(resolve_fdm_extension(".bgcode", ".gcode", false) == ".gcode");
+        CHECK(resolve_fdm_extension(".gcode", ".bgcode", true) == ".gcode");
     }
 
     // The last used extension is shared by every save dialog (projects, configs, meshes),
@@ -25,6 +26,12 @@ TEST_CASE("FDM export extension defaults to the printer's binary_gcode setting",
         CHECK(resolve_fdm_extension(".ini", ".gcode", true) == ".bgcode");
         CHECK(resolve_fdm_extension(".stl", ".gcode", false) == ".gcode");
         CHECK(resolve_fdm_extension(".sl1", ".gcode", true) == ".bgcode");
+        CHECK(resolve_fdm_extension(".3MF", ".gcode", true) == ".bgcode");
+    }
+
+    SECTION("output_filename_format without extension") {
+        CHECK(resolve_fdm_extension("", "", true) == ".bgcode");
+        CHECK(resolve_fdm_extension("", "", false) == "");
     }
 
     SECTION("output_filename_format ending with .bgcode while binary G-code is disabled") {
