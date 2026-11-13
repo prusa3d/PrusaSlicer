@@ -367,7 +367,10 @@ void PreviewRenderModule::on_status_cache_status_code_changed(const Domain::Slic
             if (status && status == Biz::Slicing::Status::Modified)
                 m_viewer->reset();
         }*/
-    m_object_list->update_sliced_info();
+    // The panel shows the estimates of the selected bed only.
+    if (id == m_project_interactor.selected_bed_slicing_id()) {
+        m_object_list->update_sliced_info();
+    }
 
     const auto status{m_project_interactor.status_cache().get_status(id)};
     if (status && status->code == Slicing::StatusCode::Modified) {

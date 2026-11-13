@@ -12,6 +12,7 @@
 #include "Slic3r/Biz/ProjectSettingsInteractor.hpp"
 #include "Slic3r/Biz/SecretStoreDummy.hpp"
 #include "Slic3r/Directories.hpp"
+#include "Slic3r/Domain/ConfigPack.hpp"
 #include "Slic3r/TestUtils/AppInstanceMessageHandlerScope.hpp"
 #include "Slic3r/TestUtils/JobManagerScope.hpp"
 #include "Slic3r/TestUtils/TestData.hpp"
@@ -58,6 +59,26 @@ TEST_CASE("palette_color wraps around every 16 slots", "[ProjectSettingsInteract
             == ProjectSettingsInteractor::palette_color(slot + 16)
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// spool_weights tests — pure function, no workbench needed
+// ---------------------------------------------------------------------------
+
+TEST_CASE("spool_weights keeps the slot order", "[ProjectSettingsInteractor]")
+{
+    using namespace Slic3r::Biz;
+
+    Slic3r::Domain::ConfigPackFDM config_pack{3};
+    for (Slic3r::Domain::FilamentSettings& filament : config_pack.filament) {
+        filament.items.opt("filament_spool_weight").set(0.);
+    }
+    // Only the second slot has a spool weight.
+    config_pack.filament.at(1).items.opt("filament_spool_weight").set(200.);
+
+    CHECK(
+        ProjectSettingsInteractor::spool_weights(config_pack) == std::vector<float>{0.f, 200.f, 0.f}
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -377,6 +398,55 @@ TEST_CASE_METHOD(
     psi.set_color_from_user(project_id, cc_id, 0, "");
     CHECK(stored_colors() == std::vector<std::string>{"#123456"});
     CHECK(psi.get_colors(project_id, cc_id) == std::vector<Domain::ColorRGB>{decoded("#123456")});
+}
+
+TEST_CASE_METHOD(
+    ProjectSettingsInteractorFixture,
+    "get_spool_weights returns the spool weight of the filament profile in each slot",
+    "[ProjectSettingsInteractor]"
+)
+{
+    const Domain::SelectionId project_id = project_interactor.new_project();
+    const Domain::SelectionId cc_id = project_interactor.selected_config_container_id();
+    auto& psi = project_interactor.project_settings_interactor();
+    auto& preset_interactor = project_interactor.preset_interactor();
+
+    const auto set_spool_weight = [&](double spool_weight)
+    {
+        preset_interactor.set_preset_value(
+            Domain::FDMConfigLocation::Filament,
+            0,
+            "filament_spool_weight",
+            [spool_weight](Domain::ConfigItem& item) { item.set(spool_weight); }
+        );
+    };
+
+    set_spool_weight(250.);
+    CHECK(psi.get_spool_weights(project_id, cc_id) == std::vector<float>{250.f});
+
+    // A profile without a spool weight.
+    set_spool_weight(0.);
+    CHECK(psi.get_spool_weights(project_id, cc_id) == std::vector<float>{0.f});
+}
+
+TEST_CASE_METHOD(
+    ProjectSettingsInteractorFixture,
+    "get_spool_weights is empty for an SLA bed and an unknown container",
+    "[ProjectSettingsInteractor]"
+)
+{
+    const Domain::SelectionId project_id = project_interactor.new_project();
+    const Domain::SelectionId cc_id = project_interactor.selected_config_container_id();
+    auto& psi = project_interactor.project_settings_interactor();
+
+    CHECK(psi.get_spool_weights(project_id, cc_id + 1000).empty());
+
+    select_printer_with_technology(Domain::PrinterTechnology::SLA);
+    REQUIRE(
+        project_interactor.selected_config_container().print_technology()
+        == Domain::PrinterTechnology::SLA
+    );
+    CHECK(psi.get_spool_weights(project_id, cc_id).empty());
 }
 
 TEST_CASE_METHOD(

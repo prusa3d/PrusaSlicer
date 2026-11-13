@@ -16,6 +16,7 @@
 namespace Slic3r::Domain {
 class Workbench;
 class ConfigContainer;
+class IConfigPackFDMViewer;
 } // namespace Slic3r::Domain
 
 namespace Slic3r::Biz {
@@ -50,6 +51,17 @@ public:
      * @return Empty vector if the container is not found.
      */
     std::vector<Domain::ColorRGB> get_colors(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id
+    ) const;
+
+    /**
+     * @brief Returns the spool weight (filament_spool_weight, in grams) of the filament profile
+     *        assigned to each material slot of the given container.
+     * @return One value per slot, 0 for a slot whose profile has no spool weight. Empty vector if
+     *         the container is not found or is not FFF.
+     */
+    std::vector<float> get_spool_weights(
         Domain::SelectionId project_id,
         Domain::SelectionId config_container_id
     ) const;
@@ -157,6 +169,13 @@ public:
      * Deterministic, never returns an empty string.
      */
     static std::string palette_color(int slot);
+
+    /**
+     * @brief Returns the spool weight (filament_spool_weight, in grams) of each filament slot of
+     *        the config pack, in the slot order.
+     * @return One value per slot, 0 for a filament without a spool weight.
+     */
+    static std::vector<float> spool_weights(const Domain::IConfigPackFDMViewer& config_pack);
 
 private:
     /**

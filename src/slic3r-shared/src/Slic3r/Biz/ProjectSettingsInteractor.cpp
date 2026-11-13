@@ -131,6 +131,32 @@ std::vector<Domain::ColorRGB> ProjectSettingsInteractor::get_colors(
     return hex_colors_to_rgb(stored_colors(*cc));
 }
 
+std::vector<float> ProjectSettingsInteractor::get_spool_weights(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id
+) const
+{
+    const Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id);
+    if (!cc || !is_fff(*cc))
+        return {};
+
+    return spool_weights(Domain::Preset::SelectedPresetConfigPack(cc->selected_preset()));
+}
+
+std::vector<float> ProjectSettingsInteractor::spool_weights(
+    const Domain::IConfigPackFDMViewer& config_pack
+)
+{
+    std::vector<float> result;
+    result.reserve(config_pack.filament_size());
+    for (size_t slot = 0; slot < config_pack.filament_size(); ++slot) {
+        const Domain::ConfigItem* spool_weight =
+            config_pack.get_filament(slot).items.find("filament_spool_weight");
+        result.push_back(spool_weight ? static_cast<float>(spool_weight->get<double>()) : 0.f);
+    }
+    return result;
+}
+
 void ProjectSettingsInteractor::set_color_from_user(
     Domain::SelectionId project_id,
     Domain::SelectionId config_container_id,

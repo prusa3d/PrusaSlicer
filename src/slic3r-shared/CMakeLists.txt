@@ -1401,6 +1401,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/ObjectList/VolumeItem.cpp
         include/Slic3r/App/ObjectList/InstanceItem.hpp
         src/Slic3r/App/ObjectList/InstanceItem.cpp
+        include/Slic3r/App/ObjectList/BedSlicedInfo.hpp
+        src/Slic3r/App/ObjectList/BedSlicedInfo.cpp
 
         include/Slic3r/Biz/MatDb/MatDbClient.hpp
         src/Slic3r/Biz/MatDb/MatDbClient.cpp

@@ -2,6 +2,7 @@
 
 #include "Slic3r/App/Yoga/CollapsibleWindow.hpp"
 #include <functional>
+#include <vector>
 
 namespace Slic3r::Biz {
 class ProjectInteractor;
@@ -19,11 +20,12 @@ using BedThumbnailTextures = std::vector<BedThumbnailTexture>;
 namespace Slic3r::App {
 
 namespace Yoga {
-class Text;
-class Rectangle;
 class LayoutButton;
-class ScrollArea;
 } // namespace Yoga
+
+namespace ObjectList {
+class BedSlicedInfo;
+} // namespace ObjectList
 
 class ObjectListItem;
 class IShowContextMenuListener;
@@ -55,24 +57,8 @@ private:
     Yoga::LayoutButton* m_add_container_button{nullptr};
     ObjectListItem* m_object_list{nullptr};
 
-    Yoga::Rectangle* m_sliced_info{nullptr};
-
-    Yoga::Text* m_used_material_total{nullptr};
-    Yoga::Item* m_used_material_for_objects_row{nullptr};
-    Yoga::Text* m_used_material_for_objects{nullptr};
-    Yoga::Item* m_used_material_for_wipe_tower_row{nullptr};
-    Yoga::Text* m_used_material_for_wipe_tower{nullptr};
-    Yoga::Item* m_used_material_for_flush_row{nullptr};
-    Yoga::Text* m_used_material_for_flush{nullptr};
-    Yoga::Item* m_used_material_for_supports_row{nullptr};
-    Yoga::Text* m_used_material_for_supports{nullptr};
-
-    Yoga::Text* m_material_cost{nullptr};
-    Yoga::Text* m_first_layer_time{nullptr};
-    Yoga::Text* m_estimated_time{nullptr};
-
-    Yoga::Item* m_material_cost_row{nullptr};
-    Yoga::Item* m_first_layer_time_row{nullptr};
+    // Preview only.
+    ObjectList::BedSlicedInfo* m_sliced_info{nullptr};
 
     Biz::ProjectInteractor& m_project_interactor;
 
