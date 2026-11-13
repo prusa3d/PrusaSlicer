@@ -6,6 +6,7 @@
 #include "Slic3r/App/Yoga/Tooltip.hpp"
 
 #include "Slic3r/Biz/I18N/I18N.hpp"
+#include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 
 #include "fmt/format.h"
@@ -138,10 +139,17 @@ void PhysicalPrinterSettingsButton::update_tooltip()
     }
     if (Biz::PhysicalPrinter::has_unresolved_model(*m_state)) {
         tooltip += "\n"
-            + Biz::_u8L(
+            + (Biz::Network::ServiceConfig::instance().is_offline() ?
+                   // TRN Tooltip of a printer added from the self-hosted Prusa Connect Local server
+                   // (offline mode) that did not report its model.
+                   Biz::_u8L(
+                       "Prusa Connect (on-premise) did not provide the printer model, it is unknown which "
+                       "printer preset belongs to this printer."
+                   ) :
+                   Biz::_u8L(
                        "Prusa Connect did not provide the printer model, it is unknown which "
                        "printer preset belongs to this printer."
-            );
+                   ));
     }
     set_tooltip(tooltip);
 }

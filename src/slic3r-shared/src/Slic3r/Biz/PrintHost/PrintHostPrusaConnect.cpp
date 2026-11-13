@@ -22,6 +22,13 @@ namespace {
 
 constexpr size_t LOG_BODY_LIMIT = 4096;
 
+void report_unauthorized(const PhysicalPrinter::ConnectUpload& auth, unsigned status)
+{
+    if (status == 401 && auth.on_unauthorized) {
+        auth.on_unauthorized(auth.access_token);
+    }
+}
+
 std::string truncate_for_log(const std::string& text)
 {
     if (text.size() <= LOG_BODY_LIMIT) {
@@ -219,6 +226,7 @@ bool PrintHostPrusaConnect::create_file_record(
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
             log_response(STEP, false, status, error, body);
+            report_unauthorized(auth, status);
             error_fn(authenticated_step_error(
                 _u8L("Failed to register the file in Prusa Connect"),
                 body,
@@ -360,6 +368,7 @@ bool PrintHostPrusaConnect::finish_file_record(
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
             log_response(STEP, false, status, error, body);
+            report_unauthorized(auth, status);
             error_fn(authenticated_step_error(
                 _u8L("Failed to finish the file upload in Prusa Connect"),
                 body,
@@ -428,6 +437,7 @@ bool PrintHostPrusaConnect::enqueue_on_printer(
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
             log_response(STEP, false, status, error, body);
+            report_unauthorized(auth, status);
             error_fn(authenticated_step_error(
                 _u8L("Failed to send the file to the printer"),
                 body,

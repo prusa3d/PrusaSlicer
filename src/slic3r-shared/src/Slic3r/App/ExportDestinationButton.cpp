@@ -3,6 +3,7 @@
 #include "Slic3r/App/Yoga/Menu.hpp"
 #include "Slic3r/App/Yoga/MenuItem.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
+#include "Slic3r/Biz/Network/ServiceConfig.hpp"
 
 namespace Slic3r::App {
 
@@ -17,8 +18,12 @@ std::string destination_label(ExportDestination destination)
     case ExportDestination::LocalDrive: return Biz::_u8L("Local drive");
     // TRN Export destination: save G-code to a USB drive or SD card.
     case ExportDestination::RemovableDrive: return Biz::_u8L("Removable drive");
-    // TRN Export destination: send G-code through Prusa Connect.
-    case ExportDestination::Connect: return Biz::_u8L("Prusa Connect");
+    case ExportDestination::Connect:
+        return Biz::Network::ServiceConfig::instance().is_offline() ?
+            // TRN Export destination in offline mode: send G-code through the self-hosted Prusa Connect Local server.
+            Biz::_u8L("Prusa Connect (on-premise)") :
+            // TRN Export destination: send G-code through Prusa Connect.
+            Biz::_u8L("Prusa Connect");
     // TRN Export destination: upload G-code directly to the selected printer.
     case ExportDestination::PrintHost: return Biz::_u8L("Printer host");
     }

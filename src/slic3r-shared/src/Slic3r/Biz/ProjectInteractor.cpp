@@ -1174,6 +1174,12 @@ void ProjectInteractor::do_result_upload_connect(
     config.host = Network::ServiceConfig::instance().connect_api_url();
     PhysicalPrinter::ConnectUpload auth;
     auth.access_token = m_user_account_interactor.access_token();
+    auth.on_unauthorized = [this](const std::string& access_token)
+    {
+        Platform::PlatformServices::instance().main_thread_dispatcher().dispatch_on_main_thread(
+            [this, access_token]() { m_user_account_interactor.on_unauthorized(access_token); }
+        );
+    };
     config.payload = std::move(auth);
 
     std::string filename;

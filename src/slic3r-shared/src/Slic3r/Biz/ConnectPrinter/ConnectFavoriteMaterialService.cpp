@@ -45,6 +45,10 @@ void ConnectFavoriteMaterialService::request_refresh()
     if (m_user_account_interactor.access_token().empty()) {
         return;
     }
+    if (Network::ServiceConfig::instance().is_offline()) {
+        // Connect Local has no GraphQL endpoint.
+        return;
+    }
     if (m_refresh_in_flight) {
         m_refresh_pending = true;
         return;

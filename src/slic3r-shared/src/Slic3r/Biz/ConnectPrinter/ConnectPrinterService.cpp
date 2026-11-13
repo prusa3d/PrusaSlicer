@@ -2,6 +2,7 @@
 
 #include "Slic3r/Biz/Network/MqttSubscriber.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
+#include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 
 #include "Slic3r/Log.hpp"
@@ -58,7 +59,10 @@ ConnectPrinterService::ConnectPrinterService(
     m_favorite_material_service(dispatcher, user_account_interactor)
 {}
 
-ConnectPrinterService::~ConnectPrinterService() = default;
+ConnectPrinterService::~ConnectPrinterService()
+{
+    stop_polling();
+}
 
 const ConnectPrinter& ConnectPrinterService::at(size_t index) const
 {
@@ -145,13 +149,27 @@ void ConnectPrinterService::fetch_printer_list(
             );
 
             http->on_error(
-                [fail_fn = std::move(fail_fn)](std::string body, std::string error, unsigned status)
+                [this,
+                 generation,
+                 access_token,
+                 fail_fn = std::move(fail_fn)](std::string body, std::string error, unsigned status)
                 {
                     SPDLOG_ERROR(
                         "Connect HTTP request failed. Status: {}, Error: {}",
                         status,
                         error
                     );
+                    if (status == 401) {
+                        // The token was refused. Offline it cannot be renewed: the interactor logs out.
+                        m_dispatcher.dispatch_on_main_thread(
+                            [this, generation, access_token]()
+                            {
+                                if (generation == m_session_generation) {
+                                    m_user_account_interactor.on_unauthorized(access_token);
+                                }
+                            }
+                        );
+                    }
                     if (fail_fn) {
                         fail_fn("Connect HTTP request failed: " + error);
                     }
@@ -174,6 +192,11 @@ void ConnectPrinterService::fetch_printer_list(
 
 void ConnectPrinterService::on_user_account_id_success(bool is_refresh, const std::string& username)
 {
+    if (Network::ServiceConfig::instance().is_offline()) {
+        on_offline_user_account_id_success(is_refresh);
+        return;
+    }
+
     if (!m_mqtt_subscriber) {
         start_mqtt();
     } else if (m_user_account_interactor.access_token() != m_mqtt_access_token) {
@@ -191,8 +214,8 @@ void ConnectPrinterService::on_user_account_logged_out()
     ++m_session_generation;
     m_refresh_in_flight = false;
     m_refresh_pending   = false;
-    m_mqtt_subscriber.reset();
-    m_mqtt_access_token.clear();
+    stop_mqtt();
+    stop_polling();
     m_favorite_material_service.on_logged_out();
 
     if (!m_printers.empty()) {
@@ -234,11 +257,64 @@ void ConnectPrinterService::start_mqtt()
     }
 }
 
+void ConnectPrinterService::stop_mqtt()
+{
+    m_mqtt_subscriber.reset();
+    m_mqtt_access_token.clear();
+}
+
 void ConnectPrinterService::update_mqtt_access_token()
 {
     const std::string access_token = m_user_account_interactor.access_token();
     m_mqtt_subscriber->update_credentials(m_user_account_interactor.user_id(), access_token);
     m_mqtt_access_token = access_token;
+}
+
+// ---- Offline (Connect Local) ----
+
+void ConnectPrinterService::on_offline_user_account_id_success(bool is_refresh)
+{
+    // No favorite materials: Connect Local has no GraphQL endpoint.
+    if (!is_refresh) {
+        fetch_printer_list({}, {});
+    }
+    start_polling();
+}
+
+void ConnectPrinterService::start_polling()
+{
+    if (m_poll_timer) {
+        return;
+    }
+    SPDLOG_INFO("Connect Local: polling printers every {} s", OFFLINE_POLL_INTERVAL.count());
+    m_poll_timer = Platform::PlatformServices::instance().timer_queue().set_timer(
+        OFFLINE_POLL_INTERVAL,
+        [this, lifetime = std::weak_ptr<int>(m_lifetime), generation = m_session_generation]()
+        {
+            if (lifetime.expired()
+                || generation != m_session_generation
+                || !Network::ServiceConfig::instance().is_offline()
+                || !m_user_account_interactor.is_logged_in())
+            {
+                return;
+            }
+            request_printer_list_refresh();
+        },
+        true
+    );
+}
+
+void ConnectPrinterService::stop_polling()
+{
+    if (!m_poll_timer) {
+        return;
+    }
+    Platform::TimerQueue& timer_queue = Platform::PlatformServices::instance().timer_queue();
+    if (timer_queue.is_timer_running(*m_poll_timer)) {
+        timer_queue.cancel_timer(*m_poll_timer);
+    }
+    m_poll_timer.reset();
+    SPDLOG_INFO("Connect Local: printer polling stopped");
 }
 
 void ConnectPrinterService::subscribe(const std::string& uuid)
@@ -324,6 +400,8 @@ void ConnectPrinterService::on_mqtt_message(
 
 void ConnectPrinterService::apply_printer_list(std::vector<ConnectPrinter> new_printers)
 {
+    // Connect Local has no MQTT, the polled list is the only source of the state.
+    const bool states_from_mqtt = !Network::ServiceConfig::instance().is_offline();
     for (size_t i = m_printers.size(); i-- > 0;) {
         const std::string uuid = m_printers.at(i).uuid;
         if (std::ranges::none_of(
@@ -345,7 +423,9 @@ void ConnectPrinterService::apply_printer_list(std::vector<ConnectPrinter> new_p
         if (std::optional<size_t> index = find_index(printer.uuid)) {
             ConnectPrinter& current = m_printers.at(*index);
             // Keep the state received over MQTT, the list is only the initial one.
-            printer.state = current.state;
+            if (states_from_mqtt) {
+                printer.state = current.state;
+            }
             if (printer != current) {
                 current = std::move(printer);
                 invoke_listeners<IListObserver<ConnectPrinter>>(

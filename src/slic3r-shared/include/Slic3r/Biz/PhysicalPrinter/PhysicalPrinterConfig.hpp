@@ -4,6 +4,9 @@
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
 
+#include <functional>
+#include <string>
+
 namespace Slic3r::Biz::PhysicalPrinter {
 
 struct ConnectUpload
@@ -11,6 +14,10 @@ struct ConnectUpload
     std::string organization_id;
     std::string printer_uuid;
     std::string access_token; // needs to be filled before upload
+    /**
+     * @brief Called (on the upload thread) with access_token when the server refused it (HTTP 401).
+     */
+    std::function<void(const std::string& access_token)> on_unauthorized;
     ConnectPrinter::ConnectPrinterState state{ConnectPrinter::ConnectPrinterState::Unknown};
 };
 
