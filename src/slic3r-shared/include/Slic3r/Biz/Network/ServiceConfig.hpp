@@ -1,22 +1,92 @@
 #pragma once
 
+#include <optional>
+#include <shared_mutex>
 #include <string>
+#include <string_view>
 
 namespace Slic3r::Biz::Network {
 
+/**
+ * @brief Which backend serves Prusa Account and Prusa Connect.
+ *
+ * Online is the cloud (account.prusa3d.com, connect.prusa3d.com). Offline is a self-hosted
+ * Prusa Connect Local server; every Account and Connect request goes there, with the same
+ * request and response contracts, only base URLs and paths differ.
+ */
+enum class ServiceMode
+{
+    Online,
+    Offline
+};
+
+/**
+ * @brief All service URLs of the application.
+ *
+ * The Account and Connect URLs depend on the service mode, which can change at runtime (the
+ * caller is responsible for logging out first, tokens belong to one server). Their getters are
+ * thread safe and return copies; the other services do not depend on the mode.
+ */
 class ServiceConfig
 {
     ServiceConfig();
 
 public:
-    const std::string& connect_url() const
+    // ---- Service mode ----
+
+    /**
+     * @brief Switches between the cloud and a Connect Local server.
+     * @param offline_server_url Base URL of the Connect Local server, used in Offline mode only.
+     * It is normalized by normalize_offline_server_url(); an invalid one leaves Offline mode
+     * without a server (offline_server_url() empty, every Account/Connect URL empty).
+     */
+    void set_mode(ServiceMode mode, const std::string& offline_server_url = {});
+
+    ServiceMode mode() const;
+
+    bool is_offline() const
     {
-        return m_connect_url;
+        return mode() == ServiceMode::Offline;
     }
+
+    /**
+     * @brief Normalized base URL of the Connect Local server, empty in Online mode or when the
+     * configured one is invalid.
+     */
+    std::string offline_server_url() const;
+
+    /**
+     * @brief Validates and normalizes the user entered Connect Local server URL.
+     *
+     * Not subject to the Prusa domain whitelist: http and https are allowed, with any host
+     * (LAN IP, hostname, .local, localhost) and optional port and path prefix. A missing scheme
+     * defaults to http. Trailing slashes are removed. Query, fragment, user info and
+     * whitespace are rejected.
+     * @return The normalized URL, or nullopt if the URL cannot be used.
+     */
+    static std::optional<std::string> normalize_offline_server_url(std::string_view url);
+
+    /**
+     * @brief Path under the Connect Local server where the PrusaSlicer module API is mounted.
+     */
+    static constexpr std::string_view OFFLINE_MODULE_PATH =
+        "/api/v1/modules/com.github.aux.prusa-research.prusaslicer3-compat";
+
+    // ---- Prusa Connect ----
+
+    /**
+     * @brief Base of the Connect HTTP API (uploads, printers, ...).
+     */
+    std::string connect_url() const;
+
+    /**
+     * @brief Page loaded in the Connect tab. Navigation away from this prefix is vetoed.
+     */
+    std::string connect_page_url() const;
 
     std::string connect_status_url() const
     {
-        return m_connect_url + "/slicer/status";
+        return connect_url() + "/slicer/status";
     }
 
     const std::string& connect_api_url() const
@@ -56,54 +126,62 @@ public:
         return m_connect_mqtt_url;
     }
 
-    std::string connect_select_printer_url() const
-    {
-        return m_connect_url + "/slicer-select-printer";
-    }
+    std::string connect_select_printer_url() const;
 
     std::string connect_printers_url() const
     {
-        return m_connect_url + "/app/printers/";
+        return connect_url() + "/app/printers/";
     }
 
+    /**
+     * @brief Printables "print to Connect" page of the cloud. Connect Local has none.
+     */
     std::string connect_printables_print_url() const
     {
         return m_connect_url + "/slicer-print";
     }
 
+    /**
+     * @brief Connect GraphQL endpoint (favorite materials) of the cloud. Connect Local has none.
+     */
     std::string connect_graphql_url() const
     {
         return m_connect_api_url + "/graphql";
     }
 
-    const std::string& account_url() const
-    {
-        return m_account_url;
-    }
+    // ---- Prusa Account ----
+
+    /**
+     * @brief Base of the Account API (token, me). Also the origin whose cookies are cleared after
+     * login.
+     */
+    std::string account_url() const;
 
     const std::string& account_client_id() const
     {
         return m_account_client_id;
     }
 
-    std::string account_token_url() const
-    {
-        return m_account_url + "/o/token/";
-    }
-
-    std::string printables_get_secret_token_url() const
-    {
-        return m_printables_url + "/auth/get-secret-token";
-    }
+    /**
+     * @brief OAuth token endpoint. Empty offline: Connect Local signs in by app pairing.
+     */
+    std::string account_token_url() const;
 
     std::string account_me_url() const
     {
-        return m_account_url + "/api/v1/me/";
+        return account_url() + "/api/v1/me/";
     }
 
     std::string account_logout_url() const
     {
-        return m_account_url + "/logout";
+        return account_url() + "/logout";
+    }
+
+    // ---- Other services (not affected by the mode) ----
+
+    std::string printables_get_secret_token_url() const
+    {
+        return m_printables_url + "/auth/get-secret-token";
     }
 
     std::string media_url() const
@@ -149,6 +227,28 @@ public:
     static ServiceConfig& instance();
 
 private:
+    /**
+     * @brief The Account and Connect URLs of the current mode, computed by set_mode().
+     */
+    struct ModeUrls
+    {
+        ServiceMode mode{ServiceMode::Online};
+        /** @brief Empty online and offline without a valid server. */
+        std::string offline_server;
+        std::string connect;
+        std::string connect_page;
+        std::string connect_select_printer;
+        std::string account;
+        std::string account_token;
+    };
+
+    ModeUrls online_urls() const;
+    static ModeUrls offline_urls(const std::string& server);
+
+    /** @brief Reads one URL of the current mode. */
+    std::string mode_url(std::string ModeUrls::* url) const;
+
+    // Online URLs, not affected by the mode.
     std::string m_connect_url;
     std::string m_connect_api_url;
     std::string m_connect_mqtt_url;
@@ -159,6 +259,9 @@ private:
     std::string m_printables_url;
     std::string m_plugin_marketplace_url;
     bool m_webdev_enabled{false};
+
+    mutable std::shared_mutex m_mutex;
+    ModeUrls m_mode_urls;
 };
 
 } // namespace Slic3r::Biz::Network

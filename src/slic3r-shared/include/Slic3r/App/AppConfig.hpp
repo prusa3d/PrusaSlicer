@@ -6,6 +6,10 @@
 #include <string>
 #include "tl/expected.hpp"
 
+namespace Slic3r::Biz::Network {
+enum class ServiceMode;
+} // namespace Slic3r::Biz::Network
+
 namespace Slic3r::App {
 
 enum class GraphicsQuality
@@ -67,7 +71,33 @@ public:
 
     bool is_webkit_available() const;
     bool is_printables_enabled() const;
+    /**
+     * @brief Account enabled in settings and, in offline mode, a valid Connect Local server set.
+     */
     bool is_prusa_account_enabled() const;
+
+    /**
+     * @brief Whether the Connect tab exists: the account is enabled in settings, whatever the
+     * service mode and server. Offline without a valid server the tab shows its setup page.
+     */
+    bool is_connect_tab_enabled() const;
+
+    /**
+     * @brief Online (cloud) or Offline (Connect Local server), the "connect_mode" setting.
+     */
+    Biz::Network::ServiceMode service_mode() const;
+
+    /**
+     * @brief Connect Local server URL as entered by the user, the "connect_local_url" setting.
+     */
+    std::string connect_local_url() const;
+
+    /**
+     * @brief Pushes the service mode settings to Biz::Network::ServiceConfig.
+     * The user account must be logged out (disabled) when the mode changes at runtime.
+     */
+    void apply_service_mode() const;
+
     bool is_sentry_enabled() const;
     bool is_sentry_available() const;
 

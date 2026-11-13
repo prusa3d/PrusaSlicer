@@ -4,6 +4,10 @@
 
 #include "Slic3r/App/IAppConfigChangedListener.hpp"
 
+namespace Slic3r::Biz::Network {
+enum class ServiceMode;
+} // namespace Slic3r::Biz::Network
+
 namespace Slic3r::App {
 
 /**
@@ -27,6 +31,12 @@ public:
         const std::string& item_name,
         const Domain::ConfigValue& value
     );
+
+    /**
+     * @brief Sets the "connect_mode" setting, if it differs. Listeners switch the service mode
+     * live (see AppConfig::apply_service_mode()).
+     */
+    void set_service_mode(Biz::Network::ServiceMode mode);
 
     void toggle_favorite_param(const std::string& param);
     void toggle_favorite_preset_printer(const std::string& id, const std::string& hw_config_id);

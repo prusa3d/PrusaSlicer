@@ -1682,6 +1682,7 @@ if(SLIC3R_BUILD_TESTS)
     add_executable(slic3r-shared-tests
             test/main.cpp
 
+            test/Slic3r/App/AppConfigTests.cpp
             test/Slic3r/App/DialogNavigationTests.cpp
             test/Slic3r/App/LoadingProgressDialogTests.cpp
             test/Slic3r/App/AppSettingsAdvancedTests.cpp
@@ -1810,6 +1811,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/MainThreadDialogProviderTests.cpp
 
         test/Slic3r/Biz/UserAccount/UserAccountSessionTests.cpp
+        test/Slic3r/Biz/Network/ServiceConfigTests.cpp
         test/Slic3r/Biz/Network/UrlTests.cpp
 
         test/Slic3r/App/CustomGCodeMigrationTests.cpp

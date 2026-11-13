@@ -6,6 +6,7 @@
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/Config/ConfigLoad.hpp"
 #include "Slic3r/Biz/Config/ConfigSerialize.hpp"
+#include "Slic3r/Biz/Network/ServiceConfig.hpp"
 
 #include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/Theme.hpp"
@@ -354,6 +355,37 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->category = Domain::ConfigItemDef::Category::AppConfig_Services;
     def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup;
     def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def           = defs.add("connect_mode", typeid(Domain::EnumWrapper));
+    def->location = Domain::AppConfigLocation{};
+    def->gui_type = GUIType::combobox;
+    def->label    = L("Prusa Account and Connect");
+    def->tooltip  = L(
+        "Online uses the cloud Prusa Account and Prusa Connect. Offline uses a self-hosted Prusa Connect (on-premise) server instead. Switching logs you out."
+    );
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Services;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup;
+    def->init_fn      = Domain::init_with(
+        Network::ServiceMode::Online,
+        {
+            {int(Network::ServiceMode::Online), "online", def->L_CONTEXT("Online", "Connect mode")},
+            {int(Network::ServiceMode::Offline),
+             "offline",
+             def->L_CONTEXT("Offline (on-premise)", "Connect mode")},
+        }
+    );
+
+    def           = defs.add("connect_local_url", typeid(std::string));
+    def->location = Domain::AppConfigLocation{};
+    def->gui_type = GUIType::textfield;
+    def->label    = L("Prusa Connect (on-premise) server");
+    def->tooltip  = L(
+        "Address of the Prusa Connect (on-premise) server used in the offline mode, for example http://192.168.1.10:8080. Changing it logs you out."
+    );
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Services;
+    def->full_width   = true;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup;
+    def->init_fn      = []() { return Domain::ConfigValue(std::string()); };
 
     def = defs.add("enable_printables", typeid(bool));
     def->location = Domain::AppConfigLocation{};
@@ -737,12 +769,45 @@ bool AppConfig::is_printables_enabled() const
 
 bool AppConfig::is_prusa_account_enabled() const
 {
+    if (!is_connect_tab_enabled()) {
+        return false;
+    }
+    // Offline mode without a usable server: there is nowhere to log in.
+    return service_mode() == Network::ServiceMode::Online
+        || Network::ServiceConfig::normalize_offline_server_url(connect_local_url());
+}
+
+bool AppConfig::is_connect_tab_enabled() const
+{
     if (!is_webkit_available()) {
         return false;
     }
-
     return get<bool>("enable_prusa_account");
 }
+
+Network::ServiceMode AppConfig::service_mode() const
+{
+#ifdef SLIC3R_HAS_WEBKIT
+    return get<Network::ServiceMode>("connect_mode");
+#else
+    return Network::ServiceMode::Online;
+#endif
+}
+
+std::string AppConfig::connect_local_url() const
+{
+#ifdef SLIC3R_HAS_WEBKIT
+    return get<std::string>("connect_local_url");
+#else
+    return {};
+#endif
+}
+
+void AppConfig::apply_service_mode() const
+{
+    Network::ServiceConfig::instance().set_mode(service_mode(), connect_local_url());
+}
+
 
 bool AppConfig::is_sentry_enabled() const
 {
