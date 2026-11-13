@@ -17,6 +17,8 @@
 #include <wx/textdlg.h>
 #include <wx/uri.h>
 
+#include <utility>
+
 #include "nlohmann/json.hpp"
 
 namespace Slic3r::App::WX::WebView {
@@ -25,6 +27,14 @@ WebViewPanel::WebViewPanel(wxWindow* parent,  int id, std::unique_ptr<App::Brows
     AbstractWebViewPanel(parent, id),
     m_logic(std::move(logic))
 {
+    m_logic->set_command_sink(
+        [this](std::vector<App::Browser::BrowserLogicCommand> commands)
+        {
+            m_host.run_when_ready(
+                [this, commands]() mutable { process_logic_command_vector(std::move(commands)); }
+            );
+        }
+    );
     topsizer    = new wxBoxSizer(wxVERTICAL);
     m_sizer_top = new wxBoxSizer(wxHORIZONTAL);
     topsizer->Add(m_sizer_top, 0, wxEXPAND, 0);

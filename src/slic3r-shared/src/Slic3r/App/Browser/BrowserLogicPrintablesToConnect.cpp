@@ -8,10 +8,12 @@
 
 namespace Slic3r::App::Browser {
 
-
-BrowserLogicPrintablesToConnect::BrowserLogicPrintablesToConnect(const std::string& url, Biz::ProjectInteractor& project_interactor)
-    : AbstractBrowserLogic(url, {"_prusaSlicer"}, "connect_loading", "connect_error")
-    , AbstractConnectRequestHandler(project_interactor)
+BrowserLogicPrintablesToConnect::BrowserLogicPrintablesToConnect(
+    const std::string& url,
+    Biz::ProjectInteractor& project_interactor
+) :
+    AbstractBrowserLogic(url, {"_prusaSlicer"}, "connect_loading", "connect_error"),
+    AbstractConnectRequestHandler(project_interactor, *this)
 {
 }
 

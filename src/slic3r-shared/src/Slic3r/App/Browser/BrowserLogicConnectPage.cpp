@@ -1,7 +1,10 @@
 #include "Slic3r/App/Browser/BrowserLogicConnectPage.hpp"
 
 #include "Slic3r/App/Browser/BrowserLogicLogInRedirect.hpp"
+#include "Slic3r/App/Browser/BrowserCookie.hpp"
 #include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
+#include "Slic3r/Biz/JsonForScript.hpp"
 #include <Slic3r/App/IDialogManager.hpp>
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include <Slic3r/Biz/Platform/PlatformServices.hpp>
@@ -14,11 +17,50 @@
 
 namespace Slic3r::App::Browser {
 
+namespace {
+const std::string UNSUPPORTED_PAGE = "connect_unsupported";
 
-BrowserLogicConnectPage::BrowserLogicConnectPage(Biz::ProjectInteractor& project_interactor)
-    : AbstractBrowserLogic(Biz::Network::ServiceConfig::instance().connect_url(), {"_prusaSlicer"}, "connect_loading", "connect_error")
-    , AbstractConnectRequestHandler(project_interactor)
+bool offline()
 {
+    return Biz::Network::ServiceConfig::instance().is_offline();
+}
+} // namespace
+
+BrowserLogicConnectPage::BrowserLogicConnectPage(Biz::ProjectInteractor& project_interactor) :
+    AbstractBrowserLogic(
+        Biz::Network::ServiceConfig::instance().connect_page_url(),
+        {"_prusaSlicer"},
+        "connect_loading",
+        "connect_error"
+    ),
+    AbstractConnectRequestHandler(project_interactor, *this)
+{}
+
+void BrowserLogicConnectPage::refresh_url()
+{
+    // The server changes with the service mode, the tab stays. Online the URL never changes.
+    std::string url = Biz::Network::ServiceConfig::instance().connect_page_url();
+    if (url != m_url) {
+        m_url                 = std::move(url);
+        m_reached_default_url = false;
+        m_styles_defined      = false;
+    }
+}
+
+bool BrowserLogicConnectPage::is_connect_url(const std::string& url) const
+{
+    return !m_url.empty() && url.find(m_url) == 0;
+}
+
+std::vector<BrowserLogicCommand> BrowserLogicConnectPage::home_page_commands()
+{
+    std::vector<BrowserLogicCommand> res;
+    if (m_project_interactor.user_account_interactor().is_logged_in()) {
+        emplace_load_default_url_commands(res);
+    } else {
+        emplace_load_logged_out_page_commands(res);
+    }
+    return res;
 }
 
 std::string BrowserLogicConnectPage::access_token()
@@ -33,7 +75,8 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_script_message_webv
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_webview_created()
 {
-    if (!m_project_interactor.user_account_interactor().is_logged_in()) {
+    // Offline the page asks for its config itself and runs on a page session cookie.
+    if (!m_project_interactor.user_account_interactor().is_logged_in() || offline()) {
         return {};
     }
     std::vector<BrowserLogicCommand> result;
@@ -43,6 +86,7 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_webview_created()
     result.insert(result.end(), temp.begin(), temp.end());
     return result;
 }
+
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_show_webview_event(bool show)
 {
     std::vector<BrowserLogicCommand> result;
@@ -54,9 +98,16 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_loaded_webview_even
 {
     if (url.empty())
         return {};
-    
+
     std::vector<BrowserLogicCommand> result;
-    if (url.find(m_url) == 0) {
+    if (url.starts_with("file:")
+        && url.find("/web/" + UNSUPPORTED_PAGE) != std::string::npos
+        && offline())
+    {
+        result.emplace_back(BrowserLogicCommandType::RunScript, unsupported_offline_script());
+    }
+
+    if (is_connect_url(url)) {
         if (m_unsupported_engine) {
             emplace_load_unsupported_page_commands(result);
             return result;
@@ -65,16 +116,13 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_loaded_webview_even
     } else {
         m_styles_defined = false;
     }
-    
+
     //m_load_default_url_on_next_error = false;
 
     if (url.find("/web/" + m_loading_html) != std::string::npos && m_load_default_url) {
         m_load_default_url = false;
-        if (m_project_interactor.user_account_interactor().is_logged_in()) {
-        emplace_load_default_url_commands(result);
-        } else {
-            emplace_load_logged_out_page_commands(result);
-        }
+        std::vector<BrowserLogicCommand> home = home_page_commands();
+        result.insert(result.end(), home.begin(), home.end());
     }
 
     return result;
@@ -83,17 +131,29 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_loaded_webview_even
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_navigation_request_webview_event(const std::string& new_url, const std::string& current_url)
 {
     // we need to do this to redefine css when reload is hit
-    if (new_url.find(m_url) == 0 && new_url == current_url) {
-         m_styles_defined = false;
+    if (is_connect_url(new_url) && new_url == current_url) {
+        m_styles_defined = false;
     }
-    if (new_url == m_url) {
+    on_page_navigation();
+    if (!m_url.empty() && new_url == m_url) {
         m_reached_default_url = true;
         return {};
     }
     if (new_url.find("connection_failed.html") != std::string::npos) {
         return {};
     }
-    if (m_reached_default_url && new_url.find(m_url) != 0) {
+    // A page of the slicer's own resources that this logic asked for is not leaving Connect:
+    // the lock keeps the page from navigating elsewhere, not the slicer from showing its own
+    // logged-out or setup page.
+    if (offline()
+        && m_own_resource_page
+        && new_url.starts_with("file:")
+        && new_url.find("/web/") != std::string::npos)
+    {
+        m_own_resource_page = false;
+        return {};
+    }
+    if (m_reached_default_url && !is_connect_url(new_url)) {
         SPDLOG_INFO( "{} does not start with default url. Vetoing.", new_url);
         return {{BrowserLogicCommandType::Veto, std::string()}};
     } else if (m_reached_default_url && new_url.find("/web/" + m_loading_html) != std::string::npos) {
@@ -104,27 +164,30 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_navigation_request_
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_load_default_url()
 {
-    std::vector<BrowserLogicCommand> res;
-    if (m_project_interactor.user_account_interactor().is_logged_in()) {
-        emplace_load_default_url_commands(res);
-    } else {
-        emplace_load_logged_out_page_commands(res);
-    }
-    
-    return res;
+    refresh_url();
+    return home_page_commands();
 }
 
 void BrowserLogicConnectPage::emplace_load_default_url_commands(std::vector<BrowserLogicCommand>& res)
 {
+    refresh_url();
     m_styles_defined = false;
 
+    if (offline()) {
+        // The page session cookie goes into the store first, the page never gets the credential.
+        // Without a session the page loads anyway and asks again (REQUEST_CONFIG).
+        with_page_session({{BrowserLogicCommandType::LoadURL, m_url}}, OnSessionFailure::Then);
+        return;
+    }
     res.emplace_back(BrowserLogicCommandType::LoadURL, m_url);
 }
 
 void BrowserLogicConnectPage::emplace_load_logged_out_page_commands(std::vector<BrowserLogicCommand>& res)
 {
-    m_styles_defined = false;
+    refresh_url();
     m_logged_out = true;
+    m_styles_defined    = false;
+    m_own_resource_page = true;
     res.emplace_back(BrowserLogicCommandType::LoadResourcesPage, "connect_logged_out");
 }
 
@@ -132,14 +195,16 @@ void BrowserLogicConnectPage::emplace_load_unsupported_page_commands(std::vector
 {
     m_styles_defined = false;
     m_unsupported_engine = true;
-    res.emplace_back(BrowserLogicCommandType::LoadResourcesPage, "connect_unsupported");
+    m_own_resource_page  = true;
+    res.emplace_back(BrowserLogicCommandType::LoadResourcesPage, UNSUPPORTED_PAGE);
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_page_will_load_webview_event()
 {
     std::vector<BrowserLogicCommand> result;
     result.emplace_back(BrowserLogicCommandType::AddUserScript, get_engine_check_script());
-    if (!m_project_interactor.user_account_interactor().is_logged_in()) {
+    if (!m_project_interactor.user_account_interactor().is_logged_in() || offline()) {
+        // Offline nothing carries the credential into the page.
         return result;
     }
     result.emplace_back(BrowserLogicCommandType::AddUserScript, get_login_script(false, m_project_interactor.user_account_interactor().access_token()));
@@ -158,6 +223,10 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_user_account_id_suc
         return res;
     }
 
+    if (offline()) {
+        // The page keeps its page session; a new credential means a new page load anyway.
+        return {};
+    }
     DEBUG_ASSERT(!m_project_interactor.user_account_interactor().access_token().empty());
     std::string javascript = get_login_script(true, m_project_interactor.user_account_interactor().access_token());
     std::vector<BrowserLogicCommand> result;
@@ -173,14 +242,41 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_user_account_logged
         return {};
     }
     m_unsupported_engine = false;
-    std::vector<BrowserLogicCommand> res = {{BrowserLogicCommandType::RunScript, get_logout_script()}};
+    std::vector<BrowserLogicCommand> res;
+    if (!offline()) {
+        res.emplace_back(BrowserLogicCommandType::RunScript, get_logout_script());
+    } else {
+        // Nothing in the page to sign out: it never had the credential, only the page session,
+        // and a script there would make the server page reload itself over the signed-out page.
+        // The page session dies with the credential on the server anyway.
+        res.emplace_back(
+            BrowserLogicCommandType::DeleteCookie,
+            cookie_command_data(
+                CONNECT_LOCAL_SESSION_COOKIE,
+                Biz::Network::ServiceConfig::instance().offline_server_url()
+            )
+        );
+    }
     emplace_load_logged_out_page_commands(res);
     return res; 
+}
+
+std::vector<BrowserLogicCommand> BrowserLogicConnectPage::signed_out_commands()
+{
+    // A server page still shown after the sign-out would wait for a session forever.
+    std::vector<BrowserLogicCommand> res;
+    emplace_load_logged_out_page_commands(res);
+    return res;
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::logout()
 {
     if (m_load_default_url) {
+        return {};
+    }
+    if (offline()) {
+        // Connect Local pages never get the credential, the logged-out handler loads the
+        // signed-out page.
         return {};
     }
     std::vector<BrowserLogicCommand> result;
@@ -225,13 +321,7 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_webview_reload_even
         if (j.contains("fromKeyboard") && j["fromKeyboard"].is_boolean() && j["fromKeyboard"].get<bool>()) {
             return {{BrowserLogicCommandType::DoReload, {}}};
         } else {
-            std::vector<BrowserLogicCommand> res;
-            if (m_project_interactor.user_account_interactor().is_logged_in()) {
-                emplace_load_default_url_commands(res);
-            } else {
-                emplace_load_logged_out_page_commands(res);
-            }
-            return res;
+            return home_page_commands();
         }
     } catch (const nlohmann::json::exception& e) {
         SPDLOG_ERROR("Could not parse Connect message. {}", e.what());
@@ -253,6 +343,10 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_requ
         return res;
     }
 
+    if (offline()) {
+        // Answered by REQUEST_CONFIG with a page session, never with the credential.
+        return {};
+    }
     return{{BrowserLogicCommandType::RunScript, get_login_script(true,  m_project_interactor.user_account_interactor().access_token())}};
 }
 
@@ -280,7 +374,37 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_unsu
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_open_connect_in_browser(const std::string& message_data)
 {
+    if (m_url.empty()) {
+        return {};
+    }
     return {{BrowserLogicCommandType::OpenExternalBrowser, m_url}};
+}
+
+std::vector<BrowserLogicCommand> BrowserLogicConnectPage::page_session_failed_commands()
+{
+    m_styles_defined    = false;
+    m_own_resource_page = true;
+    return AbstractConnectRequestHandler::page_session_failed_commands();
+}
+
+std::string BrowserLogicConnectPage::unsupported_offline_script() const
+{
+    // connect_unsupported is shared with the online mode and names Prusa Connect.
+    const nlohmann::json texts = {
+        Biz::_u8L("Prusa Connect (on-premise) can't be displayed here."),
+        Biz::_u8L(
+            "Your system's built-in web browser is too old to run Prusa Connect (on-premise). Please install the latest updates for your operating system, then restart PrusaSlicer."
+        ),
+    };
+    return std::string(R"(
+        (function(texts) {
+            var paragraphs = document.querySelectorAll('#loading-screen p');
+            var target = [];
+            paragraphs.forEach(function(p) { if (p.querySelector('svg') === null) target.push(p); });
+            for (var i = 0; i < texts.length && i < target.length; ++i) target[i].textContent = texts[i];
+        })()")
+        + Biz::json_for_script(texts)
+        + ");";
 }
 
 std::string BrowserLogicConnectPage::get_login_script(bool refresh, const std::string& access_token) const
@@ -318,12 +442,16 @@ std::string BrowserLogicConnectPage::get_login_script(bool refresh, const std::s
 #else // !AUTH_VIA_FETCH_OVERRIDE
     if (refresh) {
         javascript = std::string(R"(
-            if (location.protocol === 'https:') {
+            if ()")
+            + connect_page_js_condition()
+            + std::string(R"() {
                 if (window._prusaSlicer_initLogin !== undefined) {
                     console.log('Init login');
                     if (window._prusaSlicer !== undefined)
                         _prusaSlicer.postMessage({action: 'LOG', message: 'Refreshing login'});
-                    _prusaSlicer_initLogin(')") + access_token + std::string(R"(');
+                    _prusaSlicer_initLogin(')")
+            + access_token
+            + std::string(R"(');
                 } else {
                     console.log('Refreshing login skipped as no _prusaSlicer_login defined (yet?)');
                     if (window._prusaSlicer === undefined) {
@@ -404,7 +532,9 @@ std::string BrowserLogicConnectPage::get_login_script(bool refresh, const std::s
                 } while (retry);
             }
 
-            if (location.protocol === 'https:' && window._prusaSlicer) {
+            if ()"
+            + connect_page_js_condition()
+            + R"( && window._prusaSlicer) {
                 _prusaSlicer_log('Requesting login');
                 _prusaSlicer.postMessage({action: 'REQUEST_LOGIN'});
             }
@@ -416,7 +546,7 @@ std::string BrowserLogicConnectPage::get_login_script(bool refresh, const std::s
 
 std::string BrowserLogicConnectPage::get_logout_script() const
 {
-     return "sessionStorage.removeItem('_slicer_token');";
+    return "sessionStorage.removeItem('_slicer_token');";
 }
 
 void BrowserLogicConnectPage::emplace_define_css_commands(std::vector<BrowserLogicCommand>& res)

@@ -12,7 +12,7 @@ class BrowserLogicConnectPage final : public AbstractBrowserLogic, public Abstra
 {
 public:
     BrowserLogicConnectPage(Biz::ProjectInteractor& project_interactor);
-    
+
     // AbstractBrowserLogic
     std::string access_token() override;
     std::vector<BrowserLogicCommand> on_script_message_webview_event(const std::string& message) override;
@@ -42,13 +42,26 @@ protected:
     std::vector<BrowserLogicCommand> on_connect_action_log_in_in_browser(const std::string& message_data) override;
     std::vector<BrowserLogicCommand> on_connect_action_unsupported_webview(const std::string& message_data) override;
     std::vector<BrowserLogicCommand> on_connect_action_open_connect_in_browser(const std::string& message_data) override;
+    std::vector<BrowserLogicCommand> page_session_failed_commands() override;
+    std::vector<BrowserLogicCommand> signed_out_commands() override;
 
 private:
     bool m_styles_defined {false};
     bool m_reached_default_url {false};
+    /**
+     * @brief Offline: set when this logic loads one of its own resource pages, so the navigation
+     * lock lets it in. Online the lock keeps them out, as before Connect Local.
+     */
+    bool m_own_resource_page{false};
     bool m_load_default_url { true };
     bool m_logged_out {false};
     bool m_unsupported_engine {false};
+
+    void refresh_url();
+    bool is_connect_url(const std::string& url) const;
+    /** @brief The Connect page when signed in, else the logged-out page. */
+    std::vector<BrowserLogicCommand> home_page_commands();
+    std::string unsupported_offline_script() const;
 
     void emplace_load_default_url_commands(std::vector<BrowserLogicCommand>& res);
     void emplace_load_logged_out_page_commands(std::vector<BrowserLogicCommand>& res);

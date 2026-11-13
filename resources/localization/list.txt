@@ -29,6 +29,7 @@ src/slic3r-shared/include/Slic3r/App/Plater/MMPaintingColorDropdowns.hpp
 src/slic3r-shared/src/Slic3r/App/AddPrinterPanel.cpp
 src/slic3r-shared/src/Slic3r/App/AppConfig.cpp
 src/slic3r-shared/src/Slic3r/App/Browser/BrowserLogicConnectLocalLogIn.cpp
+src/slic3r-shared/src/Slic3r/App/Browser/BrowserLogicConnectPage.cpp
 src/slic3r-shared/src/Slic3r/App/ColorDropdown.cpp
 src/slic3r-shared/src/Slic3r/App/ColorMix/ColorMixDialog.cpp
 src/slic3r-shared/src/Slic3r/App/ColorMix/ColorMixRecipeRow.cpp
