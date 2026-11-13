@@ -1714,6 +1714,7 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/Biz/ProjectInteractorTests.cpp
             test/Slic3r/Biz/ExportGcodeTests.cpp
+            test/Slic3r/Biz/ResultExport/ExportNameParserTests.cpp
             test/Slic3r/Biz/Scene/SceneInteractorTests.cpp
             test/Slic3r/Biz/SlaPointsOperationsTests.cpp
             test/Slic3r/Biz/Scene/VirtualBedPreviewTests.cpp

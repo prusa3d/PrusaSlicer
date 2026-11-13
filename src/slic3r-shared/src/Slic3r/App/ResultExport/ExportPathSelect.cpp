@@ -139,25 +139,11 @@ ExportNameData get_export_name_data(const Biz::ProjectInteractor& project_intera
         const auto* item = project_interactor.preset_interactor().selected_printer_preset().printer.config_box().find("binary_gcode").item;
         bool bgcode_allowed = item ? item->get<bool>() : true;
 
-        if (last_used_ext_lower.empty() && bgcode_allowed) {
-            // We set extenseion here to bgcode because some systems (Linux) are using wildcards just to filter existing files.
-            // While we would rather have output format set to our primary wildcard.
-            apply_extension(".bgcode");
-        } else if (last_used_ext_lower == ".gcode" || (bgcode_allowed && last_used_ext_lower == ".bgcode")) {
-            apply_extension(ext);
-        }
-
-        // Fallback for when the parsed filename inherently contains .bgcode but binary gcode is disabled
-        std::string preferred_extension_lower = name_data.preferred_extension;
-        std::transform(
-            preferred_extension_lower.begin(),
-            preferred_extension_lower.end(),
-            preferred_extension_lower.begin(),
-            [](unsigned char c) { return std::tolower(c); }
+        const std::string fdm_ext = Biz::ExportNameParser::resolve_fdm_extension(
+            ext, name_data.preferred_extension, bgcode_allowed
         );
-
-        if (!bgcode_allowed && preferred_extension_lower == ".bgcode") {
-            apply_extension(".gcode");
+        if (fdm_ext != name_data.preferred_extension) {
+            apply_extension(fdm_ext);
         }
 
     } else if (last_used_ext_lower == ".sl1" || last_used_ext_lower == ".sl1s") { 
