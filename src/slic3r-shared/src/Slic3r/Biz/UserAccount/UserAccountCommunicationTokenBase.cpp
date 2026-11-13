@@ -28,8 +28,10 @@ long long parse_next_timeout(const std::string& next_timeout)
 }
 } // namespace
 
-UserAccountCommunicationTokenBase::UserAccountCommunicationTokenBase(Platform::IMainThreadDispatcher& dispatcher) :
-    m_session{dispatcher}
+UserAccountCommunicationTokenBase::UserAccountCommunicationTokenBase(
+    Platform::IMainThreadDispatcher& dispatcher
+) :
+    UserAccountCommunicationBase{dispatcher}
 {
 }
 
@@ -78,15 +80,7 @@ void UserAccountCommunicationTokenBase::init()
 UserAccountCommunicationTokenBase::~UserAccountCommunicationTokenBase()
 {
     stop_all_timers();
-    m_session.stop();
-
-    // Since there is m_thread_stop_condition in m_thread,
-    // we need to manually request_stop and wake up the condition for the thread to stop.
-    m_thread.request_stop();
-    wakeup_session_thread();
-    if (m_thread.joinable()) {
-        m_thread.join();
-    }
+    stop_session_thread();
 }
 
 void UserAccountCommunicationTokenBase::set_refresh_time(int seconds)
@@ -226,34 +220,6 @@ void UserAccountCommunicationTokenBase::stop_all_timers()
     }
 }
 
-void UserAccountCommunicationTokenBase::init_session_thread()
-{
-    m_thread = JThread::JThread(
-        [&](JThread::StopToken stop_token)
-        {
-            for (;;) {
-                {
-                    std::unique_lock<std::mutex> lck(m_thread_stop_mutex);
-                    m_thread_stop_condition.wait_for(
-                        lck,
-                        std::chrono::seconds(88'888),
-                        [this, stop_token] { return stop_token.stop_requested() || m_thread_wakeup; }
-                    );
-                }
-                if (stop_token.stop_requested())
-                    // Stop the worker thread.
-                    break;
-                // Do not process_action_queue if window is not active and thread was not forced to wakeup
-                if (!m_window_is_active && !m_thread_wakeup) {
-                    continue;
-                }
-                m_thread_wakeup = false;
-                m_session.process_action_queue();
-            }
-        }
-    );
-}
-
 void UserAccountCommunicationTokenBase::do_clear(bool notify_owner)
 {
     m_session.do_clear(notify_owner);
@@ -303,15 +269,6 @@ void UserAccountCommunicationTokenBase::enqueue_refresh()
     }
     m_session.enqueue_refresh({});
     wakeup_session_thread();
-}
-
-void UserAccountCommunicationTokenBase::wakeup_session_thread()
-{
-    {
-        std::lock_guard<std::mutex> lck(m_thread_stop_mutex);
-        m_thread_wakeup = true;
-    }
-    m_thread_stop_condition.notify_all();
 }
 
 void UserAccountCommunicationTokenBase::enqueue_refresh_race(const std::string& refresh_token)

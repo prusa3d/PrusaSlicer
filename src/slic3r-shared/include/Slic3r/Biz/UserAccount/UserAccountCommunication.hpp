@@ -38,39 +38,11 @@ public:
      */
     void on_log_in_code_response(const std::string& url_message) override;
 
-    /**
-     * @brief Returns true if logging in is finalized.
-     */
-    bool is_logged_in() const override;
-
-    std::string access_token() const override;
-    
-    /**
-     * @brief Returns path to avatar (even if it does not exists). 
-     */
-    boost::filesystem::path avatar() const override;
-
-    std::string email() const override;
-
-    /**
-     * @brief Uses data to download avatar.
-     */
-    void on_avatar_url(const std::string& data) override;
-
-    void on_email(const std::string& data) override;
-
-    /**
-     * @brief Stores avatar into file.
-     */
-    void on_avatar_success(std::string&& data) const override;
-
     void request_printables_secret_token() override;
 
     void enqueue_connect_printers_data_action(std::function<void(const std::string&)> succ_fn) override;
 private:
     std::string m_code_verifier;
-    std::string m_avatar_extension;
-    std::string m_email;
     /**
      * @brief True while THIS instance is waiting for a login code it initiated (between on_log_in_request and on_log_in_code_response).
      */

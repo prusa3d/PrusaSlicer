@@ -1129,6 +1129,7 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/UserAccount/UserAccountAction.hpp
         include/Slic3r/Biz/UserAccount/UserAccountActionStore.hpp
         include/Slic3r/Biz/UserAccount/UserAccountActionData.hpp
+        include/Slic3r/Biz/UserAccount/UserAccountCommunicationBase.hpp
         include/Slic3r/Biz/UserAccount/UserAccountCommunicationTokenBase.hpp
         include/Slic3r/Biz/UserAccount/UserAccountTokenStore.hpp
         include/Slic3r/Biz/UserAccount/UserAccountTokenLog.hpp
@@ -1139,6 +1140,7 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/UserAccount/UserAccountSession.cpp
         src/Slic3r/Biz/UserAccount/UserAccountSessionDispatchBase.cpp
         src/Slic3r/Biz/UserAccount/UserAccountAction.cpp
+        src/Slic3r/Biz/UserAccount/UserAccountCommunicationBase.cpp
         src/Slic3r/Biz/UserAccount/UserAccountCommunicationTokenBase.cpp
         src/Slic3r/Biz/UserAccount/UserAccountTokenStore.cpp
         src/Slic3r/Biz/UserAccount/UserAccountCodeChallengeGenerator.cpp
