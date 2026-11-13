@@ -91,6 +91,17 @@ public:
     }
 
     /**
+     * @brief Called when the hosting view is hidden (on_show_webview_event is only called on show).
+     */
+    virtual void on_hide_webview_event() {}
+
+    /**
+     * @brief Called whenever the hosting view becomes visible, also on the first show, when the
+     * web view is only being created and on_show_webview_event is not called.
+     */
+    virtual void on_visible_webview_event() {}
+
+    /**
      * @brief Lets the logic send commands on its own, outside of a webview event (e.g. results of
      * a background task). Set by the hosting view; commands must be pushed on the main thread.
      */

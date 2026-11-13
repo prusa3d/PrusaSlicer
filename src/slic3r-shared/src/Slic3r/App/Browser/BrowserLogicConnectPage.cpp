@@ -33,8 +33,34 @@ BrowserLogicConnectPage::BrowserLogicConnectPage(Biz::ProjectInteractor& project
         "connect_loading",
         "connect_error"
     ),
-    AbstractConnectRequestHandler(project_interactor, *this)
-{}
+    AbstractConnectRequestHandler(project_interactor, *this),
+    m_setup(
+        project_interactor.user_account_interactor(),
+        {
+            .push_commands = [this](std::vector<BrowserLogicCommand> commands)
+            { push_commands(std::move(commands)); },
+            .setup_page =
+                [this]()
+            {
+                std::vector<BrowserLogicCommand> res;
+                emplace_load_setup_page_commands(res);
+                return res;
+            },
+            .home_page = [this]() { return home_page_commands(); },
+            .logged_out_page =
+                [this]()
+            {
+                std::vector<BrowserLogicCommand> res;
+                emplace_load_logged_out_page_commands(res);
+                return res;
+            },
+        }
+    )
+{
+    m_setup.add_actions(m_actions);
+}
+
+BrowserLogicConnectPage::~BrowserLogicConnectPage() = default;
 
 void BrowserLogicConnectPage::refresh_url()
 {
@@ -87,8 +113,19 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_webview_created()
     return result;
 }
 
+void BrowserLogicConnectPage::on_hide_webview_event()
+{
+    m_setup.set_shown(false);
+}
+
+void BrowserLogicConnectPage::on_visible_webview_event()
+{
+    m_setup.set_shown(true);
+}
+
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_show_webview_event(bool show)
 {
+    m_setup.set_shown(show);
     std::vector<BrowserLogicCommand> result;
     result.emplace_back(BrowserLogicCommandType::RunScript, "window.location.reload();");
     return result;
@@ -99,7 +136,7 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_loaded_webview_even
     if (url.empty())
         return {};
 
-    std::vector<BrowserLogicCommand> result;
+    std::vector<BrowserLogicCommand> result = m_setup.on_page_loaded(url);
     if (url.starts_with("file:")
         && url.find("/web/" + UNSUPPORTED_PAGE) != std::string::npos
         && offline())
@@ -130,6 +167,7 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_loaded_webview_even
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_navigation_request_webview_event(const std::string& new_url, const std::string& current_url)
 {
+    m_setup.on_navigation_request(new_url);
     // we need to do this to redefine css when reload is hit
     if (is_connect_url(new_url) && new_url == current_url) {
         m_styles_defined = false;
@@ -171,6 +209,10 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_load_default_url()
 void BrowserLogicConnectPage::emplace_load_default_url_commands(std::vector<BrowserLogicCommand>& res)
 {
     refresh_url();
+    if (ConnectLocalSetupLogic::needs_server_setup()) {
+        emplace_load_setup_page_commands(res);
+        return;
+    }
     m_styles_defined = false;
 
     if (offline()) {
@@ -186,9 +228,19 @@ void BrowserLogicConnectPage::emplace_load_logged_out_page_commands(std::vector<
 {
     refresh_url();
     m_logged_out = true;
+    if (m_setup.wants_setup_page()) {
+        emplace_load_setup_page_commands(res);
+        return;
+    }
     m_styles_defined    = false;
     m_own_resource_page = true;
-    res.emplace_back(BrowserLogicCommandType::LoadResourcesPage, "connect_logged_out");
+    res.emplace_back(
+        BrowserLogicCommandType::LoadResourcesPage,
+        std::string(
+            offline() ? ConnectLocalSetupLogic::LOGGED_OUT_PAGE :
+                        ConnectLocalSetupLogic::CLOUD_LOGGED_OUT_PAGE
+        )
+    );
 }
 
 void BrowserLogicConnectPage::emplace_load_unsupported_page_commands(std::vector<BrowserLogicCommand>& res)
@@ -385,6 +437,26 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::page_session_failed_co
     m_styles_defined    = false;
     m_own_resource_page = true;
     return AbstractConnectRequestHandler::page_session_failed_commands();
+}
+
+void
+BrowserLogicConnectPage::emplace_load_setup_page_commands(std::vector<BrowserLogicCommand>& res)
+{
+    m_styles_defined    = false;
+    m_own_resource_page = true;
+    res.emplace_back(
+        BrowserLogicCommandType::LoadResourcesPage,
+        std::string(ConnectLocalSetupLogic::SETUP_PAGE)
+    );
+}
+
+std::vector<BrowserLogicCommand>
+BrowserLogicConnectPage::on_load_error(const std::string& url, bool certificate_error)
+{
+    if (!certificate_error) {
+        return {};
+    }
+    return m_setup.on_certificate_error(url);
 }
 
 std::string BrowserLogicConnectPage::unsupported_offline_script() const

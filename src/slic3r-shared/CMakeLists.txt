@@ -469,6 +469,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Browser/BrowserLogicLogInRedirect.cpp
         include/Slic3r/App/Browser/BrowserLogicConnectLocalLogIn.hpp
         src/Slic3r/App/Browser/BrowserLogicConnectLocalLogIn.cpp
+        include/Slic3r/App/Browser/ConnectLocalSetupLogic.hpp
+        src/Slic3r/App/Browser/ConnectLocalSetupLogic.cpp
         include/Slic3r/App/Browser/BrowserLogicPrintablesToConnect.hpp
         src/Slic3r/App/Browser/BrowserLogicPrintablesToConnect.cpp
         include/Slic3r/App/Browser/BrowserLogicPhysicalPrinter.hpp
@@ -1093,6 +1095,8 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/Network/IHttp.hpp
         include/Slic3r/Biz/Network/HttpFactory.hpp
         include/Slic3r/Biz/Network/HttpCurl.hpp
+        include/Slic3r/Biz/ConnectLocal/ConnectLocalDiscovery.hpp
+        src/Slic3r/Biz/ConnectLocal/ConnectLocalDiscovery.cpp
         include/Slic3r/Biz/Network/Bonjour.hpp
         include/Slic3r/Biz/Network/TCPConsole.hpp
         include/Slic3r/Biz/Network/ServiceConfig.hpp
@@ -1842,6 +1846,7 @@ if(SLIC3R_BUILD_TESTS)
         test/Slic3r/Biz/Network/ServiceConfigTests.cpp
         test/Slic3r/Biz/Network/ServerTrustTests.cpp
         test/Slic3r/Biz/Network/UrlTests.cpp
+        test/Slic3r/Biz/ConnectLocal/ConnectLocalDiscoveryTests.cpp
 
         test/Slic3r/App/CustomGCodeMigrationTests.cpp
         test/Slic3r/Biz/MatDb/MatDbClientTests.cpp

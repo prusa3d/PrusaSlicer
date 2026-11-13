@@ -54,6 +54,11 @@ private:
 
     bool m_busy_cursor_set {false};
     bool m_load_error_page{false};
+    /**
+     * @brief Set by the logic for a failed load (AbstractBrowserLogic::on_load_error), run instead
+     * of the error page.
+     */
+    std::vector<App::Browser::BrowserLogicCommand> m_error_commands;
     bool m_shown{false};
     bool m_load_default_url_on_next_error{false};
 

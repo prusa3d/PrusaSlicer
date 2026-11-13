@@ -2,6 +2,7 @@
 
 #include "Slic3r/App/Browser/AbstractBrowserLogic.hpp"
 #include "Slic3r/App/Browser/AbstractConnectRequestHandler.hpp"
+#include "Slic3r/App/Browser/ConnectLocalSetupLogic.hpp"
 
 namespace Slic3r::Biz {
 class ProjectInteractor;
@@ -12,11 +13,14 @@ class BrowserLogicConnectPage final : public AbstractBrowserLogic, public Abstra
 {
 public:
     BrowserLogicConnectPage(Biz::ProjectInteractor& project_interactor);
+    ~BrowserLogicConnectPage() override;
 
     // AbstractBrowserLogic
     std::string access_token() override;
     std::vector<BrowserLogicCommand> on_script_message_webview_event(const std::string& message) override;
     std::vector<BrowserLogicCommand> on_show_webview_event(bool show) override;
+    void on_hide_webview_event() override;
+    void on_visible_webview_event() override;
     std::vector<BrowserLogicCommand> on_navigation_request_webview_event(const std::string& new_url, const std::string& current_url) override;
     std::vector<BrowserLogicCommand> on_load_default_url() override;
     std::vector<BrowserLogicCommand> on_page_will_load_webview_event() override;
@@ -24,6 +28,8 @@ public:
     std::vector<BrowserLogicCommand> on_loaded_webview_event(const std::string& url) override;
     std::vector<BrowserLogicCommand> on_user_account_id_success(bool is_refresh, const std::string& current_url) override;
     std::vector<BrowserLogicCommand> on_user_account_logged_out(const std::string& current_url) override;
+    std::vector<BrowserLogicCommand>
+    on_load_error(const std::string& url, bool certificate_error) override;
 
     /**
      * @brief call when connect panel is being removed 
@@ -57,10 +63,16 @@ private:
     bool m_logged_out {false};
     bool m_unsupported_engine {false};
 
+    /**
+     * @brief Offline: the setup of the Connect Local server, shown in place of the Connect page.
+     */
+    ConnectLocalSetupLogic m_setup;
+
     void refresh_url();
     bool is_connect_url(const std::string& url) const;
     /** @brief The Connect page when signed in, else the logged-out page. */
     std::vector<BrowserLogicCommand> home_page_commands();
+    void emplace_load_setup_page_commands(std::vector<BrowserLogicCommand>& res);
     std::string unsupported_offline_script() const;
 
     void emplace_load_default_url_commands(std::vector<BrowserLogicCommand>& res);

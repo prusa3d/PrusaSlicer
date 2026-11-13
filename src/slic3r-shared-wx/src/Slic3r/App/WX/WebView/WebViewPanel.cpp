@@ -264,8 +264,10 @@ void WebViewPanel::on_show(wxShowEvent& evt)
     m_shown = evt.IsShown();
     if (!m_shown) {
         wxSetCursor(wxNullCursor);
+        m_logic->on_hide_webview_event();
         return;
     }
+    m_logic->on_visible_webview_event();
     if (m_host.is_pending()) {
         late_create();
         return;
@@ -354,6 +356,10 @@ case type: \
         return;
     }
 
+    m_error_commands = m_logic->on_load_error(
+        into_u8(evt.GetURL()),
+        evt.GetInt() == wxWEBVIEW_NAV_ERR_CERTIFICATE
+    );
     load_error_page();
 }
 
@@ -384,7 +390,9 @@ void WebViewPanel::on_idle(wxIdleEvent& evt)
 
     if (m_shown && m_load_error_page && !is_busy) {
         m_load_error_page = false;
-        if (m_load_default_url_on_next_error) {
+        if (!m_error_commands.empty()) {
+            process_logic_command_vector(std::exchange(m_error_commands, {}));
+        } else if (m_load_default_url_on_next_error) {
             m_load_default_url_on_next_error = false;
             load_default_url();
         } else {
