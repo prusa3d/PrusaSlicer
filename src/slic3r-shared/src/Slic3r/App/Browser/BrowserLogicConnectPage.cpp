@@ -15,6 +15,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <utility>
+
 namespace Slic3r::App::Browser {
 
 namespace {
@@ -81,8 +83,10 @@ bool BrowserLogicConnectPage::is_connect_url(const std::string& url) const
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::home_page_commands()
 {
     std::vector<BrowserLogicCommand> res;
+    // A page asked for by set_next_show_url() is shown once, in place of the Connect page.
+    const std::string next_url = std::exchange(m_next_show_url, {});
     if (m_project_interactor.user_account_interactor().is_logged_in()) {
-        emplace_load_default_url_commands(res);
+        emplace_load_default_url_commands(res, next_url);
     } else {
         emplace_load_logged_out_page_commands(res);
     }
@@ -126,6 +130,9 @@ void BrowserLogicConnectPage::on_visible_webview_event()
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_show_webview_event(bool show)
 {
     m_setup.set_shown(show);
+    if (!m_next_show_url.empty()) {
+        return home_page_commands();
+    }
     std::vector<BrowserLogicCommand> result;
     result.emplace_back(BrowserLogicCommandType::RunScript, "window.location.reload();");
     return result;
@@ -206,7 +213,10 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_load_default_url()
     return home_page_commands();
 }
 
-void BrowserLogicConnectPage::emplace_load_default_url_commands(std::vector<BrowserLogicCommand>& res)
+void BrowserLogicConnectPage::emplace_load_default_url_commands(
+    std::vector<BrowserLogicCommand>& res,
+    const std::string& page_url
+)
 {
     refresh_url();
     if (ConnectLocalSetupLogic::needs_server_setup()) {
@@ -214,14 +224,16 @@ void BrowserLogicConnectPage::emplace_load_default_url_commands(std::vector<Brow
         return;
     }
     m_styles_defined = false;
+    // A page of another server (the service mode changed meanwhile) falls back to the default.
+    const std::string url = is_connect_url(page_url) ? page_url : m_url;
 
     if (offline()) {
         // The page session cookie goes into the store first, the page never gets the credential.
         // Without a session the page loads anyway and asks again (REQUEST_CONFIG).
-        with_page_session({{BrowserLogicCommandType::LoadURL, m_url}}, OnSessionFailure::Then);
+        with_page_session({{BrowserLogicCommandType::LoadURL, url}}, OnSessionFailure::Then);
         return;
     }
-    res.emplace_back(BrowserLogicCommandType::LoadURL, m_url);
+    res.emplace_back(BrowserLogicCommandType::LoadURL, url);
 }
 
 void BrowserLogicConnectPage::emplace_load_logged_out_page_commands(std::vector<BrowserLogicCommand>& res)

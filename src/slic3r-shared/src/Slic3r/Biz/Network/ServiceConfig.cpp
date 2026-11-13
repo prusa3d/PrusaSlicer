@@ -29,6 +29,7 @@ constexpr std::string_view OFFLINE_CONNECT_API_PATH  = "/connect"; // M +
 constexpr std::string_view OFFLINE_PAIRING_API_PATH  = "/api/v1/auth/app-pairings"; // S +
 constexpr std::string_view OFFLINE_CREDENTIALS_PATH  = "/api/v1/auth/credentials/"; // S +
 constexpr std::string_view OFFLINE_PAIRING_PAGE_PATH = "/pair?code="; // S +
+constexpr std::string_view OFFLINE_PRINTER_PAGE_PATH = "/printers/"; // S +
 
 void update_from_env(std::string& dest, const char* env_name, bool remove_trailing_slash)
 {
@@ -237,6 +238,23 @@ std::string ServiceConfig::connect_page_url() const
 std::string ServiceConfig::connect_select_printer_url() const
 {
     return mode_url(&ModeUrls::connect_select_printer);
+}
+
+std::string ServiceConfig::connect_printer_page_url(const std::string& printer_uuid) const
+{
+    // The uuid comes from the server, keep it to the characters of a uuid, so it is one path
+    // segment and cannot add anything to the URL.
+    if (printer_uuid.empty() || !is_ascii_alnum_or(printer_uuid, "-_")) {
+        return {};
+    }
+    std::shared_lock lock(m_mutex);
+    if (m_mode_urls.mode == ServiceMode::Online) {
+        return m_mode_urls.connect + "/printer/" + printer_uuid + "/dashboard";
+    }
+    if (m_mode_urls.offline_server.empty()) {
+        return {};
+    }
+    return m_mode_urls.offline_server + std::string(OFFLINE_PRINTER_PAGE_PATH) + printer_uuid;
 }
 
 // ---- Prusa Account ----

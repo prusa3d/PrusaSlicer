@@ -454,7 +454,7 @@ bool PrintHostPrusaConnect::perform(
     ProgressFn progress_fn,
     RetryFn retry_fn,
     ErrorFn error_fn,
-    InfoFn
+    InfoFn info_fn
 ) const
 {
     const PhysicalPrinter::ConnectUpload* auth = std::get_if<PhysicalPrinter::ConnectUpload>(&m_print_host_config.payload);
@@ -464,6 +464,12 @@ bool PrintHostPrusaConnect::perform(
         SPDLOG_ERROR("PrusaConnect: No organization id for printer {}", auth->printer_uuid);
         error_fn(_u8L("Prusa Connect did not provide an organization for the selected printer."));
         return false;
+    }
+
+    const std::string printer_page_url =
+        Network::ServiceConfig::instance().connect_printer_page_url(auth->printer_uuid);
+    if (!printer_page_url.empty()) {
+        info_fn(PrintHostJobInfoTag::ConnectPrinterAddress, printer_page_url);
     }
 
     SPDLOG_INFO(

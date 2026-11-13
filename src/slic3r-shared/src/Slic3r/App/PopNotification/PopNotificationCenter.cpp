@@ -768,6 +768,18 @@ PopNotificationLayout upload_layout(const PrintHostProgressNotificationData& dat
         } else {
             msg = fmt::format("Uploading {} to {} has finished.", data.filename, data.target);
         }
+        if (data.show_printer_page_fn != nullptr) {
+            // TRN Button on a finished upload notification: show the printer in the Connect tab.
+            return PopNotificationLayoutTextButtons{
+                std::move(msg),
+                {{_u8L("Show printer"),
+                  [show_printer_page = data.show_printer_page_fn]()
+                  {
+                      show_printer_page();
+                      return true;
+                  }}}
+            };
+        }
         return PopNotificationLayoutText(std::move(msg));
     }
     case PrintHostJobStatus::Failed: {
@@ -1022,6 +1034,14 @@ void PopNotificationCenter::on_print_host_info(
                     m_removable_drive_service.eject_drive(path); 
                 };
         }
+    }
+    if (tag == PrintHostJobInfoTag::ConnectPrinterAddress) {
+        payload.show_printer_page_fn = [this, msg]()
+            {
+                if (m_switch_left_tab_fn) {
+                    m_switch_left_tab_fn(LeftBarTabs::Printers, msg);
+                }
+            };
     }
     if (tag == PrintHostJobInfoTag::OperationType && msg == "export") {
         payload.is_upload = false;

@@ -853,7 +853,7 @@ void MainFrame::switch_left_tab(LeftBarTabs id, const std::string& data)
         return;
     }
 
-    if (id == LeftBarTabs::Printables) {
+    if (id == LeftBarTabs::Printables || id == LeftBarTabs::Printers) {
         WebView::AbstractWebViewPanel* webview_panel =
             dynamic_cast<WebView::AbstractWebViewPanel*>(m_left_bar->GetPage(page_index));
         webview_panel->set_next_show_url(data);

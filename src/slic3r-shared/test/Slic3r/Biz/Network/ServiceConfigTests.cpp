@@ -177,6 +177,28 @@ TEST_CASE(
     CHECK(sc.offline_credential_url("1?x=y").empty());
 }
 
+TEST_CASE("Printer page URL follows the service mode", "[ServiceConfig]")
+{
+    ModeGuard guard;
+    ServiceConfig& sc      = ServiceConfig::instance();
+    const std::string uuid = "c0ffee00-1234-4abc-8def-0123456789ab";
+
+    sc.set_mode(ServiceMode::Online);
+    CHECK(sc.connect_printer_page_url(uuid) == sc.connect_url() + "/printer/" + uuid + "/dashboard");
+
+    sc.set_mode(ServiceMode::Offline, "https://pcl.local:8443/base/");
+    CHECK(sc.connect_printer_page_url(uuid) == "https://pcl.local:8443/base/printers/" + uuid);
+
+    // Nothing but one path segment is taken from the printer list.
+    CHECK(sc.connect_printer_page_url("").empty());
+    CHECK(sc.connect_printer_page_url("../me").empty());
+    CHECK(sc.connect_printer_page_url("id?x=y").empty());
+    CHECK(sc.connect_printer_page_url("id\xE9").empty());
+
+    sc.set_mode(ServiceMode::Offline, "not a url");
+    CHECK(sc.connect_printer_page_url(uuid).empty());
+}
+
 TEST_CASE("Offline mode without a valid server has no Account URLs", "[ServiceConfig]")
 {
     ModeGuard guard;

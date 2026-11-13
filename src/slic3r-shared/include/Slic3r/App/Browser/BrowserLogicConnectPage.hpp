@@ -75,7 +75,13 @@ private:
     void emplace_load_setup_page_commands(std::vector<BrowserLogicCommand>& res);
     std::string unsupported_offline_script() const;
 
-    void emplace_load_default_url_commands(std::vector<BrowserLogicCommand>& res);
+    /**
+     * @brief The Connect page, or `page_url` when it is a page of the same server.
+     */
+    void emplace_load_default_url_commands(
+        std::vector<BrowserLogicCommand>& res,
+        const std::string& page_url = {}
+    );
     void emplace_load_logged_out_page_commands(std::vector<BrowserLogicCommand>& res);
     void emplace_load_unsupported_page_commands(std::vector<BrowserLogicCommand>& res);
     void emplace_define_css_commands(std::vector<BrowserLogicCommand>& res);

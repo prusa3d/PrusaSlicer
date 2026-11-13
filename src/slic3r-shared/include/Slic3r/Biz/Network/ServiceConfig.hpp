@@ -128,6 +128,14 @@ public:
 
     std::string connect_select_printer_url() const;
 
+    /**
+     * @brief Page of one printer in the Connect web app, shown after an upload to it.
+     * @param printer_uuid Uuid of the printer in the Connect printer list (Connect Local: the
+     * device id).
+     * @return Empty for an empty or unsafe uuid, or offline without a valid server.
+     */
+    std::string connect_printer_page_url(const std::string& printer_uuid) const;
+
     std::string connect_printers_url() const
     {
         return connect_url() + "/app/printers/";
