@@ -1259,13 +1259,15 @@ public:
 
     ItemPtr logged_out_layout()
     {
-        auto login{[this]()
-                   {
-                       AppServices::instance().dialog_manager().show_webview_dialog(
-                           std::make_unique<Browser::BrowserLogicLogInRedirect>(
-                               m_project_interactor.user_account_interactor()),
-                           &m_project_interactor);
-                   }};
+        auto login{
+            [this]()
+            {
+                AppServices::instance().dialog_manager().show_webview_dialog(
+                    Browser::make_log_in_logic(m_project_interactor.user_account_interactor()),
+                    &m_project_interactor
+                );
+            }
+        };
 
         const NavigationSetup navigation_setup{
             .left_button_text     = Biz::_u8L("Back"),

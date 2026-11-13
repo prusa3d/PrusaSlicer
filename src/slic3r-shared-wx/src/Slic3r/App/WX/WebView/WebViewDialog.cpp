@@ -12,6 +12,8 @@
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Directories.hpp"
 
+#include <utility>
+
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textdlg.h>
@@ -31,6 +33,14 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
     m_logic(std::move(logic))
 {
     ASSERT(m_logic);
+    m_logic->set_command_sink(
+        [this](std::vector<App::Browser::BrowserLogicCommand> commands)
+        {
+            m_host.run_when_ready(
+                [this, commands]() mutable { process_logic_command_vector(std::move(commands)); }
+            );
+        }
+    );
     topsizer = new wxBoxSizer(wxVERTICAL);
 #ifdef DEBUG_URL_PANEL
     // Create the button
@@ -94,6 +104,7 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
 
     // Connect the idle events
     Bind(wxEVT_IDLE, &WebViewDialog::on_idle, this);
+    // Closed by the person: EndModal() lets the logic clean up first.
     Bind(wxEVT_CLOSE_WINDOW, ([this](wxCloseEvent& evt) { EndModal(wxID_CANCEL); }));
 
     // Create the webview
@@ -198,7 +209,11 @@ void WebViewDialog::on_idle(wxIdleEvent& WXUNUSED(evt))
     }
 
     if (!is_busy) {
-        if (web_view && m_load_error_page) {
+        if (web_view && m_load_error_page && !m_error_commands.empty()) {
+            // The logic shows the error itself.
+            m_load_error_page = false;
+            process_logic_command_vector(std::exchange(m_error_commands, {}));
+        } else if (web_view && m_load_error_page) {
             m_load_error_page = false;
             web_view->LoadURL(format_wxstr(
                 "file://%1%/web/error_no_reload%2%.html",
@@ -207,9 +222,11 @@ void WebViewDialog::on_idle(wxIdleEvent& WXUNUSED(evt))
             ));
         }
         if (m_waiting_for_counters && m_atomic_counter == m_counter_to_match) {
+            m_ended_by_logic = true;
             EndModal(wxID_OK);
         }
         if (m_force_close) {
+            m_ended_by_logic = true;
             EndModal(wxID_OK);
         }
     }
@@ -448,6 +465,10 @@ case type: \
         return;
     }
 
+    m_error_commands = m_logic->on_load_error(
+        into_u8(evt.GetURL()),
+        evt.GetInt() == wxWEBVIEW_NAV_ERR_CERTIFICATE
+    );
     load_error_page();
 }
 
@@ -477,6 +498,11 @@ void WebViewDialog::run_script(const wxString& javascript)
 
 void WebViewDialog::EndModal(int retCode)
 {
+    if (!std::exchange(m_ended_by_logic, false)) {
+        // Ended by the person (close button, Esc via the cancel path, ...), not by the logic: it
+        // cleans up while the web view still exists.
+        process_logic_command_vector(m_logic->on_dialog_closing());
+    }
     if (wxWebView* web_view = m_host.get_unguarded()) {
         for (const std::string& handler : m_logic->script_message_handler_names()) {
             web_view->RemoveScriptMessageHandler(from_u8(handler));
@@ -535,6 +561,28 @@ void WebViewDialog::on_user_account_will_refresh()
     DEBUG_ASSERT(r, "False return value signals Veto which cannot be done here.");
 }
 
+void WebViewDialog::
+    on_user_account_pairing_ready(const std::string& page_url, const std::string& user_code)
+{
+    if (m_host) {
+        process_logic_command_vector(m_logic->on_user_account_pairing_ready(page_url, user_code));
+    }
+}
+
+void WebViewDialog::on_user_account_pairing_failed(Biz::UserAccount::PairingFailure failure)
+{
+    if (m_host) {
+        process_logic_command_vector(m_logic->on_user_account_pairing_failed(failure));
+    }
+}
+
+void WebViewDialog::on_user_account_pairing_approved()
+{
+    if (m_host) {
+        process_logic_command_vector(m_logic->on_user_account_pairing_approved());
+    }
+}
+
 bool WebViewDialog::handle_logic_command_LoadURL(const std::string& data)
 {
     wxWebView* web_view = m_host.get();
@@ -563,12 +611,14 @@ bool WebViewDialog::handle_logic_command_RunScript(const std::string& data)
 
 bool WebViewDialog::handle_logic_command_EndModalOK(const std::string& data)
 {
+    m_ended_by_logic = true;
     EndModal(wxID_OK);
     return true;
 }
 
 bool WebViewDialog::handle_logic_command_EndModalCancel(const std::string& data)
 {
+    m_ended_by_logic = true;
     EndModal(wxID_CANCEL);
     return true;
 }

@@ -467,6 +467,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Browser/BrowserLogicPrintables.cpp
         include/Slic3r/App/Browser/BrowserLogicLogInRedirect.hpp
         src/Slic3r/App/Browser/BrowserLogicLogInRedirect.cpp
+        include/Slic3r/App/Browser/BrowserLogicConnectLocalLogIn.hpp
+        src/Slic3r/App/Browser/BrowserLogicConnectLocalLogIn.cpp
         include/Slic3r/App/Browser/BrowserLogicPrintablesToConnect.hpp
         src/Slic3r/App/Browser/BrowserLogicPrintablesToConnect.cpp
         include/Slic3r/App/Browser/BrowserLogicPhysicalPrinter.hpp
@@ -859,6 +861,7 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/OverridableConfigBoxObservableList.cpp
         include/Slic3r/Biz/OverridableConfigBoxInteractor.hpp
         src/Slic3r/Biz/OverridableConfigBoxInteractor.cpp
+        include/Slic3r/Biz/JsonForScript.hpp
         include/Slic3r/Biz/MiniZErrorTranslation.hpp
         src/Slic3r/Biz/MiniZErrorTranslation.cpp
 

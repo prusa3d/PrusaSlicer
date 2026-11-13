@@ -22,6 +22,12 @@ public:
     void on_user_account_id_success(bool is_refresh, const std::string& username) override;
     void on_user_account_logged_out() override;
     void on_user_account_will_refresh() override;
+    void on_user_account_pairing_ready(
+        const std::string& page_url,
+        const std::string& user_code
+    ) override;
+    void on_user_account_pairing_failed(Biz::UserAccount::PairingFailure failure) override;
+    void on_user_account_pairing_approved() override;
 
     void on_user_account_action_retry(const Biz::Network::IHttp::Retry& retry, std::function<void(void)> cancel_callback) override
     { /*unused*/
@@ -77,6 +83,11 @@ private:
 
     std::string m_loading_html;
     bool m_load_error_page{false};
+    /**
+     * @brief Set by the logic for a failed load (AbstractBrowserLogic::on_load_error), run instead
+     * of the error page.
+     */
+    std::vector<App::Browser::BrowserLogicCommand> m_error_commands;
 
     wxString m_response_js;
     wxString m_default_url;
@@ -85,6 +96,11 @@ private:
     std::atomic<size_t> m_atomic_counter{0};
     size_t m_counter_to_match{0};
     bool m_force_close{false};
+    /**
+     * @brief The logic ends the dialog itself, on_dialog_closing() is not needed. Reset by
+     * EndModal().
+     */
+    bool m_ended_by_logic{false};
     bool m_busy_cursor_set {false};
 
 protected:

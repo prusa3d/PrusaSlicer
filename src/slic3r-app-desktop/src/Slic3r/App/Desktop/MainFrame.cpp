@@ -136,13 +136,7 @@ MainFrame::MainFrame(
         [this, &project_interactor]()
         {
             if (!project_interactor.user_account_interactor().is_logged_in()) {
-                AppServices::instance().dialog_manager().show_webview_dialog(
-                    std::make_unique<Browser::BrowserLogicLogInRedirect>(project_interactor.user_account_interactor()),
-                    &project_interactor
-                );
-                if (project_interactor.raise_app_fn()) {
-                    project_interactor.raise_app_fn()();
-                }
+                Browser::show_log_in_dialog(project_interactor);
 
             } else {
                 project_interactor.user_account_interactor().do_log_out();

@@ -1,0 +1,56 @@
+/* Shared style of connect_local_login.html and connect_local_login_dark.html; the colour variables are set by each page. */
+body {
+  font-family: Arial, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.content {
+  width: 420px;
+  max-width: calc(100% - 32px);
+  text-align: center;
+}
+.spinner {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto 16px auto;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+.spinner.small { width: 14px; height: 14px; border-width: 2px; margin: 0 8px 0 0; display: inline-block; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+p { margin: 8px 0; }
+h1 { font-size: 20px; font-weight: normal; margin: 0 0 8px 0; }
+.error { color: var(--color-error); overflow-wrap: anywhere; }
+.muted { color: var(--color-muted); font-size: 13px; }
+.code {
+  font-family: Menlo, Consolas, monospace;
+  font-size: 32px;
+  letter-spacing: 4px;
+  margin: 16px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background-color: var(--color-panel);
+  user-select: all;
+}
+.status { margin: 16px 0; }
+button {
+  font-size: 14px;
+  padding: 8px 24px;
+  margin: 16px 4px 0 4px;
+  border: 2px solid var(--color-accent);
+  border-radius: 5px;
+  background-color: var(--color-accent);
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+}
+button.secondary { background-color: transparent; color: var(--color-accent); }
+.hidden { display: none !important; }

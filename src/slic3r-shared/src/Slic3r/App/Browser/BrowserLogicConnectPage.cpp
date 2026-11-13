@@ -259,15 +259,7 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_requ
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_log_in_in_browser(const std::string& message_data)
 {
     if (!m_project_interactor.user_account_interactor().is_logged_in()) {
-        AppServices::instance().dialog_manager().show_webview_dialog(
-            std::make_unique<Browser::BrowserLogicLogInRedirect>(
-                m_project_interactor.user_account_interactor()
-            ),
-            &m_project_interactor
-        );
-        if (m_project_interactor.raise_app_fn()) {
-            m_project_interactor.raise_app_fn()();
-        }
+        show_log_in_dialog(m_project_interactor);
     }
     return {};
 }
