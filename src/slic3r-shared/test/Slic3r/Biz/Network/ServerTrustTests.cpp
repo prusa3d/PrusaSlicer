@@ -1,3 +1,5 @@
+#include "Slic3r/App/AppConfig.hpp"
+#include "Slic3r/App/ConnectLocalTrust.hpp"
 #include "Slic3r/App/Platform/StdMainThreadDispatcher.hpp"
 #include "Slic3r/Biz/Network/IHttp.hpp"
 #include "Slic3r/Biz/Network/ServerTrust.hpp"
@@ -24,9 +26,20 @@ using namespace Slic3r::Biz;
 using Network::ServerTrust;
 using Network::ServerTrustKind;
 using Network::ServiceConfig;
+using Network::ServiceMode;
 namespace Tls               = Network::Tls;
+namespace ConnectLocalTrust = Slic3r::App::ConnectLocalTrust;
 
 namespace {
+
+struct ModeGuard
+{
+    ~ModeGuard()
+    {
+        ServiceConfig::instance().set_mode(ServiceMode::Online);
+        ConnectLocalTrust::apply({});
+    }
+};
 
 // Test certificates (EC P-256, valid until 2126), made with openssl:
 // SELF: self-signed, "O=Prusa Test, CN=connect-local.test", SAN DNS:connect-local.test, IP:192.168.1.10.
@@ -240,6 +253,149 @@ TEST_CASE("A custom trust accepts only its certificate", "[connect-local]")
     CHECK_FALSE(ServerTrust{}.accepts_chain({SRV_PEM}, "localhost"));
 }
 
+TEST_CASE("The custom trust applies to the Connect Local server only", "[connect-local]")
+{
+    ModeGuard guard;
+    ServiceConfig& sc = ServiceConfig::instance();
+    const ServerTrust
+        trust{ServerTrustKind::PinnedKey, "https://192.168.1.10:8443", SELF_PIN, {}, {}};
+    ConnectLocalTrust::apply(trust);
+
+    // Online nothing is touched.
+    sc.set_mode(ServiceMode::Online);
+    CHECK_FALSE(ConnectLocalTrust::trust_for_url("https://connect.prusa3d.com/app").has_value());
+    CHECK_FALSE(ConnectLocalTrust::trust_for_url("https://192.168.1.10:8443/").has_value());
+    CHECK_FALSE(ConnectLocalTrust::trust_for_host("192.168.1.10", 8443).has_value());
+
+    // Its server.
+    sc.set_mode(ServiceMode::Offline, "https://192.168.1.10:8443/");
+    CHECK(ConnectLocalTrust::trust_for_url(sc.account_me_url()) == trust);
+    CHECK(ConnectLocalTrust::trust_for_url(sc.offline_pairing_token_url()) == trust);
+    CHECK(ConnectLocalTrust::trust_for_url(sc.connect_printer_list_url()) == trust);
+    CHECK(ConnectLocalTrust::trust_for_url(sc.offline_pairing_page_url("BCDF-GHJK")) == trust);
+    CHECK_FALSE(ConnectLocalTrust::trust_for_url("https://connect.prusa3d.com/").has_value());
+    CHECK_FALSE(ConnectLocalTrust::trust_for_url("https://192.168.1.10:9443/").has_value());
+    CHECK_FALSE(ConnectLocalTrust::trust_for_url(sc.printables_url()).has_value());
+    CHECK(ConnectLocalTrust::trust_for_host("192.168.1.10", 8443) == trust);
+    CHECK_FALSE(ConnectLocalTrust::trust_for_host("192.168.1.10", 443).has_value());
+    CHECK_FALSE(ConnectLocalTrust::trust_for_host("192.168.1.11", 8443).has_value());
+
+    // Another server.
+    sc.set_mode(ServiceMode::Offline, "https://192.168.1.11:8443");
+    CHECK_FALSE(ConnectLocalTrust::trust_for_url("https://192.168.1.11:8443/connect").has_value());
+    CHECK_FALSE(ConnectLocalTrust::trust_for_host("192.168.1.11", 8443).has_value());
+
+    // The same address over http has no TLS to trust.
+    sc.set_mode(ServiceMode::Offline, "http://192.168.1.10:8443");
+    ConnectLocalTrust::apply(
+        {ServerTrustKind::PinnedKey, "http://192.168.1.10:8443", SELF_PIN, {}, {}}
+    );
+    CHECK_FALSE(ConnectLocalTrust::trust_for_url("http://192.168.1.10:8443/").has_value());
+
+    // System trust is no custom trust.
+    sc.set_mode(ServiceMode::Offline, "https://192.168.1.10:8443");
+    ConnectLocalTrust::apply({ServerTrustKind::System, "https://192.168.1.10:8443", {}, {}, {}});
+    CHECK_FALSE(ConnectLocalTrust::trust_for_url("https://192.168.1.10:8443/").has_value());
+
+    // IPv6 hosts, as the web views see them.
+    sc.set_mode(ServiceMode::Offline, "https://[FD00::1]:8443");
+    const ServerTrust ipv6{ServerTrustKind::PinnedKey, "https://[fd00::1]:8443", SELF_PIN, {}, {}};
+    ConnectLocalTrust::apply(ipv6);
+    CHECK(ConnectLocalTrust::trust_for_host("fd00::1", 8443) == ipv6);
+    CHECK(ConnectLocalTrust::trust_for_host("[FD00::1]", 8443) == ipv6);
+}
+
+TEST_CASE("A loaded certificate file is read once, when applied", "[connect-local]")
+{
+    ModeGuard guard;
+    ServiceConfig::instance().set_mode(ServiceMode::Offline, "https://localhost:8443");
+    const boost::filesystem::path path =
+        boost::filesystem::temp_directory_path() / boost::filesystem::unique_path("ca-%%%%%%%%");
+    {
+        boost::nowide::ofstream file(path.string(), std::ios::binary);
+        file << CA_PEM;
+    }
+    ConnectLocalTrust::apply(
+        {ServerTrustKind::Certificate, "https://localhost:8443", {}, path.string(), {}}
+    );
+    boost::filesystem::remove(path);
+
+    const std::optional<ServerTrust> trust = ConnectLocalTrust::trust_for_host("localhost", 8443);
+    REQUIRE(trust.has_value());
+    CHECK(trust->pem == CA_PEM);
+    CHECK(trust->accepts_chain({SRV_PEM}, "localhost"));
+}
+
+TEST_CASE("A stored trust is dropped when the server or the mode changes", "[connect-local]")
+{
+    using Slic3r::App::ConnectLocalTrust::keeps_trust;
+    const ServerTrust trust{ServerTrustKind::PinnedKey, "https://192.168.1.10:8443", SELF_PIN, {}};
+    CHECK(keeps_trust(trust, ServiceMode::Offline, "https://192.168.1.10:8443"));
+    CHECK_FALSE(keeps_trust(trust, ServiceMode::Online, ""));
+    CHECK_FALSE(keeps_trust(trust, ServiceMode::Offline, "https://192.168.1.11:8443"));
+    CHECK_FALSE(keeps_trust(trust, ServiceMode::Offline, "http://192.168.1.10:8443"));
+    CHECK_FALSE(keeps_trust(trust, ServiceMode::Offline, ""));
+    // Nothing stored, nothing to drop.
+    CHECK(keeps_trust(ServerTrust{}, ServiceMode::Online, ""));
+}
+
+TEST_CASE(
+    "The trust is read from the app config and applied to its server",
+    "[ServiceConfig][connect-local]"
+)
+{
+    ModeGuard guard;
+    Slic3r::App::AppConfig app_config;
+    if (!app_config.is_webkit_available()) {
+        CHECK_FALSE(app_config.connect_local_trust().is_custom());
+        SKIP("Prusa Account needs WebKit.");
+    }
+
+    // Nothing stored.
+    CHECK(app_config.connect_local_trust() == ServerTrust{});
+    CHECK_FALSE(app_config.connect_local_trust().is_custom());
+
+    app_config.set<ServiceMode>("connect_mode", ServiceMode::Offline);
+    app_config.set<std::string>("connect_local_url", "https://192.168.1.10:8443/");
+    app_config.set<ServerTrustKind>("connect_local_trust", ServerTrustKind::PinnedKey);
+    app_config.set<std::string>("connect_local_trust_url", "https://192.168.1.10:8443");
+    app_config.set<std::string>("connect_local_trust_pin", SELF_PIN);
+
+    const ServerTrust trust = app_config.connect_local_trust();
+    CHECK(trust.kind == ServerTrustKind::PinnedKey);
+    CHECK(trust.server_url == "https://192.168.1.10:8443");
+    CHECK(trust.pin == SELF_PIN);
+    // Only a loaded certificate has a file.
+    CHECK(trust.pem_path.empty());
+
+    app_config.apply_service_mode();
+    CHECK(ConnectLocalTrust::trust_for_url("https://192.168.1.10:8443/api") == trust);
+
+    // A pin that is not a curl pin is no trust.
+    app_config.set<std::string>("connect_local_trust_pin", "garbage");
+    CHECK_FALSE(app_config.connect_local_trust().is_custom());
+    // Neither is one without its server.
+    app_config.set<std::string>("connect_local_trust_pin", SELF_PIN);
+    app_config.set<std::string>("connect_local_trust_url", "");
+    CHECK_FALSE(app_config.connect_local_trust().is_custom());
+
+    // A loaded certificate needs no pin.
+    app_config.set<ServerTrustKind>("connect_local_trust", ServerTrustKind::Certificate);
+    app_config.set<std::string>("connect_local_trust_url", "https://192.168.1.10:8443");
+    app_config.set<std::string>("connect_local_trust_pin", "");
+    CHECK(app_config.connect_local_trust().kind == ServerTrustKind::Certificate);
+    CHECK(
+        app_config.connect_local_trust().pem_path
+        == Slic3r::App::AppConfig::connect_local_trust_pem_path()
+    );
+
+    // Back to the defaults, the destructor saves nothing else.
+    app_config.set<ServerTrustKind>("connect_local_trust", ServerTrustKind::System);
+    app_config.set<std::string>("connect_local_trust_url", "");
+    app_config.set<ServiceMode>("connect_mode", ServiceMode::Online);
+    app_config.set<std::string>("connect_local_url", "");
+}
+
 TEST_CASE("A newer certificate check replaces the running one", "[connect-local]")
 {
     using Clock = std::chrono::steady_clock;
@@ -324,6 +480,36 @@ TEST_CASE("Live: certificate probe and pinned requests", "[.][connect-local-live
         Network::probe_server_certificate(url, wrong).status
         == Network::TlsProbeStatus::CertificateRejected
     );
+
+    // Every request to the server gets the pin, through the HTTP factory.
+    ModeGuard guard;
+    ServiceConfig::instance().set_mode(ServiceMode::Offline, url);
+    for (const ServerTrust& trust : {pinned, wrong}) {
+        ConnectLocalTrust::apply(trust);
+        unsigned status = 0;
+        std::string error;
+        std::unique_ptr<Network::IHttp> http = Network::IHttp::create(
+            Network::IHttp::RequestMethod::Get,
+            url + "/",
+            [](Network::IHttp::Retry, bool&) {}
+        );
+        http->on_complete([&status](std::string, unsigned s) { status = s; });
+        http->on_error(
+            [&status, &error](std::string, std::string e, unsigned s)
+            {
+                status = s;
+                error  = e;
+            }
+        );
+        http->perform_sync(Network::HttpRetryOpt::no_retry());
+        INFO("pin " << trust.pin << " status " << status << " error " << error);
+        if (trust.pin == pinned.pin) {
+            CHECK(status > 0);
+        } else {
+            CHECK(status == 0);
+            CHECK_FALSE(error.empty());
+        }
+    }
 }
 
 // Manual check that the probe always ends, against the demos and a closed port:

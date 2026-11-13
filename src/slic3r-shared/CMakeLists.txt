@@ -1294,6 +1294,8 @@ set(SLIC3R_SHARED_FILES
 
         include/Slic3r/App/AppConfig.hpp
         src/Slic3r/App/AppConfig.cpp
+        include/Slic3r/App/ConnectLocalTrust.hpp
+        src/Slic3r/App/ConnectLocalTrust.cpp
         include/Slic3r/App/AppConfigInteractor.hpp
         src/Slic3r/App/AppConfigInteractor.cpp
         include/Slic3r/App/IAppConfigChangedListener.hpp

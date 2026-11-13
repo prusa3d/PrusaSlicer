@@ -6,139 +6,262 @@
 #import <WebKit/WKWebsiteDataStore.h>
 #import <Foundation/Foundation.h>
 #import <Foundation/NSURLSession.h>
+#import <Security/Security.h>
+#import <objc/runtime.h>
 
-@interface MyNavigationDelegate: NSObject<WKNavigationDelegate> {
-    id<WKNavigationDelegate> _delegate;
-    NSString* _username;
-    NSString* _passwd;
+#include "Slic3r/App/ConnectLocalTrust.hpp"
+#include "Slic3r/Biz/Network/ServerTrust.hpp"
+#include "Slic3r/Biz/Network/ServiceConfig.hpp"
+#include "Slic3r/Log.hpp"
+
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace {
+
+/**
+ * @brief Certificates of a server trust, leaf first, DER.
+ */
+std::vector<std::string> certificate_chain(SecTrustRef trust)
+{
+    std::vector<std::string> chain;
+    const auto add = [&chain](SecCertificateRef certificate) {
+        CFDataRef der = SecCertificateCopyData(certificate);
+        if (der != nullptr) {
+            const char* bytes = reinterpret_cast<const char*>(CFDataGetBytePtr(der));
+            chain.emplace_back(bytes, size_t(CFDataGetLength(der)));
+            CFRelease(der);
+        }
+    };
+    if (@available(macOS 12.0, *)) {
+        CFArrayRef certificates = SecTrustCopyCertificateChain(trust);
+        if (certificates != nullptr) {
+            for (CFIndex i = 0; i < CFArrayGetCount(certificates); ++i) {
+                add((SecCertificateRef) CFArrayGetValueAtIndex(certificates, i));
+            }
+            CFRelease(certificates);
+        }
+    } else {
+        // Deprecated in macOS 12, the only way before.
+        for (CFIndex i = 0; i < SecTrustGetCertificateCount(trust); ++i) {
+            add(SecTrustGetCertificateAtIndex(trust, i));
+        }
+    }
+    return chain;
 }
 
-- (id) initWithOriginalDelegate: (id<WKNavigationDelegate>) delegate userName: (const char*) username password: (const char*) password;
+} // namespace
 
-- (id<WKNavigationDelegate>) wrapped_delegate;
-
+/**
+ * @brief Navigation delegate in front of wxWidgets' one, installed on a web view with credentials
+ * or in the offline mode (see slicer_navigation_delegate()). It answers the authentication
+ * challenges:
+ * - the server trust of the Connect Local server with its custom trust (ConnectLocalTrust),
+ * - any other one with the credentials, when set (physical printers with a password),
+ * .
+ * and forwards everything else to wxWidgets' delegate as if this one was not here.
+ */
+@interface SlicerNavigationDelegate: NSObject<WKNavigationDelegate> {
+    id<WKNavigationDelegate> _wrapped; // Not retained, owned by wxWebView.
+    NSString* _username;
+    NSString* _password;
+}
+- (id) initWithWrappedDelegate: (id<WKNavigationDelegate>) wrapped;
+/** @brief nil clears them. */
+- (void) setUserName: (NSString*) username password: (NSString*) password;
+- (BOOL) hasCredentials;
+- (id<WKNavigationDelegate>) wrappedDelegate;
 @end
 
-@implementation MyNavigationDelegate
-- (id) initWithOriginalDelegate: (id<WKNavigationDelegate>) delegate userName: (const char*) username password: (const char*) password {
+@implementation SlicerNavigationDelegate
+- (id) initWithWrappedDelegate: (id<WKNavigationDelegate>) wrapped {
     if (self = [super init]) {
-        _delegate = delegate;
-        _username = [[NSString alloc] initWithFormat:@"%s", username];
-        _passwd = [[NSString alloc] initWithFormat:@"%s", password];
+        _wrapped = wrapped;
     }
     return self;
 }
 
-- (id<WKNavigationDelegate>) wrapped_delegate {
-    return _delegate;
+- (void) dealloc {
+    [_username release];
+    [_password release];
+    [super dealloc];
 }
 
-- (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
-    if ([_delegate respondsToSelector:@selector(webView:decidePolicyForNavigationAction:decisionHandler:)]) {
-        [_delegate webView:webView decidePolicyForNavigationAction:navigationAction decisionHandler:decisionHandler];
+- (void) setUserName: (NSString*) username password: (NSString*) password {
+    [_username release];
+    [_password release];
+    _username = [username copy];
+    _password = [password copy];
+}
+
+- (BOOL) hasCredentials {
+    return _username != nil;
+}
+
+- (id<WKNavigationDelegate>) wrappedDelegate {
+    return _wrapped;
+}
+
+// WebKit reads which methods the delegate implements when it is set as the delegate.
+- (BOOL) respondsToSelector: (SEL) selector {
+    if (selector == @selector(webView:authenticationChallenge:shouldAllowDeprecatedTLS:)) {
+        // Printers with a password may still run an old TLS.
+        return _username != nil || [_wrapped respondsToSelector:selector];
+    }
+    return [super respondsToSelector:selector]
+        || (_wrapped != nil && [_wrapped respondsToSelector:selector]);
+}
+
+- (id) forwardingTargetForSelector: (SEL) selector {
+    if (_wrapped != nil && [_wrapped respondsToSelector:selector]) {
+        return _wrapped;
+    }
+    return [super forwardingTargetForSelector:selector];
+}
+
+- (void) passOn: (WKWebView*) webView
+      challenge: (NSURLAuthenticationChallenge*) challenge
+      completionHandler: (void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential* _Nullable)) completionHandler {
+    const SEL wrapped_handler = @selector(webView:didReceiveAuthenticationChallenge:completionHandler:);
+    if (_username != nil) {
+        completionHandler(
+            NSURLSessionAuthChallengeUseCredential,
+            [NSURLCredential credentialWithUser:_username
+                                       password:_password
+                                    persistence:NSURLCredentialPersistenceForSession]
+        );
+    } else if (_wrapped != nil && [_wrapped respondsToSelector:wrapped_handler]) {
+        [_wrapped webView:webView
+            didReceiveAuthenticationChallenge:challenge
+                            completionHandler:completionHandler];
     } else {
-        decisionHandler(WKNavigationActionPolicyAllow);
+        // What WebKit does when the delegate does not implement this method.
+        completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
     }
 }
 
-- (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction preferences:(WKWebpagePreferences *)preferences decisionHandler:(void (^)(WKNavigationActionPolicy, WKWebpagePreferences *))decisionHandler API_AVAILABLE(macos(10.15), ios(13.0)) {
-    if ([_delegate respondsToSelector:@selector(webView:decidePolicyForNavigationAction:preferences:decisionHandler:)]) {
-        [_delegate webView:webView decidePolicyForNavigationAction:navigationAction preferences:preferences decisionHandler:decisionHandler];
+- (void) webView: (WKWebView*) webView
+    didReceiveAuthenticationChallenge: (NSURLAuthenticationChallenge*) challenge
+    completionHandler: (void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential* _Nullable)) completionHandler {
+    NSURLProtectionSpace* space = challenge.protectionSpace;
+    if (![space.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]
+        || space.serverTrust == nil)
+    {
+        [self passOn:webView challenge:challenge completionHandler:completionHandler];
+        return;
+    }
+    const std::string host = space.host != nil ? std::string([space.host UTF8String]) : "";
+    const std::optional<Slic3r::Biz::Network::ServerTrust> trust =
+        Slic3r::App::ConnectLocalTrust::trust_for_host(host, int(space.port));
+    if (!trust) {
+        // Not the Connect Local server, or its certificate is checked by the system.
+        [self passOn:webView challenge:challenge completionHandler:completionHandler];
+        return;
+    }
+    if (trust->accepts_chain(certificate_chain(space.serverTrust), host)) {
+        completionHandler(
+            NSURLSessionAuthChallengeUseCredential,
+            [NSURLCredential credentialForTrust:space.serverTrust]
+        );
     } else {
-        decisionHandler(WKNavigationActionPolicyAllow, preferences);
+        SPDLOG_WARN(
+            "Web view: the certificate of {}:{} does not match the trusted one, refused.",
+            host,
+            int(space.port)
+        );
+        completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, nil);
     }
 }
 
-- (void)webView:(WKWebView *)webView decidePolicyForNavigationResponse:(WKNavigationResponse *)navigationResponse decisionHandler:(void (^)(WKNavigationResponsePolicy))decisionHandler {
-    if ([_delegate respondsToSelector:@selector(webView:decidePolicyForNavigationResponse:decisionHandler:)]) {
-        [_delegate webView:webView decidePolicyForNavigationResponse: navigationResponse decisionHandler: decisionHandler];
-    } else {
-        decisionHandler(WKNavigationResponsePolicyAllow);
-    }
-}
-
-- (void)webView:(WKWebView *)webView didStartProvisionalNavigation:(null_unspecified WKNavigation *)navigation {
-    if ([_delegate respondsToSelector:@selector(webView:didStartProvisionalNavigation:)]) {
-        [_delegate webView:webView didStartProvisionalNavigation:navigation];
-    }
-}
-
-- (void)webView:(WKWebView *)webView didReceiveServerRedirectForProvisionalNavigation:(null_unspecified WKNavigation *)navigation {
-    if ([_delegate respondsToSelector:@selector(webView:didReceiveServerRedirectForProvisionalNavigation:)]) {
-        [_delegate webView:webView didReceiveServerRedirectForProvisionalNavigation:navigation];
-    }
-}
-
-- (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(null_unspecified WKNavigation *)navigation withError:(NSError *)error {
-    if ([_delegate respondsToSelector:@selector(webView:didFailProvisionalNavigation:withError:)]) {
-        [_delegate webView:webView didFailProvisionalNavigation:navigation withError:error];
-    }
-}
-
-- (void)webView:(WKWebView *)webView didCommitNavigation:(null_unspecified WKNavigation *)navigation {
-    if ([_delegate respondsToSelector:@selector(webView:didCommitNavigation:)]) {
-        [_delegate webView:webView didCommitNavigation:navigation];
-    }
-}
-
-- (void)webView:(WKWebView *)webView didFinishNavigation:(null_unspecified WKNavigation *)navigation {
-    if ([_delegate respondsToSelector:@selector(webView:didFinishNavigation:)]) {
-        [_delegate webView:webView didFinishNavigation:navigation];
-    }
-}
-
-- (void)webView:(WKWebView *)webView didFailNavigation:(null_unspecified WKNavigation *)navigation withError:(NSError *)error {
-    if ([_delegate respondsToSelector:@selector(webView:didFailNavigation:withError:)]) {
-        [_delegate webView:webView didFailNavigation:navigation withError:error];
-    }
-}
-
-- (void)webView:(WKWebView *)webView didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential * _Nullable credential))completionHandler {
-    //challenge.protectionSpace.realm
-    completionHandler(
-        NSURLSessionAuthChallengeUseCredential,
-        [NSURLCredential credentialWithUser: _username password: _passwd persistence: NSURLCredentialPersistenceForSession]
-    );
-}
-
-- (void)webViewWebContentProcessDidTerminate:(WKWebView *)webView API_AVAILABLE(macos(10.11), ios(9.0)) {
-    if ([_delegate respondsToSelector:@selector(webViewWebContentProcessDidTerminate:)]) {
-        [_delegate webViewWebContentProcessDidTerminate:webView];
-    }
-}
-
-- (void)webView:(WKWebView *)webView authenticationChallenge:(NSURLAuthenticationChallenge *)challenge shouldAllowDeprecatedTLS:(void (^)(BOOL))decisionHandler API_AVAILABLE(macos(11.0), ios(14.0)) {
-    if ([_delegate respondsToSelector:@selector(webView:authenticationChallenge:shouldAllowDeprecatedTLS:)]) {
-        [_delegate webView:webView authenticationChallenge:challenge shouldAllowDeprecatedTLS:decisionHandler];
+- (void) webView: (WKWebView*) webView
+    authenticationChallenge: (NSURLAuthenticationChallenge*) challenge
+    shouldAllowDeprecatedTLS: (void (^)(BOOL)) decisionHandler API_AVAILABLE(macos(11.0)) {
+    if ([_wrapped respondsToSelector:_cmd]) {
+        [_wrapped webView:webView
+            authenticationChallenge:challenge
+           shouldAllowDeprecatedTLS:decisionHandler];
     } else {
         decisionHandler(YES);
     }
 }
 @end
 
+static char SlicerNavigationDelegateKey;
+
+namespace {
+
+/**
+ * @brief The SlicerNavigationDelegate of the web view, installed on the first call.
+ */
+SlicerNavigationDelegate* slicer_navigation_delegate(WKWebView* backend)
+{
+    SlicerNavigationDelegate* delegate =
+        objc_getAssociatedObject(backend, &SlicerNavigationDelegateKey);
+    if (delegate == nil) {
+        delegate =
+            [[SlicerNavigationDelegate alloc] initWithWrappedDelegate:backend.navigationDelegate];
+        // navigationDelegate is weak: the web view keeps the delegate alive by the association.
+        objc_setAssociatedObject(
+            backend, &SlicerNavigationDelegateKey, delegate, OBJC_ASSOCIATION_RETAIN
+        );
+        [delegate release];
+        backend.navigationDelegate = delegate;
+    }
+    return delegate;
+}
+
+/** @brief Puts wxWidgets' delegate back, as if SlicerNavigationDelegate was never installed. */
+void remove_slicer_navigation_delegate(WKWebView* backend)
+{
+    SlicerNavigationDelegate* delegate =
+        objc_getAssociatedObject(backend, &SlicerNavigationDelegateKey);
+    if (delegate == nil) {
+        return;
+    }
+    backend.navigationDelegate = [delegate wrappedDelegate];
+    objc_setAssociatedObject(backend, &SlicerNavigationDelegateKey, nil, OBJC_ASSOCIATION_RETAIN);
+}
+
+/**
+ * @brief The Connect Local trust is needed in the offline mode only: online, a web view gets the
+ * delegate only for credentials, as before Connect Local.
+ */
+bool needs_server_trust()
+{
+    return Slic3r::Biz::Network::ServiceConfig::instance().is_offline();
+}
+
+} // namespace
+
 #include "Slic3r/Assert.hpp"
-#include "Slic3r/Log.hpp"
 
 namespace Slic3r::App::WX::WebView {
 void setup_webview_with_credentials(wxWebView* web_view, const std::string& username, const std::string& password)
 {
-    remove_webview_credentials(web_view);
-    WKWebView* backend = static_cast<WKWebView*>(web_view->GetNativeBackend());
-    if (![backend.navigationDelegate isKindOfClass:MyNavigationDelegate.class]) {
-        backend.navigationDelegate = [[MyNavigationDelegate alloc]
-            initWithOriginalDelegate:backend.navigationDelegate
-                            userName:username.c_str()
-                            password:password.c_str()];
-    }
+    WKWebView* backend                 = static_cast<WKWebView*>(web_view->GetNativeBackend());
+    SlicerNavigationDelegate* delegate = slicer_navigation_delegate(backend);
+    [delegate setUserName:[NSString stringWithFormat:@"%s", username.c_str()]
+                 password:[NSString stringWithFormat:@"%s", password.c_str()]];
+    // WebKit reads which methods the delegate implements only when it is set.
+    backend.navigationDelegate = delegate;
 }
 
 void remove_webview_credentials(wxWebView* web_view)
 {
     WKWebView* backend = static_cast<WKWebView*>(web_view->GetNativeBackend());
-    if ([backend.navigationDelegate isKindOfClass:MyNavigationDelegate.class]) {
-        MyNavigationDelegate* my_delegate = backend.navigationDelegate;
-        backend.navigationDelegate = my_delegate.wrapped_delegate;
+    SlicerNavigationDelegate* delegate =
+        objc_getAssociatedObject(backend, &SlicerNavigationDelegateKey);
+    if (delegate == nil) {
+        return;
     }
+    if (!needs_server_trust()) {
+        remove_slicer_navigation_delegate(backend);
+        return;
+    }
+    [delegate setUserName:nil password:nil];
+    backend.navigationDelegate = delegate;
 }
 
 void delete_cookies(wxWebView* web_view, const std::string& url)
@@ -274,6 +397,32 @@ void setup_webview_devtools(wxWebView* web_view)
 {
     web_view->EnableContextMenu();
     web_view->EnableAccessToDevTools();
+}
+
+void setup_webview_server_trust(wxWebView* web_view)
+{
+    WKWebView* backend = static_cast<WKWebView*>(web_view->GetNativeBackend());
+    if (backend == nil) {
+        return;
+    }
+    if (needs_server_trust()) {
+        slicer_navigation_delegate(backend);
+        return;
+    }
+    SlicerNavigationDelegate* delegate =
+        objc_getAssociatedObject(backend, &SlicerNavigationDelegateKey);
+    if (delegate != nil && ![delegate hasCredentials]) {
+        // Switched online: installed for the trust only.
+        remove_slicer_navigation_delegate(backend);
+    }
+}
+
+void webview_server_trust_changed(wxWebView* web_view)
+{
+    // WebKit keeps no decision about a server trust: every challenge (each new TLS connection) is
+    // answered by the delegate with the trust in effect. Connections open already are reused
+    // until they close. Only the service mode decides whether the delegate is needed.
+    setup_webview_server_trust(web_view);
 }
 }
 

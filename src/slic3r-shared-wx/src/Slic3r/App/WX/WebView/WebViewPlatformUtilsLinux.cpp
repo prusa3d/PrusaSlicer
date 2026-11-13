@@ -1,5 +1,7 @@
 #include "WebViewPlatformUtils.hpp"
 
+#include "Slic3r/App/ConnectLocalTrust.hpp"
+#include "Slic3r/Biz/Network/ServerTrust.hpp"
 #include "Slic3r/Biz/Network/Url.hpp"
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Assert.hpp"
@@ -7,6 +9,8 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <unordered_set>
+#include <vector>
 
 #include <webkit2/webkit2.h>
 #include <wx/webview.h>
@@ -278,6 +282,139 @@ void setup_webview_devtools(wxWebView* web_view)
 {
     web_view->EnableContextMenu();
     web_view->EnableAccessToDevTools();
+}
+
+namespace {
+constexpr const char* SERVER_TRUST_DATA_KEY = "prusaslicer-server-trust";
+
+/** @brief Hosts with a certificate accepted for the web context, main thread only. */
+std::unordered_set<std::string> g_allowed_hosts;
+
+/** @brief PEM certificates from the certificate up its issuers. */
+std::vector<std::string> certificate_chain(GTlsCertificate* certificate)
+{
+    std::vector<std::string> chain;
+    for (GTlsCertificate* cert = certificate; cert != nullptr;
+         cert                  = g_tls_certificate_get_issuer(cert))
+    {
+        gchar* pem = nullptr;
+        g_object_get(cert, "certificate-pem", &pem, nullptr);
+        if (pem != nullptr) {
+            chain.emplace_back(pem);
+            g_free(pem);
+        }
+    }
+    return chain;
+}
+
+/*
+ * A certificate accepted below stays accepted for its host by the whole web context: WebKitGTK
+ * has no API to revoke webkit_web_context_allow_tls_certificate_for_host() nor one to accept a
+ * certificate for a single load. So every committed page is checked again (on_load_changed()):
+ * once the trust is forgotten or replaced, a page that reached the server only thanks to the
+ * former acceptance is stopped. Limitation: requests of a page loaded before the change (scripts,
+ * XHR) still pass until the page is navigated again or the app restarts.
+ */
+gboolean on_load_failed_with_tls_errors(
+    WebKitWebView* web_view,
+    gchar* failing_uri,
+    GTlsCertificate* certificate,
+    GTlsCertificateFlags errors,
+    gpointer
+)
+{
+    if (failing_uri == nullptr || certificate == nullptr) {
+        return FALSE;
+    }
+    const std::optional<Biz::Network::UrlParts> url = Biz::Network::parse_url(failing_uri);
+    if (!url) {
+        return FALSE;
+    }
+    const std::optional<Biz::Network::ServerTrust> trust =
+        ConnectLocalTrust::trust_for_host(url->host, url->port);
+    if (!trust) {
+        // Not the Connect Local server: the load fails as before.
+        return FALSE;
+    }
+
+    if (!trust->accepts_chain(certificate_chain(certificate), url->host)) {
+        SPDLOG_WARN(
+            "WebView: the certificate of {}:{} does not match the trusted one, refused.",
+            url->host,
+            url->port
+        );
+        return FALSE;
+    }
+
+    // Allowed for this host (all loads of the context, also the page's own requests), then retried.
+    g_allowed_hosts.insert(url->host);
+    webkit_web_context_allow_tls_certificate_for_host(
+        webkit_web_view_get_context(web_view),
+        certificate,
+        url->host.c_str()
+    );
+    webkit_web_view_load_uri(web_view, failing_uri);
+    return TRUE;
+}
+
+/**
+ * @brief Stops a committed page whose certificate failed the system check and is not (or no
+ * longer) accepted by the Connect Local trust, see above.
+ */
+void on_load_changed(WebKitWebView* web_view, WebKitLoadEvent load_event, gpointer)
+{
+    if (load_event != WEBKIT_LOAD_COMMITTED || g_allowed_hosts.empty()) {
+        return;
+    }
+    GTlsCertificate* certificate = nullptr; // Owned by the web view.
+    GTlsCertificateFlags errors  = GTlsCertificateFlags(0);
+    if (!webkit_web_view_get_tls_info(web_view, &certificate, &errors)
+        || errors == 0
+        || certificate == nullptr)
+    {
+        // Not https, or a certificate the system trusts.
+        return;
+    }
+    const gchar* uri = webkit_web_view_get_uri(web_view);
+    const std::optional<Biz::Network::UrlParts> url =
+        uri != nullptr ? Biz::Network::parse_url(uri) : std::nullopt;
+    if (!url || !g_allowed_hosts.contains(url->host)) {
+        // Not accepted by on_load_failed_with_tls_errors(): none of this code's business.
+        return;
+    }
+    const std::optional<Biz::Network::ServerTrust> trust =
+        ConnectLocalTrust::trust_for_host(url->host, url->port);
+    if (trust && trust->accepts_chain(certificate_chain(certificate), url->host)) {
+        return;
+    }
+    SPDLOG_WARN("WebView: the certificate of {} is no longer trusted, the page is stopped.", uri);
+    webkit_web_view_stop_loading(web_view);
+    webkit_web_view_load_plain_text(web_view, "The server certificate is not trusted.");
+}
+} // namespace
+
+void setup_webview_server_trust(wxWebView* web_view)
+{
+    WebKitWebView* native_backend = static_cast<WebKitWebView*>(web_view->GetNativeBackend());
+    if (!native_backend
+        || g_object_get_data(G_OBJECT(native_backend), SERVER_TRUST_DATA_KEY) != nullptr)
+    {
+        return;
+    }
+    g_object_set_data(G_OBJECT(native_backend), SERVER_TRUST_DATA_KEY, GINT_TO_POINTER(1));
+    g_signal_connect(
+        native_backend,
+        "load-failed-with-tls-errors",
+        G_CALLBACK(on_load_failed_with_tls_errors),
+        nullptr
+    );
+    g_signal_connect(native_backend, "load-changed", G_CALLBACK(on_load_changed), nullptr);
+}
+
+void webview_server_trust_changed(wxWebView*)
+{
+    // Nothing to drop: WebKitGTK cannot revoke an accepted certificate, the next committed page
+    // is checked instead (on_load_changed()).
 }
 
 } // namespace Slic3r::App::WX::WebView

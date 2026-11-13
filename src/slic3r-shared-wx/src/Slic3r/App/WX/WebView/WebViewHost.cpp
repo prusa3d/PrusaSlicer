@@ -5,6 +5,7 @@
 #include "Slic3r/App/WX/WebView/WebView.hpp"
 #include "Slic3r/App/Browser/BrowserCookie.hpp"
 #include "Slic3r/App/Browser/BrowserLogicCommand.hpp"
+#include "Slic3r/App/ConnectLocalTrust.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 
 #include "Slic3r/Assert.hpp"
@@ -14,9 +15,39 @@
 #include <wx/sizer.h>
 #include <wx/window.h>
 
+#include <mutex>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace Slic3r::App::WX::WebView {
+
+namespace {
+/** @brief The hosts with a web view, main thread only. */
+std::unordered_set<WebViewHost*> g_hosts;
+
+/** @brief Tells every web view that the Connect Local trust changed. */
+void install_server_trust_listener()
+{
+    static std::once_flag installed;
+    std::call_once(
+        installed,
+        []()
+        {
+            ConnectLocalTrust::set_apply_listener(
+                []()
+                {
+                    for (WebViewHost* host : std::vector(g_hosts.begin(), g_hosts.end())) {
+                        if (wxWebView* web_view = host->get()) {
+                            webview_server_trust_changed(web_view);
+                        }
+                    }
+                }
+            );
+        }
+    );
+}
+} // namespace
 
 WebViewHost::WebViewHost()
 {
@@ -26,6 +57,7 @@ WebViewHost::WebViewHost()
 
 WebViewHost::~WebViewHost()
 {
+    g_hosts.erase(this);
     m_watchdog.Stop();
 }
 
@@ -57,6 +89,9 @@ bool WebViewHost::create(
     }
 
     m_state = State::Creating;
+    setup_webview_server_trust(m_web_view);
+    install_server_trust_listener();
+    g_hosts.insert(this);
 
     if (Biz::Network::ServiceConfig::instance().webdev_enabled()) {
         setup_webview_devtools(m_web_view);
@@ -74,6 +109,8 @@ void WebViewHost::notify_created()
         return;
     }
     m_state = State::Ready;
+    // WebView2 has its native web view only now.
+    setup_webview_server_trust(m_web_view);
     for (const std::function<void()>& fn : std::exchange(m_when_ready, {})) {
         fn();
     }

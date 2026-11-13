@@ -54,6 +54,7 @@ src/slic3r-shared/src/Slic3r/App/Config/PrintToolRowItem.cpp
 src/slic3r-shared/src/Slic3r/App/Config/ToolRowControl.cpp
 src/slic3r-shared/src/Slic3r/App/Config/ToolToFeatureDialog.cpp
 src/slic3r-shared/src/Slic3r/App/Config/ToolToFeatureDialogHeader.cpp
+src/slic3r-shared/src/Slic3r/App/ConnectLocalTrust.cpp
 src/slic3r-shared/src/Slic3r/App/CrashedProjectsDialog.cpp
 src/slic3r-shared/src/Slic3r/App/DisplayStrings.cpp
 src/slic3r-shared/src/Slic3r/App/EffectiveValuesDialog.cpp

@@ -2,7 +2,10 @@
 
 #include "Slic3r/App/WX/StringConversions.hpp"
 #include "Slic3r/App/WX/Format.hpp"
+#include "Slic3r/App/ConnectLocalTrust.hpp"
+#include "Slic3r/Biz/Network/ServerTrust.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
+#include "Slic3r/Biz/Network/Url.hpp"
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Assert.hpp"
 
@@ -10,6 +13,7 @@
 #include <wrl.h>
 #include <atlbase.h>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
@@ -424,6 +428,157 @@ void setup_webview_devtools(wxWebView* web_view)
 {
     web_view->EnableContextMenu();
     web_view->EnableAccessToDevTools();
+}
+
+#ifdef __ICoreWebView2_14_INTERFACE_DEFINED__
+namespace {
+/** @brief Web views whose server certificate errors are handled already. */
+std::unordered_set<wxWebView*> g_server_trust_web_views;
+
+std::string take_co_string(LPWSTR value)
+{
+    std::string result = value ? boost::nowide::narrow(value) : std::string();
+    if (value) {
+        CoTaskMemFree(value);
+    }
+    return result;
+}
+} // namespace
+#endif
+
+void setup_webview_server_trust(wxWebView* webview)
+{
+#ifdef __ICoreWebView2_14_INTERFACE_DEFINED__
+    ICoreWebView2* webView2_raw = static_cast<ICoreWebView2*>(webview->GetNativeBackend());
+    if (!webView2_raw) {
+        // Not created yet, WebViewHost::notify_created() calls this again.
+        return;
+    }
+    if (!g_server_trust_web_views.insert(webview).second) {
+        return;
+    }
+    webview->Bind(
+        wxEVT_DESTROY,
+        [webview](wxWindowDestroyEvent& event)
+        {
+            g_server_trust_web_views.erase(webview);
+            event.Skip();
+        }
+    );
+    ComPtr<ICoreWebView2> wv2(webView2_raw);
+    ComPtr<ICoreWebView2_14> wv2_14;
+    if (FAILED(wv2.As(&wv2_14))) {
+        SPDLOG_WARN(
+            "{}: ICoreWebView2_14 not supported by the runtime, Connect Local certificates cannot be trusted in web views.",
+            __FUNCTION__
+        );
+        return;
+    }
+
+    EventRegistrationToken token = {};
+    const HRESULT hr             = wv2_14->add_ServerCertificateErrorDetected(
+        Microsoft::WRL::Callback<ICoreWebView2ServerCertificateErrorDetectedEventHandler>(
+            [](ICoreWebView2* sender,
+               ICoreWebView2ServerCertificateErrorDetectedEventArgs* args) -> HRESULT
+            {
+                // Default: what WebView2 does without this handler (the load fails).
+                args->put_Action(COREWEBVIEW2_SERVER_CERTIFICATE_ERROR_ACTION_DEFAULT);
+
+                LPWSTR uri = nullptr;
+                if (FAILED(args->get_RequestUri(&uri))) {
+                    return S_OK;
+                }
+                const std::optional<Biz::Network::UrlParts> url =
+                    Biz::Network::parse_url(take_co_string(uri));
+                if (!url) {
+                    return S_OK;
+                }
+                const std::optional<Biz::Network::ServerTrust> trust =
+                    ConnectLocalTrust::trust_for_host(url->host, url->port);
+                if (!trust) {
+                    return S_OK;
+                }
+
+                ComPtr<ICoreWebView2Certificate> certificate;
+                if (FAILED(args->get_ServerCertificate(&certificate)) || !certificate) {
+                    return S_OK;
+                }
+                std::vector<std::string> chain;
+                LPWSTR pem = nullptr;
+                if (SUCCEEDED(certificate->ToPemEncoding(&pem))) {
+                    chain.emplace_back(take_co_string(pem));
+                }
+                ComPtr<ICoreWebView2StringCollection> issuers;
+                if (SUCCEEDED(certificate->get_PemEncodedIssuerCertificateChain(&issuers))
+                    && issuers) {
+                    UINT32 count = 0;
+                    issuers->get_Count(&count);
+                    for (UINT32 i = 0; i < count; ++i) {
+                        LPWSTR issuer = nullptr;
+                        if (SUCCEEDED(issuers->GetValueAtIndex(i, &issuer))) {
+                            chain.emplace_back(take_co_string(issuer));
+                        }
+                    }
+                }
+
+                if (trust->accepts_chain(chain, url->host)) {
+                    // Remembered by WebView2 for this host and certificate for the session, until
+                    // webview_server_trust_changed() clears it.
+                    args->put_Action(COREWEBVIEW2_SERVER_CERTIFICATE_ERROR_ACTION_ALWAYS_ALLOW);
+                } else {
+                    SPDLOG_WARN(
+                        "WebView: the certificate of {}:{} does not match the trusted one, refused.",
+                        url->host,
+                        url->port
+                    );
+                    args->put_Action(COREWEBVIEW2_SERVER_CERTIFICATE_ERROR_ACTION_CANCEL);
+                }
+                return S_OK;
+            }
+        ).Get(),
+        &token
+    );
+    // The handler stays for the lifetime of the web view.
+    if (FAILED(hr)) {
+        SPDLOG_ERROR(
+            "WebView: Cannot register the server certificate error handler. HRESULT: {0:x}",
+            (unsigned int) hr
+        );
+    }
+#else
+    SPDLOG_WARN(
+        "{}: built with a WebView2 SDK without ICoreWebView2_14, Connect Local certificates cannot be trusted in web views.",
+        __FUNCTION__
+    );
+#endif
+}
+
+void webview_server_trust_changed(wxWebView* webview)
+{
+#ifdef __ICoreWebView2_14_INTERFACE_DEFINED__
+    ICoreWebView2* webView2_raw = static_cast<ICoreWebView2*>(webview->GetNativeBackend());
+    if (!webView2_raw) {
+        return;
+    }
+    ComPtr<ICoreWebView2> wv2(webView2_raw);
+    ComPtr<ICoreWebView2_14> wv2_14;
+    if (FAILED(wv2.As(&wv2_14))) {
+        return;
+    }
+    // Drops the ALWAYS_ALLOW decisions (of all web views of the session): a certificate accepted
+    // with the previous trust is checked again, with the new one, by the handler above.
+    const HRESULT hr = wv2_14->ClearServerCertificateErrorActions(
+        Microsoft::WRL::Callback<ICoreWebView2ClearServerCertificateErrorActionsCompletedHandler>(
+            [](HRESULT) -> HRESULT { return S_OK; }
+        ).Get()
+    );
+    if (FAILED(hr)) {
+        SPDLOG_ERROR(
+            "WebView: Cannot clear the server certificate decisions. HRESULT: {0:x}",
+            (unsigned int) hr
+        );
+    }
+#endif
 }
 
 } // Slic3r::App::WX::WebView

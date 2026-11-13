@@ -8,6 +8,7 @@
 
 namespace Slic3r::Biz::Network {
 enum class ServiceMode;
+struct ServerTrust;
 } // namespace Slic3r::Biz::Network
 
 namespace Slic3r::App {
@@ -93,10 +94,22 @@ public:
     std::string connect_local_url() const;
 
     /**
-     * @brief Pushes the service mode settings to Biz::Network::ServiceConfig.
+     * @brief Pushes the service mode settings, Connect Local certificate trust included, to
+     * Biz::Network::ServiceConfig.
      * The user account must be logged out (disabled) when the mode changes at runtime.
      */
     void apply_service_mode() const;
+
+    /**
+     * @brief Trust of the Connect Local server certificate (connect_local_trust*), System when none
+     * is stored. Applies to its server_url only, see ConnectLocalTrust::apply().
+     */
+    Biz::Network::ServerTrust connect_local_trust() const;
+
+    /**
+     * @brief The PEM file of connect_local_trust() in the data directory.
+     */
+    static std::string connect_local_trust_pem_path();
 
     bool is_sentry_enabled() const;
     bool is_sentry_available() const;

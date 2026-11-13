@@ -10,6 +10,7 @@
 
 #include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/Theme.hpp"
+#include "Slic3r/App/ConnectLocalTrust.hpp"
 
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Log.hpp"
@@ -386,6 +387,40 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->full_width   = true;
     def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup;
     def->init_fn      = []() { return Domain::ConfigValue(std::string()); };
+
+    // Trust of the https Connect Local server certificate, set from the Connect tab. Belongs to the
+    // server in connect_local_trust_url, see AppConfig::connect_local_trust().
+    // Not shown in Preferences, the setup page of the Connect tab shows and changes it.
+    def           = defs.add("connect_local_trust", typeid(Domain::EnumWrapper));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn  = Domain::init_with(
+        Network::ServerTrustKind::System,
+        {
+            {int(Network::ServerTrustKind::System),
+             "system",
+             def->L_CONTEXT("System trust store", "Connect Local certificate")},
+            {int(Network::ServerTrustKind::PinnedKey),
+             "pinned",
+             def->L_CONTEXT(
+                 "Trusted server certificate (pinned key)",
+                 "Connect Local certificate"
+             )},
+            {int(Network::ServerTrustKind::Certificate),
+             "certificate",
+             def->L_CONTEXT("Loaded certificate", "Connect Local certificate")},
+        }
+    );
+
+    def           = defs.add("connect_local_trust_url", typeid(std::string));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue(std::string()); };
+
+    def           = defs.add("connect_local_trust_pin", typeid(std::string));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue(std::string()); };
 
     def = defs.add("enable_printables", typeid(bool));
     def->location = Domain::AppConfigLocation{};
@@ -806,8 +841,32 @@ std::string AppConfig::connect_local_url() const
 void AppConfig::apply_service_mode() const
 {
     Network::ServiceConfig::instance().set_mode(service_mode(), connect_local_url());
+    ConnectLocalTrust::apply(connect_local_trust());
 }
 
+Network::ServerTrust AppConfig::connect_local_trust() const
+{
+    Network::ServerTrust trust;
+#ifdef SLIC3R_HAS_WEBKIT
+    trust.kind       = get<Network::ServerTrustKind>("connect_local_trust");
+    trust.server_url = get<std::string>("connect_local_trust_url");
+    trust.pin        = get<std::string>("connect_local_trust_pin");
+    if (trust.kind == Network::ServerTrustKind::Certificate) {
+        trust.pem_path = connect_local_trust_pem_path();
+    }
+    const bool complete = !trust.server_url.empty()
+        && (trust.kind != Network::ServerTrustKind::PinnedKey || trust.pin.starts_with("sha256//"));
+    if (!complete) {
+        trust = Network::ServerTrust{};
+    }
+#endif
+    return trust;
+}
+
+std::string AppConfig::connect_local_trust_pem_path()
+{
+    return (boost::filesystem::path(data_dir()) / "connect_local_certificate.pem").string();
+}
 
 bool AppConfig::is_sentry_enabled() const
 {
