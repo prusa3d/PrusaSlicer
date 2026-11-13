@@ -1091,6 +1091,7 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/Network/Bonjour.hpp
         include/Slic3r/Biz/Network/TCPConsole.hpp
         include/Slic3r/Biz/Network/ServiceConfig.hpp
+        include/Slic3r/Biz/Network/Url.hpp
         include/Slic3r/Biz/Network/Jwt.hpp
         include/Slic3r/Biz/Network/MqttSubscriber.hpp
         src/Slic3r/Biz/Network/IHttp.cpp
@@ -1098,6 +1099,7 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Network/Bonjour.cpp
         src/Slic3r/Biz/Network/TCPConsole.cpp
         src/Slic3r/Biz/Network/ServiceConfig.cpp
+        src/Slic3r/Biz/Network/Url.cpp
         src/Slic3r/Biz/Network/Jwt.cpp
         src/Slic3r/Biz/Network/HttpCurlFactory.cpp
         src/Slic3r/Biz/Network/MqttSubscriber.cpp
@@ -1808,6 +1810,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/MainThreadDialogProviderTests.cpp
 
         test/Slic3r/Biz/UserAccount/UserAccountSessionTests.cpp
+        test/Slic3r/Biz/Network/UrlTests.cpp
 
         test/Slic3r/App/CustomGCodeMigrationTests.cpp
         test/Slic3r/Biz/MatDb/MatDbClientTests.cpp
