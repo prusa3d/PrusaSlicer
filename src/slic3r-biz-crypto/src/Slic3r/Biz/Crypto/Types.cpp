@@ -3,6 +3,7 @@
 #include <ranges>
 
 #include <boost/nowide/cstdio.hpp>
+#include <cstring>
 
 namespace Slic3r::Biz::Crypto {
 
