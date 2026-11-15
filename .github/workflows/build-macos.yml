@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 240
     env:
       SCCACHE_VERSION: v0.14.0
@@ -47,8 +47,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            deps/build-arm64/destdir
-            deps/build-arm64/dep_*-prefix/src/*-stamp
+            deps/build-mac_universal_arm/destdir
+            deps/build-mac_universal_arm/dep_*-prefix/src/*-stamp
           key: deps-macos-arm64-universal-sdk${{ steps.sdk.outputs.version }}-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
 
       # --- Cache x86_64 deps ---
@@ -57,8 +57,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            deps/build-x86_64/destdir
-            deps/build-x86_64/dep_*-prefix/src/*-stamp
+            deps/build-mac_universal_x86/destdir
+            deps/build-mac_universal_x86/dep_*-prefix/src/*-stamp
           key: deps-macos-x86_64-universal-sdk${{ steps.sdk.outputs.version }}-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
 
       - name: Cache package downloads
@@ -100,13 +100,14 @@ jobs:
       - name: Check arm64 deps cached
         id: arm64-deps-exist
         run: |
-          if [ -d "deps/build-arm64/destdir/usr/local/lib" ]; then
+          if [ -d "deps/build-mac_universal_arm/destdir/usr/local/lib" ]; then
             echo "found=true" >> $GITHUB_OUTPUT
           else
             echo "found=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Build arm64 deps
+        id: build-deps-arm64
         if: steps.arm64-deps-exist.outputs.found != 'true'
         env:
           LC_ALL: en_US.UTF-8
@@ -118,13 +119,24 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=sccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
+      # Save right away: actions/cache only saves when the whole job succeeds,
+      # so a later failure (e.g. notarization) would throw these hours away.
+      - name: Save arm64 dependencies cache
+        if: steps.build-deps-arm64.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            deps/build-mac_universal_arm/destdir
+            deps/build-mac_universal_arm/dep_*-prefix/src/*-stamp
+          key: deps-macos-arm64-universal-sdk${{ steps.sdk.outputs.version }}-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
+
       - name: Configure arm64 PrusaSlicer
         if: steps.arm64-deps-exist.outputs.found == 'true'
         run: |
           cmake --preset mac_universal_arm \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/deps/build-arm64/destdir/usr/local" \
+            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/deps/build-mac_universal_arm/destdir/usr/local" \
             -DCMAKE_C_COMPILER_LAUNCHER=sccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
@@ -152,13 +164,14 @@ jobs:
       - name: Check x86_64 deps cached
         id: x86-deps-exist
         run: |
-          if [ -d "deps/build-x86_64/destdir/usr/local/lib" ]; then
+          if [ -d "deps/build-mac_universal_x86/destdir/usr/local/lib" ]; then
             echo "found=true" >> $GITHUB_OUTPUT
           else
             echo "found=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Build x86_64 deps
+        id: build-deps-x86_64
         if: steps.x86-deps-exist.outputs.found != 'true'
         env:
           LC_ALL: en_US.UTF-8
@@ -170,13 +183,24 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=sccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
+      # Save right away: actions/cache only saves when the whole job succeeds,
+      # so a later failure (e.g. notarization) would throw these hours away.
+      - name: Save x86_64 dependencies cache
+        if: steps.build-deps-x86_64.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            deps/build-mac_universal_x86/destdir
+            deps/build-mac_universal_x86/dep_*-prefix/src/*-stamp
+          key: deps-macos-x86_64-universal-sdk${{ steps.sdk.outputs.version }}-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
+
       - name: Configure x86_64 PrusaSlicer
         if: steps.x86-deps-exist.outputs.found == 'true'
         run: |
           cmake --preset mac_universal_x86 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/deps/build-x86_64/destdir/usr/local" \
+            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/deps/build-mac_universal_x86/destdir/usr/local" \
             -DCMAKE_C_COMPILER_LAUNCHER=sccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
@@ -301,11 +325,7 @@ jobs:
           NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
         run: |
           ditto -c -k --keepParent PrusaSlicer.app "$RUNNER_TEMP/PrusaSlicer-notarize.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/PrusaSlicer-notarize.zip" \
-            --apple-id "$NOTARY_APPLE_ID" \
-            --password "$NOTARY_PASSWORD" \
-            --team-id "$NOTARY_TEAM_ID" \
-            --wait
+          .github/scripts/notarize.sh "$RUNNER_TEMP/PrusaSlicer-notarize.zip"
           xcrun stapler staple PrusaSlicer.app
           xcrun stapler validate PrusaSlicer.app
 
@@ -341,11 +361,7 @@ jobs:
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
             | grep 'Developer ID Application' | head -1 | awk '{print $2}')
           codesign --force --timestamp --sign "$IDENTITY" "$dmg_name"
-          xcrun notarytool submit "$dmg_name" \
-            --apple-id "$NOTARY_APPLE_ID" \
-            --password "$NOTARY_PASSWORD" \
-            --team-id "$NOTARY_TEAM_ID" \
-            --wait
+          .github/scripts/notarize.sh "$dmg_name"
           xcrun stapler staple "$dmg_name"
           xcrun stapler validate "$dmg_name"
 
