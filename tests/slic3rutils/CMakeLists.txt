@@ -9,6 +9,7 @@ add_executable(${_TEST_NAME}_tests
     filamentdb_tests.cpp
     filamentscanclient_tests.cpp
     printer_tools_tests.cpp
+    connect_printer_tools_tests.cpp
     filament_sync_tests.cpp
     prusalink_mock_tests.cpp
     )

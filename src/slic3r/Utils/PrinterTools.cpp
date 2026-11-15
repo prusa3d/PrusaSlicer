@@ -13,8 +13,11 @@
 
 #include <nlohmann/json.hpp>
 
+#include <boost/log/trivial.hpp>
+
 #include "libslic3r/Preset.hpp"
 #include "libslic3r/PrintConfig.hpp"
+#include "Http.hpp"
 #include "PrintHost.hpp"
 
 namespace Slic3r {
@@ -50,6 +53,52 @@ bool fetch_printer_tools(const DynamicPrintConfig &physical_printer_config, Prin
         return false;
     }
     return host->get_tools(out, opts);
+}
+
+void fetch_connect_printers(const std::string &url, const std::string &access_token, ConnectPrintersResult &out,
+                            const PrinterToolsOptions &opts)
+{
+    namespace detail = printer_tools_detail;
+    out = {};
+    BOOST_LOG_TRIVIAL(info) << "Prusa Connect: Get printers at: " << url;
+
+    auto http = Http::get(url);
+    http.header("Authorization", "Bearer " + access_token)
+        .header("Accept", "application/json")
+        .timeout_connect(opts.timeout_connect_s)
+        .timeout_max(opts.timeout_max_s)
+        .on_error([&](std::string body, std::string error, unsigned status) {
+            BOOST_LOG_TRIVIAL(error) << "Prusa Connect: Error getting printers: " << error << ", HTTP " << status << ", body: `" << body << "`";
+            out.http_status = status;
+            if (status == 0) {
+                out.status  = PrinterToolsStatus::Transport;
+                out.message = error;
+            } else {
+                // 401 is an access token Connect no longer takes; 403 is access refused, which a
+                // new token doesn't change, so its message is shown
+                out.status  = status == 401 ? PrinterToolsStatus::AuthFailed :
+                              status == 404 ? PrinterToolsStatus::Unsupported :
+                                              PrinterToolsStatus::PrinterError;
+                out.message = detail::connect_error_summary(body, status);
+            }
+        })
+        .on_complete([&](std::string body, unsigned status) {
+            BOOST_LOG_TRIVIAL(debug) << "Prusa Connect: Got printers: " << body;
+            out.http_status = status;
+            if (status != 200) {
+                out.status  = PrinterToolsStatus::PrinterError;
+                out.message = detail::connect_error_summary(body, status);
+                return;
+            }
+            std::string error;
+            if (detail::parse_connect_printers_json(body, out.printers, out.warnings, error)) {
+                out.status = PrinterToolsStatus::Ok;
+            } else {
+                out.status  = PrinterToolsStatus::Malformed;
+                out.message = error;
+            }
+        })
+        .perform_sync();
 }
 
 namespace printer_tools_detail {

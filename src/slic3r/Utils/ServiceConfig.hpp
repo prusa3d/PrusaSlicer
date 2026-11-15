@@ -11,6 +11,8 @@ public:
 
     std::string connect_status_url() const { return m_connect_url + "/slicer/status"; }
     std::string connect_printer_list_url() const { return m_connect_url + "/slicer/v1/printers"; }
+    // With each tool's material as Connect has it (brand, product name, color), for syncing filaments
+    std::string connect_printer_list_v2_url() const { return m_connect_url + "/slicer/v2/printers"; }
     std::string connect_select_printer_url() const { return m_connect_url + "/slicer-select-printer"; }
     std::string connect_printers_url() const { return m_connect_url + "/app/printers/"; }
     std::string connect_teams_url() const { return m_connect_url + "/app/teams"; }

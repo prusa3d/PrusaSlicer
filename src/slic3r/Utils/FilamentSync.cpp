@@ -311,13 +311,13 @@ std::string mm(double d) { return (boost::format("%.2f") % d).str(); }
 
 // What a row says about the tool whatever preset the extruder gets: an unnamed vendor, a nozzle
 // unlike the profile's
-std::vector<std::string> tool_notes(const PrinterTool &tool, const ExtruderState &ex, bool vendor_known)
+std::vector<std::string> tool_notes(const PrinterTool &tool, const ExtruderState &ex, bool vendor_known, const std::string &source)
 {
     std::vector<std::string> notes;
     const int                n = tool.extruder_idx + 1;
     if (!vendor_known)
         notes.emplace_back(tool.vendor.empty() ?
-            (boost::format("The printer reports no vendor for tool %1%.") % n).str() :
+            (boost::format("%1% reports no vendor for tool %2%.") % source % n).str() :
             (boost::format("Vendor \"%1%\" on tool %2% is one of the printer's unnamed user vendors.") % tool.vendor % n).str());
     if (std::abs(tool.nozzle_diameter - ex.nozzle_diameter) > 0.005)
         notes.emplace_back((boost::format("Tool %1% has a %2% mm nozzle; the printer profile has %3% mm.") % n %
@@ -420,8 +420,10 @@ Plan make_plan(const PrinterTools &tools, const std::vector<ExtruderState> &extr
                const std::set<std::string> &taken_names, const std::string &name_tag)
 {
     Plan plan;
+    // Who reported the tools, in the notes: the printer, or Prusa Connect
+    const std::string source = tools.source.empty() ? std::string("The printer") : tools.source;
     for (const std::string &w : tools.warnings)
-        plan.notes.emplace_back("The printer sent " + w + ".");
+        plan.notes.emplace_back(source + " sent " + w + ".");
 
     std::set<std::string>                  taken = taken_names;
     // By vendor_key + '\n' + lowercased material: one per template, as compatibility is per extruder
@@ -521,7 +523,7 @@ Plan make_plan(const PrinterTools &tools, const std::vector<ExtruderState> &extr
         }
 
         const Wanted want(tool);
-        row.notes = tool_notes(tool, ex, want.vendor_known);
+        row.notes = tool_notes(tool, ex, want.vendor_known, source);
 
         // Usable for this tool: compatible with the extruder and of the same material
         std::vector<const Candidate *> visible, invisible_system;
@@ -597,7 +599,7 @@ Plan make_plan(const PrinterTools &tools, const std::vector<ExtruderState> &extr
         const ExtruderState &ex   = extruders[row.idx];
         const Wanted         want(tool);
         std::vector<Alternative> &alts = row.alternatives;
-        const std::vector<std::string> notes = tool_notes(tool, ex, want.vendor_known);
+        const std::vector<std::string> notes = tool_notes(tool, ex, want.vendor_known, source);
 
         // A preset of the tool's own color, from a template that isn't abrasive on this nozzle;
         // failure says why there's none

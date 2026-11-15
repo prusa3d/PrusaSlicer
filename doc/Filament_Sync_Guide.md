@@ -1,10 +1,11 @@
 # Filament Sync Guide (INDX)
 
 This guide explains **Sync Filaments from Printer**: it reads the filament loaded in each tool of
-a CORE One INDX over PrusaLink, then selects a matching filament preset and sets the color for
-each extruder. Presets and extruder colors don't change until you click **Apply** in its preview.
+a CORE One INDX over PrusaLink, or the filament Prusa Connect has for each tool of your printer,
+then selects a matching filament preset and sets the color for each extruder. Presets and extruder
+colors don't change until you click **Apply** in its preview.
 
-It's one way only. Nothing is sent to the printer or to Filament DB.
+It's one way only. Nothing is sent to the printer, to Prusa Connect or to Filament DB.
 
 For a short walkthrough with screenshots of the printer and slicer screens, see the
 [Filament Slots and Sync user guide](Filament_Slots_and_Sync_User_Guide.md).
@@ -25,22 +26,43 @@ For a short walkthrough with screenshots of the printer and slicer screens, see 
 
 ## 1. What you need
 
+The sync reads one of two sources:
+
+**From the printer, over PrusaLink** (on your network):
+
 - **A printer that reports its filaments.** A CORE One INDX with firmware that has Filament
   Slots: hyiger/Prusa-Firmware-Buddy `v6.9.2-hy.3` or later. Stock Prusa firmware doesn't report
   them, and neither does the CORE One L INDX build yet.
 - **A physical printer** for your INDX printer profile, with **PrusaLink** as its host type, the
   printer's address, and its API key or user and password. Add one with the cog icon next to the
   Printer list: **Add physical printer**. Then select it in the Printer list.
-- The **sync icon** (two circular arrows) appears next to **Filament** in the sidebar once that
-  physical printer is selected.
+
+**From Prusa Connect** (anywhere):
+
+- **Sign in to Prusa Account** in PrusaSlicer, with the printer registered in your Prusa Connect
+  account. No physical printer is needed, and any firmware works.
+- **Assign the filament in Connect**: open the printer's **Tools** page in Prusa Connect and pick
+  each tool's material (brand, product and color). Without that, Connect knows only what the
+  printer reports: the type and, from Filament Slots firmware, the color, but never the vendor.
+- A Prusa printer profile (a system one, or one saved from it) whose **printer model** Connect
+  lists for the printer (`COREONE_INDX8T` for an 8-tool INDX). Printers with an MMU aren't read
+  yet.
+
+When a PrusaLink physical printer is selected, the sync reads it; otherwise, when you're signed in,
+it reads Prusa Connect. The **sync icon** (two circular arrows) appears next to **Filament** in
+the sidebar whenever one of them can be read; its tooltip says which.
 
 ## 2. Running it
 
 1. Click the sync icon next to **Filament**, or choose **Maintenance → Sync Filaments from
    Printer…**.
-2. PrusaSlicer reads the printer, which takes a moment (it gives up after 10 seconds).
+2. PrusaSlicer reads the printer, or Prusa Connect, which takes a moment (it gives up after 10
+   seconds). When several printers in your Connect account fit the printer profile, it asks which
+   one, starting with the one you picked last.
 3. The preview lists each tool the printer reports:
-   - **In the printer**: the vendor, material and color the printer has for that tool.
+   - **In the printer** (or **In Prusa Connect**): the vendor, material and color the printer has
+     for that tool. A material assigned in Connect shows its brand and product name, such as
+     `3D Fuel Pro PCTG, Translucent Cyan`.
    - **Preset**: what happens to the extruder's filament preset: *Keeps*, *Selects*, *Installs
      and selects*, *Creates … from …*, or *No change* for an empty tool.
    - **Preset color**: the filament color of that preset, which is what the extruder shows.
@@ -109,16 +131,40 @@ cleared), the current preset is kept if it's the right material, unless it's for
 filament on a nozzle that isn't hardened; otherwise a Generic one is selected. Nothing is created
 without a vendor. A tool without a color doesn't count against a preset that names one.
 
+### From Prusa Connect
+
+A material assigned in Connect's Tools page comes from Connect's material database:
+
+- **Vendor:** the material's brand, as the database spells it (`3D Fuel`, `eSUN`, `BambuLab`).
+  These fold onto your presets' spellings like the printer's do.
+- **Color:** the printer's color name that the product name contains (`Cyan` in `Pro PCTG,
+  Translucent Cyan`, `Gray` for Grey), so presets named for a color match as they do with the
+  printer. When the name has several (`PETG Black Silver Glitter`), the one closest to the
+  product's color counts. The color code is the database's color for that product (`#0099E6`),
+  which needn't be your preset's, and a preset named for the color matches whatever its own color
+  code. Qualifiers are dropped: `Light Gray` is `Gray`. A product name without one of the
+  printer's 16 color names goes by the color code alone: it has a name only when it's exactly one
+  of the printer's colors.
+- A tool Connect has no assigned material for reports only the type and the printer's color, with
+  no vendor. A color from the printer's palette gets the printer's name for it (`#00FFFF` is
+  `Cyan`), as over PrusaLink; a user color has only its color code. Then it's treated like a tool
+  without a vendor above. The preview's notes say what Prusa Connect, rather than the printer,
+  reported.
+
 ### Empty tools
 
 An empty tool keeps its extruder's preset. PrusaSlicer remembers which tools were empty, and which
-docks weren't calibrated, at the last sync with the selected physical printer:
+docks weren't calibrated, at the last sync with the selected physical printer (or, from Prusa
+Connect, for printer profiles of the same printer model while you stay signed in; Connect lists
+every tool, so it never reports a dock as not calibrated):
 
 - **The sidebar hides their filament lists**, as Bambu Studio and OrcaSlicer show only loaded
   filaments, and numbers the lists it still shows, so a gap (tools 1, 2, 3 and 5) stays clear.
   Untick **Hide empty extruders in the sidebar** in the preview to show them all; that choice is
-  remembered. Every list shows again when you select another physical printer. The extruders
-  themselves stay: the INDX start G-code names all eight tools.
+  remembered. Every list shows again when you select another physical printer, or, after a sync
+  from Prusa Connect, when you sign out, select a printer profile of another printer model, or
+  select a PrusaLink physical printer. The extruders themselves stay: the INDX start G-code names
+  all eight tools.
 - **A print that uses one of them gets a warning** naming those extruders and the time of the
   sync: load the filament, or move those parts to another extruder.
 
@@ -154,11 +200,17 @@ preview says so in a note, and the extruder shows the preset's color.
 
 | Message | What to do |
 | --- | --- |
-| *To read the filaments loaded in your printer, select a physical printer…* | Add and select a PrusaLink physical printer (section 1). |
+| *To read the filaments loaded in your printer, select a physical printer…* | Add and select a PrusaLink physical printer, or sign in to Prusa Account (section 1). If you're signed in, it says why Prusa Connect can't be read: the printer profile isn't a Prusa printer's with a printer model; select your printer's system profile, or one saved from it. |
 | *… doesn't report the filaments in its tools* | The printer's firmware has no Filament Slots. |
 | *… refused the API key or password* | Check them in the physical printer's settings, and that login is enabled on the printer. |
 | *Couldn't reach the printer at …* | Check the address and that the printer is on the network. |
 | *… reports no tools* | No dock is calibrated yet. |
+| *None of the printers in your Prusa Connect account is a …* | The printer profile's printer model isn't one Connect lists for your printers: select the profile for your printer. |
+| *… has an MMU* | Printers with an MMU aren't read from Prusa Connect yet. |
+| *Prusa Connect didn't accept your Prusa Account sign-in* | PrusaSlicer renews the sign-in on its own: try again in a moment, or sign in again. |
+| *Couldn't reach Prusa Connect* | Check your internet connection. |
+| *Prusa Connect answered with an error* | Connect's own message follows, for example when your account has no access to the printer list. |
+| *Prusa Connect has no tools of … yet* | The printer hasn't reported its tools to Connect: turn it on and connect it, then try again. |
 
 ## 7. How it works
 
@@ -169,12 +221,26 @@ The printer serves `GET /api/v1/tools` over PrusaLink (Digest or API key, like u
 "nozzle_diameter":0.40,"hardened":false,"high_flow":false}, ...}}
 ```
 
+Prusa Connect serves `GET /slicer/v2/printers` with the Prusa Account access token (`Authorization:
+Bearer`), the same list PrusaSlicer 3.0 reads. Its tools count from `"0"`, and a material assigned
+in Connect carries its brand, product name and color:
+
+```json
+{"printers":[{"uuid":"…","name":"Core One INDX","legacy_printer_model":"COREONE_INDX8T",
+"tools":{"0":{"features":{"nozzle_diameter":0.25,"nozzle_high_flow":false,"nozzle_hardened":false},
+"material_package_instance":{"package":{"material":{"type":"PCTG","name":"Pro PCTG, Translucent Cyan",
+"brand":{"name":"3D Fuel"},"primary_color":{"color_rgba":"#0099e6ff"}}}}},
+"4":{"features":{…},"material_package_instance":null}, ...}}]}
+```
+
 - `src/slic3r/Utils/PrinterTools.{hpp,cpp}`: fetching and parsing (`fetch_printer_tools`,
-  `PrintHost::get_tools`).
+  `PrintHost::get_tools`, `fetch_connect_printers`).
+- `src/slic3r/Utils/ConnectPrinterTools.cpp`: parsing Connect's printer list
+  (`parse_connect_printers_json`, `connect_printer_fits`), with only the JSON library.
 - `src/slic3r/Utils/FilamentSync.{hpp,cpp}`: matching (`make_plan`) and applying
   (`apply_presets`), with no wx dependency.
-- `src/slic3r/GUI/FilamentSyncDialog.{hpp,cpp}`: the sidebar button, the menu item and the
-  preview.
+- `src/slic3r/GUI/FilamentSyncDialog.{hpp,cpp}`: choosing the source (`filament_sync_source`), the
+  sidebar button, the menu item, the Connect printer picker and the preview.
 
 Tests: `[PrinterTools]` and `[FilamentSync]` in `tests/slic3rutils`, and the hidden
 `[PrusaLinkMock]` tests, which run against

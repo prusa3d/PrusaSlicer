@@ -414,6 +414,7 @@ set(SLIC3R_GUI_SOURCES
     Utils/PrintHost.hpp
     Utils/PrinterTools.cpp
     Utils/PrinterTools.hpp
+    Utils/ConnectPrinterTools.cpp
     Utils/Bonjour.cpp
     Utils/Bonjour.hpp
     Utils/PresetUpdater.cpp

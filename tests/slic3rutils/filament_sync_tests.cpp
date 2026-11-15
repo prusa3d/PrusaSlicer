@@ -132,6 +132,50 @@ TEST_CASE("A new spool on the same tool selects its color's preset", "[FilamentS
     CHECK(kept.preset_colour == "#000000");
 }
 
+// The one tool of a Prusa Connect /slicer/v2/printers body with this material object, as the
+// sync reads it
+static PrinterTool connect_tool(const std::string &material)
+{
+    const std::string body = R"({"printers":[{"uuid":"u","tools":{"0":{"features":{"nozzle_diameter":0.4,"nozzle_high_flow":true},)"
+                             R"("material_package_instance":{"package":{"material":)" + material + "}}}}}]}";
+    std::vector<ConnectPrinter> printers;
+    std::vector<std::string>    warnings;
+    std::string                 error;
+    REQUIRE(printer_tools_detail::parse_connect_printers_json(body, printers, warnings, error));
+    REQUIRE(printers.size() == 1);
+    REQUIRE(printers.front().tools.tools.size() == 1);
+    return printers.front().tools.tools.front();
+}
+
+TEST_CASE("A material assigned in Prusa Connect selects the vendor's preset of its color", "[FilamentSync]")
+{
+    // Connect spells the brand "3D Fuel" and gives the material database's color, not the
+    // preset's; the color name comes from the product name
+    const PrinterTool t = connect_tool(R"({"type":"PCTG","name":"Pro PCTG, Translucent Cyan","brand":{"name":"3D Fuel"},)"
+                                       R"("primary_color":{"color_rgba":"#0099e6ff"}})");
+    CHECK(t.color == "Cyan");
+    const std::vector<Candidate> c = {cand("3D-Fuel PCTG Cyan", "3D-Fuel", "PCTG", "#00FFFF"),
+                                      cand("3D-Fuel PCTG Magenta", "3D-Fuel", "PCTG", "#FF00FF"),
+                                      cand("Generic PCTG", "Generic", "PCTG")};
+    const ExtruderPlan p = plan_one(t, c, "Generic PCTG");
+    CHECK(p.action == Action::Select);
+    CHECK(p.preset == "3D-Fuel PCTG Cyan");
+}
+
+TEST_CASE("A tool Prusa Connect only has the printer's report of keeps its color's preset", "[FilamentSync]")
+{
+    // Nothing assigned in Connect: the printer reported PLA in its palette's black, which is named
+    // as the printer names it, so the selected black preset isn't taken for another color
+    const PrinterTool t = connect_tool(R"({"type":"PLA","abbreviation":"PLA","primary_color":{"color_rgba":"#000000"}})");
+    CHECK(t.vendor.empty());
+    CHECK(t.color == "Black");
+    const std::vector<Candidate> c = {cand("Prusament PLA Galaxy Black", "Prusament", "PLA", "#3D3E3D"),
+                                      cand("Generic PLA", "Generic", "PLA")};
+    const ExtruderPlan p = plan_one(t, c, "Prusament PLA Galaxy Black");
+    CHECK(p.action == Action::Keep);
+    CHECK(p.preset == "Prusament PLA Galaxy Black");
+}
+
 TEST_CASE("A selected variant the printer can't tell apart is kept", "[FilamentSync]")
 {
     const std::vector<Candidate> c = {cand("Overture PLA Matte White", "Overture", "PLA"), cand("Overture PLA White", "Overture", "PLA")};

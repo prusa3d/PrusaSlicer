@@ -1,7 +1,9 @@
 # Filament Slots and Sync: user guide
 
 The CORE One INDX can remember the vendor and color of the filament in each tool, and PrusaSlicer
-can read them over PrusaLink and pick matching filament presets for you.
+can read them over PrusaLink and pick matching filament presets for you. PrusaSlicer can also read
+the filament you assign to each tool in Prusa Connect: see
+[Sync from Prusa Connect](#sync-from-prusa-connect).
 
 You need:
 
@@ -65,6 +67,20 @@ or user and password, then select it in the Printer list. The sync button (two c
 appears next to **Filament:** in the sidebar.
 
 ![The sync button next to Filament:](images/fsync_sl_sidebar_before.jpg)
+
+### Sync from Prusa Connect
+
+Away from the printer's network, or without a PrusaLink physical printer, PrusaSlicer can read
+the filaments from Prusa Connect instead:
+
+1. In Prusa Connect, open the printer's **Tools** page and assign each tool's material: its brand,
+   product and color. (What the printer reports by itself reaches Connect without the vendor.)
+2. In PrusaSlicer, sign in to Prusa Account and select your INDX printer profile, with no
+   PrusaLink physical printer selected. The sync button appears next to **Filament:**; its tooltip
+   says it reads Prusa Connect.
+3. Sync as below. The preview's **In Prusa Connect** column shows each tool's brand and product,
+   and the color name in the product name (`Cyan` in `Pro PCTG, Translucent Cyan`) picks the
+   preset named for it.
 
 ### Sync
 

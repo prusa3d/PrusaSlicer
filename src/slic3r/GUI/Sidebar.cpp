@@ -345,7 +345,13 @@ void Sidebar::update_filament_sync_button()
 {
     if (!m_btn_sync_filaments || !m_presets_sizer)
         return;
-    const bool show = can_sync_filaments_from_printer();
+    const FilamentSyncSource source = filament_sync_source();
+    const bool               show   = source != FilamentSyncSource::None;
+    if (show)
+        m_btn_sync_filaments->SetToolTip(source == FilamentSyncSource::Connect ?
+                                             _L("Sync filaments from Prusa Connect: select the presets of the filaments it has for "
+                                                "your printer's tools") :
+                                             _L("Sync filaments from the printer: select the presets of the filaments loaded in its tools"));
     if (m_btn_sync_filaments->IsShown() != show) {
         m_btn_sync_filaments->Show(show);
         m_presets_sizer->Layout();

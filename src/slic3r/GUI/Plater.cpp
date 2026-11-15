@@ -612,6 +612,9 @@ struct Plater::priv
     void show_action_buttons(const bool is_ready_to_slice) const;
     void show_autoslicing_action_buttons() const;
     bool can_show_upload_to_connect() const;
+    // The filament sync button, and what the last sync says about empty extruders, follow the
+    // Prusa Account sign-in: a sync can read Prusa Connect
+    void refresh_filament_sync();
     // Set the bed shape to a single closed 2D polygon(array of two element arrays),
     // triangulate the bed and store the triangles into m_bed.m_triangles,
     // fills the m_bed.m_grid_lines and sets m_bed.m_origin.
@@ -1052,6 +1055,8 @@ void Plater::priv::init()
             sidebar->update_printer_presets_combobox();
             wxGetApp().update_wizard_login_page();
             this->show_action_buttons(this->ready_to_slice);
+            // Syncing filaments from Prusa Connect needs the account
+            this->refresh_filament_sync();
         });
 
         auto on_id_user_success = [this](UserAccountSuccessEvent& evt, bool after_token_success) {
@@ -1084,7 +1089,8 @@ void Plater::priv::init()
                 this->main_frame->refresh_account_menu();
                 wxGetApp().update_wizard_login_page();
                 this->show_action_buttons(this->ready_to_slice);
- 
+                this->refresh_filament_sync();
+
             } else {
                 // data were corrupt and username was not retrieved
                 // procced as if EVT_UA_RESET was recieved
@@ -1097,7 +1103,8 @@ void Plater::priv::init()
                 this->main_frame->refresh_account_menu(true);
                 // Update sidebar printer status
                 sidebar->update_printer_presets_combobox();
-            }    
+                this->refresh_filament_sync();
+            }
         };
 
         this->q->Bind(EVT_UA_ID_USER_SUCCESS, [on_id_user_success](UserAccountSuccessEvent& evt) {
@@ -1117,6 +1124,7 @@ void Plater::priv::init()
             this->main_frame->refresh_account_menu(true);
             // Update sidebar printer status
             sidebar->update_printer_presets_combobox();
+            this->refresh_filament_sync();
             });
         this->q->Bind(EVT_UA_FAIL, [this](UserAccountFailEvent& evt) {
             BOOST_LOG_TRIVIAL(error) << "Failed communication with Prusa Account: " << evt.data;
@@ -4265,7 +4273,17 @@ bool Plater::priv::can_show_upload_to_connect() const
     // Upload to Connect should show only for prusa printers
     // Some vendors might have prefixed name due to repository id.
     return vendor_id.find("Prusa") != std::string::npos;
-} 
+}
+
+void Plater::priv::refresh_filament_sync()
+{
+    // What a sync read from Prusa Connect belongs to the account that's no longer signed in
+    if (!user_account->is_logged())
+        forget_filament_sync_from_connect();
+    sidebar->update_filament_sync_button();
+    update_unavailable_extruders_warning();
+    update_filament_list_visibility();
+}
 
 void Plater::priv::show_action_buttons(const bool ready_to_slice_) const
 {

@@ -166,7 +166,8 @@ public:
 
     void collapse(bool collapse);
     void set_extruders_count(size_t extruders_count);
-    // Shows the sync filaments button when the selected physical printer can report its filaments.
+    // Shows the sync filaments button while the filaments can be read (filament_sync_source() isn't
+    // None), with a tooltip naming the source: the PrusaLink physical printer or Prusa Connect.
     void update_filament_sync_button();
     // Hides the filament lists of these extruders (0-based), and numbers the others; empty shows all.
     void set_hidden_filament_extruders(std::vector<int> hidden);

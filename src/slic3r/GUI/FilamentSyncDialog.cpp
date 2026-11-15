@@ -24,6 +24,7 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Print.hpp"
 #include "slic3r/Utils/PrinterTools.hpp"
+#include "slic3r/Utils/ServiceConfig.hpp"
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
@@ -32,6 +33,7 @@
 #include "PhysicalPrinterDialog.hpp"
 #include "Plater.hpp"
 #include "Tab.hpp"
+#include "UserAccount.hpp"
 #include "format.hpp"
 #include "wxExtensions.hpp"
 
@@ -46,36 +48,89 @@ namespace {
 // Not kept across sessions: filament can change while PrusaSlicer is closed.
 struct LastSync
 {
+    // The physical printer's name, or the Prusa Connect printer's
     std::string          printer;
-    // The device read: an edited physical printer keeps its name but can point elsewhere
+    // The device read: an edited physical printer keeps its name but can point elsewhere. From
+    // Prusa Connect, "connect:<printer uuid>"
     std::string          host;
     // What the printer reported; which extruders that leaves out depends on the printer profile
     // in use, which can change while the physical printer stays
     PrinterTools         tools;
     std::string          time;
+    bool                 from_connect = false;
+    // From Prusa Connect: the account and the profile's printer_model it was read for, as no
+    // physical printer ties it to the profile
+    std::string          account;
+    std::string          printer_model;
 };
 std::optional<LastSync> s_last_sync;
 
+// The Prusa Connect printer last synced from, preselected when several fit the profile
+const char* CONNECT_PRINTER_KEY = "filament_sync_connect_printer";
+
 wxString dialog_title() { return _L("Sync Filaments from Printer"); }
+
+UserAccount* user_account()
+{
+    Plater* plater = wxGetApp().plater();
+    return plater ? plater->get_user_account() : nullptr;
+}
+
+// The edited printer profile's printer_model, which finds its printer in Prusa Connect
+std::string edited_printer_model(const PresetBundle& bundle)
+{
+    const DynamicPrintConfig& printer = bundle.printers.get_edited_preset().config;
+    return printer.has("printer_model") ? printer.opt_string("printer_model") : std::string();
+}
+
+// A Prusa printer's profile, or one saved from it: only those can be in Prusa Connect. The check
+// "Upload to Connect" makes (Plater::priv::can_show_upload_to_connect).
+bool is_prusa_printer_profile(const PresetBundle& bundle)
+{
+    const Preset& printer = bundle.printers.get_selected_preset();
+    std::string   vendor_id;
+    if (printer.vendor) {
+        vendor_id = printer.vendor->id;
+    } else if (const std::string inherits = printer.inherits(); !inherits.empty()) {
+        if (const Preset* parent = bundle.printers.find_preset(inherits); parent && parent->vendor)
+            vendor_id = parent->vendor->id;
+    }
+    // Some vendor ids carry a repository prefix
+    return vendor_id.find("Prusa") != std::string::npos;
+}
 
 // The preview's "Hide empty extruders in the sidebar", on unless turned off
 const char* HIDE_EMPTY_KEY = "filament_sync_hide_empty";
 bool hide_empty_extruders() { return wxGetApp().app_config->get(HIDE_EMPTY_KEY) != "0"; }
 
-// The last sync applies to the physical printer it read
 // The extruders the last sync leaves without filament, for the edited printer profile
 UnavailableExtruders unavailable_now()
 {
     const auto* diameters = wxGetApp().preset_bundle->printers.get_edited_preset().config.option<ConfigOptionFloats>("nozzle_diameter");
-    return unavailable_extruders(s_last_sync->tools, diameters ? diameters->values.size() : 0);
+    UnavailableExtruders out = unavailable_extruders(s_last_sync->tools, diameters ? diameters->values.size() : 0);
+    // Prusa Connect lists every tool, an empty one too: one it leaves out isn't a dock the printer
+    // skipped for not being calibrated, so nothing is known about it
+    if (s_last_sync->from_connect)
+        out.uncalibrated.clear();
+    return out;
 }
 
+// The last sync applies to the physical printer it read, or, from Prusa Connect, to the account
+// and printer model it was read for
 bool last_sync_applies()
 {
     PresetBundle* bundle = wxGetApp().preset_bundle;
-    return s_last_sync && bundle && bundle->printers.get_edited_preset().printer_technology() == ptFFF &&
-           bundle->physical_printers.has_selection() && bundle->physical_printers.get_selected_printer().name == s_last_sync->printer &&
-           can_sync_filaments_from_printer() &&
+    if (!s_last_sync || !bundle)
+        return false;
+    const FilamentSyncSource source = filament_sync_source();
+    if (s_last_sync->from_connect) {
+        // Read for this profile's model, as this account, and still the source (no PrusaLink
+        // physical printer selected since)
+        const UserAccount* account = user_account();
+        return source == FilamentSyncSource::Connect && account && account->get_username() == s_last_sync->account &&
+               edited_printer_model(*bundle) == s_last_sync->printer_model;
+    }
+    return source == FilamentSyncSource::PrusaLink && bundle->physical_printers.get_selected_printer().name == s_last_sync->printer &&
            bundle->physical_printers.get_selected_printer_config()->opt_string("print_host") == s_last_sync->host;
 }
 
@@ -83,8 +138,12 @@ wxString reported_text(const PrinterTool& tool)
 {
     if (!tool.loaded)
         return _L("Empty");
+    // A material assigned in Prusa Connect goes by its product name, which names its type and color
+    const std::vector<const std::string*> parts = tool.product.empty() ?
+                                                      std::vector<const std::string*>{&tool.vendor, &tool.material, &tool.color} :
+                                                      std::vector<const std::string*>{&tool.vendor, &tool.product};
     std::string s;
-    for (const std::string* part : {&tool.vendor, &tool.material, &tool.color})
+    for (const std::string* part : parts)
         if (!part->empty())
             s += (s.empty() ? "" : " ") + *part;
     return from_u8(s);
@@ -257,28 +316,167 @@ void update_filament_list_visibility()
     plater->sidebar().set_hidden_filament_extruders(std::move(hidden));
 }
 
-bool can_sync_filaments_from_printer()
+FilamentSyncSource filament_sync_source()
 {
     PresetBundle* bundle = wxGetApp().preset_bundle;
     if (!bundle || bundle->printers.get_edited_preset().printer_technology() != ptFFF)
-        return false;
-    const DynamicPrintConfig* cfg = bundle->physical_printers.get_selected_printer_config();
-    if (!cfg)
-        return false;
-    const auto* host_type = cfg->option<ConfigOptionEnum<PrintHostType>>("host_type");
-    return host_type && host_type->value == htPrusaLink && cfg->has("print_host") && !cfg->opt_string("print_host").empty();
+        return FilamentSyncSource::None;
+    if (const DynamicPrintConfig* cfg = bundle->physical_printers.get_selected_printer_config()) {
+        const auto* host_type = cfg->option<ConfigOptionEnum<PrintHostType>>("host_type");
+        if (host_type && host_type->value == htPrusaLink && cfg->has("print_host") && !cfg->opt_string("print_host").empty())
+            return FilamentSyncSource::PrusaLink;
+    }
+    const UserAccount* account = user_account();
+    if (account && account->is_logged() && !edited_printer_model(*bundle).empty() && is_prusa_printer_profile(*bundle))
+        return FilamentSyncSource::Connect;
+    return FilamentSyncSource::None;
 }
+
+void forget_filament_sync_from_connect()
+{
+    if (s_last_sync && s_last_sync->from_connect)
+        s_last_sync.reset();
+}
+
+bool can_sync_filaments_from_printer() { return filament_sync_source() != FilamentSyncSource::None; }
+
+namespace {
+
+// The preview of what the reported tools would change, and the changes the user accepts
+void preview_and_apply(wxWindow* parent, PresetBundle& bundle, const PrinterTools& tools, const std::string& printer_name,
+                       bool from_connect)
+{
+    const Plan plan = make_plan(tools, collect_extruder_states(bundle), taken_filament_names(bundle.filaments), printer_name_tag(bundle));
+    FilamentSyncDialog dlg(parent, plan, printer_name, from_connect);
+    if (dlg.ShowModal() != wxID_OK)
+        return;
+    apply_plan(parent, printer_name, dlg.chosen_plan(), dlg.accepted(), dlg.reset_extruder_colours());
+}
+
+void sync_from_connect(wxWindow* parent, PresetBundle& bundle)
+{
+    UserAccount*      account = user_account();
+    const std::string model   = edited_printer_model(bundle);
+    const std::string token   = account ? account->get_access_token() : std::string();
+    if (token.empty()) {
+        show_info(parent, _L("Sign in to Prusa Account to read the filaments of your printer from Prusa Connect."), dialog_title());
+        return;
+    }
+
+    ConnectPrintersResult res;
+    {
+        wxBusyCursor wait;
+        wxBusyInfo   info(_L("Reading the filaments from Prusa Connect…"), parent);
+        fetch_connect_printers(Utils::ServiceConfig::instance().connect_printer_list_v2_url(), token, res);
+    }
+    switch (res.status) {
+    case PrinterToolsStatus::Ok: break;
+    case PrinterToolsStatus::AuthFailed:
+        // The access token is refreshed in the background; the next try will have the new one
+        account->request_refresh();
+        show_error(parent, _L("Prusa Connect didn't accept your Prusa Account sign-in. PrusaSlicer is renewing it: try again in a "
+                              "moment, or sign in again."));
+        return;
+    case PrinterToolsStatus::Transport:
+        // TRN %1% = error detail
+        show_error(parent, format_wxstr(_L("Couldn't reach Prusa Connect: %1%"), res.message));
+        return;
+    case PrinterToolsStatus::Unsupported:
+    case PrinterToolsStatus::PrinterError:
+        show_error(parent, format_wxstr(_L("Prusa Connect answered with an error: %1%"), res.message));
+        return;
+    case PrinterToolsStatus::Malformed:
+        show_error(parent, format_wxstr(_L("Prusa Connect's answer couldn't be read: %1%"), res.message));
+        return;
+    }
+    for (const std::string& w : res.warnings)
+        BOOST_LOG_TRIVIAL(warning) << "Filament sync from Prusa Connect: " << w;
+
+    std::vector<const ConnectPrinter*> fits;
+    for (const ConnectPrinter& p : res.printers)
+        if (connect_printer_fits(p, model))
+            fits.push_back(&p);
+    if (fits.empty()) {
+        // TRN %1% = printer model, such as COREONE_INDX8T
+        show_info(parent,
+                  format_wxstr(_L("None of the printers in your Prusa Connect account is a %1%, the printer of this printer profile."), model),
+                  dialog_title());
+        return;
+    }
+    const auto display_name = [](const ConnectPrinter& p) { return p.name.empty() ? p.model : p.name; };
+    const ConnectPrinter* chosen = fits.front();
+    if (fits.size() > 1) {
+        AppConfig*    app_config = wxGetApp().app_config;
+        const std::string last   = app_config->get(CONNECT_PRINTER_KEY);
+        wxArrayString names;
+        int           preselect = 0;
+        for (size_t i = 0; i < fits.size(); ++i) {
+            const std::string state = fits[i]->state.empty() ? std::string() : " (" + fits[i]->state + ")";
+            names.Add(from_u8(display_name(*fits[i]) + state));
+            if (fits[i]->uuid == last)
+                preselect = int(i);
+        }
+        const int picked = wxGetApp().GetSingleChoiceIndex(
+            _L("Several printers in your Prusa Connect account fit this printer profile. Read the filaments of:"), dialog_title(),
+            names, preselect);
+        if (picked < 0)
+            return;
+        chosen = fits[size_t(picked)];
+    }
+    wxGetApp().app_config->set(CONNECT_PRINTER_KEY, chosen->uuid);
+
+    const std::string name = display_name(*chosen);
+    if (chosen->has_feeder_slots) {
+        show_info(parent,
+                  format_wxstr(_L("%1% has an MMU. Syncing from Prusa Connect reads printers whose tools are extruders, such as the "
+                                  "CORE One INDX, not the slots of an MMU."),
+                               name),
+                  dialog_title());
+        return;
+    }
+    for (const std::string& w : chosen->tools.warnings)
+        BOOST_LOG_TRIVIAL(warning) << "Filament sync from Prusa Connect, " << name << ": " << w;
+
+    // No tools isn't a printer without calibrated docks, as over PrusaLink: Connect has no data
+    // for it (it never reported), or what it has couldn't be read. Nothing is remembered then.
+    if (chosen->tools.tools.empty()) {
+        if (!chosen->tools.warnings.empty())
+            show_error(parent, format_wxstr(_L("Prusa Connect's answer couldn't be read: %1%"), chosen->tools.warnings.front()));
+        else
+            show_info(parent, format_wxstr(_L("Prusa Connect has no tools of %1% yet."), name), dialog_title());
+        return;
+    }
+
+    s_last_sync = LastSync{name, "connect:" + chosen->uuid, chosen->tools, into_u8(wxDateTime::Now().Format("%H:%M")),
+                           /* from_connect */ true, account->get_username(), model};
+    update_unavailable_extruders_warning();
+    update_filament_list_visibility();
+
+    preview_and_apply(parent, bundle, chosen->tools, name, /* from_connect */ true);
+}
+
+} // namespace
 
 void sync_filaments_from_printer(wxWindow* parent)
 {
     PresetBundle& bundle = *wxGetApp().preset_bundle;
-    if (!can_sync_filaments_from_printer()) {
-        show_info(parent,
-                  _L("To read the filaments loaded in your printer, select a physical printer for this printer profile, "
-                     "with PrusaLink as its host and its address and API key or password set.") +
-                      "\n\n" + _L("Add one with the cog icon next to the Printer list: Add physical printer."),
-                  dialog_title());
+    switch (filament_sync_source()) {
+    case FilamentSyncSource::PrusaLink: break;
+    case FilamentSyncSource::Connect: sync_from_connect(parent, bundle); return;
+    case FilamentSyncSource::None: {
+        const UserAccount* account = user_account();
+        const bool         signed_in = account && account->is_logged();
+        wxString           text = _L("To read the filaments loaded in your printer, select a physical printer for this printer profile, "
+                                     "with PrusaLink as its host and its address and API key or password set.") +
+                        "\n\n" + _L("Add one with the cog icon next to the Printer list: Add physical printer.") + "\n\n";
+        // Signed in, the profile is what keeps Prusa Connect out
+        text += signed_in ? _L("Prusa Connect can't be read for this printer profile: it isn't a Prusa printer's profile with a "
+                               "printer model to find your printer by. Select your Prusa printer's system profile, or one saved "
+                               "from it.") :
+                            _L("Or sign in to Prusa Account to read the filaments that Prusa Connect has for your printer.");
+        show_info(parent, text, dialog_title());
         return;
+    }
     }
 
     const PhysicalPrinter& pp  = bundle.physical_printers.get_selected_printer();
@@ -325,27 +523,25 @@ void sync_filaments_from_printer(wxWindow* parent)
         show_info(parent, format_wxstr(_L("%1% reports no tools: none of its docks is calibrated."), pp.name), dialog_title());
         return;
     }
-
-    const Plan plan = make_plan(res.tools, collect_extruder_states(bundle), taken_filament_names(bundle.filaments),
-                                printer_name_tag(bundle));
-    FilamentSyncDialog dlg(parent, plan, pp.name);
-    if (dlg.ShowModal() != wxID_OK)
-        return;
-    apply_plan(parent, pp.name, dlg.chosen_plan(), dlg.accepted(), dlg.reset_extruder_colours());
+    preview_and_apply(parent, bundle, res.tools, pp.name, /* from_connect */ false);
 }
 
-FilamentSyncDialog::FilamentSyncDialog(wxWindow* parent, const Plan& plan, const std::string& printer_name)
+FilamentSyncDialog::FilamentSyncDialog(wxWindow* parent, const Plan& plan, const std::string& printer_name, bool from_connect)
     : wxDialog(parent, wxID_ANY, dialog_title(), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
     , m_plan(plan)
 {
-    const int em   = wxGetApp().em_unit();
-    auto*     top  = new wxBoxSizer(wxVERTICAL);
-    auto*     intro = new wxStaticText(this, wxID_ANY, format_wxstr(_L("Filaments loaded in %1%. Choose what to apply:"), printer_name));
+    const int em    = wxGetApp().em_unit();
+    auto*     top   = new wxBoxSizer(wxVERTICAL);
+    auto*     intro = new wxStaticText(this, wxID_ANY,
+                                       from_connect ?
+                                           format_wxstr(_L("Filaments of %1% in Prusa Connect. Choose what to apply:"), printer_name) :
+                                           format_wxstr(_L("Filaments loaded in %1%. Choose what to apply:"), printer_name));
     top->Add(intro, 0, wxALL, em);
 
     auto* grid = new wxGridBagSizer(int(0.4 * em), em);
     int   line = 0;
-    const wxString headings[] = {_L("Extruder"), _L("In the printer"), _L("Preset"), _L("Preset color")};
+    const wxString headings[] = {_L("Extruder"), from_connect ? _L("In Prusa Connect") : _L("In the printer"), _L("Preset"),
+                                 _L("Preset color")};
     for (int c = 0; c < 4; ++c) {
         auto* h = new wxStaticText(this, wxID_ANY, headings[c]);
         h->SetFont(wxGetApp().bold_font());

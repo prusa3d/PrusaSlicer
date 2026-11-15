@@ -1947,7 +1947,8 @@ void MainFrame::init_menubar_as_editor()
             [this](wxCommandEvent&) { if (m_plater) m_plater->cold_pull_maintenance(); },
             "", nullptr, []() { return true; }, this);
         append_menu_item(maintenanceMenu, wxID_ANY, _L("&Sync Filaments from Printer…"),
-            _L("Read the filaments loaded in the selected PrusaLink printer and select matching presets and extruder colors"),
+            _L("Read the filaments from the selected PrusaLink printer or from Prusa Connect, and select matching presets and "
+               "extruder colors"),
             [this](wxCommandEvent&) { if (m_plater) sync_filaments_from_printer(this); },
             "refresh", nullptr,
             []() { return wxGetApp().preset_bundle && wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF; },
