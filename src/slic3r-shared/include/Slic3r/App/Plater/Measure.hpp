@@ -4,6 +4,7 @@
 #include "Slic3r/Domain/TriangleMesh.hpp"
 
 #include <optional>
+#include <cassert>
 
 struct indexed_triangle_set;
 

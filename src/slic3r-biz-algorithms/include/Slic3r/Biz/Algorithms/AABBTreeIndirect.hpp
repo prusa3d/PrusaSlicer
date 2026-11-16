@@ -9,6 +9,7 @@
 #include <limits>
 #include <type_traits>
 #include <vector>
+#include <cassert>
 
 #include <Eigen/Geometry>
 #include "Slic3r/Domain/Types.hpp"

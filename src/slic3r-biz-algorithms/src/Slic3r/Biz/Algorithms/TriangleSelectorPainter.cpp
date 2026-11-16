@@ -5,6 +5,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include <cassert>
 
 #include <igl/Hit.h>
 

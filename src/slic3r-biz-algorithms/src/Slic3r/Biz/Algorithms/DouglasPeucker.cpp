@@ -4,6 +4,7 @@
 #include "Slic3r/Math.hpp"
 
 #include <optional>
+#include <cassert>
 
 using namespace Slic3r::Domain;
 
