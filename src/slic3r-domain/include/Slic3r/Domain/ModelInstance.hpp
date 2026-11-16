@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+
 #include "Slic3r/Domain/Forward.hpp"
 #include "Slic3r/Domain/ObjectID.hpp"
 #include "Slic3r/Domain/Transformation.hpp"
