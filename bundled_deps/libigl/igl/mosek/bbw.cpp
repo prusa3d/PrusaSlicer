@@ -8,7 +8,6 @@
 #include "bbw.h"
 #include "mosek_quadprog.h"
 #include "../harmonic.h"
-#include "../slice_into.h"
 #include <Eigen/Sparse>
 #include <iostream>
 #include <cstdio>
@@ -21,17 +20,15 @@ template <
   typename Derivedbc,
   typename DerivedW>
 IGL_INLINE bool igl::mosek::bbw(
-  const Eigen::PlainObjectBase<DerivedV> & V,
-  const Eigen::PlainObjectBase<DerivedEle> & Ele,
-  const Eigen::PlainObjectBase<Derivedb> & b,
-  const Eigen::PlainObjectBase<Derivedbc> & bc,
+  const Eigen::MatrixBase<DerivedV> & V,
+  const Eigen::MatrixBase<DerivedEle> & Ele,
+  const Eigen::MatrixBase<Derivedb> & b,
+  const Eigen::MatrixBase<Derivedbc> & bc,
   igl::BBWData & data,
   igl::mosek::MosekData & mosek_data,
   Eigen::PlainObjectBase<DerivedW> & W
   )
 {
-  using namespace std;
-  using namespace Eigen;
   assert(!data.partition_unity && "partition_unity not implemented yet");
   // number of domain vertices
   int n = V.rows();
@@ -42,26 +39,26 @@ IGL_INLINE bool igl::mosek::bbw(
   harmonic(V,Ele,2,Q);
   W.derived().resize(n,m);
   // No linear terms
-  VectorXd c = VectorXd::Zero(n);
+  Eigen::VectorXd c = Eigen::VectorXd::Zero(n);
   // No linear constraints
-  SparseMatrix<typename DerivedW::Scalar> A(0,n);
-  VectorXd uc(0,1),lc(0,1);
+  Eigen::SparseMatrix<typename DerivedW::Scalar> A(0,n);
+  Eigen::VectorXd uc(0,1),lc(0,1);
   // Upper and lower box constraints (Constant bounds)
-  VectorXd ux = VectorXd::Ones(n);
-  VectorXd lx = VectorXd::Zero(n);
+  Eigen::VectorXd ux = Eigen::VectorXd::Ones(n);
+  Eigen::VectorXd lx = Eigen::VectorXd::Zero(n);
   // Loop over handles
   for(int i = 0;i<m;i++)
   {
     if(data.verbosity >= 1)
     {
-      cout<<"BBW: Computing weight for handle "<<i+1<<" out of "<<m<<
-        "."<<endl;
+      std::cout<<"BBW: Computing weight for handle "<<i+1<<" out of "<<m<<
+        "."<<std::endl;
     }
-    VectorXd bci = bc.col(i);
-    VectorXd Wi;
+    Eigen::VectorXd bci = bc.col(i);
+    Eigen::VectorXd Wi;
     // impose boundary conditions via bounds
-    slice_into(bci,b,ux);
-    slice_into(bci,b,lx);
+    ux(b) = bci;
+    lx(b) = bci;
     bool r = mosek_quadprog(Q,c,0,A,lc,uc,lx,ux,mosek_data,Wi);
     if(!r)
     {
@@ -73,8 +70,8 @@ IGL_INLINE bool igl::mosek::bbw(
     const double min_rowsum = W.rowwise().sum().array().abs().minCoeff();
     if(min_rowsum < 0.1)
     {
-      cerr<<"bbw.cpp: Warning, minimum row sum is very low. Consider more "
-        "active set iterations or enforcing partition of unity."<<endl;
+      std::cerr<<"bbw.cpp: Warning, minimum row sum is very low. Consider more "
+        "active set iterations or enforcing partition of unity."<<std::endl;
     }
 #endif
 
@@ -83,6 +80,6 @@ IGL_INLINE bool igl::mosek::bbw(
 
 #ifdef IGL_STATIC_LIBRARY
 // Explicit template instantiation
-template bool igl::mosek::bbw<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, 1, 0, -1, 1>, Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<double, -1, -1, 0, -1, -1> >(Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, igl::BBWData&, igl::mosek::MosekData&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> >&);
+template bool igl::mosek::bbw<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, 1, 0, -1, 1>, Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<double, -1, -1, 0, -1, -1> >(Eigen::MatrixBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::MatrixBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> > const&, Eigen::MatrixBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, igl::BBWData&, igl::mosek::MosekData&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> >&);
 #endif
 

@@ -38,9 +38,6 @@ IGL_INLINE bool igl::copyleft::cgal::signed_distance_isosurface(
   Eigen::MatrixXd & V,
   Eigen::MatrixXi & F)
 {
-  using namespace std;
-  using namespace Eigen;
-
   // default triangulation for Surface_mesher
   typedef CGAL::Surface_mesh_default_triangulation_3 Tr;
   // c2t3
@@ -58,7 +55,7 @@ IGL_INLINE bool igl::copyleft::cgal::signed_distance_isosurface(
   Eigen::MatrixXd FN,VN,EN;
   Eigen::MatrixXi E;
   Eigen::VectorXi EMAP;
-  WindingNumberAABB< Eigen::Vector3d, Eigen::MatrixXd, Eigen::MatrixXi > hier;
+  WindingNumberAABB<double,int> hier;
   switch(sign_type)
   {
     default:
@@ -102,9 +99,9 @@ IGL_INLINE bool igl::copyleft::cgal::signed_distance_isosurface(
         [&tree,&IV,&IF,&level](const Point_3 & q) -> FT
         {
           int i;
-          RowVector3d c;
+          Eigen::RowVector3d c;
           const double sd = tree.squared_distance(
-            IV,IF,RowVector3d(q.x(),q.y(),q.z()),i,c);
+            IV,IF,Eigen::RowVector3d(q.x(),q.y(),q.z()),i,c);
           return sd-level;
         };
     case SIGNED_DISTANCE_TYPE_DEFAULT:
@@ -113,7 +110,7 @@ IGL_INLINE bool igl::copyleft::cgal::signed_distance_isosurface(
         [&tree,&IV,&IF,&hier,&level](const Point_3 & q) -> FT
         {
           const double sd = signed_distance_winding_number(
-            tree,IV,IF,hier,Vector3d(q.x(),q.y(),q.z()));
+            tree,IV,IF,hier,Eigen::Vector3d(q.x(),q.y(),q.z()));
           return sd-level;
         };
       break;
@@ -122,7 +119,7 @@ IGL_INLINE bool igl::copyleft::cgal::signed_distance_isosurface(
         {
           const double sd = 
             igl::signed_distance_pseudonormal(
-              tree,IV,IF,FN,VN,EN,EMAP,RowVector3d(q.x(),q.y(),q.z()));
+              tree,IV,IF,FN,VN,EN,EMAP,Eigen::RowVector3d(q.x(),q.y(),q.z()));
           return sd- level;
         };
       break;

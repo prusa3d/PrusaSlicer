@@ -3,7 +3,9 @@
 #include "../triangle/triangulate.h"
 #include "../remove_duplicate_vertices.h"
 #include "../remove_unreferenced.h"
-#include "../slice_mask.h"
+#include "../placeholders.h"
+
+#include <cassert>
 
 template <
   typename DerivedV, 
@@ -23,8 +25,6 @@ IGL_INLINE void igl::triangle::cdt(
 {
   assert(V.cols() == 2);
   assert(E.cols() == 2);
-  typedef typename DerivedV::Scalar Scalar;
-  typedef Eigen::Matrix<Scalar,Eigen::Dynamic,2> MatrixX2S;
   //MatrixX2S BV;
   //Eigen::MatrixXi BE;
   //igl::bounding_box(V,BV,BE);
@@ -37,7 +37,8 @@ IGL_INLINE void igl::triangle::cdt(
   Eigen::VectorXi _;
   igl::remove_duplicate_vertices(DerivedWV(WV),DerivedWE(WE),1e-10,WV,_,J,WE);
   // Remove degenerate edges
-  igl::slice_mask(DerivedWE(WE),(WE.array().col(0) != WE.array().col(1)).eval(),1,WE);
+  const Eigen::Array<bool,Eigen::Dynamic,1> keep = (WE.array().col(0) != WE.array().col(1));
+  WE = WE(keep,igl::placeholders::all).eval();
   // c flag must be present
   igl::triangle::triangulate(DerivedWV(WV),WE,DerivedWV(),flags,WV,WF);
   Eigen::VectorXi UJ;

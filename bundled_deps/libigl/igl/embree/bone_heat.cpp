@@ -11,7 +11,7 @@
 #include "../project_to_line_segment.h"
 #include "../cotmatrix.h"
 #include "../massmatrix.h"
-#include "../mat_min.h"
+#include "../min.h"
 #include <Eigen/Sparse>
 
 bool igl::embree::bone_heat(
@@ -23,8 +23,6 @@ bool igl::embree::bone_heat(
   const Eigen::MatrixXi & CE,
   Eigen::MatrixXd & W)
 {
-  using namespace std;
-  using namespace Eigen;
   assert(CE.rows() == 0 && "Cage edges not supported.");
   assert(C.cols() == V.cols() && "V and C should have same #cols");
   assert(BE.cols() == 2 && "BE should have #cols=2");
@@ -37,22 +35,22 @@ bool igl::embree::bone_heat(
   const int m = np + nb;
 
   // "double sided lighting"
-  MatrixXi FF;
+  Eigen::MatrixXi FF;
   FF.resize(F.rows()*2,F.cols());
   FF << F, F.rowwise().reverse();
   // Initialize intersector
   EmbreeIntersector ei;
   ei.init(V.cast<float>(),F.cast<int>());
 
-  typedef Matrix<bool,Dynamic,1> VectorXb;
-  typedef Matrix<bool,Dynamic,Dynamic> MatrixXb;
+  typedef Eigen::Matrix<bool ,Eigen::Dynamic,1> VectorXb;
+  typedef Eigen::Matrix<bool ,Eigen::Dynamic ,Eigen::Dynamic> MatrixXb;
   MatrixXb vis_mask(n,m);
   // Distances
-  MatrixXd D(n,m);
+  Eigen::MatrixXd D(n,m);
   // loop over points
   for(int j = 0;j<np;j++)
   {
-    const Vector3d p = C.row(P(j));
+    const Eigen::Vector3d p = C.row(P(j));
     D.col(j) = (V.rowwise()-p.transpose()).rowwise().norm();
     VectorXb vj;
     bone_visible(V,F,ei,p,p,vj);
@@ -62,9 +60,9 @@ bool igl::embree::bone_heat(
   // loop over bones
   for(int j = 0;j<nb;j++)
   {
-    const Vector3d s = C.row(BE(j,0));
-    const Vector3d d = C.row(BE(j,1));
-    VectorXd t,sqrD;
+    const Eigen::Vector3d s = C.row(BE(j,0));
+    const Eigen::Vector3d d = C.row(BE(j,1));
+    Eigen::VectorXd t,sqrD;
     project_to_line_segment(V,s,d,t,sqrD);
     D.col(np+j) = sqrD.array().sqrt();
     VectorXb vj;
@@ -72,16 +70,13 @@ bool igl::embree::bone_heat(
     vis_mask.col(np+j) = vj;
   }
 
-  if(CE.rows() > 0)
-  {
-    cerr<<"Error: Cage edges are not supported. Ignored."<<endl;
-  }
+  assert(CE.rows() == 0 && "Cage edges not supported.");
 
-  MatrixXd PP = MatrixXd::Zero(n,m);
-  VectorXd min_D;
-  VectorXd Hdiag = VectorXd::Zero(n);
-  VectorXi J;
-  mat_min(D,2,min_D,J);
+  Eigen::MatrixXd PP = Eigen::MatrixXd::Zero(n,m);
+  Eigen::VectorXd min_D;
+  Eigen::VectorXd Hdiag = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXi J;
+  igl::min(D,2,min_D,J);
   for(int i = 0;i<n;i++)
   {
     PP(i,J(i)) = 1;
@@ -91,22 +86,26 @@ bool igl::embree::bone_heat(
       Hdiag(i) = (hii>1e10?1e10:hii);
     }
   }
-  SparseMatrix<double> Q,L,M;
+  Eigen::SparseMatrix<double> Q,L,M;
   cotmatrix(V,F,L);
   massmatrix(V,F,MASSMATRIX_TYPE_DEFAULT,M);
   const auto & H = Hdiag.asDiagonal();
   Q = (-L+M*H);
-  SimplicialLLT <SparseMatrix<double > > llt;
+  Eigen::SimplicialLLT <Eigen::SparseMatrix<double > > llt;
   llt.compute(Q);
   switch(llt.info())
   {
     case Eigen::Success:
       break;
     case Eigen::NumericalIssue:
-      cerr<<"Error: Numerical issue."<<endl;
+#ifdef IGL_BONE_HEAT_DEBUG
+      std::cerr<<"Error: Numerical issue."<<std::endl;
+#endif
       return false;
     default:
-      cerr<<"Error: Other."<<endl;
+#ifdef IGL_BONE_HEAT_DEBUG
+      std::cerr<<"Error: Other."<<std::endl;
+#endif
       return false;
   }
 

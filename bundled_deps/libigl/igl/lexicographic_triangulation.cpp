@@ -9,7 +9,9 @@
 
 #include "lexicographic_triangulation.h"
 #include "sortrows.h"
+#include "PlainMatrix.h"
 
+#include <cassert>
 #include <vector>
 #include <list>
 
@@ -19,7 +21,7 @@ template<
   typename DerivedF
   >
 IGL_INLINE void igl::lexicographic_triangulation(
-    const Eigen::PlainObjectBase<DerivedP>& P,
+    const Eigen::MatrixBase<DerivedP>& P,
     Orient2D orient2D,
     Eigen::PlainObjectBase<DerivedF>& F)
 {
@@ -30,11 +32,12 @@ IGL_INLINE void igl::lexicographic_triangulation(
   }
 
   // Sort points in lexicographic order.
-  DerivedP ordered_P;
+  PlainMatrix<DerivedP> ordered_P;
   Eigen::VectorXi order;
   igl::sortrows(P, true, ordered_P, order);
 
-  std::vector<Eigen::Vector3i> faces;
+  using Vector3I = Eigen::Matrix<typename DerivedF::Scalar,3,1>;
+  std::vector<Vector3I> faces;
   std::list<int> boundary;
   const Scalar p0[] = {ordered_P(0, 0), ordered_P(0, 1)};
   const Scalar p1[] = {ordered_P(1, 0), ordered_P(1, 1)};
@@ -95,13 +98,12 @@ IGL_INLINE void igl::lexicographic_triangulation(
       for (auto itr=left_itr; itr!=right_itr; itr++) {
         if (itr == boundary.end()) itr = boundary.begin();
         if (itr == right_itr) break;
-        if (itr == left_itr || itr == right_itr) continue;
+        if (itr == left_itr) continue;
         itr = boundary.erase(itr);
         if (itr == boundary.begin()) {
             itr = boundary.end();
-        } else {
-            itr--;
         }
+        itr--;
       }
 
       if (right_itr == boundary.begin()) {
@@ -128,5 +130,5 @@ IGL_INLINE void igl::lexicographic_triangulation(
 
 
 #ifdef IGL_STATIC_LIBRARY
-template void igl::lexicographic_triangulation<Eigen::Matrix<double, -1, -1, 0, -1, -1>, short (*)(double const*, double const*, double const*), Eigen::Matrix<int, -1, -1, 0, -1, -1> >(Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, short (*)(double const*, double const*, double const*), Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&);
+template void igl::lexicographic_triangulation<Eigen::Matrix<double, -1, -1, 0, -1, -1>, short (*)(double const*, double const*, double const*), Eigen::Matrix<int, -1, -1, 0, -1, -1> >(Eigen::MatrixBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, short (*)(double const*, double const*, double const*), Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&);
 #endif

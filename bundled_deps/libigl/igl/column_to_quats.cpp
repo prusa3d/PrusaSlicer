@@ -11,7 +11,6 @@ IGL_INLINE bool igl::column_to_quats(
   std::vector<
     Eigen::Quaterniond,Eigen::aligned_allocator<Eigen::Quaterniond> > & vQ)
 {
-  using namespace Eigen;
   if(Q.size() % 4 != 0)
   {
     return false;
@@ -21,7 +20,7 @@ IGL_INLINE bool igl::column_to_quats(
   for(int q=0;q<nQ;q++)
   {
     // Constructor uses wxyz
-    vQ[q] = Quaterniond( Q(q*4+3), Q(q*4+0), Q(q*4+1), Q(q*4+2));
+    vQ[q] = Eigen::Quaterniond( Q(q*4+3), Q(q*4+0), Q(q*4+1), Q(q*4+2));
   }
   return true;
 }

@@ -8,28 +8,56 @@
 #ifndef IGL_QSLIM_H
 #define IGL_QSLIM_H
 #include "igl_inline.h"
+#include "decimate_callback_types.h"
 #include <Eigen/Core>
+#include <vector>
 namespace igl
 {
-
-  // Decimate (simplify) a triangle mesh in nD according to the paper
-  // "Simplifying Surfaces with Color and Texture using Quadric Error Metrics"
-  // by [Garland and Heckbert, 1987] (technically a followup to qslim). The
-  // mesh can have open boundaries but should be edge-manifold.
-  //
-  // Inputs:
-  //   V  #V by dim list of vertex positions. Assumes that vertices w
-  //   F  #F by 3 list of triangle indices into V
-  //   max_m  desired number of output faces
-  // Outputs:
-  //   U  #U by dim list of output vertex posistions (can be same ref as V)
-  //   G  #G by 3 list of output face indices into U (can be same ref as G)
-  //   J  #G list of indices into F of birth face
-  //   I  #U list of indices into V of birth vertices
+  /// Decimate (simplify) a triangle mesh in nD according to the paper
+  /// "Simplifying Surfaces with Color and Texture using Quadric Error Metrics"
+  /// by [Garland and Heckbert, 1987] (technically a followup to qslim). The
+  /// mesh can have open boundaries but should be edge-manifold.
+  ///
+  /// @param[in] V  #V by dim list of vertex positions. Assumes that vertices with
+  ///     infinite coordinates are "points at infinity" being used to close up
+  ///     boundary edges with faces. This allows special subspace quadrice for
+  ///     boundary edges: There should never be more than one "point at
+  ///     infinity" in a single triangle.
+  /// @param[in] F  #F by 3 list of triangle indices into V
+  /// @param[in] max_m  desired number of output faces
+  /// @param[in] block_intersections  whether to block intersections (see
+  ///   intersection_blocking_collapse_edge_callbacks)
+  /// @param[out] U  #U by dim list of output vertex posistions (can be same ref as V)
+  /// @param[out] G  #G by 3 list of output face indices into U (can be same ref as F)
+  /// @param[out] J  #G list of indices into F of birth face
+  /// @param[out] I  #U list of indices into V of birth vertices
   IGL_INLINE bool qslim(
     const Eigen::MatrixXd & V,
     const Eigen::MatrixXi & F,
-    const size_t max_m,
+    const int max_m,
+    const bool block_intersections,
+    Eigen::MatrixXd & U,
+    Eigen::MatrixXi & G,
+    Eigen::VectorXi & J,
+    Eigen::VectorXi & I);
+
+  /// \overload
+  ///
+  /// \brief Decimate with quadric error metrics while applying a list of
+  /// user-supplied callback decorators (e.g., igl::block_self_intersections,
+  /// igl::block_intersections_with_input, or a custom decorator). Each decorator
+  /// wraps the result of the previous, so they are cascaded in order.
+  ///
+  /// @param[in] decorators  list of pre/post-collapse callback decorators to
+  ///   cascade (may be empty)
+  ///
+  /// \see block_self_intersections, block_intersections_with_input,
+  ///   decimate_pre_post_collapse_callbacks_decorator
+  IGL_INLINE bool qslim(
+    const Eigen::MatrixXd & V,
+    const Eigen::MatrixXi & F,
+    const int max_m,
+    const std::vector<decimate_pre_post_collapse_callbacks_decorator> & decorators,
     Eigen::MatrixXd & U,
     Eigen::MatrixXi & G,
     Eigen::VectorXi & J,

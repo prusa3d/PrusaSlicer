@@ -16,3 +16,5 @@
 #else
 #  define IGL_INLINE
 #endif
+
+#include <cassert>

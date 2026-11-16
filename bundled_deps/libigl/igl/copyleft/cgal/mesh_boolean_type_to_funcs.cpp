@@ -1,6 +1,8 @@
 #include "mesh_boolean_type_to_funcs.h"
 #include "BinaryWindingNumberOperations.h"
 
+#include <cassert>
+
 IGL_INLINE void igl::copyleft::cgal::mesh_boolean_type_to_funcs(
   const MeshBooleanType & type,
   std::function<int(const Eigen::Matrix<int,1,Eigen::Dynamic>) >& wind_num_op,

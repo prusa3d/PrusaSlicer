@@ -55,8 +55,9 @@ std::vector<Node> sample_mesh(const indexed_triangle_set &its, double radius)
     Eigen::MatrixXi FI;
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
+    Eigen::MatrixXd P;
     to_eigen_mesh(its, V, F);
-    igl::random_points_on_mesh(N, V, F, B, FI);
+    igl::random_points_on_mesh(N, V, F, B, FI, P);
 
     ret.reserve(size_t(N));
     for (int i = 0; i < FI.size(); i++) {

@@ -49,7 +49,7 @@ void TriangleSelectorPainter::paint_spot(
     const Vec3f point  = m_inv_mesh_transform * position;
     const Vec3f origin = m_inv_mesh_transform * Vec3f(position.x(), position.y(), 0.f);
 
-    std::vector<igl::Hit> hits;
+    std::vector<igl::Hit<float>> hits;
     const Vec3f dir = (point - origin).normalized();
     if (AABBTreeIndirect::intersect_ray_all_hits(
             m_mesh.its.vertices,
@@ -61,7 +61,7 @@ void TriangleSelectorPainter::paint_spot(
         ))
     {
         for (int hit_idx = static_cast<int>(hits.size()) - 1; hit_idx >= 0; --hit_idx) {
-            const igl::Hit& hit = hits[hit_idx];
+            const igl::Hit<float>& hit = hits[hit_idx];
             const Vec3f pos     = origin + dir * hit.t;
 
             const Vec3f face_normal = TriangleMesh::its_face_normal(m_mesh.its, hit.id);

@@ -11,8 +11,7 @@
 template <typename Printable>
 IGL_INLINE bool igl::example_fun(const Printable & input)
 {
-  using namespace std;
-  cout<<"example_fun: "<<input<<endl;
+  std::cout<<"example_fun: "<<input<<std::endl;
   return true;
 }
 

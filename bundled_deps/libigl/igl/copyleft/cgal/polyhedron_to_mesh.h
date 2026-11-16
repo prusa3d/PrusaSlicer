@@ -16,15 +16,13 @@ namespace igl
   {
     namespace cgal
     {
-      // Convert a CGAL Polyhedron to a mesh (V,F)
-      //
-      // Templates:
-      //   Polyhedron  CGAL Polyhedron type (e.g. Polyhedron_3)
-      // Inputs:
-      //   poly  cgal polyhedron
-      // Outputs:
-      //   V  #V by 3 list of vertex positions
-      //   F  #F by 3 list of triangle indices
+      /// Convert a CGAL Polyhedron (assumed to be all triangles) to a mesh (V,F)
+      ///
+      /// @tparam Polyhedron  CGAL Polyhedron type (e.g. Polyhedron_3)
+      /// @param[in] poly  cgal polyhedron
+      /// @param[out] V  #V by 3 list of vertex positions
+      /// @param[out] F  #F by 3 list of triangle indices
+      ///
       template <
         typename Polyhedron,
         typename DerivedV,
@@ -33,6 +31,26 @@ namespace igl
         const Polyhedron & poly,
         Eigen::PlainObjectBase<DerivedV> & V,
         Eigen::PlainObjectBase<DerivedF> & F);
+      /// Convert a CGAL Polyhedron to a polygon mesh (V,I,C)
+      ///
+      /// @tparam Polyhedron  CGAL Polyhedron type (e.g. Polyhedron_3)
+      /// @param[in] poly  cgal polyhedron
+      /// @param[out] V  #V by 3 list of vertex positions
+      /// @param[out] I  #I vectorized list of polygon corner indices into rows of some matrix V
+      /// @param[out] C  #polygons+1 list of cumulative polygon sizes so that C(i+1)-C(i) =
+      ///     size of the ith polygon, and so I(C(i)) through I(C(i+1)-1) are the
+      ///     indices of the ith polygon
+      template <
+        typename Polyhedron,
+        typename DerivedV,
+        typename DerivedI,
+        typename DerivedC
+        >
+      IGL_INLINE void polyhedron_to_mesh(
+        const Polyhedron & poly,
+        Eigen::PlainObjectBase<DerivedV> & V,
+        Eigen::PlainObjectBase<DerivedI> & I,
+        Eigen::PlainObjectBase<DerivedC> & C);
     }
   }
 }

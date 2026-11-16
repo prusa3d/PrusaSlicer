@@ -2,6 +2,8 @@
 #include "for_each.h"
 #include "any.h"
 
+#include <cassert>
+
 template <typename AType, typename DerivedI>
 IGL_INLINE void igl::find_zero(
   const Eigen::SparseMatrix<AType> & A,
@@ -38,7 +40,7 @@ IGL_INLINE void igl::find_zero(
       }
     }
   };
-  for_each(A,func);
+  igl::for_each(A,func);
 }
 
 #ifdef IGL_STATIC_LIBRARY

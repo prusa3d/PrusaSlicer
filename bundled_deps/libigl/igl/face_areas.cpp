@@ -8,6 +8,7 @@
 #include "face_areas.h"
 #include "edge_lengths.h"
 #include "doublearea.h"
+#include <cassert>
 
 template <typename DerivedV, typename DerivedT, typename DerivedA>
 IGL_INLINE void igl::face_areas(
@@ -36,13 +37,12 @@ IGL_INLINE void igl::face_areas(
   const typename DerivedL::Scalar doublearea_nan_replacement,
   Eigen::PlainObjectBase<DerivedA>& A)
 {
-  using namespace Eigen;
   assert(L.cols() == 6);
   const int m = L.rows();
   // (unsigned) face Areas (opposite vertices: 1 2 3 4)
-  Matrix<typename DerivedA::Scalar,Dynamic,1> 
+  Eigen::Matrix<typename DerivedA::Scalar ,Eigen::Dynamic,1>
     A0(m,1), A1(m,1), A2(m,1), A3(m,1);
-  Matrix<typename DerivedA::Scalar,Dynamic,3> 
+  Eigen::Matrix<typename DerivedA::Scalar ,Eigen::Dynamic,3>
     L0(m,3), L1(m,3), L2(m,3), L3(m,3);
   L0<<L.col(1),L.col(2),L.col(3);
   L1<<L.col(0),L.col(2),L.col(4);

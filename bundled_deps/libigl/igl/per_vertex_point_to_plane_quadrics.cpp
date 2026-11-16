@@ -21,7 +21,6 @@ IGL_INLINE void igl::per_vertex_point_to_plane_quadrics(
   std::vector<
     std::tuple<Eigen::MatrixXd,Eigen::RowVectorXd,double> > & quadrics)
 {
-  using namespace std;
   typedef std::tuple<Eigen::MatrixXd,Eigen::RowVectorXd,double> Quadric;
   const int dim = V.cols();
   //// Quadrics per face
@@ -143,7 +142,7 @@ IGL_INLINE void igl::per_vertex_point_to_plane_quadrics(
       assert(N.rows() == ev.size()-2);
       Eigen::MatrixXd S(N.rows()+1,ev.size());
       S<<ev,N;
-      Quadric boundary_edge_quadric = subspace_quadric(p,S,length);
+      Quadric boundary_edge_quadric = subspace_quadric(p,S,length*length);
       for(int c = 0;c<3;c++)
       {
         if(c != infinite_corner)

@@ -9,11 +9,12 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <cassert>
 #include <vector>
 
-#include <igl/cotmatrix_entries.h>
-#include <igl/cotmatrix.h>
-#include <igl/vertex_triangle_adjacency.h>
+#include "cotmatrix_entries.h"
+#include "cotmatrix.h"
+#include "vertex_triangle_adjacency.h"
 
 namespace igl
 {
@@ -159,7 +160,6 @@ IGL_INLINE void Frame_field_deformer::reset_opt()
 // precomputation of all components
 IGL_INLINE void Frame_field_deformer::precompute_opt()
 {
-  using namespace Eigen;
 	nfree = V.rows() - fixed;						    // free vertices (at the beginning ov m.V) - global
   nconst = V.rows()-nfree;						// #constrained vertices
   igl::vertex_triangle_adjacency(V,F,VT,VTi);                // compute vertex to face relationship
@@ -168,10 +168,10 @@ IGL_INLINE void Frame_field_deformer::precompute_opt()
 
   igl::cotmatrix(V,F,L);
 
-	SparseMatrix<double> MA;						// internal matrix for ARAP-warping energy
-	MatrixXd LfcVc;										  // RHS (partial) for ARAP-warping energy
-	SparseMatrix<double> MS;						// internal matrix for smoothing energy
-	MatrixXd bS;										    // RHS (full) for smoothing energy
+	Eigen::SparseMatrix<double> MA;						// internal matrix for ARAP-warping energy
+	Eigen::MatrixXd LfcVc;										  // RHS (partial) for ARAP-warping energy
+	Eigen::SparseMatrix<double> MS;						// internal matrix for smoothing energy
+	Eigen::MatrixXd bS;										    // RHS (full) for smoothing energy
 
 	precompute_ARAP(MA,LfcVc);					// precompute terms for the ARAP-warp part
 	precompute_SMOOTH(MS,bS);						// precompute terms for the smoothing part
@@ -190,32 +190,30 @@ IGL_INLINE void Frame_field_deformer::precompute_opt()
 
 IGL_INLINE void Frame_field_deformer::precompute_ARAP(Eigen::SparseMatrix<double> & Lff, Eigen::MatrixXd & LfcVc)
 {
-  using namespace Eigen;
 	fprintf(stdout,"Precomputing ARAP terms\n");
-	SparseMatrix<double> LL = -4*L;
-	Lff = SparseMatrix<double>(nfree,nfree);
+	Eigen::SparseMatrix<double> LL = -4*L;
+	Lff = Eigen::SparseMatrix<double>(nfree,nfree);
   extractBlock(LL,0,0,nfree,nfree,Lff);
-	SparseMatrix<double> Lfc = SparseMatrix<double>(nfree,nconst);
+	Eigen::SparseMatrix<double> Lfc = Eigen::SparseMatrix<double>(nfree,nconst);
   extractBlock(LL,0,nfree,nfree,nconst,Lfc);
 	LfcVc = - Lfc * V_w.block(nfree,0,nconst,3);
 }
 
 IGL_INLINE void Frame_field_deformer::precompute_SMOOTH(Eigen::SparseMatrix<double> & MS, Eigen::MatrixXd & bS)
 {
-  using namespace Eigen;
 	fprintf(stdout,"Precomputing SMOOTH terms\n");
 
-	SparseMatrix<double> LL = 4*L*L;
+	Eigen::SparseMatrix<double> LL = 4*L*L;
 
   // top-left
-	MS = SparseMatrix<double>(nfree,nfree);
+	MS = Eigen::SparseMatrix<double>(nfree,nfree);
   extractBlock(LL,0,0,nfree,nfree,MS);
 
   // top-right
-	SparseMatrix<double> Mfc = SparseMatrix<double>(nfree,nconst);
+	Eigen::SparseMatrix<double> Mfc = Eigen::SparseMatrix<double>(nfree,nconst);
   extractBlock(LL,0,nfree,nfree,nconst,Mfc);
 
-	MatrixXd MfcVc = Mfc * V_w.block(nfree,0,nconst,3);
+	Eigen::MatrixXd MfcVc = Mfc * V_w.block(nfree,0,nconst,3);
 	bS = (LL*V).block(0,0,nfree,3)-MfcVc;
 
 }
@@ -234,8 +232,7 @@ IGL_INLINE void Frame_field_deformer::precompute_SMOOTH(Eigen::SparseMatrix<doub
 
 IGL_INLINE void Frame_field_deformer::compute_optimal_rotations()
 {
-  using namespace Eigen;
-  Matrix<double,3,3> r,S,P,PP,D;
+  Eigen::Matrix<double,3,3> r,S,P,PP,D;
 
   for (int i=0;i<F.rows();i++)
 	{
@@ -257,9 +254,9 @@ IGL_INLINE void Frame_field_deformer::compute_optimal_rotations()
     0,      0,      C(i,1);
 
 		S = PP*D*P.transpose();
-		Eigen::JacobiSVD<Matrix<double,3,3> > svd(S, Eigen::ComputeFullU | Eigen::ComputeFullV );
-		Matrix<double,3,3>  su = svd.matrixU();
-		Matrix<double,3,3>  sv = svd.matrixV();
+		Eigen::JacobiSVD<Eigen::Matrix<double,3,3> > svd(S, Eigen::ComputeFullU | Eigen::ComputeFullV );
+		Eigen::Matrix<double,3,3>  su = svd.matrixU();
+		Eigen::Matrix<double,3,3>  sv = svd.matrixV();
 		r = su*sv.transpose();
 
 		if (r.determinant()<0)  // correct reflections
@@ -273,10 +270,9 @@ IGL_INLINE void Frame_field_deformer::compute_optimal_rotations()
 
 IGL_INLINE void Frame_field_deformer::compute_optimal_positions()
 {
-  using namespace Eigen;
 	// compute variable RHS of ARAP-warp part of the system
-  MatrixXd b(nfree,3);          // fx3 known term of the system
-	MatrixXd X;										// result
+  Eigen::MatrixXd b(nfree,3);          // fx3 known term of the system
+	Eigen::MatrixXd X;										// result
   int t;		  									// triangles incident to edge (i,j)
 	int vi,i1,i2;									// index of vertex i wrt tri t0
 
@@ -312,8 +308,7 @@ IGL_INLINE void Frame_field_deformer::compute_optimal_positions()
 
   IGL_INLINE void Frame_field_deformer::computeXField(std::vector< Eigen::Matrix<double,3,2> > & XF)
 {
-  using namespace Eigen;
-  Matrix<double,3,3> P,PP,DG;
+  Eigen::Matrix<double,3,3> P,PP,DG;
 	XF.resize(F.rows());
 
   for (int i=0;i<F.rows();i++)
@@ -341,27 +336,25 @@ IGL_INLINE void Frame_field_deformer::compute_optimal_positions()
 // computes in WW the ideal warp at each tri to make the frame field a cross
   IGL_INLINE void Frame_field_deformer::compute_idealWarp(std::vector< Eigen::Matrix<double,3,3> > & WW)
 {
-  using namespace Eigen;
-
   WW.resize(F.rows());
 	for (int i=0;i<(int)FF.size();i++)
 	{
-		Vector3d v0,v1,v2;
+		Eigen::Vector3d v0,v1,v2;
 		v0 = FF[i].col(0);
 		v1 = FF[i].col(1);
 		v2=v0.cross(v1); v2.normalize();			// normal
 
-		Matrix3d A,AI;								// compute affine map A that brings:
+		Eigen::Matrix3d A,AI;								// compute affine map A that brings:
 		A <<    v0[0], v1[0], v2[0],				//	first vector of FF to x unary vector
     v0[1], v1[1], v2[1],				//	second vector of FF to xy plane
     v0[2], v1[2], v2[2];				//	triangle normal to z unary vector
 		AI = A.inverse();
 
 		// polar decomposition to discard rotational component (unnecessary but makes it easier)
-		Eigen::JacobiSVD<Matrix<double,3,3> > svd(AI, Eigen::ComputeFullU | Eigen::ComputeFullV );
+		Eigen::JacobiSVD<Eigen::Matrix<double,3,3> > svd(AI, Eigen::ComputeFullU | Eigen::ComputeFullV );
 		//Matrix<double,3,3>  au = svd.matrixU();
-		Matrix<double,3,3>  av = svd.matrixV();
-		DiagonalMatrix<double,3>	as(svd.singularValues());
+		Eigen::Matrix<double,3,3>  av = svd.matrixV();
+		Eigen::DiagonalMatrix<double,3>	as(svd.singularValues());
 		WW[i] = av*as*av.transpose();
 	}
 }
@@ -381,7 +374,6 @@ IGL_INLINE void igl::frame_field_deformer(
   const double           lambda,
   const bool             perturb_initial_guess)
 {
-  using namespace Eigen;
   // Solvers
   Frame_field_deformer deformer;
 
