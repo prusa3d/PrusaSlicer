@@ -1,6 +1,6 @@
 #include "Slic3r/App/AppConfigInteractor.hpp"
 
-#include "Slic3r/Biz/Network/ServiceConfig.hpp"
+#include "Slic3r/App/AppConfig.hpp"
 
 namespace Slic3r::App {
 
@@ -41,14 +41,14 @@ void AppConfigInteractor::set_item_value(
                                                 { l->on_app_config_changed(item_name); });
 }
 
-void AppConfigInteractor::set_service_mode(Biz::Network::ServiceMode mode)
+void AppConfigInteractor::set_account_service(AccountService service)
 {
-    Domain::ConfigValue value = *m_app_config_cbi.find("connect_mode");
-    if (value.get<Biz::Network::ServiceMode>() == mode) {
+    Domain::ConfigValue value = *m_app_config_cbi.find("account_service");
+    if (service == AccountService::None || value.get<AccountService>() == service) {
         return;
     }
-    value.set(mode);
-    set_item_value("connect_mode", value);
+    value.set(service);
+    set_item_value("account_service", value);
 }
 
 void AppConfigInteractor::toggle_favorite_param(const std::string& param)

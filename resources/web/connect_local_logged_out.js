@@ -7,7 +7,7 @@
   window.connectLocalLoggedOut = {
     init: function (data) {
       var t = data.texts || {};
-      connectPages.setModeTexts(t);
+      connectPages.setModeTexts(t, data.showSwitch);
       setText('title', t.title);
       setText('intro', t.intro);
       setText('login', t.login);

@@ -20,7 +20,7 @@ TEST_CASE("Tokens are stored separately per service mode", "[user_account]")
     }
     REQUIRE(
         TokenStore::
-            save_offline_credential({"offline-access", "cred-1", 0, "http://192.168.1.10:8080"})
+            save_connect_local_credential({"offline-access", "cred-1", 0, "http://192.168.1.10:8080"})
     );
 
     CHECK(secrets->secrets.at("PrusaAccount").first == "tokens");
@@ -30,14 +30,13 @@ TEST_CASE("Tokens are stored separately per service mode", "[user_account]")
     REQUIRE(TokenStore::load_tokens(data));
     CHECK(data.access_token == "online-access");
 
-    // Logging out of Prusa Account keeps the Connect Local credential.
     TokenStore::reset();
-    REQUIRE(TokenStore::read_offline_credential().credential);
-    CHECK(TokenStore::read_offline_credential().credential->token == "offline-access");
+    REQUIRE(TokenStore::read_connect_local_credential().credential);
+    CHECK(TokenStore::read_connect_local_credential().credential->token == "offline-access");
 
     TokenStore::reset_all_modes();
     data = {};
     TokenStore::load_tokens(data);
     CHECK(data.access_token.empty());
-    CHECK(TokenStore::read_offline_credential().status == TokenStore::StoreReadStatus::Empty);
+    CHECK(TokenStore::read_connect_local_credential().status == TokenStore::StoreReadStatus::Empty);
 }

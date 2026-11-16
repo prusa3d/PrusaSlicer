@@ -9,8 +9,9 @@
 #import <Security/Security.h>
 #import <objc/runtime.h>
 
-#include "Slic3r/App/ConnectLocalTrust.hpp"
+#include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/Biz/Network/ServerTrust.hpp"
+#include "Slic3r/Biz/Network/ServerTrustStore.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Log.hpp"
 
@@ -154,7 +155,7 @@ std::vector<std::string> certificate_chain(SecTrustRef trust)
     }
     const std::string host = space.host != nil ? std::string([space.host UTF8String]) : "";
     const std::optional<Slic3r::Biz::Network::ServerTrust> trust =
-        Slic3r::App::ConnectLocalTrust::trust_for_host(host, int(space.port));
+        Slic3r::App::AppServices::instance().server_trust_store().trust_for_host(host, int(space.port));
     if (!trust) {
         // Not the Connect Local server, or its certificate is checked by the system.
         [self passOn:webView challenge:challenge completionHandler:completionHandler];
@@ -225,12 +226,12 @@ void remove_slicer_navigation_delegate(WKWebView* backend)
 }
 
 /**
- * @brief The Connect Local trust is needed in the offline mode only: online, a web view gets the
- * delegate only for credentials, as before Connect Local.
+ * @brief The server trust is needed with a Connect Local server only: without one, a web view
+ * gets the delegate only for credentials, as before Connect Local.
  */
 bool needs_server_trust()
 {
-    return Slic3r::Biz::Network::ServiceConfig::instance().is_offline();
+    return !Slic3r::Biz::Network::ServiceConfig::instance().connect_local_server_url().empty();
 }
 
 } // namespace

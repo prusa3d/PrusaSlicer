@@ -26,7 +26,7 @@
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/MenuManager.hpp"
 #include "Slic3r/App/Browser/BrowserLogicPrintables.hpp"
-#include "Slic3r/App/Browser/BrowserLogicConnectPage.hpp"
+#include "Slic3r/App/Browser/AbstractConnectPageLogic.hpp"
 #include "Slic3r/App/Browser/BrowserLogicLogInRedirect.hpp"
 #include "Slic3r/App/Browser/BrowserLogicPhysicalPrinter.hpp"
 
@@ -44,7 +44,8 @@
 #include <Slic3r/Biz/Platform/Termination.hpp>
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
-#include "Slic3r/App/ConnectLocalTrust.hpp"
+#include "Slic3r/App/AppConfig.hpp"
+#include "Slic3r/App/Browser/ConnectLocalSetupLogic.hpp"
 
 #include <wx/panel.h>
 #include <wx/notebook.h>
@@ -114,6 +115,7 @@ MainFrame::MainFrame(
     SetForegroundColour(config->get_label_clr_default());
 
     AppServices::instance().app_config_interactor().add_listener<IAppConfigChangedListener>(this);
+    AppServices::instance().account_service_switcher().add_listener<IAccountServiceListener>(this);
     project_interactor.physical_printer_interactor().add_listener<Biz::PhysicalPrinter::IPhysicalPrinterChangedListener>(this);
 
     localization().add_listener<ILanguageChangedListener>(this);
@@ -137,21 +139,28 @@ MainFrame::MainFrame(
     m_tabs_bar_menus.set_account_menu_callbacks(
         [this, &project_interactor]()
         {
-            if (!project_interactor.user_account_interactor().is_logged_in()) {
-                Browser::show_log_in_dialog(project_interactor);
-
-            } else {
+            if (project_interactor.user_account_interactor().is_logged_in()) {
                 project_interactor.user_account_interactor().do_log_out();
+            } else if (!AppServices::instance().app_config().is_account_usable()) {
+                show_connect_server_setup();
+            } else {
+                Browser::show_log_in_dialog(project_interactor);
             }
         },
         [&project_interactor]()
         {
+            const AppConfig& app_config = AppServices::instance().app_config();
+            const bool connect_local       = app_config.account_service() == AccountService::ConnectLocal;
             return TabsBarMenus::UserAccountInfo{
                 project_interactor.user_account_interactor().is_logged_in(),
                 project_interactor.user_account_interactor().username(),
-                project_interactor.user_account_interactor().avatar()
+                project_interactor.user_account_interactor().avatar(),
+                connect_local,
+                !connect_local || app_config.is_account_usable(),
+                app_config.are_both_account_services_enabled()
             };
-        }
+        },
+        [this](TabsBarMenus::AccountState state) { choose_account_state(state); }
     );
 
     project_interactor.user_account_interactor().set_update_menu_callback(
@@ -306,6 +315,7 @@ MainFrame::MainFrame(
 
 MainFrame::~MainFrame()
 {
+    AppServices::instance().account_service_switcher().remove_listener<IAccountServiceListener>(this);
 #ifdef USE_NATIVE_MENU
     if (m_canvas) {
         m_canvas->remove_listener<Platform::IInputTextFocusChangedListener>(
@@ -345,21 +355,6 @@ void MainFrame::on_app_config_changed(const std::string& key)
         {
             update_printables_left_bar(printables_enabled);
         }
-    }
-
-    if (key == "enable_prusa_account") {
-        if (bool acc_enabled = AppServices::instance().app_config().is_prusa_account_enabled();
-            acc_enabled != m_project_interactor.user_account_interactor().is_enabled())
-        {
-            m_project_interactor.user_account_interactor().init(acc_enabled);
-        }
-        // The tab does not depend on the account being usable (offline mode without a server
-        // shows its setup page), so it follows the setting directly.
-        update_printers_left_bar();
-    }
-
-    if (key == "connect_mode" || key == "connect_local_url") {
-        on_service_mode_settings_changed();
     }
 
     if (key == "enable_preset_update") {
@@ -633,12 +628,16 @@ static size_t get_tab_insert_index(LeftBar* left_bar, LeftBarTabs page_id)
 
 void MainFrame::init_printers_page(Biz::ProjectInteractor& project_interactor)
 {
-    if (!AppServices::instance().app_config().is_connect_tab_enabled()) {
+    if (!AppServices::instance().app_config().is_account_service_enabled()) {
         return;
     }
     assert(!m_printers_page_added);
-    std::unique_ptr<App::Browser::BrowserLogicConnectPage> logic = std::make_unique<App::Browser::BrowserLogicConnectPage>(project_interactor);
-    WX::WebView::AbstractWebViewPanel* webview_panel = WebView::new_web_view_panel(m_left_bar, static_cast<int>(LeftBarTabs::Printers), std::move(logic), false);
+    WX::WebView::AbstractWebViewPanel* webview_panel = WebView::new_web_view_panel(
+        m_left_bar,
+        static_cast<int>(LeftBarTabs::Printers),
+        App::Browser::make_connect_page_logic(project_interactor),
+        false
+    );
     project_interactor.user_account_interactor().add_listener<Biz::UserAccount::IUserAccountListener>(webview_panel);
     m_left_bar->InsertNewPage(get_tab_insert_index(m_left_bar, LeftBarTabs::Printers), webview_panel, WX::_L("Connect"), "lb_printers");
     webview_panel->set_switch_left_tab_fn(std::bind(&MainFrame::switch_left_tab, this, std::placeholders::_1, std::placeholders::_2));
@@ -740,54 +739,107 @@ void MainFrame::update_printables_left_bar(bool printables_enabled)
     ensure_slicing_page_selected();
 }
 
-void MainFrame::on_service_mode_settings_changed()
+void MainFrame::on_account_service_applied(const AccountServiceChange& change)
 {
-    using Biz::Network::ServiceConfig;
-    using Biz::Network::ServiceMode;
+    const bool had_printers_page = m_printers_page_added;
+    update_printers_left_bar();
+    if (had_printers_page && m_printers_page_added && m_printers_panel) {
+        if (change.service_changed) {
+            CallAfter([this]() { recreate_printers_page(); });
+        } else if (change.enabled_services_changed
+            && !m_project_interactor.user_account_interactor().is_logged_in())
+        {
+            m_printers_panel->reload_default_page();
+        }
+    }
+    m_left_bar->ShowUserAccount(AppServices::instance().app_config().is_account_service_enabled());
+    m_tabs_bar_menus.UpdateAccountMenu();
+}
 
-    const AppConfig& app_config         = AppServices::instance().app_config();
-    const ServiceConfig& service_config = ServiceConfig::instance();
+void MainFrame::choose_account_state(TabsBarMenus::AccountState state)
+{
+    AccountServiceSwitcher& switcher = AppServices::instance().account_service_switcher();
 
-    const ServiceMode new_mode   = app_config.service_mode();
-    const std::string new_server = new_mode == ServiceMode::Offline ?
-        ServiceConfig::normalize_offline_server_url(app_config.connect_local_url())
-            .value_or(std::string()) :
-        std::string();
-    if (new_mode == service_config.mode() && new_server == service_config.offline_server_url()) {
-        // E.g. the server URL edited while online, or only its formatting changed.
+    switch (state) {
+    case TabsBarMenus::AccountState::SignedOut:
+        if (m_project_interactor.user_account_interactor().is_logged_in()) {
+            m_project_interactor.user_account_interactor().do_log_out();
+        }
+        break;
+    case TabsBarMenus::AccountState::PrusaAccount:
+        if (switcher.choose(AccountService::PrusaAccount)) {
+            CallAfter(
+                [this]()
+                {
+                    const AppConfig& app_config = AppServices::instance().app_config();
+                    if (app_config.account_service() == AccountService::PrusaAccount
+                        && !m_project_interactor.user_account_interactor().is_logged_in())
+                    {
+                        Browser::show_log_in_dialog(m_project_interactor);
+                    }
+                }
+            );
+        }
+        break;
+    case TabsBarMenus::AccountState::ConnectLocal:
+        if (switcher.choose(AccountService::ConnectLocal)) {
+            CallAfter([this]() { switch_left_tab(LeftBarTabs::Printers, std::string()); });
+        }
+        break;
+    }
+    m_tabs_bar_menus.UpdateAccountMenu();
+}
+
+void MainFrame::show_connect_server_setup()
+{
+    if (!m_printers_page_added || !m_printers_panel) {
         return;
     }
-
-    // The trust of a server certificate belongs to that server only.
-    ConnectLocalTrust::forget_if_stale();
-
-    // Tokens belong to one server: log out while the old URLs are still active, apply the new
-    // mode, then start the account against the new server. The Connect tab stays, it only
-    // reloads its page (the setup page when offline without a server).
-    m_project_interactor.user_account_interactor().restart(
-        app_config.is_prusa_account_enabled(),
-        [&app_config]() { app_config.apply_service_mode(); }
+    switch_left_tab(
+        LeftBarTabs::Printers,
+        std::string(Browser::ConnectLocalSetupLogic::SETUP_REQUEST)
     );
+}
 
-    if (m_printers_panel) {
-        // After the current event: this may run from a message of that very page.
-        WX::WebView::AbstractWebViewPanel* panel = m_printers_panel;
-        panel->CallAfter([panel]() { panel->reload_default_page(); });
+void MainFrame::remove_printers_page()
+{
+    ASSERT(m_printers_page_added && m_printers_panel);
+    WX::WebView::AbstractWebViewPanel* panel = m_printers_panel;
+    m_project_interactor.user_account_interactor()
+        .remove_listener<Biz::UserAccount::IUserAccountListener>(panel);
+    remove_left_bar_page(LeftBarTabs::Printers);
+    m_printers_page_added = false;
+    m_printers_panel      = nullptr;
+    panel->destroy_when_safe();
+}
+
+void MainFrame::recreate_printers_page()
+{
+    ASSERT(m_left_bar);
+
+    if (!m_printers_page_added) {
+        return;
     }
+    const wxWindow* current_page = m_left_bar->GetCurrentPage();
+    const LeftBarTabs current_tab =
+        current_page ? static_cast<LeftBarTabs>(current_page->GetId()) : LeftBarTabs::Slicing;
+
+    remove_printers_page();
+    init_printers_page(m_project_interactor);
+    switch_left_tab(current_tab, std::string());
 }
 
 void MainFrame::update_printers_left_bar()
 {
     ASSERT(m_left_bar);
 
-    const bool wanted = AppServices::instance().app_config().is_connect_tab_enabled();
+    const bool wanted = AppServices::instance().app_config().is_account_service_enabled();
     if (m_printers_page_added && !wanted) {
-        remove_left_bar_page(LeftBarTabs::Printers);
-        m_printers_page_added = false;
-        m_printers_panel      = nullptr;
+        remove_printers_page();
         ensure_slicing_page_selected();
     } else if (!m_printers_page_added && wanted) {
         init_printers_page(m_project_interactor);
+        ensure_slicing_page_selected();
     }
 }
 
@@ -795,10 +847,9 @@ void MainFrame::on_user_account_enabled_state_changed(bool is_enabled)
 {
     ASSERT(m_left_bar);
 
-    // The Connect tab follows enable_prusa_account, not whether the account can reach a server.
     update_printers_left_bar();
 
-    m_left_bar->ShowUserAccount(is_enabled);
+    m_left_bar->ShowUserAccount(AppServices::instance().app_config().is_account_service_enabled());
 }
 
 void MainFrame::on_user_account_id_success(bool is_refresh, const std::string& username)
@@ -821,6 +872,10 @@ void MainFrame::on_selected_physical_printer_changed()
 
     bool show_physicial_printer_page =
         m_project_interactor.physical_printer_interactor().is_printer_upload_selected();
+    const wxWindow* shown_page             = m_left_bar->GetCurrentPage();
+    const bool physical_printer_page_shown = m_physical_printer_page_added
+        && shown_page
+        && shown_page->GetId() == static_cast<wxWindowID>(LeftBarTabs::PhysicalPrinter);
 
     if (m_physical_printer_page_added) {
         remove_left_bar_page(LeftBarTabs::PhysicalPrinter);
@@ -831,7 +886,9 @@ void MainFrame::on_selected_physical_printer_changed()
         init_physical_printer_page(m_project_interactor);
     }
 
-    ensure_slicing_page_selected();
+    if (physical_printer_page_shown) {
+        ensure_slicing_page_selected();
+    }
 }
 
 void MainFrame::on_menu_updated()
@@ -857,6 +914,13 @@ void MainFrame::switch_left_tab(LeftBarTabs id, const std::string& data)
         WebView::AbstractWebViewPanel* webview_panel =
             dynamic_cast<WebView::AbstractWebViewPanel*>(m_left_bar->GetPage(page_index));
         webview_panel->set_next_show_url(data);
+        if (id == LeftBarTabs::Printers
+            && !data.empty()
+            && m_left_bar->GetCurrentPage() == webview_panel)
+        {
+            webview_panel->reload_default_page();
+            return;
+        }
     }
     m_left_bar->SetSelection(page_index);
 }

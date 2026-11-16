@@ -99,8 +99,6 @@ void UserAccountSession::do_clear(bool notify_owner)
     ++m_session_epoch;
     {
         std::lock_guard<std::mutex> lock(m_session_mutex);
-        // Cancels the request in flight. The queue is emptied at once, so the next action picked
-        // was enqueued after this logout and is not cancelled (see process_action_queue_inner()).
         m_global_cancel              = true;
         m_cancel_ends_at_next_action = true;
         m_priority_action_queue.clear();

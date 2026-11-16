@@ -1,7 +1,8 @@
 #include "Slic3r/App/Browser/BrowserLogicConnectLocalLogIn.hpp"
 
-#include "Slic3r/App/ConnectLocalTrust.hpp"
+#include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/Browser/BrowserCookie.hpp"
+#include "Slic3r/Biz/Network/ServerTrustStore.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/JsonForScript.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
@@ -66,21 +67,40 @@ BrowserLogicConnectLocalLogIn::BrowserLogicConnectLocalLogIn(
     m_user_account(user_account)
 {
     set_title("Sign in");
+    m_user_account.add_listener<Biz::UserAccount::IUserAccountListener>(&m_pairing_events);
 }
 
 BrowserLogicConnectLocalLogIn::~BrowserLogicConnectLocalLogIn()
 {
+    m_user_account.remove_listener<Biz::UserAccount::IUserAccountListener>(&m_pairing_events);
     if (m_state != State::Done) {
-        // Closed without signing in, whatever way: the pairing would go on in the background.
         m_user_account.cancel_pairing();
     }
+}
+
+void BrowserLogicConnectLocalLogIn::PairingEvents::
+    on_user_account_pairing_ready(const std::string& page_url, const std::string& user_code)
+{
+    m_logic.push_commands(m_logic.on_pairing_ready(page_url, user_code));
+}
+
+void BrowserLogicConnectLocalLogIn::PairingEvents::on_user_account_pairing_failed(
+    Biz::UserAccount::PairingFailure failure
+)
+{
+    m_logic.push_commands(m_logic.on_pairing_failed(failure));
+}
+
+void BrowserLogicConnectLocalLogIn::PairingEvents::on_user_account_pairing_approved()
+{
+    m_logic.push_commands(m_logic.on_pairing_approved());
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::page_init_commands() const
 {
     const nlohmann::json texts = {
-        {"opening", Biz::_u8L("Connecting to your Prusa Connect (on-premise) server…")},
-        {"waitingTitle", Biz::_u8L("Approve PrusaSlicer on your Prusa Connect (on-premise) server")},
+        {"opening", Biz::_u8L("Connecting to your Prusa Connect on-premise server…")},
+        {"waitingTitle", Biz::_u8L("Approve PrusaSlicer on your Prusa Connect on-premise server")},
         {"waitingHint", Biz::_u8L("Sign in on the server and approve this code:")},
         {"waitingStatus", Biz::_u8L("Waiting for approval…")},
         {"openInBrowser", Biz::_u8L("Open in browser")},
@@ -129,8 +149,6 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::page_state_comma
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::take_session_cookie_deletion()
 {
-    // Only the session of the approval page this dialog loaded, at most once, and never once the
-    // account is signed in: the Connect tab's page session has the same cookie name.
     if (!std::exchange(m_session_cookie_pending, false) || m_user_account.is_logged_in()) {
         return {};
     }
@@ -138,15 +156,13 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::take_session_coo
         {BrowserLogicCommandType::DeleteCookie,
          cookie_command_data(
              CONNECT_LOCAL_SESSION_COOKIE,
-             Biz::Network::ServiceConfig::instance().offline_server_url()
+             Biz::Network::ServiceConfig::instance().connect_local_server_url()
          )}
     };
 }
 
-std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::on_user_account_pairing_approved()
+std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::on_pairing_approved()
 {
-    // The approval page is done with. Its session goes now, before the account loads and the
-    // Connect tab opens its own page session under the same cookie name.
     return take_session_cookie_deletion();
 }
 
@@ -188,16 +204,13 @@ BrowserLogicConnectLocalLogIn::show_waiting(const std::string& note)
 void BrowserLogicConnectLocalLogIn::request_pairing()
 {
     m_state = State::Starting;
-    // Not from within a webview event: the pairing may fail right away, and its commands must
-    // not mix with those of the event.
     Biz::Platform::PlatformServices::instance().main_thread_dispatcher().dispatch_on_main_thread(
-        [alive = std::weak_ptr<char>(m_alive), this]()
+        [alive = m_lifetime.token(), this]()
         {
             if (alive.expired() || m_state != State::Starting) {
                 return;
             }
             if (m_user_account.is_logged_in()) {
-                // Signed in meanwhile (e.g. by another instance): nothing to pair.
                 m_state = State::Done;
                 push_commands({{BrowserLogicCommandType::EndModalOK, {}}});
                 return;
@@ -208,7 +221,7 @@ void BrowserLogicConnectLocalLogIn::request_pairing()
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::
-    on_user_account_pairing_ready(const std::string& page_url, const std::string& user_code)
+    on_pairing_ready(const std::string& page_url, const std::string& user_code)
 {
     if (m_state != State::Starting) {
         return {};
@@ -235,16 +248,13 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::
     return {{BrowserLogicCommandType::LoadURL, m_pairing_url}};
 }
 
-std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::on_user_account_pairing_failed(
+std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::on_pairing_failed(
     Biz::UserAccount::PairingFailure failure
 )
 {
-    // A final error stays; one that waits for the account in the background may be followed by
-    // the final outcome.
     if (m_state == State::Done || (m_state == State::Failed && m_error_retry)) {
         return {};
     }
-    // Trying again would only start another pairing while the approved one is still being loaded.
     const bool can_retry = failure != Biz::UserAccount::PairingFailure::AccountUnavailable;
     std::vector<BrowserLogicCommand> commands = take_session_cookie_deletion();
     std::vector<BrowserLogicCommand> error    = show_error(failure_reason(failure), can_retry);
@@ -255,20 +265,19 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::on_user_account_
 void BrowserLogicConnectLocalLogIn::start_sign_in()
 {
     m_state                  = State::Starting;
-    const std::string server = Biz::Network::ServiceConfig::instance().offline_server_url();
+    const std::string server = Biz::Network::ServiceConfig::instance().connect_local_server_url();
     if (server.empty()) {
-        push_commands(show_error(Biz::_u8L("No Prusa Connect (on-premise) server is set."), false));
+        push_commands(show_error(Biz::_u8L("No Prusa Connect on-premise server is set."), false));
         return;
     }
     if (!server.starts_with("https://")) {
         request_pairing();
         return;
     }
-    // https: check the certificate first, a refused one would leave the dialog blank.
     SPDLOG_INFO("Connect Local sign-in: checking the certificate of {}", server);
     m_certificate_probe.start(
         server,
-        ConnectLocalTrust::trust_for_url(server).value_or(Biz::Network::ServerTrust{}),
+        AppServices::instance().server_trust_store().trust_for_url(server).value_or(Biz::Network::ServerTrust{}),
         [this](Biz::Network::TlsProbeResult result)
         {
             switch (result.status) {
@@ -307,7 +316,6 @@ std::vector<BrowserLogicCommand>
 BrowserLogicConnectLocalLogIn::on_load_error(const std::string& url, bool certificate_error)
 {
     if (m_state == State::PageOpen) {
-        // The pairing itself still waits: let the person approve it in a browser.
         return show_waiting(
             certificate_error ?
                 Biz::_u8L(
@@ -344,8 +352,6 @@ BrowserLogicConnectLocalLogIn::on_loaded_webview_event(const std::string& url)
     }
     if (!url.starts_with("file:")) {
         if (m_state == State::PageOpen) {
-            // The approval page (or the server's sign-in on the way to it) is in this dialog: a
-            // session cookie may now exist that is this dialog's to delete.
             m_session_cookie_pending = true;
         }
         if (m_page_timeout_token) {
@@ -370,7 +376,6 @@ BrowserLogicConnectLocalLogIn::on_script_message_webview_event(const std::string
         return {};
     }
     if (event == "closeDialog") {
-        // The person may have signed in on the approval page before giving up.
         std::vector<BrowserLogicCommand> commands = abandon_sign_in();
         commands.emplace_back(BrowserLogicCommandType::EndModalCancel, std::string());
         return commands;
@@ -392,8 +397,6 @@ BrowserLogicConnectLocalLogIn::on_script_message_webview_event(const std::string
 std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::
     on_user_account_id_success(bool is_refresh, const std::string& current_url)
 {
-    // The approval page's session was deleted when the credential was collected, before this
-    // broadcast; deleting now could hit the Connect tab's page session (same cookie name).
     m_state = State::Done;
     m_page_timeout_token.reset();
     m_session_cookie_pending = false;

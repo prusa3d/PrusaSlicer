@@ -3,7 +3,7 @@
 <head>
   <meta charset='UTF-8' />
   <meta content='width=device-width, initial-scale=1.0' name='viewport' />
-  <title>Prusa Connect (on-premise) sign in</title>
+  <title>Prusa Connect on-premise sign in</title>
   <style>
     :root {
       --color-background: #eceef1;
@@ -38,13 +38,13 @@
      PrusaSlicer fills in the translated texts and the server through connectLocalLoggedOut.init(). -->
 <div class='page'>
   <nav aria-label='Connect service' class='modes' id='modes'>
-    <button data-action='SET_CONNECT_MODE_ONLINE' type='button'>
+    <button data-action='SET_ACCOUNT_SERVICE_PRUSA_ACCOUNT' type='button'>
       <svg aria-hidden='true' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' viewBox='0 0 24 24'><path d='M7 18.5h10.5a4 4 0 0 0 .6-7.95 6 6 0 0 0-11.5-1.4A4.7 4.7 0 0 0 7 18.5z' /></svg>
       <span id='mode-cloud'>Prusa Connect</span>
     </button>
-    <button aria-current='page' data-action='SET_CONNECT_MODE_OFFLINE' type='button'>
+    <button aria-current='page' data-action='SET_ACCOUNT_SERVICE_CONNECT_LOCAL' type='button'>
       <svg aria-hidden='true' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' viewBox='0 0 24 24'><rect height='7' rx='2' width='18' x='3' y='3.5' /><rect height='7' rx='2' width='18' x='3' y='13.5' /><path d='M7 7h.01M7 17h.01M11 7h2M11 17h2' /></svg>
-      <span id='mode-local'>Prusa Connect (on-premise)</span>
+      <span id='mode-local'>Prusa Connect on-premise</span>
     </button>
   </nav>
 
@@ -80,7 +80,7 @@
                           type='rotate' values='0;540;0' />
       </g>
     </svg>
-    <h1 id='title'>Sign in to Prusa Connect (on-premise)</h1>
+    <h1 id='title'>Sign in to Prusa Connect on-premise</h1>
     <p class='lead' id='intro'>PrusaSlicer will open the sign-in page of your server in a PrusaSlicer window.</p>
     <div class='cta'>
       <button class='btn btn-primary' id='login' type='button'>Sign in</button>

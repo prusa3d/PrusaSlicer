@@ -54,6 +54,27 @@ TEST_CASE("Connect PRINT message parsing", "[UserAccount][Connect]")
             body
         ));
         CHECK(upload_of(config).organization_id.empty());
+        CHECK(upload_of(config).team_id == "10533");
+    }
+
+    SECTION("team_id may be a string") {
+        REQUIRE(UserAccount::ConnectUtils::config_from_json(
+            R"({"team_id":"7","printer_uuid":"u-1","filename":"f.bgcode","data":{}})",
+            config,
+            filename,
+            body
+        ));
+        CHECK(upload_of(config).team_id == "7");
+    }
+
+    SECTION("message without team_id") {
+        REQUIRE(UserAccount::ConnectUtils::config_from_json(
+            R"({"organization_id":"org-7","printer_uuid":"u-1","filename":"f.bgcode","data":{}})",
+            config,
+            filename,
+            body
+        ));
+        CHECK(upload_of(config).team_id.empty());
     }
 
     SECTION("organization_id only inside data is not used") {

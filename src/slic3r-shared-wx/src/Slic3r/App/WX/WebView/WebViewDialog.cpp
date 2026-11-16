@@ -104,7 +104,6 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
 
     // Connect the idle events
     Bind(wxEVT_IDLE, &WebViewDialog::on_idle, this);
-    // Closed by the person: EndModal() lets the logic clean up first.
     Bind(wxEVT_CLOSE_WINDOW, ([this](wxCloseEvent& evt) { EndModal(wxID_CANCEL); }));
 
     // Create the webview
@@ -210,7 +209,6 @@ void WebViewDialog::on_idle(wxIdleEvent& WXUNUSED(evt))
 
     if (!is_busy) {
         if (web_view && m_load_error_page && !m_error_commands.empty()) {
-            // The logic shows the error itself.
             m_load_error_page = false;
             process_logic_command_vector(std::exchange(m_error_commands, {}));
         } else if (web_view && m_load_error_page) {
@@ -499,8 +497,6 @@ void WebViewDialog::run_script(const wxString& javascript)
 void WebViewDialog::EndModal(int retCode)
 {
     if (!std::exchange(m_ended_by_logic, false)) {
-        // Ended by the person (close button, Esc via the cancel path, ...), not by the logic: it
-        // cleans up while the web view still exists.
         process_logic_command_vector(m_logic->on_dialog_closing());
     }
     if (wxWebView* web_view = m_host.get_unguarded()) {
@@ -559,28 +555,6 @@ void WebViewDialog::on_user_account_will_refresh()
     }
     [[maybe_unused]] bool r = process_logic_command_vector(m_logic->on_user_account_will_refresh());
     DEBUG_ASSERT(r, "False return value signals Veto which cannot be done here.");
-}
-
-void WebViewDialog::
-    on_user_account_pairing_ready(const std::string& page_url, const std::string& user_code)
-{
-    if (m_host) {
-        process_logic_command_vector(m_logic->on_user_account_pairing_ready(page_url, user_code));
-    }
-}
-
-void WebViewDialog::on_user_account_pairing_failed(Biz::UserAccount::PairingFailure failure)
-{
-    if (m_host) {
-        process_logic_command_vector(m_logic->on_user_account_pairing_failed(failure));
-    }
-}
-
-void WebViewDialog::on_user_account_pairing_approved()
-{
-    if (m_host) {
-        process_logic_command_vector(m_logic->on_user_account_pairing_approved());
-    }
 }
 
 bool WebViewDialog::handle_logic_command_LoadURL(const std::string& data)

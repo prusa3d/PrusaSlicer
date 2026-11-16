@@ -1,6 +1,7 @@
 #include "Slic3r/App/Browser/ConnectLocalSetupLogic.hpp"
 
 #include "Slic3r/App/AppConfig.hpp"
+#include "Slic3r/App/AccountServiceSwitcher.hpp"
 #include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/ConnectLocalTrust.hpp"
@@ -81,21 +82,6 @@ bool is_resources_page(const std::string& url, std::string_view page)
     return url.find("/web/" + std::string(page)) != std::string::npos;
 }
 
-/**
- * @brief Labels of the switch between Prusa Connect and Prusa Connect Local at the top of the
- * slicer's Connect tab pages, see connect_pages.js.
- */
-void add_mode_texts(nlohmann::json& texts)
-{
-    texts["modeCloud"] = Biz::_u8L("Prusa Connect");
-    // TRN Prusa Connect Local, the Prusa Connect server run on the customer's own network.
-    texts["modeLocal"] = Biz::_u8L("Prusa Connect (on-premise)");
-    // TRN Small label under the PRUSA CONNECT logo on the Prusa Connect (on-premise) pages.
-    texts["modeTag"] = Biz::_u8L("on-premise");
-    // TRN Accessible name of the switch between Prusa Connect and Prusa Connect (on-premise).
-    texts["modeSwitch"] = Biz::_u8L("Connect service");
-}
-
 std::string trust_kind_label(Biz::Network::ServerTrustKind kind)
 {
     switch (kind) {
@@ -122,23 +108,21 @@ ConnectLocalSetupLogic::~ConnectLocalSetupLogic() = default;
 bool ConnectLocalSetupLogic::needs_server_setup()
 {
     const Biz::Network::ServiceConfig& sc = Biz::Network::ServiceConfig::instance();
-    return sc.is_offline() && sc.offline_server_url().empty();
+    return sc.is_connect_local() && sc.connect_local_server_url().empty();
 }
 
 bool ConnectLocalSetupLogic::wants_setup_page() const
 {
-    return needs_server_setup()
-        || (m_setup_requested && Biz::Network::ServiceConfig::instance().is_offline());
+    return needs_server_setup() || m_setup_requested;
 }
 
 void ConnectLocalSetupLogic::add_actions(Actions& actions)
 {
-    // Sent by the slicer's offline pages only, so registered for the Connect tab only.
     const auto add = [this, &actions](const char* name, MessageHandler handler)
     {
         actions[name] = [this, name, handler](const std::string& message_data)
         {
-            if (!m_local_page) {
+            if (!m_service_switch.on_own_page()) {
                 SPDLOG_WARN("Ignoring {} from a page that is not ours.", name);
                 return std::vector<BrowserLogicCommand>{};
             }
@@ -146,51 +130,45 @@ void ConnectLocalSetupLogic::add_actions(Actions& actions)
         };
     };
     add("SET_CONNECT_LOCAL_URL", &ConnectLocalSetupLogic::on_set_url);
-    add("SET_CONNECT_MODE_ONLINE", &ConnectLocalSetupLogic::on_set_online);
-    add("SET_CONNECT_MODE_OFFLINE", &ConnectLocalSetupLogic::on_set_offline);
     add("SHOW_CONNECT_LOCAL_SETUP", &ConnectLocalSetupLogic::on_show_setup);
     add("CANCEL_CONNECT_LOCAL_SETUP", &ConnectLocalSetupLogic::on_cancel_setup);
     add("CONNECT_LOCAL_DISCOVERY", &ConnectLocalSetupLogic::on_discovery);
     add("TRUST_CONNECT_LOCAL_CERTIFICATE", &ConnectLocalSetupLogic::on_trust_certificate);
     add("LOAD_CONNECT_LOCAL_CERTIFICATE", &ConnectLocalSetupLogic::on_load_certificate);
     add("FORGET_CONNECT_LOCAL_CERTIFICATE", &ConnectLocalSetupLogic::on_forget_certificate);
+    m_service_switch.add_actions(actions);
 }
 
 std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::on_page_loaded(const std::string& url)
 {
-    m_local_page = url.starts_with("file:");
-    if (m_local_page && is_resources_page(url, SETUP_PAGE)) {
+    m_service_switch.on_page_loaded(url);
+    const bool own_page = m_service_switch.on_own_page();
+    if (own_page && is_resources_page(url, SETUP_PAGE)) {
         std::vector<BrowserLogicCommand> result = {
             {BrowserLogicCommandType::RunScript, setup_page_init_script()}
         };
-        // The network is searched only when the user asks for it on the page. A stopped search
-        // is dropped, the page starts without its old results.
         if (m_discovery && !m_discovery->running()) {
             m_discovery.reset();
         }
         std::vector<BrowserLogicCommand> state = discovery_state_commands();
         result.insert(result.end(), state.begin(), state.end());
         if (m_certificate_setup) {
-            // Opened because the server's certificate was refused: go to the certificate step.
             check_current_server_certificate();
         }
         return result;
     }
 
     stop_discovery();
-    if (m_local_page && is_resources_page(url, LOGGED_OUT_PAGE)) {
+    if (own_page && is_resources_page(url, LOGGED_OUT_PAGE)) {
         check_certificate_before_sign_in();
         return {{BrowserLogicCommandType::RunScript, logged_out_page_init_script()}};
-    }
-    if (m_local_page && is_resources_page(url, CLOUD_LOGGED_OUT_PAGE)) {
-        return {{BrowserLogicCommandType::RunScript, cloud_logged_out_page_init_script()}};
     }
     return {};
 }
 
 void ConnectLocalSetupLogic::on_navigation_request(const std::string& new_url)
 {
-    m_local_page = m_local_page && new_url.starts_with("file:");
+    m_service_switch.on_navigation_request(new_url);
 }
 
 void ConnectLocalSetupLogic::set_shown(bool shown)
@@ -205,12 +183,9 @@ std::vector<BrowserLogicCommand>
 ConnectLocalSetupLogic::on_certificate_error(const std::string& url)
 {
     const Biz::Network::ServiceConfig& sc = Biz::Network::ServiceConfig::instance();
-    // The tab loads only pages of the server or of the slicer, so a refused certificate is the
-    // server's (the URL of the event may still be the previous page's on some platforms).
-    if (!sc.is_offline() || !is_https(sc.offline_server_url())) {
+    if (!sc.is_connect_local() || !is_https(sc.connect_local_server_url())) {
         return {};
     }
-    // The setup page explains the certificate and lets the user trust it.
     SPDLOG_WARN("Connect Local page {} refused its certificate, showing the server setup.", url);
     m_certificate_setup = true;
     return m_page.setup_page();
@@ -218,23 +193,23 @@ ConnectLocalSetupLogic::on_certificate_error(const std::string& url)
 
 std::string ConnectLocalSetupLogic::setup_page_init_script() const
 {
-    std::string url = Biz::Network::ServiceConfig::instance().offline_server_url();
+    std::string url = Biz::Network::ServiceConfig::instance().connect_local_server_url();
     if (url.empty()) {
         url = AppServices::instance().app_config().connect_local_url();
     }
     nlohmann::json texts = {
-        {"title", Biz::_u8L("Prusa Connect (on-premise) server")},
+        {"title", Biz::_u8L("Prusa Connect on-premise server")},
         {"intro",
          Biz::_u8L(
-             "Enter the address of the Prusa Connect (on-premise) server that manages your printers."
+             "Enter the address of the Prusa Connect on-premise server that manages your printers."
          )},
         {"address", Biz::_u8L("Server address")},
         {"discoveryTitle", Biz::_u8L("Find a server on the network")},
         {"discoveryIntro",
          Biz::_u8L(
-             "PrusaSlicer can look for Prusa Connect (on-premise) servers running on your local network."
+             "PrusaSlicer can look for Prusa Connect on-premise servers running on your local network."
          )},
-        // TRN Button that starts the search for Prusa Connect (on-premise) servers.
+        // TRN Button that starts the search for Prusa Connect on-premise servers.
         {"discoveryStart", Biz::_u8L("Find servers on the network")},
         {"searching", Biz::_u8L("Searching the network…")},
         {"nothing", Biz::_u8L("No server found yet. Still searching…")},
@@ -250,7 +225,7 @@ std::string ConnectLocalSetupLogic::setup_page_init_script() const
         {"certTitle", Biz::_u8L("The server certificate is not trusted")},
         {"certIntro",
          Biz::_u8L(
-             "This system does not trust the certificate of the server, which is common for a server with a self-signed certificate. Compare the fingerprint with the one of your Prusa Connect (on-premise) server before you trust it, or load the certificate of the authority that issued it."
+             "This system does not trust the certificate of the server, which is common for a server with a self-signed certificate. Compare the fingerprint with the one of your Prusa Connect on-premise server before you trust it, or load the certificate of the authority that issued it."
          )},
         {"fingerprint", Biz::_u8L("SHA-256 fingerprint")},
         {"subject", Biz::_u8L("Issued to")},
@@ -263,11 +238,12 @@ std::string ConnectLocalSetupLogic::setup_page_init_script() const
         {"trust", Biz::_u8L("Trust this certificate")},
         {"load", Biz::_u8L("Load certificate…")},
     };
-    add_mode_texts(texts);
+    ConnectServiceSwitch::add_texts(texts);
     const nlohmann::json init = {
         {"texts", texts},
         {"url", url},
         {"canCancel", !needs_server_setup()},
+        {"showSwitch", ConnectServiceSwitch::shown()},
     };
     return call_setup_page("init", Biz::json_for_script(init)).data;
 }
@@ -275,7 +251,7 @@ std::string ConnectLocalSetupLogic::setup_page_init_script() const
 std::string ConnectLocalSetupLogic::logged_out_page_init_script() const
 {
     nlohmann::json texts = {
-        {"title", Biz::_u8L("Sign in to Prusa Connect (on-premise)")},
+        {"title", Biz::_u8L("Sign in to Prusa Connect on-premise")},
         {"intro",
          Biz::_u8L(
              "PrusaSlicer will open the sign-in page of your server in a PrusaSlicer window."
@@ -284,35 +260,19 @@ std::string ConnectLocalSetupLogic::logged_out_page_init_script() const
         {"change", Biz::_u8L("Change server")},
         {"forget", Biz::_u8L("Forget certificate")},
     };
-    add_mode_texts(texts);
-    const std::string server = Biz::Network::ServiceConfig::instance().offline_server_url();
+    ConnectServiceSwitch::add_texts(texts);
+    const std::string server = Biz::Network::ServiceConfig::instance().connect_local_server_url();
     const Biz::Network::ServerTrust trust = ConnectLocalTrust::stored_trust_for(server);
     const nlohmann::json init             = {
         {"texts", texts},
         // TRN {} is the address of the Prusa Connect Local server, e.g. http://192.168.1.10:8080
         {"server", fmt::format(fmt::runtime(Biz::_u8L("Server: {}")), server)},
-        // A certificate trusted in PrusaSlicer for this server: it can be forgotten here.
         {"trust", trust.is_custom() ? trust_kind_label(trust.kind) : std::string()},
+        {"showSwitch", ConnectServiceSwitch::shown()},
     };
     return call_page("connectLocalLoggedOut", "init", Biz::json_for_script(init)).data;
 }
 
-std::string ConnectLocalSetupLogic::cloud_logged_out_page_init_script()
-{
-    nlohmann::json texts = {
-        {"title", Biz::_u8L("Sign in to Prusa Connect")},
-        {"intro",
-         Biz::_u8L(
-             "Sign in with your Prusa Account to send prints to your printers and see their status here."
-         )},
-        {"login", Biz::_u8L("Sign in")},
-    };
-    add_mode_texts(texts);
-    const nlohmann::json init = {{"texts", texts}};
-    return call_page("connectLoggedOut", "init", Biz::json_for_script(init)).data;
-}
-
-// ---- LAN discovery ----
 
 void ConnectLocalSetupLogic::start_discovery()
 {
@@ -352,12 +312,11 @@ std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::discovery_state_command
     };
 }
 
-// ---- Messages of the setup and logged-out pages ----
 
 std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::on_set_url(const std::string& message_data)
 {
     const std::optional<std::string> normalized =
-        Biz::Network::ServiceConfig::normalize_offline_server_url(
+        Biz::Network::ServiceConfig::normalize_connect_local_server_url(
             parse_field<std::string>(message_data, "url").value_or(std::string())
         );
     if (!normalized) {
@@ -370,32 +329,12 @@ std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::on_set_url(const std::s
     if (!is_https(*normalized)) {
         return use_server(*normalized);
     }
-    // An https server is used only once its certificate is accepted, else the page shows it.
     return check_and_use_server(*normalized);
-}
-
-std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::on_set_online(const std::string&)
-{
-    m_setup_requested = false;
-    stop_discovery();
-    AppServices::instance().app_config_interactor().set_service_mode(
-        Biz::Network::ServiceMode::Online
-    );
-    return {};
-}
-
-std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::on_set_offline(const std::string&)
-{
-    // Sent by the switch of the cloud logged-out page; the mode change reloads the Connect tab.
-    AppServices::instance().app_config_interactor().set_service_mode(
-        Biz::Network::ServiceMode::Offline
-    );
-    return {};
 }
 
 std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::on_show_setup(const std::string&)
 {
-    if (!Biz::Network::ServiceConfig::instance().is_offline() || m_user_account.is_logged_in()) {
+    if (!Biz::Network::ServiceConfig::instance().is_connect_local() || m_user_account.is_logged_in()) {
         return {};
     }
     m_setup_requested = true;
@@ -406,7 +345,6 @@ std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::on_cancel_setup(const s
 {
     m_setup_requested = false;
     stop_discovery();
-    // Back to the page whose certificate failed, or to the logged-out page that opened the setup.
     return std::exchange(m_certificate_setup, false) ?
         m_page.home_page() :
         m_page.logged_out_page();
@@ -429,7 +367,6 @@ ConnectLocalSetupLogic::on_trust_certificate(const std::string& message_data)
     const std::string url = parse_field<std::string>(message_data, "url").value_or(std::string());
     const std::string fingerprint =
         parse_field<std::string>(message_data, "fingerprint").value_or(std::string());
-    // Only the certificate the page shows, for the server it was shown for.
     if (!m_presented_certificate
         || url != m_presented_certificate_url
         || fingerprint != m_presented_certificate->sha256_fingerprint)
@@ -441,20 +378,18 @@ ConnectLocalSetupLogic::on_trust_certificate(const std::string& message_data)
     }
     const Biz::Network::CertificateInfo cert =
         *std::exchange(m_presented_certificate, std::nullopt);
-    if (!ConnectLocalTrust::trust_certificate(url, cert)) {
-        return {show_error(
-            Biz::_u8L("The certificate could not be stored in the PrusaSlicer data folder.")
-        )};
+    std::optional<Biz::Network::ServerTrust> trust = ConnectLocalTrust::pinned_key_trust(url, cert);
+    if (!trust) {
+        return {show_error(Biz::_u8L("The key of this certificate cannot be trusted."))};
     }
-    // Check it with the trust, as the connections will (the server may have changed meanwhile).
-    return check_and_use_server(url);
+    return check_and_use_server(url, std::move(trust));
 }
 
 std::vector<BrowserLogicCommand>
 ConnectLocalSetupLogic::on_load_certificate(const std::string& message_data)
 {
     const std::optional<std::string> normalized =
-        Biz::Network::ServiceConfig::normalize_offline_server_url(
+        Biz::Network::ServiceConfig::normalize_connect_local_server_url(
             parse_field<std::string>(message_data, "url").value_or(std::string())
         );
     if (!normalized || !is_https(*normalized)) {
@@ -465,8 +400,7 @@ ConnectLocalSetupLogic::on_load_certificate(const std::string& message_data)
         )};
     }
 
-    // Not from inside the web view's message callback: the file dialog is modal.
-    std::weak_ptr<char> alive = m_alive;
+    Biz::Lifetime::Token alive = m_lifetime.token();
     Biz::Platform::PlatformServices::instance()
         .main_thread_dispatcher()
         .dispatch_on_main_thread_after(
@@ -483,11 +417,12 @@ ConnectLocalSetupLogic::on_load_certificate(const std::string& message_data)
                     if (alive.expired() || !ok || paths.empty()) {
                         return;
                     }
+                    Biz::Network::ServerTrust trust;
                     const std::string error =
-                        ConnectLocalTrust::load_certificate_file(server, paths.front());
+                        ConnectLocalTrust::certificate_file_trust(server, paths.front(), trust);
                     m_page.push_commands(
                         error.empty() ?
-                            check_and_use_server(server) :
+                            check_and_use_server(server, std::move(trust)) :
                             std::vector<BrowserLogicCommand>{show_error(error)}
                     );
                 };
@@ -510,8 +445,6 @@ ConnectLocalSetupLogic::on_load_certificate(const std::string& message_data)
 std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::on_forget_certificate(const std::string&)
 {
     ConnectLocalTrust::forget();
-    // Reload the signed-out page: it checks the server again (and shows the certificate step if
-    // the system does not trust it).
     m_certificate_checked_server.clear();
     return m_page.logged_out_page();
 }
@@ -523,37 +456,29 @@ ConnectLocalSetupLogic::use_server(const std::string& normalized_url)
     m_certificate_setup = false;
     stop_discovery();
 
-    const Biz::Network::ServiceConfig& sc = Biz::Network::ServiceConfig::instance();
-    const bool unchanged = sc.is_offline() && sc.offline_server_url() == normalized_url;
+    const AppConfig& app_config = AppServices::instance().app_config();
+    const bool unchanged = app_config.account_service() == AccountService::ConnectLocal
+        && app_config.connect_local_server() == normalized_url;
 
-    // Saving runs the service mode switch (MainFrame), which reloads this tab against the new server.
-    AppConfigInteractor& app_config_interactor = AppServices::instance().app_config_interactor();
-    if (AppServices::instance().app_config().connect_local_url() != normalized_url) {
-        app_config_interactor
-            .set_item_value("connect_local_url", Domain::ConfigValue(normalized_url));
-    }
-    app_config_interactor.set_service_mode(Biz::Network::ServiceMode::Offline);
+    AppServices::instance().account_service_switcher().use_server(normalized_url);
 
-    // Nothing to switch, just leave the setup page.
     return unchanged ? m_page.home_page() : std::vector<BrowserLogicCommand>{};
 }
 
-// ---- Certificate of an https server ----
 
 void ConnectLocalSetupLogic::probe_certificate(
     const std::string& normalized_url,
     ProbeKind kind,
+    const Biz::Network::ServerTrust& trust,
     std::function<void(Biz::Network::TlsProbeResult)> done
 )
 {
-    // A newer probe of the same kind replaces an older one. Foreground and background checks are
-    // separate, so a background check never swallows the result the page waits for.
     Biz::Network::ServerTrustProbe& probe =
         kind == ProbeKind::Foreground ? m_foreground_probe : m_background_probe;
     SPDLOG_INFO("Connect Local: checking the certificate of {}", normalized_url);
     probe.start(
         normalized_url,
-        ConnectLocalTrust::stored_trust_for(normalized_url),
+        trust,
         [url = normalized_url, done = std::move(done)](Biz::Network::TlsProbeResult result)
         {
             switch (result.status) {
@@ -572,25 +497,39 @@ void ConnectLocalSetupLogic::probe_certificate(
     );
 }
 
-std::vector<BrowserLogicCommand>
-ConnectLocalSetupLogic::check_and_use_server(const std::string& normalized_url)
+std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::check_and_use_server(
+    const std::string& normalized_url,
+    std::optional<Biz::Network::ServerTrust> candidate_trust
+)
 {
+    const Biz::Network::ServerTrust trust =
+        candidate_trust ? *candidate_trust : ConnectLocalTrust::stored_trust_for(normalized_url);
     probe_certificate(
         normalized_url,
         ProbeKind::Foreground,
-        [this, normalized_url](Biz::Network::TlsProbeResult result)
-        { m_page.push_commands(finish_foreground_probe(normalized_url, result)); }
+        trust,
+        [this, normalized_url, candidate_trust](Biz::Network::TlsProbeResult result)
+        { m_page.push_commands(finish_foreground_probe(normalized_url, result, candidate_trust)); }
     );
     return {show_checking(true)};
 }
 
-std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::
-    finish_foreground_probe(const std::string& server, const Biz::Network::TlsProbeResult& result)
+std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::finish_foreground_probe(
+    const std::string& server,
+    const Biz::Network::TlsProbeResult& result,
+    const std::optional<Biz::Network::ServerTrust>& candidate_trust
+)
 {
     switch (result.status) {
     case Biz::Network::TlsProbeStatus::CertificateRejected:
-        return show_certificate_commands(server, result);
+        ConnectLocalTrust::discard_candidate_trust();
+        return show_certificate_commands(
+            server,
+            result,
+            candidate_trust ? *candidate_trust : ConnectLocalTrust::stored_trust_for(server)
+        );
     case Biz::Network::TlsProbeStatus::Unreachable:
+        ConnectLocalTrust::discard_candidate_trust();
         return {
             show_checking(false),
             show_error(
@@ -604,6 +543,12 @@ std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::
     case Biz::Network::TlsProbeStatus::Ok:
     default: {
         std::vector<BrowserLogicCommand> res = {show_checking(false)};
+        if (candidate_trust && !ConnectLocalTrust::store_trust(*candidate_trust)) {
+            res.push_back(show_error(
+                Biz::_u8L("The certificate could not be stored in the PrusaSlicer data folder.")
+            ));
+            return res;
+        }
         std::vector<BrowserLogicCommand> use = use_server(server);
         res.insert(res.end(), use.begin(), use.end());
         return res;
@@ -613,7 +558,8 @@ std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::
 
 std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::show_certificate_commands(
     const std::string& normalized_url,
-    const Biz::Network::TlsProbeResult& result
+    const Biz::Network::TlsProbeResult& result,
+    const Biz::Network::ServerTrust& trust
 )
 {
     if (!result.certificate) {
@@ -623,7 +569,6 @@ std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::show_certificate_comman
     m_presented_certificate                   = cert;
     m_presented_certificate_url               = normalized_url;
 
-    const Biz::Network::ServerTrust trust = ConnectLocalTrust::stored_trust_for(normalized_url);
     std::string error;
     if (trust.kind == Biz::Network::ServerTrustKind::PinnedKey) {
         error = Biz::_u8L(
@@ -664,17 +609,19 @@ std::vector<BrowserLogicCommand> ConnectLocalSetupLogic::show_certificate_comman
 
 void ConnectLocalSetupLogic::check_current_server_certificate()
 {
-    const std::string server = Biz::Network::ServiceConfig::instance().offline_server_url();
+    const std::string server = Biz::Network::ServiceConfig::instance().connect_local_server_url();
     if (!is_https(server)) {
         return;
     }
+    const Biz::Network::ServerTrust trust = ConnectLocalTrust::stored_trust_for(server);
     probe_certificate(
         server,
         ProbeKind::Background,
-        [this, server](Biz::Network::TlsProbeResult result)
+        trust,
+        [this, server, trust](Biz::Network::TlsProbeResult result)
         {
             if (result.status == Biz::Network::TlsProbeStatus::CertificateRejected) {
-                m_page.push_commands(show_certificate_commands(server, result));
+                m_page.push_commands(show_certificate_commands(server, result, trust));
             }
         }
     );
@@ -682,8 +629,7 @@ void ConnectLocalSetupLogic::check_current_server_certificate()
 
 void ConnectLocalSetupLogic::check_certificate_before_sign_in()
 {
-    // Once per server, so that Cancel on the setup page can still come back here.
-    const std::string server = Biz::Network::ServiceConfig::instance().offline_server_url();
+    const std::string server = Biz::Network::ServiceConfig::instance().connect_local_server_url();
     if (!is_https(server) || m_certificate_checked_server == server) {
         return;
     }
@@ -691,10 +637,11 @@ void ConnectLocalSetupLogic::check_certificate_before_sign_in()
     probe_certificate(
         server,
         ProbeKind::Background,
+        ConnectLocalTrust::stored_trust_for(server),
         [this](Biz::Network::TlsProbeResult result)
         {
             if (result.status == Biz::Network::TlsProbeStatus::CertificateRejected
-                && m_local_page
+                && m_service_switch.on_own_page()
                 && !m_setup_requested
                 && !m_user_account.is_logged_in())
             {

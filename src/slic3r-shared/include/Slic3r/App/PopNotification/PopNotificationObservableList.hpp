@@ -2,6 +2,7 @@
 
 #include "Slic3r/App/PopNotification/PopNotificationData.hpp"
 #include "Slic3r/Biz/IObservableList.hpp"
+#include "Slic3r/Biz/Lifetime.hpp"
 
 #include <vector>
 
@@ -45,6 +46,7 @@ protected:
     void stop_notification_timer(PopNotificationDataIt it) const;
 
     std::vector<PopNotificationDataPtr> m_notifications;
+    Biz::Lifetime m_lifetime;
 };
 
 inline const PopNotificationObservableList::Matcher never_equal_matcher = 

@@ -134,7 +134,6 @@ std::optional<Credential> parse_credential(const std::string& body)
     if (credential.id.empty() || credential.token.empty()) {
         return std::nullopt;
     }
-    // The token carries its expiration (JWT exp); expires_at of the reply is the same moment.
     if (const boost::optional<double> exp = Network::Jwt::get_exp(credential.token)) {
         credential.expires_at = static_cast<std::time_t>(*exp);
     } else if (const auto it = j->find("expires_at"); it != j->end() && it->is_number()) {

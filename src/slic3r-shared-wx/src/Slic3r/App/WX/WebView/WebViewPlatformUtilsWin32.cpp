@@ -2,8 +2,9 @@
 
 #include "Slic3r/App/WX/StringConversions.hpp"
 #include "Slic3r/App/WX/Format.hpp"
-#include "Slic3r/App/ConnectLocalTrust.hpp"
+#include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/Biz/Network/ServerTrust.hpp"
+#include "Slic3r/Biz/Network/ServerTrustStore.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Biz/Network/Url.hpp"
 #include "Slic3r/Log.hpp"
@@ -13,7 +14,6 @@
 #include <wrl.h>
 #include <atlbase.h>
 #include <unordered_map>
-#include <unordered_set>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
@@ -432,9 +432,6 @@ void setup_webview_devtools(wxWebView* web_view)
 
 #ifdef __ICoreWebView2_14_INTERFACE_DEFINED__
 namespace {
-/** @brief Web views whose server certificate errors are handled already. */
-std::unordered_set<wxWebView*> g_server_trust_web_views;
-
 std::string take_co_string(LPWSTR value)
 {
     std::string result = value ? boost::nowide::narrow(value) : std::string();
@@ -454,17 +451,6 @@ void setup_webview_server_trust(wxWebView* webview)
         // Not created yet, WebViewHost::notify_created() calls this again.
         return;
     }
-    if (!g_server_trust_web_views.insert(webview).second) {
-        return;
-    }
-    webview->Bind(
-        wxEVT_DESTROY,
-        [webview](wxWindowDestroyEvent& event)
-        {
-            g_server_trust_web_views.erase(webview);
-            event.Skip();
-        }
-    );
     ComPtr<ICoreWebView2> wv2(webView2_raw);
     ComPtr<ICoreWebView2_14> wv2_14;
     if (FAILED(wv2.As(&wv2_14))) {
@@ -494,7 +480,7 @@ void setup_webview_server_trust(wxWebView* webview)
                     return S_OK;
                 }
                 const std::optional<Biz::Network::ServerTrust> trust =
-                    ConnectLocalTrust::trust_for_host(url->host, url->port);
+                    AppServices::instance().server_trust_store().trust_for_host(url->host, url->port);
                 if (!trust) {
                     return S_OK;
                 }

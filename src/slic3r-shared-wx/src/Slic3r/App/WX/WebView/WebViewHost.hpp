@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Slic3r/Biz/Lifetime.hpp"
+#include "Slic3r/Biz/Network/ServerTrustStore.hpp"
+
 #include <wx/event.h>
 #include <wx/timer.h>
 
@@ -15,11 +18,14 @@ class wxString;
 
 namespace Slic3r::App::WX::WebView {
 
-class WebViewHost : public wxEvtHandler
+class WebViewHost : public wxEvtHandler, public Biz::Network::IServerTrustListener
 {
 public:
     WebViewHost();
     ~WebViewHost() override;
+
+    /** @brief The Connect Local trust changed: the web view forgets the certificates it accepted. */
+    void on_server_trust_applied() override;
 
     WebViewHost(const WebViewHost&) = delete;
     WebViewHost& operator=(const WebViewHost&) = delete;
@@ -56,6 +62,12 @@ public:
         return m_state == State::Pending;
     }
 
+    /** @brief The native web view is being created and its creation callback is still to come. */
+    bool is_creating() const
+    {
+        return m_state == State::Creating;
+    }
+
     /**
      * @brief Runs fn once the web view is created (WebView2 creates its native web view
      * asynchronously), right away when it is. Dropped if the web view never comes up.
@@ -81,17 +93,19 @@ private:
     };
 
     void on_watchdog(wxTimerEvent& evt);
+    void set_up_server_trust();
     void fail();
 
     wxWebView* m_web_view{nullptr};
     wxWindow* m_parent{nullptr};
     wxSizer* m_sizer{nullptr};
     State m_state{State::Pending};
+    bool m_server_trust_set_up{false};
 
     wxTimer m_watchdog;
     std::vector<std::function<void()>> m_when_ready;
     /** @brief Expires with this host, late completions of cookie operations check it. */
-    std::shared_ptr<char> m_alive{std::make_shared<char>(0)};
+    Biz::Lifetime m_lifetime;
 };
 
 } // namespace Slic3r::App::WX::WebView

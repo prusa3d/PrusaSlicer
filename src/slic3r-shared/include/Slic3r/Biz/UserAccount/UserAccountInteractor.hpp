@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Slic3r/Biz/UserAccount/IPairingCommunication.hpp"
 #include "Slic3r/Biz/UserAccount/IUserAccountListener.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountCommunication.hpp"
 #include "Slic3r/Biz/UserAccount/IUserAccountSessionListener.hpp"
@@ -23,7 +24,9 @@ namespace Slic3r::Biz::UserAccount {
 /**
  * @brief Hub for all communication with UserAccount.
  */
-class UserAccountInteractor final : public IUserAccountSessionListener, public WithListeners<IUserAccountListener>
+class UserAccountInteractor final : public IUserAccountSessionListener,
+                                    public IPairingListener,
+                                    public WithListeners<IUserAccountListener>
 {
 public:
     UserAccountInteractor(Platform::IMainThreadDispatcher& dispatcher);
@@ -153,21 +156,35 @@ public:
     void request_printables_secret_token();
 
     /**
-     * @brief Connect Local sign-in: starts an app pairing, replacing a running one.
-     * Results come as on_user_account_pairing_ready / _failed and on_user_account_id_success.
+     * @brief Whether the account is a Prusa Account (see
+     * IUserAccountCommunication::is_prusa_account()). False when disabled or with Connect Local.
+     */
+    bool has_prusa_account() const;
+
+    /**
+     * @brief Whether the account is a Prusa Connect Local one: it signs in by app pairing and its
+     * web pages run on page sessions, never on the credential.
+     */
+    bool is_connect_local_account() const;
+
+    /**
+     * @brief Connect Local sign-in: starts an app pairing, replacing a running one. Results come
+     * as on_user_account_pairing_ready / _failed and on_user_account_id_success. Does nothing
+     * for an account that does not sign in by pairing.
      */
     void start_pairing();
     void cancel_pairing();
 
     /**
      * @brief The server answered access_token with HTTP 401 outside the session (printer list,
-     * upload). Offline this logs out, a Connect Local credential cannot be renewed. Main thread.
+     * upload). With Connect Local this logs out, a Connect Local credential cannot be renewed. Main thread.
      */
     void on_unauthorized(const std::string& access_token);
 
     /**
-     * @brief Offline: opens a page session for the Connect Local web pages, see
-     * IUserAccountCommunication::enqueue_page_session_action().
+     * @brief Connect Local: opens a page session for the Connect Local web pages, see
+     * IPairingCommunication::enqueue_page_session_action(). Without a pairing account done gets
+     * nullopt right away.
      */
     void request_page_session(std::function<void(std::optional<std::string>)> done, bool fresh);
 

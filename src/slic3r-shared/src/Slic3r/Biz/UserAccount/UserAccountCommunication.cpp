@@ -128,4 +128,21 @@ void UserAccountCommunication::enqueue_connect_printers_data_action(std::functio
     wakeup_session_thread();
 }
 
+void UserAccountCommunication::on_unauthorized(const std::string& access_token)
+{
+    if (access_token.empty() || access_token != this->access_token()) {
+        return;
+    }
+    if (validate_and_refresh()) {
+        SPDLOG_INFO("UserAccountCommunication: the refused access token has expired, refreshing.");
+    } else {
+        SPDLOG_WARN("UserAccountCommunication: the server refused an access token that is valid.");
+    }
+}
+
+void UserAccountCommunication::on_user_id_unusable()
+{
+    SPDLOG_ERROR("UserAccountCommunication: the account reply has no usable username.");
+}
+
 } // namespace Slic3r::Biz::UserAccount

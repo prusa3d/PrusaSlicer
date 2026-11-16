@@ -4,18 +4,15 @@
 #include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
-#include "Slic3r/Biz/Network/HttpCurl.hpp"
-#include "Slic3r/Biz/Network/Url.hpp"
+#include "Slic3r/Biz/Network/ServerTrustStore.hpp"
+#include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Log.hpp"
 
-#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/nowide/fstream.hpp>
 
-#include <functional>
 #include <iterator>
-#include <locale>
-#include <mutex>
+#include <optional>
 
 namespace Slic3r::App::ConnectLocalTrust {
 
@@ -26,12 +23,6 @@ using Biz::Network::ServiceConfig;
 namespace {
 
 constexpr size_t MAX_CERTIFICATE_FILE_SIZE = 1024 * 1024;
-
-/** @brief The trust in effect, see apply(). */
-std::mutex applied_mutex;
-ServerTrust applied;
-/** @brief See set_apply_listener(), guarded by applied_mutex. */
-std::function<void()> apply_listener;
 
 std::optional<std::string> read_file(const boost::filesystem::path& path)
 {
@@ -72,6 +63,11 @@ void remove_certificate_file()
     boost::filesystem::remove(AppConfig::connect_local_trust_pem_path(), ec);
 }
 
+std::string candidate_pem_path()
+{
+    return AppConfig::connect_local_trust_pem_path() + ".candidate";
+}
+
 /** @brief Writes the trust to the app config and applies it. */
 void store(ServerTrustKind kind, const std::string& server_url, const std::string& pin)
 {
@@ -86,38 +82,10 @@ void store(ServerTrustKind kind, const std::string& server_url, const std::strin
     value.set(kind);
     app_config_interactor.set_item_value("connect_local_trust", value);
 
-    apply(app_config.connect_local_trust());
-}
-
-/** @brief The applied trust if its server is the current offline https server. */
-std::optional<ServerTrust> active_trust()
-{
-    ServerTrust trust;
-    {
-        std::lock_guard lock(applied_mutex);
-        trust = applied;
-    }
-    if (!trust.is_custom()
-        || !trust.server_url.starts_with("https://")
-        || ServiceConfig::instance().offline_server_url() != trust.server_url)
-    {
-        return std::nullopt;
-    }
-    return trust;
+    AppServices::instance().server_trust_store().apply(app_config.connect_local_trust());
 }
 
 } // namespace
-
-bool
-keeps_trust(const ServerTrust& trust, Biz::Network::ServiceMode mode, const std::string& server_url)
-{
-    if (!trust.is_custom()) {
-        return true;
-    }
-    return mode == Biz::Network::ServiceMode::Offline
-        && !server_url.empty()
-        && trust.server_url == server_url;
-}
 
 ServerTrust stored_trust_for(const std::string& server_url)
 {
@@ -128,85 +96,24 @@ ServerTrust stored_trust_for(const std::string& server_url)
     return trust;
 }
 
-void apply(ServerTrust trust)
-{
-    // Every request asks for the trust of its URL from now on.
-    static std::once_flag lookup_installed;
-    std::call_once(
-        lookup_installed,
-        []() { Biz::Network::HttpCurl::set_server_trust_lookup(&trust_for_url); }
-    );
-
-    if (trust.kind == ServerTrustKind::Certificate && trust.pem.empty()) {
-        trust.pem = read_file(trust.pem_path).value_or(std::string());
-        if (trust.pem.empty()) {
-            SPDLOG_ERROR("Connect Local certificate file {} cannot be read.", trust.pem_path);
-        }
-    }
-    std::function<void()> listener;
-    {
-        std::lock_guard lock(applied_mutex);
-        applied  = std::move(trust);
-        listener = apply_listener;
-    }
-    if (listener) {
-        listener();
-    }
-}
-
-void set_apply_listener(std::function<void()> listener)
-{
-    std::lock_guard lock(applied_mutex);
-    apply_listener = std::move(listener);
-}
-
-std::optional<ServerTrust> trust_for_url(const std::string& url)
-{
-    std::optional<ServerTrust> trust = active_trust();
-    if (!trust || !Biz::Network::url_belongs_to_server(url, trust->server_url)) {
-        return std::nullopt;
-    }
-    return trust;
-}
-
-std::optional<ServerTrust> trust_for_host(std::string_view host, int port)
-{
-    std::optional<ServerTrust> trust = active_trust();
-    if (!trust) {
-        return std::nullopt;
-    }
-    if (host.size() > 2 && host.front() == '[' && host.back() == ']') {
-        host = host.substr(1, host.size() - 2);
-    }
-    const std::optional<Biz::Network::UrlParts> server = Biz::Network::parse_url(trust->server_url);
-    const std::string lower_host =
-        boost::algorithm::to_lower_copy(std::string(host), std::locale::classic());
-    if (!server || server->port != port || server->host != lower_host) {
-        return std::nullopt;
-    }
-    return trust;
-}
-
-bool
-trust_certificate(const std::string& server_url, const Biz::Network::CertificateInfo& certificate)
+std::optional<ServerTrust>
+pinned_key_trust(const std::string& server_url, const Biz::Network::CertificateInfo& certificate)
 {
     if (server_url.empty() || !certificate.spki_pin.starts_with("sha256//")) {
-        return false;
+        return std::nullopt;
     }
-    // The pin is the whole trust, a certificate file loaded before is of no use any more.
-    remove_certificate_file();
-    store(ServerTrustKind::PinnedKey, server_url, certificate.spki_pin);
-    SPDLOG_INFO(
-        "Connect Local server {}: trusting the certificate {} (key {})",
-        server_url,
-        certificate.sha256_fingerprint,
-        certificate.spki_pin
-    );
-    return true;
+    ServerTrust trust;
+    trust.kind       = ServerTrustKind::PinnedKey;
+    trust.server_url = server_url;
+    trust.pin        = certificate.spki_pin;
+    return trust;
 }
 
-std::string
-load_certificate_file(const std::string& server_url, const boost::filesystem::path& path)
+std::string certificate_file_trust(
+    const std::string& server_url,
+    const boost::filesystem::path& path,
+    ServerTrust& trust
+)
 {
     boost::system::error_code ec;
     const boost::uintmax_t size = boost::filesystem::file_size(path, ec);
@@ -219,16 +126,42 @@ load_certificate_file(const std::string& server_url, const boost::filesystem::pa
     if (!pem) {
         return Biz::_u8L("The file does not contain a certificate in PEM or DER format.");
     }
-    if (!write_file(AppConfig::connect_local_trust_pem_path(), *pem)) {
+    if (!write_file(candidate_pem_path(), *pem)) {
         return Biz::_u8L("The certificate could not be stored in the PrusaSlicer data folder.");
     }
-    store(ServerTrustKind::Certificate, server_url, std::string());
-    SPDLOG_INFO(
-        "Connect Local server {}: verifying with the certificate from {}",
-        server_url,
-        path.string()
-    );
+    trust            = ServerTrust{};
+    trust.kind       = ServerTrustKind::Certificate;
+    trust.server_url = server_url;
+    trust.pem_path   = candidate_pem_path();
+    trust.pem        = *pem;
     return {};
+}
+
+bool store_trust(const ServerTrust& trust)
+{
+    if (trust.kind == ServerTrustKind::Certificate) {
+        boost::system::error_code ec;
+        boost::filesystem::rename(
+            candidate_pem_path(),
+            AppConfig::connect_local_trust_pem_path(),
+            ec
+        );
+        if (ec) {
+            SPDLOG_ERROR("Could not store the Connect Local certificate: {}", ec.message());
+            return false;
+        }
+    } else {
+        remove_certificate_file();
+    }
+    store(trust.kind, trust.server_url, trust.pin);
+    SPDLOG_INFO("Connect Local server {}: certificate trust stored.", trust.server_url);
+    return true;
+}
+
+void discard_candidate_trust()
+{
+    boost::system::error_code ec;
+    boost::filesystem::remove(candidate_pem_path(), ec);
 }
 
 void forget()
@@ -245,13 +178,9 @@ void forget()
 
 void forget_if_stale()
 {
-    const AppConfig& app_config          = AppServices::instance().app_config();
-    const Biz::Network::ServiceMode mode = app_config.service_mode();
-    const std::string server             = mode == Biz::Network::ServiceMode::Offline ?
-        ServiceConfig::normalize_offline_server_url(app_config.connect_local_url())
-            .value_or(std::string()) :
-        std::string();
-    if (!keeps_trust(app_config.connect_local_trust(), mode, server)) {
+    const AppConfig& app_config = AppServices::instance().app_config();
+    const std::string server    = app_config.connect_local_server().value_or(std::string());
+    if (!Biz::Network::ServerTrustStore::keeps_trust(app_config.connect_local_trust(), server)) {
         forget();
     }
 }

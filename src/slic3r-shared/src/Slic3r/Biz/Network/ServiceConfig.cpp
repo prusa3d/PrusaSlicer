@@ -18,18 +18,16 @@
 namespace Slic3r::Biz::Network {
 
 namespace {
-// Offline (Connect Local) URL layout. S is the user entered server URL, M is S + OFFLINE_MODULE_PATH.
-// Web pages are served from S, the HTTP API of the PrusaSlicer module from M, app pairing
-// (the offline sign-in) from the core API of S.
-constexpr std::string_view OFFLINE_SELECT_PRINTER_PATH =
-    "/m/com.github.aux.prusa-research.prusaslicer3-compat/select-printer?embed=1"; // S +
-constexpr std::string_view OFFLINE_CONNECT_PAGE_PATH = "/"; // S +
-constexpr std::string_view OFFLINE_ACCOUNT_API_PATH  = "/account"; // M +
-constexpr std::string_view OFFLINE_CONNECT_API_PATH  = "/connect"; // M +
-constexpr std::string_view OFFLINE_PAIRING_API_PATH  = "/api/v1/auth/app-pairings"; // S +
-constexpr std::string_view OFFLINE_CREDENTIALS_PATH  = "/api/v1/auth/credentials/"; // S +
-constexpr std::string_view OFFLINE_PAIRING_PAGE_PATH = "/pair?code="; // S +
-constexpr std::string_view OFFLINE_PRINTER_PAGE_PATH = "/printers/"; // S +
+constexpr std::string_view CONNECT_LOCAL_SELECT_PRINTER_PATH =
+    "/m/com.github.aux.prusa-research.prusaslicer3-compat/select-printer?embed=1";
+constexpr std::string_view CONNECT_LOCAL_CONNECT_PAGE_PATH = "/";
+constexpr std::string_view CONNECT_LOCAL_ACCOUNT_API_PATH  = "/account";
+constexpr std::string_view CONNECT_LOCAL_CONNECT_API_PATH  = "/connect";
+constexpr std::string_view CONNECT_LOCAL_PRINTER_LIST_PATH = "/slicer/v2/printers";
+constexpr std::string_view CONNECT_LOCAL_PAIRING_API_PATH  = "/api/v1/auth/app-pairings";
+constexpr std::string_view CONNECT_LOCAL_CREDENTIALS_PATH  = "/api/v1/auth/credentials/";
+constexpr std::string_view CONNECT_LOCAL_PAIRING_PAGE_PATH = "/pair?code=";
+constexpr std::string_view CONNECT_LOCAL_PRINTER_PAGE_PATH = "/printers/";
 
 void update_from_env(std::string& dest, const char* env_name, bool remove_trailing_slash)
 {
@@ -118,7 +116,7 @@ ServiceConfig::ServiceConfig() :
 
     update_from_env(m_account_client_id, "PRUSA_ACCOUNT_CLIENT_ID", false);
 
-    m_mode_urls = online_urls();
+    m_mode_urls = cloud_urls();
 }
 
 ServiceConfig& ServiceConfig::instance()
@@ -127,14 +125,12 @@ ServiceConfig& ServiceConfig::instance()
     return inst;
 }
 
-// ---- Service mode ----
 
-std::optional<std::string> ServiceConfig::normalize_offline_server_url(std::string_view url)
+std::optional<std::string> ServiceConfig::normalize_connect_local_server_url(std::string_view url)
 {
     using namespace boost::algorithm;
     const std::locale& ascii  = std::locale::classic();
     const std::string trimmed = trim_copy(std::string(url), ascii);
-    // Neither query, fragment nor user info, nothing curl would escape or reject.
     if (trimmed.empty()
         || std::ranges::any_of(trimmed, is_space(ascii) || is_cntrl(ascii) || is_any_of("?#@\\")))
     {
@@ -152,35 +148,42 @@ std::optional<std::string> ServiceConfig::normalize_offline_server_url(std::stri
     while (path.ends_with('/')) {
         path.remove_suffix(1);
     }
-    return parts->origin() + std::string(path);
+    UrlParts server      = *parts;
+    server.explicit_port = parts->explicit_port && parts->port != (parts->scheme == "https" ? 443 : 80);
+    return server.origin() + std::string(path);
 }
 
-void ServiceConfig::set_mode(ServiceMode mode, const std::string& offline_server_url)
+void ServiceConfig::set_mode(ServiceMode mode, const std::string& connect_local_server_url)
 {
-    ModeUrls urls = online_urls();
-    if (mode == ServiceMode::Offline) {
-        const std::optional<std::string> server = normalize_offline_server_url(offline_server_url);
+    ModeUrls urls = cloud_urls();
+    if (mode == ServiceMode::ConnectLocal) {
+        const std::optional<std::string> server = normalize_connect_local_server_url(connect_local_server_url);
         if (!server) {
-            SPDLOG_WARN("Offline mode: invalid Connect Local server URL '{}'.", offline_server_url);
+            SPDLOG_WARN("Invalid Prusa Connect on-premise server URL '{}'.", connect_local_server_url);
         }
-        urls = offline_urls(server.value_or(std::string()));
+        urls = connect_local_urls(server.value_or(std::string()));
     }
     SPDLOG_INFO(
         "Service mode: {}{}",
-        mode == ServiceMode::Online ? "online" : "offline",
-        mode == ServiceMode::Online ? std::string() : ", server: " + urls.offline_server
+        mode == ServiceMode::Cloud ? "cloud" : "on-premise",
+        mode == ServiceMode::Cloud ? std::string() : ", server: " + urls.connect_local_server
     );
 
     std::unique_lock lock(m_mutex);
     m_mode_urls = std::move(urls);
 }
 
-ServiceConfig::ModeUrls ServiceConfig::online_urls() const
+ServiceConfig::ModeUrls ServiceConfig::cloud_urls() const
 {
     return {
-        .mode                   = ServiceMode::Online,
-        .offline_server         = {},
+        .mode                   = ServiceMode::Cloud,
+        .connect_local_server         = {},
         .connect                = m_connect_url,
+        .connect_api            = m_connect_api_url,
+        .connect_printer_list   = m_connect_api_url + "/printer/slicer/v1/printers",
+        .connect_mqtt           = m_connect_mqtt_url,
+        .connect_graphql        = m_connect_api_url + "/graphql",
+        .connect_printables_print = m_connect_url + "/slicer-print",
         .connect_page           = m_connect_url,
         .connect_select_printer = m_connect_url + "/slicer-select-printer",
         .account                = m_account_url,
@@ -188,20 +191,25 @@ ServiceConfig::ModeUrls ServiceConfig::online_urls() const
     };
 }
 
-ServiceConfig::ModeUrls ServiceConfig::offline_urls(const std::string& server)
+ServiceConfig::ModeUrls ServiceConfig::connect_local_urls(const std::string& server)
 {
     if (server.empty()) {
-        return {.mode = ServiceMode::Offline};
+        return {.mode = ServiceMode::ConnectLocal};
     }
-    const std::string module = server + std::string(OFFLINE_MODULE_PATH);
+    const std::string module  = server + std::string(CONNECT_LOCAL_MODULE_PATH);
+    const std::string connect = module + std::string(CONNECT_LOCAL_CONNECT_API_PATH);
     return {
-        .mode                   = ServiceMode::Offline,
-        .offline_server         = server,
-        .connect                = module + std::string(OFFLINE_CONNECT_API_PATH),
-        .connect_page           = server + std::string(OFFLINE_CONNECT_PAGE_PATH),
-        .connect_select_printer = server + std::string(OFFLINE_SELECT_PRINTER_PATH),
-        .account                = module + std::string(OFFLINE_ACCOUNT_API_PATH),
-        // Connect Local signs in by app pairing, there is no OAuth token endpoint.
+        .mode                   = ServiceMode::ConnectLocal,
+        .connect_local_server         = server,
+        .connect                = connect,
+        .connect_api            = {},
+        .connect_printer_list   = connect + std::string(CONNECT_LOCAL_PRINTER_LIST_PATH),
+        .connect_mqtt           = {},
+        .connect_graphql        = {},
+        .connect_printables_print = {},
+        .connect_page           = server + std::string(CONNECT_LOCAL_CONNECT_PAGE_PATH),
+        .connect_select_printer = server + std::string(CONNECT_LOCAL_SELECT_PRINTER_PATH),
+        .account                = module + std::string(CONNECT_LOCAL_ACCOUNT_API_PATH),
         .account_token = {},
     };
 }
@@ -218,16 +226,70 @@ ServiceMode ServiceConfig::mode() const
     return m_mode_urls.mode;
 }
 
-std::string ServiceConfig::offline_server_url() const
+std::string ServiceConfig::connect_local_server_url() const
 {
-    return mode_url(&ModeUrls::offline_server);
+    return mode_url(&ModeUrls::connect_local_server);
 }
 
-// ---- Prusa Connect ----
 
 std::string ServiceConfig::connect_url() const
 {
     return mode_url(&ModeUrls::connect);
+}
+
+std::string ServiceConfig::connect_api_url() const
+{
+    return mode_url(&ModeUrls::connect_api);
+}
+
+std::string ServiceConfig::connect_printer_list_url() const
+{
+    return mode_url(&ModeUrls::connect_printer_list);
+}
+
+std::string ServiceConfig::connect_mqtt_url() const
+{
+    return mode_url(&ModeUrls::connect_mqtt);
+}
+
+std::string ServiceConfig::connect_graphql_url() const
+{
+    return mode_url(&ModeUrls::connect_graphql);
+}
+
+std::string ServiceConfig::connect_printables_print_url() const
+{
+    return mode_url(&ModeUrls::connect_printables_print);
+}
+
+std::string ServiceConfig::connect_organization_files_url(const std::string& organization_id) const
+{
+    const std::string api = connect_api_url();
+    if (api.empty()) {
+        return {};
+    }
+    return api + "/file/slicer/v1/organizations/" + organization_id + "/files";
+}
+
+std::string ServiceConfig::connect_organization_file_url(
+    const std::string& organization_id,
+    const std::string& file_id
+) const
+{
+    const std::string files = connect_organization_files_url(organization_id);
+    if (files.empty()) {
+        return {};
+    }
+    return files + "/" + file_id;
+}
+
+std::string ServiceConfig::connect_printer_queue_url(const std::string& printer_uuid) const
+{
+    const std::string api = connect_api_url();
+    if (api.empty()) {
+        return {};
+    }
+    return api + "/printer/slicer/v1/printers/" + printer_uuid + "/queue";
 }
 
 std::string ServiceConfig::connect_page_url() const
@@ -242,22 +304,19 @@ std::string ServiceConfig::connect_select_printer_url() const
 
 std::string ServiceConfig::connect_printer_page_url(const std::string& printer_uuid) const
 {
-    // The uuid comes from the server, keep it to the characters of a uuid, so it is one path
-    // segment and cannot add anything to the URL.
     if (printer_uuid.empty() || !is_ascii_alnum_or(printer_uuid, "-_")) {
         return {};
     }
     std::shared_lock lock(m_mutex);
-    if (m_mode_urls.mode == ServiceMode::Online) {
+    if (m_mode_urls.mode == ServiceMode::Cloud) {
         return m_mode_urls.connect + "/printer/" + printer_uuid + "/dashboard";
     }
-    if (m_mode_urls.offline_server.empty()) {
+    if (m_mode_urls.connect_local_server.empty()) {
         return {};
     }
-    return m_mode_urls.offline_server + std::string(OFFLINE_PRINTER_PAGE_PATH) + printer_uuid;
+    return m_mode_urls.connect_local_server + std::string(CONNECT_LOCAL_PRINTER_PAGE_PATH) + printer_uuid;
 }
 
-// ---- Prusa Account ----
 
 std::string ServiceConfig::account_url() const
 {
@@ -269,44 +328,41 @@ std::string ServiceConfig::account_token_url() const
     return mode_url(&ModeUrls::account_token);
 }
 
-// ---- Connect Local app pairing ----
 
-std::string ServiceConfig::offline_pairing_url() const
+std::string ServiceConfig::connect_local_pairing_url() const
 {
-    const std::string server = offline_server_url();
-    return server.empty() ? std::string() : server + std::string(OFFLINE_PAIRING_API_PATH);
+    const std::string server = connect_local_server_url();
+    return server.empty() ? std::string() : server + std::string(CONNECT_LOCAL_PAIRING_API_PATH);
 }
 
-std::string ServiceConfig::offline_pairing_token_url() const
+std::string ServiceConfig::connect_local_pairing_token_url() const
 {
-    const std::string url = offline_pairing_url();
+    const std::string url = connect_local_pairing_url();
     return url.empty() ? std::string() : url + "/token";
 }
 
-std::string ServiceConfig::offline_pairing_page_url(const std::string& user_code) const
+std::string ServiceConfig::connect_local_pairing_page_url(const std::string& user_code) const
 {
-    // The code is the only part of the URL taken from the server, keep it to the characters a user
-    // code consists of, so it cannot add anything to the URL.
-    const std::string server = offline_server_url();
+    const std::string server = connect_local_server_url();
     if (server.empty() || user_code.empty() || !is_ascii_alnum_or(user_code, "-")) {
         return {};
     }
-    return server + std::string(OFFLINE_PAIRING_PAGE_PATH) + user_code;
+    return server + std::string(CONNECT_LOCAL_PAIRING_PAGE_PATH) + user_code;
 }
 
-std::string ServiceConfig::offline_page_session_url() const
+std::string ServiceConfig::connect_local_page_session_url() const
 {
-    const std::string url = offline_pairing_url();
+    const std::string url = connect_local_pairing_url();
     return url.empty() ? std::string() : url + "/session";
 }
 
-std::string ServiceConfig::offline_credential_url(const std::string& credential_id) const
+std::string ServiceConfig::connect_local_credential_url(const std::string& credential_id) const
 {
-    const std::string server = offline_server_url();
+    const std::string server = connect_local_server_url();
     if (server.empty() || credential_id.empty() || !is_ascii_alnum_or(credential_id, "-_")) {
         return {};
     }
-    return server + std::string(OFFLINE_CREDENTIALS_PATH) + credential_id;
+    return server + std::string(CONNECT_LOCAL_CREDENTIALS_PATH) + credential_id;
 }
 
 } // namespace Slic3r::Biz::Network

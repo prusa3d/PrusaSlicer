@@ -1,5 +1,6 @@
 #include "Slic3r/App/WelcomeDialog.hpp"
 #include <ranges>
+#include "Slic3r/App/AccountServiceSwitcher.hpp"
 #include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/Browser/BrowserLogicLogInRedirect.hpp"
@@ -437,12 +438,8 @@ ItemPtr create_offline_button_content()
     connect_local_row->set_flex_shrink(0);
     connect_local_row->set_gap(gap);
     connect_local_row->set_align_items(YGAlignCenter);
-    auto connect_local_icon{connect_local_row->emplace_back<Icon>(Render::Icon::Connect)};
-    connect_local_icon->set_width(16_fpx);
-    connect_local_icon->set_height(16_fpx);
-    // TRN Welcome dialog, offline choice: printing through a self-hosted Prusa Connect Local
-    // server on the local network instead of the cloud.
-    connect_local_row->emplace_back<Text>(Biz::_u8L("Prusa Connect (on-premise) printing"));
+    emplace_dot(connect_local_row, green);
+    connect_local_row->emplace_back<Text>(Biz::_u8L("Prusa Connect on-premise enabled"));
 
     return result;
 }
@@ -1296,7 +1293,6 @@ public:
         m_logged_out_avatar->set_height(50_fpx);
         m_logged_out_avatar->set_rounding(25_fpx);
 
-        // Shown for the online choice only, the offline one signs in from the Connect tab.
         result->content()->emplace_back<Title>(
             Biz::_u8L("Sign in to your Prusa Account"),
             Biz::_u8L(
@@ -1419,8 +1415,6 @@ WelcomeDialog::WelcomeDialog(Biz::ProjectInteractor& project_interactor, Navigat
             } else {
                 ASSERT(button == m_offline_button);
                 m_online = false;
-                // Working without an account is not signing out: nothing is revoked on a
-                // Connect Local server.
                 m_project_interactor.user_account_interactor().log_out_locally();
                 m_login_screen->reload_layout();
                 m_printer_screen->disable_printer_sync();
@@ -1604,12 +1598,9 @@ void WelcomeDialog::sync_config() const
     auto& app_config_interactor{AppServices::instance().app_config_interactor()};
     if (app_config.is_webkit_available()) {
         app_config_interactor.set_item_value("enable_printables", Domain::ConfigValue{m_online});
-        // Offline keeps the account and the Connect tab: it signs in to a Connect Local server on
-        // the local network instead of the cloud. The tab then asks for the server.
-        app_config_interactor.set_service_mode(
-            m_online ? Biz::Network::ServiceMode::Online : Biz::Network::ServiceMode::Offline
-        );
-        app_config_interactor.set_item_value("enable_prusa_account", Domain::ConfigValue{true});
+        AppServices::instance()
+            .account_service_switcher()
+            .enable_services(m_online, true, AccountService::PrusaAccount);
     }
 
     if (app_config.is_sentry_available()) {

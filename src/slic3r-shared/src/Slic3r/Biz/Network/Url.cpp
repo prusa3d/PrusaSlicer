@@ -51,7 +51,6 @@ std::string UrlParts::origin() const
 {
     std::string result = scheme + "://";
     if (is_ipv6()) {
-        // The zone id is percent encoded in a URL (RFC 6874).
         result += "[" + host + (zone_id.empty() ? std::string() : "%25" + zone_id) + "]";
     } else {
         result += host;
@@ -66,7 +65,6 @@ std::optional<UrlParts> parse_url(std::string_view url)
 {
     const CurlUrlPtr handle(curl_url());
     const std::string text(url);
-    // Any scheme, the path as written.
     const unsigned int flags = CURLU_NON_SUPPORT_SCHEME | CURLU_PATH_AS_IS;
     if (!handle || curl_url_set(handle.get(), CURLUPART_URL, text.c_str(), flags) != CURLUE_OK) {
         return std::nullopt;
@@ -130,7 +128,6 @@ std::string resolve_url(std::string_view reference, std::string_view base_url)
         return text;
     }
 
-    // Setting a relative URL on a handle holding an absolute one resolves it against that one.
     const CurlUrlPtr handle(curl_url());
     const std::string base(base_url);
     if (!handle

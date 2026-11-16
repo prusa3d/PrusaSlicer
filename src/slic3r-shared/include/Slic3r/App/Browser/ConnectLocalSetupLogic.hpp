@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Slic3r/Biz/Lifetime.hpp"
 #include "Slic3r/App/Browser/BrowserLogicCommand.hpp"
+#include "Slic3r/App/Browser/ConnectServiceSwitch.hpp"
 
 #include "Slic3r/Biz/Network/ServerTrustProbe.hpp"
 
@@ -23,15 +25,13 @@ class UserAccountInteractor;
 namespace Slic3r::App::Browser {
 
 /**
- * @brief The Connect Local server setup of the Connect tab (offline mode).
+ * @brief The Connect Local server setup of the Connect tab (Connect Local).
  *
  * Drives the slicer's own pages of the tab that choose the server: the setup page
  * (resources/web/connect_local_setup.html) with the LAN discovery on request and the certificate of
- * an https server, and the logged-out page (connect_local_logged_out.html) that leads to it. These
- * pages and the online logged-out page (connect_logged_out.html) switch between Prusa Connect and
- * Prusa Connect Local. Choosing a server writes it, with the service mode, to the app config; the
- * mode switch then reloads the tab. The Connect page logic (BrowserLogicConnectPage) owns the tab
- * and loads the pages.
+ * an https server, and the logged-out page (connect_local_logged_out.html) that leads to it.
+ * Choosing a server writes it to the app config; the Connect tab is then created again. The
+ * Connect Local page logic (BrowserLogicConnectLocalPage) owns the tab and loads the pages.
  */
 class ConnectLocalSetupLogic
 {
@@ -59,14 +59,15 @@ public:
     /** @brief Resources page that chooses the server. */
     static constexpr std::string_view SETUP_PAGE = "connect_local_setup";
     /**
-     * @brief Offline replacement of connect_logged_out: signs in to the server, not to Prusa
+     * @brief Connect Local replacement of connect_logged_out: signs in to the server, not to Prusa
      * Account.
      */
     static constexpr std::string_view LOGGED_OUT_PAGE = "connect_local_logged_out";
     /**
-     * @brief Logged-out page of Prusa Connect (online), whose switch leads to the offline mode.
+     * @brief Passed to the Connect tab as the page to show next: the setup page, asked for from
+     * outside of the tab (the account menu, Preferences).
      */
-    static constexpr std::string_view CLOUD_LOGGED_OUT_PAGE = "connect_logged_out";
+    static constexpr std::string_view SETUP_REQUEST = "prusaslicer://connect-server-setup";
 
     ConnectLocalSetupLogic(Biz::UserAccount::UserAccountInteractor& user_account, Page page);
     ~ConnectLocalSetupLogic();
@@ -75,7 +76,7 @@ public:
     ConnectLocalSetupLogic& operator=(const ConnectLocalSetupLogic&) = delete;
 
     /**
-     * @brief Offline mode without a valid server: the tab can only show the setup page.
+     * @brief Connect Local without a valid server: the tab can only show the setup page.
      */
     static bool needs_server_setup();
 
@@ -83,6 +84,14 @@ public:
      * @brief Whether the tab shows the setup page instead of the logged-out page.
      */
     bool wants_setup_page() const;
+
+    /**
+     * @brief The person asked to change the server from outside of the tab.
+     */
+    void request_setup()
+    {
+        m_setup_requested = true;
+    }
 
     /**
      * @brief Adds the handlers of the messages of the setup and logged-out pages.
@@ -128,16 +137,12 @@ private:
 
     std::string setup_page_init_script() const;
     std::string logged_out_page_init_script() const;
-    static std::string cloud_logged_out_page_init_script();
 
     void start_discovery();
     void stop_discovery();
     std::vector<BrowserLogicCommand> discovery_state_commands() const;
 
-    // ---- Messages of the setup and logged-out pages ----
     std::vector<BrowserLogicCommand> on_set_url(const std::string& message_data);
-    std::vector<BrowserLogicCommand> on_set_online(const std::string& message_data);
-    std::vector<BrowserLogicCommand> on_set_offline(const std::string& message_data);
     std::vector<BrowserLogicCommand> on_show_setup(const std::string& message_data);
     std::vector<BrowserLogicCommand> on_cancel_setup(const std::string& message_data);
     std::vector<BrowserLogicCommand> on_discovery(const std::string& message_data);
@@ -146,7 +151,7 @@ private:
     std::vector<BrowserLogicCommand> on_forget_certificate(const std::string& message_data);
 
     /**
-     * @brief Saves the server (and offline mode); the mode switch reloads the tab, or this leaves
+     * @brief Saves the server (and Connect Local); the mode switch reloads the tab, or this leaves
      * the setup page when nothing changes.
      */
     std::vector<BrowserLogicCommand> use_server(const std::string& normalized_url);
@@ -158,6 +163,7 @@ private:
     void probe_certificate(
         const std::string& normalized_url,
         ProbeKind kind,
+        const Biz::Network::ServerTrust& trust,
         std::function<void(Biz::Network::TlsProbeResult)> done
     );
 
@@ -165,20 +171,28 @@ private:
      * @brief Shows "checking" and probes the server; the result uses it, shows its certificate or
      * why it failed.
      */
-    std::vector<BrowserLogicCommand> check_and_use_server(const std::string& normalized_url);
+    std::vector<BrowserLogicCommand> check_and_use_server(
+        const std::string& normalized_url,
+        std::optional<Biz::Network::ServerTrust> candidate_trust = std::nullopt
+    );
 
     /**
      * @brief The page commands after a check the page waits for.
      */
     std::vector<BrowserLogicCommand>
-    finish_foreground_probe(const std::string& server, const Biz::Network::TlsProbeResult& result);
+    finish_foreground_probe(
+        const std::string& server,
+        const Biz::Network::TlsProbeResult& result,
+        const std::optional<Biz::Network::ServerTrust>& candidate_trust
+    );
 
     /**
      * @brief The page commands showing a refused certificate (and the trust buttons).
      */
     std::vector<BrowserLogicCommand> show_certificate_commands(
         const std::string& normalized_url,
-        const Biz::Network::TlsProbeResult& result
+        const Biz::Network::TlsProbeResult& result,
+        const Biz::Network::ServerTrust& trust
     );
 
     /**
@@ -196,8 +210,8 @@ private:
     Page m_page;
 
     bool m_shown{true};
-    /** @brief One of the slicer's pages is loaded, the only ones allowed to change the server. */
-    bool m_local_page{false};
+    /** @brief Knows whether one of the app's pages is loaded, the only ones allowed to act. */
+    ConnectServiceSwitch m_service_switch;
     /** @brief The user asked to change a valid server from the logged-out page. */
     bool m_setup_requested{false};
     /** @brief The setup page was shown because the server page failed on its certificate. */
@@ -212,7 +226,7 @@ private:
     std::string m_presented_certificate_url;
     Biz::Network::ServerTrustProbe m_foreground_probe{"Connect Local certificate check"};
     Biz::Network::ServerTrustProbe m_background_probe{"Connect Local certificate check"};
-    std::shared_ptr<char> m_alive{std::make_shared<char>()};
+    Biz::Lifetime m_lifetime;
 };
 
 } // namespace Slic3r::App::Browser

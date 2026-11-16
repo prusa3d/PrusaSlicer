@@ -23,7 +23,16 @@ public:
 	/**
 	 * @brief This constructor should be called only from IHttp::create.
 	 */
-    HttpCurl(RequestMethod request_method, std::string&& url, RetryFn fn);
+    /**
+     * @param server_trust Custom certificate trust of the server of the URL, see
+     * apply_server_trust(). Without it the system trust store verifies the server.
+     */
+    HttpCurl(
+        RequestMethod request_method,
+        std::string&& url,
+        RetryFn fn,
+        const std::optional<ServerTrust>& server_trust = std::nullopt
+    );
 
 	/**
 	 * @brief Sets a maximum connection timeout in seconds.
@@ -197,10 +206,12 @@ public:
     using ServerTrustLookup = std::function<std::optional<ServerTrust>(const std::string& url)>;
 
     /**
-     * @brief Sets the lookup asked by every new request for the trust of its URL (see
-     * apply_server_trust()). Thread safe. Without a lookup every request uses the system trust.
+     * @brief A creator of requests for HttpFactory::set_create_fn(): every request gets the
+     * trust the lookup returns for its URL. The lookup is called on the thread that creates the
+     * request.
      */
-    static void set_server_trust_lookup(ServerTrustLookup lookup);
+    static std::function<std::unique_ptr<IHttp>(RequestMethod, std::string, RetryFn)>
+    creator(ServerTrustLookup lookup);
 
     struct CurlDeleter {
         void operator()(CURL* ptr) const { if (ptr) curl_easy_cleanup(ptr); }

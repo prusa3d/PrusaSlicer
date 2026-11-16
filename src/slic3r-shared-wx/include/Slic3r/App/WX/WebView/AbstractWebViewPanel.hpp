@@ -36,8 +36,18 @@ public:
     virtual void set_next_show_url(const std::string url) {}
 
     /**
-     * @brief Asks the logic for its start page and loads it (e.g. after the service it shows
-     * changed).
+     * @brief Hides the panel and destroys it as soon as that is safe. A web view whose native
+     * part is still being created must not be destroyed: its creation callback would use it.
+     */
+    virtual void destroy_when_safe()
+    {
+        Hide();
+        Destroy();
+    }
+
+    /**
+     * @brief Asks the logic for its start page and loads it, for a set_next_show_url() while
+     * the panel is already shown.
      */
     virtual void reload_default_page() {}
 

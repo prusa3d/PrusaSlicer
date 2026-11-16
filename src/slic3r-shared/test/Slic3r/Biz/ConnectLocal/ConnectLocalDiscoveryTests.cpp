@@ -20,13 +20,11 @@ TEST_CASE("An announced instance is read into something addressable", "[connect-
 
     REQUIRE(found.has_value());
     CHECK(found->name == "Workshop");
-    // The trailing dot is how DNS spells a fully qualified name and has no place in a URL.
     CHECK(found->hostname == "workshop.local");
     CHECK(found->address == "192.168.1.50");
     CHECK(found->port == 8080);
     CHECK_FALSE(found->tls);
     CHECK(found->version == "0.1.0");
-    // The name is preferred over the address: a lease changes and a name does not.
     CHECK(found->base_url() == "http://workshop.local:8080");
 }
 
@@ -46,8 +44,6 @@ TEST_CASE("What an instance publishes decides how it is reached", "[connect-loca
         const auto found = discovered_from_reply("Kitchen Pi", "kitchen.local", "10.0.0.3", 80, {});
         REQUIRE(found.has_value());
         CHECK(found->name == "Kitchen Pi");
-        // The port is written out even when it is the scheme's default: 80 on one of
-        // these is a coincidence, not a promise.
         CHECK(found->base_url() == "http://kitchen.local:80");
     }
 
@@ -61,7 +57,6 @@ TEST_CASE("What an instance publishes decides how it is reached", "[connect-loca
 
 TEST_CASE("An answer that cannot be connected to is not offered", "[connect-local]")
 {
-    // Offering it would put a row in the list that does nothing when clicked.
     CHECK_FALSE(discovered_from_reply("No port", "a.local", "10.0.0.5", 0, {}).has_value());
     CHECK_FALSE(discovered_from_reply("Nowhere", "", "", 8080, {}).has_value());
     CHECK_FALSE(discovered_from_reply("Dots only", ".", "", 8080, {}).has_value());
@@ -69,8 +64,6 @@ TEST_CASE("An answer that cannot be connected to is not offered", "[connect-loca
 
 TEST_CASE("The service label fits what DNS-SD allows", "[connect-local]")
 {
-    // A service label is capped at 15 characters, which is why it is not spelled out
-    // as "prusa-connect-local"; the lookup silently refuses to ask for a longer one.
     CHECK(std::string{SERVICE_NAME}.size() <= 15);
 }
 
@@ -84,11 +77,9 @@ TEST_CASE("An instance answering again is listed once", "[connect-local]")
 
     CHECK(list.add(*a));
     CHECK(list.add(*b));
-    // The same answer again (e.g. over IPv6 or in the next round) changes nothing shown.
     CHECK_FALSE(list.add(*a));
     CHECK(list.instances().size() == 2);
 
-    // An update of a known instance replaces it in place.
     auto a2 = discovered_from_reply("A", "a.local", "10.0.0.1", 8080, {{TXT_VERSION, "2"}});
     REQUIRE(a2.has_value());
     CHECK(list.add(*a2));
@@ -106,17 +97,14 @@ TEST_CASE("An instance that stops answering is dropped after two rounds", "[conn
 
     list.add(*old_name);
     CHECK_FALSE(list.end_round());
-    // The server restarts under another host name: both are listed for a while...
     list.add(*new_name);
     CHECK_FALSE(list.end_round());
     REQUIRE(list.instances().size() == 2);
-    // ...one missed round is not enough (a lost packet), two are.
     list.add(*new_name);
     CHECK(list.end_round());
     REQUIRE(list.instances().size() == 1);
     CHECK(list.instances()[0].hostname == "host-2.local");
 
-    // Carried over to a new search: must answer in its first two rounds.
     list.restart();
     CHECK_FALSE(list.end_round());
     CHECK(list.end_round());
@@ -144,10 +132,22 @@ TEST_CASE("The setup page receives escaped JSON", "[connect-local]")
     CHECK(parsed[0]["port"] == 8080);
     CHECK(parsed[0]["tls"] == false);
     CHECK(parsed[0]["url"] == "http://evil.local:8080");
-    // Plain ASCII, so it is safe to splice into a script as a literal.
     CHECK(std::ranges::all_of(json, [](unsigned char c) { return c < 0x80; }));
-    // Quotes and backslashes are escaped by the JSON encoder.
     CHECK(json.find("\\\"\\\\") != std::string::npos);
 
     CHECK(discovered_list_json({}) == "[]");
+}
+
+TEST_CASE("An instance known by its IPv6 address gets a bracketed URL", "[connect-local]")
+{
+    Discovered found;
+    found.address = "fe80::1";
+    found.port    = 8080;
+    CHECK(found.base_url() == "http://[fe80::1]:8080");
+
+    found.tls = true;
+    CHECK(found.base_url() == "https://[fe80::1]:8080");
+
+    found.hostname = "workshop.local";
+    CHECK(found.base_url() == "https://workshop.local:8080");
 }

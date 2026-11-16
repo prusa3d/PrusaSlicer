@@ -51,26 +51,6 @@ public:
     virtual std::vector<BrowserLogicCommand> on_printables_secret_token(const std::string& body) {return {};}
 
     /**
-     * @brief Connect Local app pairing events, see IUserAccountListener.
-     */
-    virtual std::vector<BrowserLogicCommand>
-    on_user_account_pairing_ready(const std::string& page_url, const std::string& user_code)
-    {
-        return {};
-    }
-
-    virtual std::vector<BrowserLogicCommand>
-    on_user_account_pairing_failed(Biz::UserAccount::PairingFailure failure)
-    {
-        return {};
-    }
-
-    virtual std::vector<BrowserLogicCommand> on_user_account_pairing_approved()
-    {
-        return {};
-    }
-
-    /**
      * @brief A page failed to load. Commands returned replace the error page of the hosting view,
      * no commands keep it.
      * @param certificate_error The server certificate was refused.

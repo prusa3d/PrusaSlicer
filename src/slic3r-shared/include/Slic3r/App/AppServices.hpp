@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 
 namespace Slic3r::App::PopNotification {
@@ -18,8 +19,13 @@ namespace Slic3r::App::Mouse3D {
 class Mouse3DController;
 } // namespace Slic3r::App::Mouse3D
 
+namespace Slic3r::Biz::Network {
+class ServerTrustStore;
+} // namespace Slic3r::Biz::Network
+
 namespace Slic3r::App {
 
+class AccountServiceSwitcher;
 class AppConfig;
 class IDialogManager;
 class AppConfigInteractor;
@@ -54,7 +60,22 @@ public:
     Mouse3D::Mouse3DController& mouse_3d_controller() const;
     bool has_mouse_3d_controller() const;
 
+    /**
+     * @brief The certificate trust in effect for the Connect Local server. Always present.
+     */
+    Biz::Network::ServerTrustStore& server_trust_store() const;
+
+    /**
+     * @brief The switcher is owned by the application, which registers it here for its lifetime.
+     */
+    void set_account_service_switcher(AccountServiceSwitcher* switcher);
+    AccountServiceSwitcher& account_service_switcher() const;
+
 private:
+    AppServices();
+
+    std::unique_ptr<Biz::Network::ServerTrustStore> m_server_trust_store;
+    AccountServiceSwitcher* m_account_service_switcher{nullptr};
     std::unique_ptr<PopNotification::PopNotificationCenter> m_pop_notification_center;
     std::unique_ptr<IDialogManager> m_dialog_manager{};
     std::unique_ptr<Navigator> m_navigator;

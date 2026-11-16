@@ -18,7 +18,6 @@ TEST_CASE("Parts of a URL", "[Url]")
     CHECK(url->path == "/X");
     CHECK(url->origin() == "https://printfarm.local:8443");
 
-    // The default port of the scheme.
     url = parse_url("https://192.168.1.10");
     REQUIRE(url);
     CHECK(url->port == 443);
@@ -26,7 +25,6 @@ TEST_CASE("Parts of a URL", "[Url]")
     CHECK(url->path == "/");
     CHECK(url->origin() == "https://192.168.1.10");
 
-    // IPv6 without brackets, origin with them.
     url = parse_url("http://[FE80::1]/a/../b");
     REQUIRE(url);
     CHECK(url->host == "fe80::1");
@@ -40,7 +38,6 @@ TEST_CASE("Parts of a URL", "[Url]")
     CHECK(url->zone_id == "en0");
     CHECK(url->origin() == "http://[fe80::1%25en0]:8080");
 
-    // Any scheme.
     url = parse_url("ssl://[::1]:8883");
     REQUIRE(url);
     CHECK(url->scheme == "ssl");
@@ -71,7 +68,6 @@ TEST_CASE("URLs under the Connect Local server", "[Url]")
     CHECK_FALSE(url_belongs_to_server("https://printfarm.local/", server));
     CHECK_FALSE(url_belongs_to_server("https://connect.prusa3d.com/", server));
     CHECK_FALSE(url_belongs_to_server(server, ""));
-    // The default port, written out or not.
     CHECK(url_belongs_to_server("https://printfarm.local:443/x", "https://printfarm.local"));
 
     const std::string with_path = "https://10.0.0.5/connect";
@@ -84,10 +80,8 @@ TEST_CASE("URLs under the Connect Local server", "[Url]")
 TEST_CASE("Resolving a URL reference", "[Url]")
 {
     const std::string me = "https://printfarm.local:8443/account/api/v1/me/";
-    // Absolute references pass through unchanged.
     CHECK(resolve_url("https://cdn.prusa3d.com/a/B.png", me) == "https://cdn.prusa3d.com/a/B.png");
     CHECK(resolve_url("HTTP://Other.local/x/../y.png?q", me) == "HTTP://Other.local/x/../y.png?q");
-    // Relative references resolve under the base, the query kept.
     CHECK(
         resolve_url("avatar.png?i=D&c=fa6831", me)
         == "https://printfarm.local:8443/account/api/v1/me/avatar.png?i=D&c=fa6831"
@@ -95,7 +89,6 @@ TEST_CASE("Resolving a URL reference", "[Url]")
     CHECK(resolve_url("../x.png", me) == "https://printfarm.local:8443/account/api/v1/x.png");
     CHECK(resolve_url("/avatar.png", me) == "https://printfarm.local:8443/avatar.png");
     CHECK(resolve_url("avatar.png", "https://h/me") == "https://h/avatar.png");
-    // Nothing to resolve.
     CHECK(resolve_url("", me).empty());
     CHECK(resolve_url("avatar.png", "").empty());
 }

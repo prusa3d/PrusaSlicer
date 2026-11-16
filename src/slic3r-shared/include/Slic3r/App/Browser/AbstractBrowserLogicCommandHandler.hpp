@@ -49,7 +49,6 @@ protected:
         bool ret_val = true;
         for (auto it = command.begin(); it != command.end(); ++it) {
             if (it->type == BrowserLogicCommandType::SetCookie) {
-                // The commands after the cookie may need it, they wait until it is set.
                 std::vector<BrowserLogicCommand>
                     then(std::make_move_iterator(it + 1), std::make_move_iterator(command.end()));
                 ret_val &= handle_logic_command_SetCookie(it->data, std::move(then));

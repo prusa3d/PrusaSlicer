@@ -1,7 +1,8 @@
 #include "WebViewPlatformUtils.hpp"
 
-#include "Slic3r/App/ConnectLocalTrust.hpp"
+#include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/Biz/Network/ServerTrust.hpp"
+#include "Slic3r/Biz/Network/ServerTrustStore.hpp"
 #include "Slic3r/Biz/Network/Url.hpp"
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Assert.hpp"
@@ -331,7 +332,7 @@ gboolean on_load_failed_with_tls_errors(
         return FALSE;
     }
     const std::optional<Biz::Network::ServerTrust> trust =
-        ConnectLocalTrust::trust_for_host(url->host, url->port);
+        AppServices::instance().server_trust_store().trust_for_host(url->host, url->port);
     if (!trust) {
         // Not the Connect Local server: the load fails as before.
         return FALSE;
@@ -383,7 +384,7 @@ void on_load_changed(WebKitWebView* web_view, WebKitLoadEvent load_event, gpoint
         return;
     }
     const std::optional<Biz::Network::ServerTrust> trust =
-        ConnectLocalTrust::trust_for_host(url->host, url->port);
+        AppServices::instance().server_trust_store().trust_for_host(url->host, url->port);
     if (trust && trust->accepts_chain(certificate_chain(certificate), url->host)) {
         return;
     }

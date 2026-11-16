@@ -42,16 +42,16 @@ namespace Slic3r::App::WX::WebView {
 
     /**
      * @brief Lets the web view accept the certificate of the Connect Local server when it matches
-     * the trust chosen for that server (App::ConnectLocalTrust::trust_for_host()):
+     * the trust chosen for that server (Biz::Network::ServerTrustStore::trust_for_host()):
      * the pinned public key or a chain to the loaded certificate. Any other certificate is handled
-     * by the platform as before. Safe to call repeatedly; does nothing until the native web view
-     * exists (WebView2 is created asynchronously).
+     * by the platform as before. Call it once per web view, after its native web view exists
+     * (WebView2 is created asynchronously).
      */
     void setup_webview_server_trust(wxWebView* web_view);
 
     /**
      * @brief The trust of the Connect Local server or the service mode was applied again
-     * (App::ConnectLocalTrust::set_apply_listener()): drops what the web view remembers about
+     * (Biz::Network::IServerTrustListener): drops what the web view remembers about
      * certificates it accepted, so they are checked with the new trust.
      */
     void webview_server_trust_changed(wxWebView* web_view);

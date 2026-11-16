@@ -18,6 +18,24 @@ public:
     UserAccountCommunication& operator=(const UserAccountCommunication& ) = delete;
     UserAccountCommunication& operator=(UserAccountCommunication&& other) = delete;
 
+    bool is_prusa_account() const override
+    {
+        return true;
+    }
+
+    IPairingCommunication* pairing() override
+    {
+        return nullptr;
+    }
+
+    /**
+     * @brief The server refused the access token somewhere outside the session: refreshes it if
+     * it is still the current one and has expired. A refusal of a valid token changes nothing.
+     */
+    void on_unauthorized(const std::string& access_token) override;
+
+    void on_user_id_unusable() override;
+
     /**
      * @brief Logs out of User Account, tokens are thrown out, all other running apps gets message to log out.
      */

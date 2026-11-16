@@ -92,11 +92,6 @@ TEST_CASE_METHOD(HwBundleEvaluatorFixture, "Evaluate Connect HW Config Tests", "
     }
 }
 
-// The printer list of the prusaslicer3-compat module of Prusa Connect Local, recorded from its
-// demo printers. Offline mode reads it the way it reads the cloud's list, so every printer
-// with a model must load and match a printer of the bundle, MMU included. A printer the
-// cloud's model table does not know, such as the Klipper one, carries no model and is left
-// out, as the cloud leaves out such printers.
 TEST_CASE_METHOD(
     HwBundleEvaluatorFixture,
     "Evaluate the Connect Local printer list",

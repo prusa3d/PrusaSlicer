@@ -6,6 +6,9 @@
 
 #include "Slic3r/Assert.hpp"
 
+#include <memory>
+#include <utility>
+
 namespace Slic3r::App::Browser {
 
 BrowserLogicPrintablesToConnect::BrowserLogicPrintablesToConnect(
@@ -13,7 +16,12 @@ BrowserLogicPrintablesToConnect::BrowserLogicPrintablesToConnect(
     Biz::ProjectInteractor& project_interactor
 ) :
     AbstractBrowserLogic(url, {"_prusaSlicer"}, "connect_loading", "connect_error"),
-    AbstractConnectRequestHandler(project_interactor, *this)
+    AbstractConnectRequestHandler(
+        project_interactor,
+        std::make_unique<ConnectTokenAuth>(),
+        [this](std::vector<BrowserLogicCommand> commands) { push_commands(std::move(commands)); },
+        "connect_error"
+    )
 {
 }
 

@@ -23,7 +23,7 @@ body {
 /* Must win over the display of any component class below. */
 .hidden { display: none !important; }
 
-/* ---- Prusa Connect | Prusa Connect (on-premise) ---- */
+/* ---- Prusa Connect | Prusa Connect on-premise ---- */
 .modes {
   display: flex;
   gap: 4px;

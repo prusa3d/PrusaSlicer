@@ -60,7 +60,6 @@ void UserAccountActionPost::perform(
             http->header(key, value);
         }
     }
-    // A request without retries (Connect Local) sends only the headers it was given.
     if (!content_type_added && shared_data->retry) {
         http->header("Content-Type", "application/x-www-form-urlencoded");
     }

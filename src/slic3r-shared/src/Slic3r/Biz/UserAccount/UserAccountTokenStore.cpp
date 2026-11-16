@@ -19,7 +19,7 @@ std::mutex g_store_mutex;
 /**
  * @brief Secret store service of the Connect Local credential, apart from the Prusa Account tokens.
  */
-const std::string OFFLINE_SERVICE = "PrusaAccountOffline";
+const std::string CONNECT_LOCAL_SERVICE = "PrusaAccountOffline";
 } // namespace
 
 bool save_tokens(const StoreData& secrets)
@@ -56,7 +56,7 @@ void reset()
 void reset_all_modes()
 {
     reset();
-    clear_offline_credential();
+    clear_connect_local_credential();
 }
 
 bool load_tokens(StoreData& result)
@@ -96,7 +96,7 @@ bool load_tokens(StoreData& result)
 
 }
 
-std::string serialize_offline_credential(const OfflineCredential& credential)
+std::string serialize_connect_local_credential(const ConnectLocalCredential& credential)
 {
     return credential.token
         + "|"
@@ -107,16 +107,15 @@ std::string serialize_offline_credential(const OfflineCredential& credential)
         + credential.server_url;
 }
 
-std::optional<OfflineCredential> parse_offline_credential(const std::string& record)
+std::optional<ConnectLocalCredential> parse_connect_local_credential(const std::string& record)
 {
-    // The server URL is the last field and keeps any '|' it might contain.
     const size_t first  = record.find('|');
     const size_t second = first == std::string::npos ? first : record.find('|', first + 1);
     const size_t third  = second == std::string::npos ? second : record.find('|', second + 1);
     if (third == std::string::npos) {
         return std::nullopt;
     }
-    OfflineCredential credential;
+    ConnectLocalCredential credential;
     credential.token             = record.substr(0, first);
     credential.credential_id     = record.substr(first + 1, second - first - 1);
     const std::string expires_at = record.substr(second + 1, third - second - 1);
@@ -135,16 +134,16 @@ std::optional<OfflineCredential> parse_offline_credential(const std::string& rec
     return credential;
 }
 
-bool save_offline_credential(const OfflineCredential& credential)
+bool save_connect_local_credential(const ConnectLocalCredential& credential)
 {
 #ifdef SLIC3R_HAS_WEBKIT
     std::lock_guard<std::mutex> lock(g_store_mutex);
     SPDLOG_INFO("{} token: {}", __FUNCTION__, token_log_fingerprint(credential.token));
     const std::string record =
-        credential.token.empty() ? std::string() : serialize_offline_credential(credential);
+        credential.token.empty() ? std::string() : serialize_connect_local_credential(credential);
     if (!Platform::PlatformServices::instance()
              .secret_store()
-             .save_secret(OFFLINE_SERVICE, "tokens", record))
+             .save_secret(CONNECT_LOCAL_SERVICE, "tokens", record))
     {
         SPDLOG_ERROR("Failed to write the Connect Local credential to the secret store.");
         return false;
@@ -156,7 +155,7 @@ bool save_offline_credential(const OfflineCredential& credential)
 #endif // SLIC3R_HAS_WEBKIT
 }
 
-OfflineCredentialRead read_offline_credential()
+ConnectLocalCredentialRead read_connect_local_credential()
 {
 #ifdef SLIC3R_HAS_WEBKIT
     std::lock_guard<std::mutex> lock(g_store_mutex);
@@ -164,16 +163,15 @@ OfflineCredentialRead read_offline_credential()
     std::string record;
     if (!Platform::PlatformServices::instance()
              .secret_store()
-             .load_secret(OFFLINE_SERVICE, key, record))
+             .load_secret(CONNECT_LOCAL_SERVICE, key, record))
     {
-        // The store does not tell a missing entry (no sign-in yet, the usual case) from a failure.
         SPDLOG_INFO("No Connect Local credential could be read from the secret store.");
         return {StoreReadStatus::Error, std::nullopt};
     }
     if (record.empty()) {
         return {StoreReadStatus::Empty, std::nullopt};
     }
-    std::optional<OfflineCredential> credential = parse_offline_credential(record);
+    std::optional<ConnectLocalCredential> credential = parse_connect_local_credential(record);
     if (!credential) {
         SPDLOG_WARN(
             "The Connect Local credential in the secret store is unreadable ({} bytes).",
@@ -188,8 +186,8 @@ OfflineCredentialRead read_offline_credential()
 #endif // SLIC3R_HAS_WEBKIT
 }
 
-void clear_offline_credential()
+void clear_connect_local_credential()
 {
-    save_offline_credential({});
+    save_connect_local_credential({});
 }
 }

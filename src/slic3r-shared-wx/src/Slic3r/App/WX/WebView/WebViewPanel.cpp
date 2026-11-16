@@ -12,10 +12,12 @@
 #include <Slic3r/Assert.hpp>
 #include <Slic3r/Directories.hpp>
 
+#include <wx/app.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textdlg.h>
 #include <wx/uri.h>
+#include <wx/weakref.h>
 
 #include <utility>
 
@@ -149,6 +151,7 @@ void WebViewPanel::late_create()
     Bind(wxEVT_WEBVIEW_NAVIGATING, &WebViewPanel::on_navigation_request, this, web_view->GetId());
     Bind(wxEVT_WEBVIEW_LOADED, &WebViewPanel::on_loaded, this, web_view->GetId());
     Bind(wxEVT_WEBVIEW_CREATED, &WebViewPanel::on_created, this, web_view->GetId());
+    Bind(wxEVT_WEBVIEW_SCRIPT_RESULT, &WebViewPanel::on_script_result, this, web_view->GetId());
 
     Layout();
 
@@ -236,7 +239,17 @@ void WebViewPanel::run_script(const wxString& javascript)
     if (!web_view || !m_shown)
         return;
     // SPDLOG_DEBUG("RunScript: {}", into_u8(javascript));
+    ++m_pending_scripts;
     web_view->RunScriptAsync(javascript);
+}
+
+void WebViewPanel::on_script_result(wxWebViewEvent& evt)
+{
+    evt.Skip();
+    if (m_pending_scripts > 0) {
+        --m_pending_scripts;
+    }
+    destroy_if_requested();
 }
 
 void WebViewPanel::do_reload()
@@ -259,12 +272,45 @@ void WebViewPanel::do_reload()
     load_default_url();
 }
 
+void WebViewPanel::destroy_when_safe()
+{
+    m_destroy_requested = true;
+    Hide();
+    destroy_if_requested();
+}
+
+void WebViewPanel::destroy_if_requested()
+{
+    if (!m_destroy_requested
+        || m_destroy_scheduled
+        || m_host.is_creating()
+        || m_pending_scripts > 0)
+    {
+        return;
+    }
+    m_destroy_scheduled = true;
+    wxTheApp->CallAfter(
+        [panel = wxWeakRef<WebViewPanel>(this)]()
+        {
+            if (panel) {
+                panel->Destroy();
+            }
+        }
+    );
+}
+
 void WebViewPanel::on_show(wxShowEvent& evt)
 {
+    if (IsBeingDeleted() || m_destroy_scheduled) {
+        return;
+    }
     m_shown = evt.IsShown();
     if (!m_shown) {
         wxSetCursor(wxNullCursor);
         m_logic->on_hide_webview_event();
+        return;
+    }
+    if (m_destroy_requested) {
         return;
     }
     m_logic->on_visible_webview_event();
@@ -327,6 +373,10 @@ void WebViewPanel::on_page_will_load()
 void WebViewPanel::on_created(wxWebViewEvent& evt)
 {
     m_host.notify_created();
+    if (m_destroy_requested) {
+        destroy_if_requested();
+        return;
+    }
     [[maybe_unused]] bool b = process_logic_command_vector(m_logic->on_webview_created());
     DEBUG_ASSERT(b, "False return value signals Veto which cannot be done here.");
 }
@@ -365,6 +415,10 @@ case type: \
 
 void WebViewPanel::on_idle(wxIdleEvent& evt)
 {
+    if (m_destroy_requested) {
+        destroy_if_requested();
+        return;
+    }
     wxWebView* web_view = m_host.get();
     if (!web_view)
         return;

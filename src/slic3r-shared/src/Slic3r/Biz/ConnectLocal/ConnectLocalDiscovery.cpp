@@ -47,9 +47,13 @@ std::string Discovered::base_url() const
     if (host.empty() || port == 0) {
         return {};
     }
-    // The port is always written out, even when it is the scheme's default: an instance
-    // is not a web site, and 80 on one of these is a coincidence rather than a promise.
-    return fmt::format("{}://{}:{}", tls ? "https" : "http", host, port);
+    const bool bare_ipv6 = host.find(':') != std::string::npos && !host.starts_with('[');
+    return fmt::format(
+        "{}://{}:{}",
+        tls ? "https" : "http",
+        bare_ipv6 ? "[" + host + "]" : host,
+        port
+    );
 }
 
 std::optional<Discovered> discovered_from_reply(
@@ -61,7 +65,6 @@ std::optional<Discovered> discovered_from_reply(
 )
 {
     if (port == 0) {
-        // Nothing to connect to. An answer without one is not an instance we can offer.
         return std::nullopt;
     }
     const std::string host = without_trailing_dot(hostname);
@@ -77,7 +80,6 @@ std::optional<Discovered> discovered_from_reply(
     found.version  = txt_value(txt, TXT_VERSION);
     found.name     = txt_value(txt, TXT_NAME);
     if (found.name.empty()) {
-        // The service name is what a person named the machine, so it beats an address.
         found.name = service_name.empty() ? host : service_name;
     }
     return found;
@@ -152,7 +154,6 @@ bool DiscoveredList::end_round()
 
 void DiscoveredList::restart()
 {
-    // As if all of them answered in the round before the first one.
     m_answered.clear();
     m_answered_before.clear();
     for (const Discovered& instance : m_instances) {
@@ -199,7 +200,6 @@ void DiscoveryLoop::start()
     }
     m_running     = true;
     m_rounds_done = 0;
-    // What was found before has to answer again to stay.
     m_found.restart();
     m_session = std::make_shared<char>(0);
     start_round();
@@ -209,16 +209,12 @@ void DiscoveryLoop::stop()
 {
     m_running = false;
     m_session.reset();
-    // Dropping the token does not stop a lookup in flight, it runs out on its own; its
-    // callbacks find the session expired and do nothing.
     m_lookup.reset();
 }
 
 void DiscoveryLoop::start_round()
 {
     std::weak_ptr<char> session = m_session;
-    // The callbacks run on the lookup thread. They only carry data to the main thread, where
-    // the session is checked: alive means `this` is alive and still wants the results.
     m_lookup = browse_for_instances(
         [this, session, &dispatcher = m_dispatcher](Discovered found)
         {

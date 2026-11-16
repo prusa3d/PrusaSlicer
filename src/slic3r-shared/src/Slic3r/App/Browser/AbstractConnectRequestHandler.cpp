@@ -5,8 +5,7 @@
 #include <Slic3r/App/Theme.hpp>
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
-#include "Slic3r/App/Browser/AbstractBrowserLogic.hpp"
-#include "Slic3r/App/Browser/BrowserCookie.hpp"
+#include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/LegacyFormat.hpp"
@@ -20,10 +19,14 @@
 namespace Slic3r::App::Browser {
 AbstractConnectRequestHandler::AbstractConnectRequestHandler(
     Biz::ProjectInteractor& project_interactor,
-    AbstractBrowserLogic& logic
+    std::unique_ptr<IConnectPageAuth> page_auth,
+    PushCommandsFn push_commands,
+    std::string error_page
 ) :
     m_project_interactor(project_interactor),
-    m_logic(logic)
+    m_page_auth(std::move(page_auth)),
+    m_push_commands(std::move(push_commands)),
+    m_error_page(std::move(error_page))
 {
     m_actions["REQUEST_LOGIN"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_request_login, this, std::placeholders::_1);
     m_actions["REQUEST_CONFIG"] = std::bind(
@@ -44,19 +47,11 @@ AbstractConnectRequestHandler::AbstractConnectRequestHandler(
     m_actions["OPEN_CONNECT_IN_BROWSER"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_open_connect_in_browser, this, std::placeholders::_1);
 }
 
-std::string AbstractConnectRequestHandler::connect_page_js_condition()
-{
-    if (Biz::Network::ServiceConfig::instance().is_offline()) {
-        return "(location.protocol === 'https:' || location.protocol === 'http:')";
-    }
-    return "location.protocol === 'https:'";
-}
-
 std::string AbstractConnectRequestHandler::get_engine_check_script() const
 {
     return R"(
         if ()"
-        + connect_page_js_condition()
+        + m_page_auth->page_js_condition()
         + R"( && window._prusaSlicer) {
             try {
                 new Function('class _{static{}}');
@@ -146,21 +141,19 @@ AbstractConnectRequestHandler::on_connect_action_request_config_message(
     const std::string& message_data
 )
 {
-    if (!Biz::Network::ServiceConfig::instance().is_offline()) {
+    if (m_page_auth->pages_get_token()) {
         return on_connect_action_request_config(message_data);
     }
-    if (!m_project_interactor.user_account_interactor().access_token().empty()) {
-        // A page asking again got 401 with its session: it needs a new one, and without one it
-        // would only reload and ask again.
-        const bool refused = std::exchange(m_page_configured, true);
-        with_page_session(
-            on_connect_action_request_config(message_data),
-            refused ? OnSessionFailure::ShowError : OnSessionFailure::Then,
-            refused
-        );
-        return {};
+    if (m_project_interactor.user_account_interactor().access_token().empty()) {
+        return signed_out_commands();
     }
-    return signed_out_commands();
+    const bool refused = std::exchange(m_page_configured, true);
+    with_page_session(
+        on_connect_action_request_config(message_data),
+        refused ? OnSessionFailure::ShowError : OnSessionFailure::Then,
+        refused
+    );
+    return {};
 }
 
 std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::signed_out_commands()
@@ -170,7 +163,7 @@ std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::signed_out_comma
 
 std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::page_session_failed_commands()
 {
-    return {{BrowserLogicCommandType::LoadResourcesPage, m_logic.error_html()}};
+    return {{BrowserLogicCommandType::LoadResourcesPage, m_error_page}};
 }
 
 void AbstractConnectRequestHandler::with_page_session(
@@ -179,39 +172,11 @@ void AbstractConnectRequestHandler::with_page_session(
     bool fresh
 )
 {
-    m_project_interactor.user_account_interactor().request_page_session(
-        [this, alive = std::weak_ptr<char>(m_page_session_alive), then, on_failure](
-            std::optional<std::string> reply
-        ) mutable
-        {
-            if (alive.expired()) {
-                return;
-            }
-            const std::string server = Biz::Network::ServiceConfig::instance().offline_server_url();
-            const std::optional<BrowserCookie> cookie =
-                reply ? parse_page_session(*reply, server) : std::nullopt;
-            if (cookie) {
-                then.insert(
-                    then.begin(),
-                    BrowserLogicCommand(
-                        BrowserLogicCommandType::SetCookie,
-                        cookie_set_command_data(*cookie)
-                    )
-                );
-            } else if (reply) {
-                SPDLOG_ERROR(
-                    "Connect Local page session: unreadable reply ({} bytes).",
-                    reply->size()
-                );
-            }
-            if (cookie || on_failure == OnSessionFailure::Then) {
-                m_logic.push_commands(std::move(then));
-            } else {
-                m_logic.push_commands(page_session_failed_commands());
-            }
-        },
-        fresh
-    );
+    IConnectPageAuth::FallbackFn fallback;
+    if (on_failure == OnSessionFailure::ShowError) {
+        fallback = [this]() { return page_session_failed_commands(); };
+    }
+    m_page_auth->prepare_page(std::move(then), std::move(fallback), fresh, m_push_commands);
 }
 
 std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_action_request_config(const std::string& message_data)
@@ -244,10 +209,10 @@ std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_actio
         {"colorMode", theme},
         {"language", lang_app_conf},
     };
-    // Offline the page runs on its page session cookie and never gets the credential.
-    if (!Biz::Network::ServiceConfig::instance().is_offline()) {
-        init_options["accessToken"] = m_project_interactor.user_account_interactor().access_token();
-    }
+    m_page_auth->add_credentials(
+        init_options,
+        m_project_interactor.user_account_interactor().access_token()
+    );
     std::string script = format("window._prusaConnect_v2.init(%1%)", init_options.dump());
     return {{BrowserLogicCommandType::RunScript, script}};
 }

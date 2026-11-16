@@ -6,7 +6,9 @@
 #include "Slic3r/App/DisplayStrings.hpp"
 
 #include "Slic3r/Biz/I18N/I18N.hpp"
-#include "Slic3r/Biz/Network/ServiceConfig.hpp"
+#include "Slic3r/App/ConnectServiceName.hpp"
+
+#include <fmt/format.h>
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 
 #include <ranges>
@@ -1226,11 +1228,7 @@ void PopNotificationCenter::on_user_account_action_retry(
             PopNotificationLevel::Warning,
             0s,
             PopNotificationLayoutHeaderTextButtons(
-                Network::ServiceConfig::instance().is_offline() ?
-                    // TRN Header of the retry notification in offline mode (Prusa Connect Local server).
-                    _u8L("Prusa Connect (on-premise)") :
-                    // TRN Header of the Prusa Account retry notification.
-                    _u8L("Prusa Account"),
+                account_service_name(),
                 text,
                 // TRN Button on the Prusa Account retry notification. Cancels the retried request.
                 {{_u8L("Cancel"),
@@ -1252,12 +1250,12 @@ void PopNotificationCenter::on_user_account_credential_expires_soon(std::time_t 
     const long long days_left = (seconds_left + 24 * 60 * 60 - 1) / (24 * 60 * 60);
     const std::string text    = days_left <= 1 ?
         // TRN Connect Local notification: the sign-in of the app ends within a day and cannot be renewed.
-        _u8L("Your sign-in to Prusa Connect (on-premise) ends within a day. Sign in again after that.") :
+        _u8L("Your sign-in to Prusa Connect on-premise ends within a day. Sign in again after that.") :
         fmt::format(
             fmt::runtime(_L_PLURAL_u8(
                 // TRN Connect Local notification: the sign-in of the app ends soon and cannot be renewed. {} is a number of days.
-                "Your sign-in to Prusa Connect (on-premise) ends in {} day. Sign in again after that.",
-                "Your sign-in to Prusa Connect (on-premise) ends in {} days. Sign in again after that.",
+                "Your sign-in to Prusa Connect on-premise ends in {} day. Sign in again after that.",
+                "Your sign-in to Prusa Connect on-premise ends in {} days. Sign in again after that.",
                 static_cast<int>(days_left)
             )),
             days_left
@@ -1268,7 +1266,7 @@ void PopNotificationCenter::on_user_account_credential_expires_soon(std::time_t 
             PopNotificationLevel::Warning,
             0s,
             // TRN Header of the Connect Local sign-in expiration notification.
-            PopNotificationLayoutHeaderText{_u8L("Prusa Connect (on-premise)"), text}
+            PopNotificationLayoutHeaderText{_u8L("Prusa Connect on-premise"), text}
         },
         always_equal_matcher
     );
@@ -1500,13 +1498,11 @@ void PopNotificationCenter::on_fatal_arrange_error(
 
 void PopNotificationCenter::on_connect_handler_error(const std::string& msg)
 {
-    const std::string header{
-        Network::ServiceConfig::instance().is_offline() ?
-            // TRN Header of the Prusa Connect Local error notification (offline mode).
-            _u8L("Prusa Connect (on-premise) error") :
-            // TRN Header of the Prusa Connect error notification.
-            _u8L("Prusa Connect error")
-    };
+    const std::string header{fmt::format(
+        // TRN Header of the Prusa Connect error notification, {} is the name of the service.
+        fmt::runtime(_u8L("{} error")),
+        connect_service_name()
+    )};
 
     upsert_notification(
         PopNotificationData{

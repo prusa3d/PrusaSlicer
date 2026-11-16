@@ -7,6 +7,9 @@
 
 #include "Slic3r/App/CLI/CLIApp.hpp"
 #include "Slic3r/App/Launcher/ReadCLI.hpp"
+#include "Slic3r/Biz/Network/HttpCurl.hpp"
+#include "Slic3r/Biz/Network/HttpFactory.hpp"
+#include "Slic3r/Biz/Network/ServerTrustStore.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Log.hpp"
@@ -114,7 +117,12 @@ int main(int argc, char** argv)
 
     auto& app_services{Slic3r::App::AppServices::instance()};
     app_services.set_app_config(Slic3r::App::AppConfig::create_app_config());
-    // Online (cloud) or Offline (Connect Local) Account and Connect, before anything reads their URLs.
+    Slic3r::Biz::Network::HttpFactory::instance().set_create_fn(
+        Slic3r::Biz::Network::HttpCurl::creator(
+            [&store = app_services.server_trust_store()](const std::string& url)
+            { return store.trust_for_url(url); }
+        )
+    );
     app_services.app_config().apply_service_mode();
 
     const std::optional<Slic3r::App::Launcher::SentryScope> sentry{

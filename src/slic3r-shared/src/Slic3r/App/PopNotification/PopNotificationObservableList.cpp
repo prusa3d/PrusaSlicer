@@ -123,7 +123,12 @@ void PopNotificationObservableList::reset_notification_timeout(PopNotificationDa
     auto& timer_queue{Biz::Platform::PlatformServices::instance().timer_queue()};
     notification.timer_id = timer_queue.set_timer(
         duration_cast<milliseconds>(timeout),
-        std::bind(&PopNotificationObservableList::erase_notification, this, it->get()),
+        [this, alive = m_lifetime.token(), to_erase = it->get()]()
+        {
+            if (!alive.expired()) {
+                erase_notification(to_erase);
+            }
+        },
         false
     );
 }

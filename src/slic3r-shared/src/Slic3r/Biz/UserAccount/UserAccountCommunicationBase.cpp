@@ -24,8 +24,6 @@ void UserAccountCommunicationBase::stop_session_thread()
 {
     m_session.stop();
 
-    // Since there is m_thread_stop_condition in m_thread,
-    // we need to manually request_stop and wake up the condition for the thread to stop.
     m_thread.request_stop();
     wakeup_session_thread();
     if (m_thread.joinable()) {
@@ -50,7 +48,6 @@ void UserAccountCommunicationBase::init_session_thread()
                     m_thread_wakeup = false;
                 }
                 if (stop_token.stop_requested())
-                    // Stop the worker thread.
                     break;
                 m_session.process_action_queue();
             }

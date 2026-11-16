@@ -1,7 +1,9 @@
 #pragma once
 
+#include "Slic3r/Biz/Lifetime.hpp"
 #include "Slic3r/App/Browser/AbstractBrowserLogic.hpp"
 #include "Slic3r/Biz/Network/ServerTrustProbe.hpp"
+#include "Slic3r/Biz/UserAccount/IUserAccountListener.hpp"
 
 #include <memory>
 #include <string>
@@ -14,13 +16,16 @@ class UserAccountInteractor;
 namespace Slic3r::App::Browser {
 
 /**
- * @brief Sign-in dialog of the offline mode: Connect Local app pairing.
+ * @brief Sign-in dialog of Connect Local: Connect Local app pairing.
  *
  * Checks the server certificate (https), starts the pairing and opens the server's approval
  * page in the dialog. If that page does not show up in time, the code is shown on a local page
  * to be approved in a browser. The account signs in by polling, the dialog ends with it. The
  * session cookie the approval page leaves in the web views is deleted before the account is
  * announced, or when the dialog ends without signing in.
+ *
+ * The pairing events come from the account directly, through a listener this logic registers;
+ * the hosting dialog knows nothing of the pairing.
  */
 class BrowserLogicConnectLocalLogIn final : public AbstractBrowserLogic
 {
@@ -38,13 +43,6 @@ public:
     on_script_message_webview_event(const std::string& message) override;
     std::vector<BrowserLogicCommand>
     on_user_account_id_success(bool is_refresh, const std::string& current_url) override;
-    std::vector<BrowserLogicCommand> on_user_account_pairing_ready(
-        const std::string& page_url,
-        const std::string& user_code
-    ) override;
-    std::vector<BrowserLogicCommand>
-    on_user_account_pairing_failed(Biz::UserAccount::PairingFailure failure) override;
-    std::vector<BrowserLogicCommand> on_user_account_pairing_approved() override;
     std::vector<BrowserLogicCommand>
     on_load_error(const std::string& url, bool certificate_error) override;
     std::vector<BrowserLogicCommand> on_dialog_closing() override;
@@ -62,6 +60,31 @@ private:
         Done,
     };
 
+    /**
+     * @brief Receives the pairing events of the account for the logic, which pushes the resulting
+     * commands to the dialog.
+     */
+    class PairingEvents final : public Biz::UserAccount::IUserAccountListener
+    {
+    public:
+        explicit PairingEvents(BrowserLogicConnectLocalLogIn& logic) : m_logic(logic) {}
+
+        void on_user_account_pairing_ready(
+            const std::string& page_url,
+            const std::string& user_code
+        ) override;
+        void on_user_account_pairing_failed(Biz::UserAccount::PairingFailure failure) override;
+        void on_user_account_pairing_approved() override;
+
+    private:
+        BrowserLogicConnectLocalLogIn& m_logic;
+    };
+
+    std::vector<BrowserLogicCommand>
+    on_pairing_ready(const std::string& page_url, const std::string& user_code);
+    std::vector<BrowserLogicCommand> on_pairing_failed(Biz::UserAccount::PairingFailure failure);
+    std::vector<BrowserLogicCommand> on_pairing_approved();
+
     std::vector<BrowserLogicCommand> page_init_commands() const;
     std::vector<BrowserLogicCommand> page_state_commands() const;
     std::vector<BrowserLogicCommand> show_error(const std::string& reason, bool can_retry = true);
@@ -78,6 +101,7 @@ private:
     std::vector<BrowserLogicCommand> abandon_sign_in();
 
     Biz::UserAccount::UserAccountInteractor& m_user_account;
+    PairingEvents m_pairing_events{*this};
     bool m_page_requested{false};
 
     State m_state{State::Starting};
@@ -94,7 +118,7 @@ private:
     Biz::Network::ServerTrustProbe m_certificate_probe{"Connect Local sign-in certificate check"};
     /** @brief Alive while waiting for the server page; dropping it cancels the timeout. */
     std::shared_ptr<char> m_page_timeout_token;
-    std::shared_ptr<char> m_alive{std::make_shared<char>(0)};
+    Biz::Lifetime m_lifetime;
 };
 
 } // namespace Slic3r::App::Browser

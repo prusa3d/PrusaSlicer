@@ -10,14 +10,14 @@ namespace Slic3r::Biz::Network {
 /**
  * @brief Which backend serves Prusa Account and Prusa Connect.
  *
- * Online is the cloud (account.prusa3d.com, connect.prusa3d.com). Offline is a self-hosted
- * Prusa Connect Local server; every Account and Connect request goes there, with the same
+ * Cloud is account.prusa3d.com and connect.prusa3d.com. ConnectLocal is a self-hosted Prusa
+ * Connect on-premise server; every Account and Connect request goes there, with the same
  * request and response contracts, only base URLs and paths differ.
  */
 enum class ServiceMode
 {
-    Online,
-    Offline
+    Cloud,
+    ConnectLocal
 };
 
 /**
@@ -32,28 +32,27 @@ class ServiceConfig
     ServiceConfig();
 
 public:
-    // ---- Service mode ----
 
     /**
      * @brief Switches between the cloud and a Connect Local server.
-     * @param offline_server_url Base URL of the Connect Local server, used in Offline mode only.
-     * It is normalized by normalize_offline_server_url(); an invalid one leaves Offline mode
-     * without a server (offline_server_url() empty, every Account/Connect URL empty).
+     * @param connect_local_server_url Base URL of the Connect Local server, used in ConnectLocal mode only.
+     * It is normalized by normalize_connect_local_server_url(); an invalid one leaves ConnectLocal mode
+     * without a server (connect_local_server_url() empty, every Account/Connect URL empty).
      */
-    void set_mode(ServiceMode mode, const std::string& offline_server_url = {});
+    void set_mode(ServiceMode mode, const std::string& connect_local_server_url = {});
 
     ServiceMode mode() const;
 
-    bool is_offline() const
+    bool is_connect_local() const
     {
-        return mode() == ServiceMode::Offline;
+        return mode() == ServiceMode::ConnectLocal;
     }
 
     /**
-     * @brief Normalized base URL of the Connect Local server, empty in Online mode or when the
+     * @brief Normalized base URL of the Connect Local server, empty in Cloud mode or when the
      * configured one is invalid.
      */
-    std::string offline_server_url() const;
+    std::string connect_local_server_url() const;
 
     /**
      * @brief Validates and normalizes the user entered Connect Local server URL.
@@ -64,15 +63,14 @@ public:
      * whitespace are rejected.
      * @return The normalized URL, or nullopt if the URL cannot be used.
      */
-    static std::optional<std::string> normalize_offline_server_url(std::string_view url);
+    static std::optional<std::string> normalize_connect_local_server_url(std::string_view url);
 
     /**
      * @brief Path under the Connect Local server where the PrusaSlicer module API is mounted.
      */
-    static constexpr std::string_view OFFLINE_MODULE_PATH =
+    static constexpr std::string_view CONNECT_LOCAL_MODULE_PATH =
         "/api/v1/modules/com.github.aux.prusa-research.prusaslicer3-compat";
 
-    // ---- Prusa Connect ----
 
     /**
      * @brief Base of the Connect HTTP API (uploads, printers, ...).
@@ -89,42 +87,38 @@ public:
         return connect_url() + "/slicer/status";
     }
 
-    const std::string& connect_api_url() const
-    {
-        return m_connect_api_url;
-    }
+    /**
+     * @brief Base of the Connect slicer REST API (file records, printer queue). Empty Connect Local:
+     * Connect Local serves the legacy API under connect_url() only.
+     */
+    std::string connect_api_url() const;
 
-    /** @brief GET here lists the user's Connect printers. */
-    std::string connect_printer_list_url() const
-    {
-        return m_connect_api_url + "/printer/slicer/v1/printers";
-    }
+    /**
+     * @brief GET here lists the user's Connect printers. The slicer REST API online, the legacy
+     * endpoint of connect_url() Connect Local.
+     */
+    std::string connect_printer_list_url() const;
 
-    /** @brief POST here creates a file record in the organization and returns the presigned upload URL. */
-    std::string connect_organization_files_url(const std::string& organization_id) const
-    {
-        return m_connect_api_url + "/file/slicer/v1/organizations/" + organization_id + "/files";
-    }
+    /**
+     * @brief POST here creates a file record in the organization and returns the presigned
+     * upload URL. Empty Connect Local.
+     */
+    std::string connect_organization_files_url(const std::string& organization_id) const;
 
-    /** @brief PATCH here finishes the upload of one file record. */
+    /** @brief PATCH here finishes the upload of one file record. Empty Connect Local. */
     std::string connect_organization_file_url(
         const std::string& organization_id,
         const std::string& file_id
-    ) const
-    {
-        return connect_organization_files_url(organization_id) + "/" + file_id;
-    }
+    ) const;
 
-    /** @brief POST here sends an uploaded file to the printer or to its queue. */
-    std::string connect_printer_queue_url(const std::string& printer_uuid) const
-    {
-        return m_connect_api_url + "/printer/slicer/v1/printers/" + printer_uuid + "/queue";
-    }
+    /** @brief POST here sends an uploaded file to the printer or to its queue. Empty Connect Local. */
+    std::string connect_printer_queue_url(const std::string& printer_uuid) const;
 
-    const std::string& connect_mqtt_url() const
-    {
-        return m_connect_mqtt_url;
-    }
+    /**
+     * @brief The MQTT broker pushing printer states. Empty Connect Local: Connect Local has none, the
+     * printer list is polled instead.
+     */
+    std::string connect_mqtt_url() const;
 
     std::string connect_select_printer_url() const;
 
@@ -132,7 +126,7 @@ public:
      * @brief Page of one printer in the Connect web app, shown after an upload to it.
      * @param printer_uuid Uuid of the printer in the Connect printer list (Connect Local: the
      * device id).
-     * @return Empty for an empty or unsafe uuid, or offline without a valid server.
+     * @return Empty for an empty or unsafe uuid, or Connect Local without a valid server.
      */
     std::string connect_printer_page_url(const std::string& printer_uuid) const;
 
@@ -142,22 +136,17 @@ public:
     }
 
     /**
-     * @brief Printables "print to Connect" page of the cloud. Connect Local has none.
+     * @brief Printables "print to Connect" page of the cloud. Empty Connect Local, Connect Local has
+     * none.
      */
-    std::string connect_printables_print_url() const
-    {
-        return m_connect_url + "/slicer-print";
-    }
+    std::string connect_printables_print_url() const;
 
     /**
-     * @brief Connect GraphQL endpoint (favorite materials) of the cloud. Connect Local has none.
+     * @brief Connect GraphQL endpoint (favorite materials) of the cloud. Empty Connect Local, Connect
+     * Local has none.
      */
-    std::string connect_graphql_url() const
-    {
-        return m_connect_api_url + "/graphql";
-    }
+    std::string connect_graphql_url() const;
 
-    // ---- Prusa Account ----
 
     /**
      * @brief Base of the Account API (token, me). Also the origin whose cookies are cleared after
@@ -171,9 +160,18 @@ public:
     }
 
     /**
-     * @brief OAuth token endpoint. Empty offline: Connect Local signs in by app pairing.
+     * @brief OAuth token endpoint. Empty Connect Local: Connect Local signs in by app pairing.
      */
     std::string account_token_url() const;
+
+    /**
+     * @brief Whether a Prusa Account can sign in (OAuth) with the current services. False Connect Local:
+     * Connect Local signs in to the server by app pairing, not to Prusa Account or Printables.
+     */
+    bool prusa_account_available() const
+    {
+        return !account_token_url().empty();
+    }
 
     std::string account_me_url() const
     {
@@ -185,36 +183,34 @@ public:
         return account_url() + "/logout";
     }
 
-    // ---- Connect Local app pairing (Offline mode only, empty otherwise) ----
 
     /**
      * @brief Starts a pairing (POST, no auth).
      */
-    std::string offline_pairing_url() const;
+    std::string connect_local_pairing_url() const;
 
     /**
      * @brief Collects the credential of a pairing (POST, no auth).
      */
-    std::string offline_pairing_token_url() const;
+    std::string connect_local_pairing_token_url() const;
 
     /**
      * @brief Page where the person signs in and approves the pairing with the given user code.
      * Built from the server URL, not taken from the server reply. Empty for a malformed code.
      */
-    std::string offline_pairing_page_url(const std::string& user_code) const;
+    std::string connect_local_pairing_page_url(const std::string& user_code) const;
 
     /**
      * @brief A credential (DELETE revokes it). Empty for a malformed id.
      */
-    std::string offline_credential_url(const std::string& credential_id) const;
+    std::string connect_local_credential_url(const std::string& credential_id) const;
 
     /**
      * @brief Trades the credential (bearer) for a short page session cookie of the server's
      * web pages (POST), so that the pages never see the credential.
      */
-    std::string offline_page_session_url() const;
+    std::string connect_local_page_session_url() const;
 
-    // ---- Other services (not affected by the mode) ----
 
     std::string printables_get_secret_token_url() const
     {
@@ -269,23 +265,29 @@ private:
      */
     struct ModeUrls
     {
-        ServiceMode mode{ServiceMode::Online};
-        /** @brief Empty online and offline without a valid server. */
-        std::string offline_server;
+        ServiceMode mode{ServiceMode::Cloud};
+        /** @brief Empty online and Connect Local without a valid server. */
+        std::string connect_local_server;
         std::string connect;
+        /** @brief Empty Connect Local, Connect Local has no slicer REST API. */
+        std::string connect_api;
+        std::string connect_printer_list;
+        /** @brief Empty Connect Local, Connect Local has no MQTT broker and no GraphQL. */
+        std::string connect_mqtt;
+        std::string connect_graphql;
+        std::string connect_printables_print;
         std::string connect_page;
         std::string connect_select_printer;
         std::string account;
         std::string account_token;
     };
 
-    ModeUrls online_urls() const;
-    static ModeUrls offline_urls(const std::string& server);
+    ModeUrls cloud_urls() const;
+    static ModeUrls connect_local_urls(const std::string& server);
 
     /** @brief Reads one URL of the current mode. */
     std::string mode_url(std::string ModeUrls::* url) const;
 
-    // Online URLs, not affected by the mode.
     std::string m_connect_url;
     std::string m_connect_api_url;
     std::string m_connect_mqtt_url;

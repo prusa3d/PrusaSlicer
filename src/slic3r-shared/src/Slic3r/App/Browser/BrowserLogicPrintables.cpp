@@ -38,8 +38,7 @@ BrowserLogicPrintables::BrowserLogicPrintables(Biz::ProjectInteractor& project_i
 
 std::string BrowserLogicPrintables::access_token()
 {
-    // In offline mode the access token belongs to the Connect Local server, not to Printables.
-    if (Biz::Network::ServiceConfig::instance().is_offline()) {
+    if (!m_project_interactor.user_account_interactor().has_prusa_account()) {
         return {};
     }
     return m_project_interactor.user_account_interactor().access_token();
@@ -116,7 +115,6 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_load_default_url()
 
 std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_user_account_id_success(bool is_refresh, const std::string& current_url)
 {
-    // Offline the sign-in is the Connect Local one, Printables stays logged out (access_token()).
     if (m_load_default_url || access_token().empty()) {
         return {};
     }
@@ -223,8 +221,7 @@ BrowserLogicPrintables::on_printables_event_access_token_expired(const std::stri
     // { "event": "accessTokenExpired")
     // There seems to be a situation where we get accessTokenExpired when there is active token from Slicer POW
     // We need get new token and freeze webview until its not refreshed
-    // Offline there is no Printables token to refresh, see access_token().
-    if (m_refreshing_token || Biz::Network::ServiceConfig::instance().is_offline()) {
+    if (m_refreshing_token || !m_project_interactor.user_account_interactor().has_prusa_account()) {
         return {};
     }
     m_refreshing_token = true;
@@ -251,13 +248,12 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_pri
     }
     DEBUG_ASSERT(!download_url.empty() && !model_url.empty(), "Faulty printables message.");
 
-    if (Biz::Network::ServiceConfig::instance().is_offline()) {
-        SPDLOG_WARN("Printing from Printables to Connect is not available in offline mode.");
+    if (Biz::Network::ServiceConfig::instance().connect_printables_print_url().empty()) {
+        SPDLOG_WARN("Printing from Printables to Connect is not available with Prusa Connect on-premise.");
         AppServices::instance().dialog_manager().show_info_dialog(
             // TRN Shown when printing a Printables model while PrusaSlicer uses the self-hosted
-            // Prusa Connect Local server (offline mode).
             Biz::_u8L(
-                "Printing from Printables to Prusa Connect is not available in offline mode. Download the model and slice it instead."
+                "Printing from Printables to Prusa Connect is not available with Prusa Connect on-premise. Download the model and slice it instead."
             ),
             Biz::_u8L("Print to Prusa Connect")
         );
@@ -386,14 +382,11 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_sli
 
 std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_required_login(const std::string& message_data)
 {
-    if (Biz::Network::ServiceConfig::instance().is_offline()) {
-        // The offline sign-in is the one of the Connect Local server, it does not sign in to
-        // Printables.
+    if (!Biz::Network::ServiceConfig::instance().prusa_account_available()) {
         AppServices::instance().dialog_manager().show_info_dialog(
             // TRN Shown when Printables asks to sign in while PrusaSlicer uses the self-hosted
-            // Prusa Connect Local server (offline mode).
             Biz::_u8L(
-                "Signing in to Printables is not available in offline mode. Switch to online Prusa Connect in Preferences to sign in."
+                "Signing in to Printables needs a Prusa Account. Choose Prusa Connect in the account menu to sign in."
             ),
             Biz::_u8L("Printables")
         );

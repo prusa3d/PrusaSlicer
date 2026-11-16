@@ -11,7 +11,10 @@ namespace Slic3r::App::Browser {
 class BrowserLogicConnectSelect final : public AbstractUploadBrowserLogic, public AbstractConnectRequestHandler
 {
 public:
-    BrowserLogicConnectSelect(Biz::ProjectInteractor& project_interactor);
+    BrowserLogicConnectSelect(
+        Biz::ProjectInteractor& project_interactor,
+        std::unique_ptr<IConnectPageAuth> page_auth
+    );
     
     // AbstractBrowserLogic
     std::vector<BrowserLogicCommand> on_script_message_webview_event(const std::string& message) override;
@@ -36,7 +39,8 @@ protected:
 
 private:
     /**
-     * @brief The select-printer page. Offline it loads only after the page session cookie is set.
+     * @brief The select-printer page. Without a token for the page it loads only after
+     * IConnectPageAuth::prepare_page().
      */
     std::string m_select_url;
     bool m_select_page_requested{false};

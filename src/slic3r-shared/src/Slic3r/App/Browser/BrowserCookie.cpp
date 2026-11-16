@@ -64,7 +64,6 @@ parse_page_session(const std::string& body, const std::string& server_url)
             return std::nullopt;
         }
         if (cookie->name != CONNECT_LOCAL_SESSION_COOKIE) {
-            // Logging out deletes the cookie by this name: another one would stay behind.
             SPDLOG_ERROR("Connect Local page session: unexpected cookie name {}.", cookie->name);
             return std::nullopt;
         }

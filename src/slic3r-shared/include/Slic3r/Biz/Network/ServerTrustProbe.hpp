@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Slic3r/Biz/Lifetime.hpp"
 #include "Slic3r/Biz/Network/ServerTrust.hpp"
 #include "Slic3r/Biz/Network/Tls.hpp"
 
@@ -89,7 +90,7 @@ private:
     std::string m_running_job;
     unsigned m_generation{0};
     /** @brief Expires with this object: results arriving later are dropped. */
-    std::shared_ptr<char> m_alive{std::make_shared<char>(0)};
+    Biz::Lifetime m_lifetime;
 };
 
 } // namespace Slic3r::Biz::Network

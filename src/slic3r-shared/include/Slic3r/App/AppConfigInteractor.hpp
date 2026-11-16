@@ -4,11 +4,9 @@
 
 #include "Slic3r/App/IAppConfigChangedListener.hpp"
 
-namespace Slic3r::Biz::Network {
-enum class ServiceMode;
-} // namespace Slic3r::Biz::Network
-
 namespace Slic3r::App {
+
+enum class AccountService;
 
 /**
  * Manipulates config box associated with application configuration
@@ -33,10 +31,10 @@ public:
     );
 
     /**
-     * @brief Sets the "connect_mode" setting, if it differs. Listeners switch the service mode
-     * live (see AppConfig::apply_service_mode()).
+     * @brief Makes a service the active one ("account_service"), if it is not. It takes effect
+     * when both services are enabled. Listeners switch the account and the Connect tab live.
      */
-    void set_service_mode(Biz::Network::ServiceMode mode);
+    void set_account_service(AccountService service);
 
     void toggle_favorite_param(const std::string& param);
     void toggle_favorite_preset_printer(const std::string& id, const std::string& hw_config_id);

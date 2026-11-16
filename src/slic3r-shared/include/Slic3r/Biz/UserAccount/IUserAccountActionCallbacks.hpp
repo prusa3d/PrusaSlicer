@@ -22,7 +22,7 @@ enum class ActionFailType
 };
 
 /**
- * @brief Why a Connect Local app pairing (offline sign-in) ended without a credential.
+ * @brief Why a Connect Local app pairing (Connect Local sign-in) ended without a credential.
  */
 enum class PairingFailure
 {

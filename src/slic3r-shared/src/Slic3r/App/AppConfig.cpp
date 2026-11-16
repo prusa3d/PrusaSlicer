@@ -10,7 +10,8 @@
 
 #include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/Theme.hpp"
-#include "Slic3r/App/ConnectLocalTrust.hpp"
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/Biz/Network/ServerTrustStore.hpp"
 
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Log.hpp"
@@ -348,49 +349,71 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->init_fn = []() { return Domain::ConfigValue{11}; };
 
 #ifdef SLIC3R_HAS_WEBKIT
-    def = defs.add("enable_prusa_account", typeid(bool));
+    def           = defs.add("enable_prusa_account", typeid(bool));
     def->location = Domain::AppConfigLocation{};
     def->gui_type = GUIType::checkbox;
-    def->label = L("Enable Prusa Account");
-    def->tooltip = L("Enable logging to Prusa Account, Connect tab and uploading files to Connect.");
-    def->category = Domain::ConfigItemDef::Category::AppConfig_Services;
-    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup;
-    def->init_fn = []() { return Domain::ConfigValue(false); };
-
-    def           = defs.add("connect_mode", typeid(Domain::EnumWrapper));
-    def->location = Domain::AppConfigLocation{};
-    def->gui_type = GUIType::combobox;
-    def->label    = L("Prusa Account and Connect");
+    def->label    = L("Prusa Account and Prusa Connect");
     def->tooltip  = L(
-        "Online uses the cloud Prusa Account and Prusa Connect. Offline uses a self-hosted Prusa Connect (on-premise) server instead. Switching logs you out."
+        "Enables signing in to Prusa Account, the Connect tab with Prusa Connect and uploading files to it."
     );
     def->category     = Domain::ConfigItemDef::Category::AppConfig_Services;
     def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup;
-    def->init_fn      = Domain::init_with(
-        Network::ServiceMode::Online,
+    def->init_fn      = []() { return Domain::ConfigValue(false); };
+
+    def           = defs.add("enable_connect_local", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->gui_type = GUIType::checkbox;
+    def->label    = L("Prusa Connect on-premise");
+    def->tooltip  = L(
+        "Enables signing in to your own Prusa Connect on-premise server, the Connect tab with its printers and uploading files to it. The server is set up in the Connect tab."
+    );
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Services;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup;
+    def->init_fn      = []() { return Domain::ConfigValue(true); };
+
+    def           = defs.add("account_service", typeid(Domain::EnumWrapper));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = Domain::init_with(
+        AccountService::PrusaAccount,
         {
-            {int(Network::ServiceMode::Online), "online", def->L_CONTEXT("Online", "Connect mode")},
-            {int(Network::ServiceMode::Offline),
-             "offline",
-             def->L_CONTEXT("Offline (on-premise)", "Connect mode")},
+            {int(AccountService::None), "none", "none"},
+            {int(AccountService::PrusaAccount), "prusa_account", "prusa_account"},
+            {int(AccountService::ConnectLocal), "connect_local", "connect_local"},
+        }
+    );
+
+    def           = defs.add("account_services_split", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue(false); };
+
+    def           = defs.add("account_service_migrated", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue(false); };
+
+    def           = defs.add("confirm_account_service_switch", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue(true); };
+
+    def           = defs.add("connect_mode", typeid(Domain::EnumWrapper));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = Domain::init_with(
+        Network::ServiceMode::Cloud,
+        {
+            {int(Network::ServiceMode::Cloud), "online", "online"},
+            {int(Network::ServiceMode::ConnectLocal), "offline", "offline"},
         }
     );
 
     def           = defs.add("connect_local_url", typeid(std::string));
     def->location = Domain::AppConfigLocation{};
-    def->gui_type = GUIType::textfield;
-    def->label    = L("Prusa Connect (on-premise) server");
-    def->tooltip  = L(
-        "Address of the Prusa Connect (on-premise) server used in the offline mode, for example http://192.168.1.10:8080. Changing it logs you out."
-    );
-    def->category     = Domain::ConfigItemDef::Category::AppConfig_Services;
-    def->full_width   = true;
-    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup;
-    def->init_fn      = []() { return Domain::ConfigValue(std::string()); };
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue(std::string()); };
 
-    // Trust of the https Connect Local server certificate, set from the Connect tab. Belongs to the
-    // server in connect_local_trust_url, see AppConfig::connect_local_trust().
-    // Not shown in Preferences, the setup page of the Connect tab shows and changes it.
     def           = defs.add("connect_local_trust", typeid(Domain::EnumWrapper));
     def->location = Domain::AppConfigLocation{};
     def->category = Category::Hidden;
@@ -734,6 +757,24 @@ void AppConfig::handle_legacy_config(AppConfig& app_config)
         app_config.set("favorite_params_sla_added", true);
     }
 
+#ifdef SLIC3R_HAS_WEBKIT
+    if (!app_config.get<bool>("account_services_split")) {
+        if (app_config.get<bool>("account_service_migrated")) {
+            const AccountService chosen = app_config.get<AccountService>("account_service");
+            app_config.set("enable_prusa_account", chosen == AccountService::PrusaAccount);
+        } else if (app_config.get<bool>("enable_prusa_account")
+            && app_config.get<Network::ServiceMode>("connect_mode") == Network::ServiceMode::ConnectLocal)
+        {
+            app_config.set("account_service", AccountService::ConnectLocal);
+        }
+        app_config.set("enable_connect_local", true);
+        if (app_config.get<AccountService>("account_service") == AccountService::None) {
+            app_config.set("account_service", AccountService::PrusaAccount);
+        }
+        app_config.set("account_services_split", true);
+    }
+#endif
+
     const boost::optional<Semver> semver{Semver::parse(app_config.get<std::string>("version"))};
     if (semver.has_value() && *semver < Semver("3.0.0-alpha13")) {
         app_config.set("initialized", false);
@@ -755,6 +796,7 @@ std::unique_ptr<AppConfig> AppConfig::create_app_config()
     else {
         SPDLOG_ERROR("Failed to parse app config. Creating a new one from default.");
         app_config = std::make_unique<AppConfig>();
+        AppConfig::handle_legacy_config(*app_config);
     }
     app_config->set_filename(appconfig_filename.string());
     return app_config;
@@ -802,31 +844,59 @@ bool AppConfig::is_printables_enabled() const
     return get<bool>("enable_printables");
 }
 
-bool AppConfig::is_prusa_account_enabled() const
+bool AppConfig::is_account_service_enabled() const
 {
-    if (!is_connect_tab_enabled()) {
-        return false;
-    }
-    // Offline mode without a usable server: there is nowhere to log in.
-    return service_mode() == Network::ServiceMode::Online
-        || Network::ServiceConfig::normalize_offline_server_url(connect_local_url());
+    return is_webkit_available() && account_service() != AccountService::None;
 }
 
-bool AppConfig::is_connect_tab_enabled() const
+AccountService AppConfig::account_service() const
 {
-    if (!is_webkit_available()) {
+#ifdef SLIC3R_HAS_WEBKIT
+    const bool prusa_account = get<bool>("enable_prusa_account");
+    const bool connect_local    = get<bool>("enable_connect_local");
+    if (!prusa_account && !connect_local) {
+        return AccountService::None;
+    }
+    if (!prusa_account) {
+        return AccountService::ConnectLocal;
+    }
+    if (!connect_local) {
+        return AccountService::PrusaAccount;
+    }
+    return get<AccountService>("account_service") == AccountService::ConnectLocal ?
+        AccountService::ConnectLocal :
+        AccountService::PrusaAccount;
+#else
+    return AccountService::None;
+#endif
+}
+
+bool AppConfig::are_both_account_services_enabled() const
+{
+#ifdef SLIC3R_HAS_WEBKIT
+    return get<bool>("enable_prusa_account") && get<bool>("enable_connect_local");
+#else
+    return false;
+#endif
+}
+
+bool AppConfig::is_account_usable() const
+{
+    if (!is_account_service_enabled()) {
         return false;
     }
-    return get<bool>("enable_prusa_account");
+    return service_mode() == Network::ServiceMode::Cloud || connect_local_server().has_value();
+}
+
+std::optional<std::string> AppConfig::connect_local_server() const
+{
+    return Network::ServiceConfig::normalize_connect_local_server_url(connect_local_url());
 }
 
 Network::ServiceMode AppConfig::service_mode() const
 {
-#ifdef SLIC3R_HAS_WEBKIT
-    return get<Network::ServiceMode>("connect_mode");
-#else
-    return Network::ServiceMode::Online;
-#endif
+    return account_service() == AccountService::ConnectLocal ? Network::ServiceMode::ConnectLocal :
+                                                            Network::ServiceMode::Cloud;
 }
 
 std::string AppConfig::connect_local_url() const
@@ -841,7 +911,7 @@ std::string AppConfig::connect_local_url() const
 void AppConfig::apply_service_mode() const
 {
     Network::ServiceConfig::instance().set_mode(service_mode(), connect_local_url());
-    ConnectLocalTrust::apply(connect_local_trust());
+    AppServices::instance().server_trust_store().apply(connect_local_trust());
 }
 
 Network::ServerTrust AppConfig::connect_local_trust() const

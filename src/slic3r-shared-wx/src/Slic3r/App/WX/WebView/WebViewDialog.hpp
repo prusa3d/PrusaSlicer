@@ -22,12 +22,6 @@ public:
     void on_user_account_id_success(bool is_refresh, const std::string& username) override;
     void on_user_account_logged_out() override;
     void on_user_account_will_refresh() override;
-    void on_user_account_pairing_ready(
-        const std::string& page_url,
-        const std::string& user_code
-    ) override;
-    void on_user_account_pairing_failed(Biz::UserAccount::PairingFailure failure) override;
-    void on_user_account_pairing_approved() override;
 
     void on_user_account_action_retry(const Biz::Network::IHttp::Retry& retry, std::function<void(void)> cancel_callback) override
     { /*unused*/

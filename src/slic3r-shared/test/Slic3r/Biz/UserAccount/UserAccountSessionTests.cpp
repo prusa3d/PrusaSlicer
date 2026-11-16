@@ -65,14 +65,6 @@ public:
     void on_race_lost(const std::string&) override {}
     void on_printables_secret_token(const std::string&) override {}
 
-    void on_pairing_ready(const std::string&, const std::string&) override {}
-
-    void on_pairing_failed(PairingFailure) override {}
-
-    void on_pairing_approved() override {}
-
-    void on_credential_expires_soon(std::time_t) override {}
-
     void on_logged_out(bool notify_owner, bool was_logged_in) override
     {
         logged_out.push_back({notify_owner, was_logged_in});
@@ -279,7 +271,6 @@ TEST_CASE_METHOD(
     {
         auto& mock = static_cast<AccountMockHttp&>(http);
         if (performed_urls.size() == 1) {
-            // Logout while the first request runs, then a new request (e.g. a pairing).
             session.do_clear(false);
             session.enqueue_priority_action(
                 {UserAccountActionID::TestAccessToken, nullptr, nullptr, {}, {}}

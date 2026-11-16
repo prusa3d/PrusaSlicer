@@ -137,12 +137,17 @@ void PrinterSettingsDialog::create_page_list()
         AppServices::instance().app_config().get<int>("last_printer_settings_dialog_filter")
     );
 
+    std::vector<std::string> filter_btn_names{_u8L("All"), _u8L("Local")};
+    if (AppServices::instance().app_config().is_account_service_enabled()) {
+        filter_btn_names.push_back(_u8L("Connect"));
+    } else if (m_printer_filter_type == PrinterFilter::Connect) {
+        m_printer_filter_type = PrinterFilter::All;
+    }
+
     Item* filters_row = m_page_list->emplace_back<Item>();
     filters_row->set_flex_shrink(0);
     filters_row->set_gap(5_fpx);
-    for (const std::string& filter_btn_name :
-         std::initializer_list<std::string>{_u8L("All"), _u8L("Local"), _u8L("Connect")})
-    {
+    for (const std::string& filter_btn_name : filter_btn_names) {
         LayoutButton* btn = filters_row->emplace_back<LayoutButton>(filter_btn_name);
         btn->set_checkable(true);
         btn->set_checked(

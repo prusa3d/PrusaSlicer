@@ -3,6 +3,7 @@
 
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
+#include "Slic3r/Biz/UserAccount/IPairingCommunication.hpp"
 #include "Slic3r/Biz/UserAccount/IUserAccountSessionListener.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountCommunicationPairing.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountPairing.hpp"
@@ -76,7 +77,6 @@ Pairing::Started started(int expires_in = 600, int interval = 5)
 
 } // namespace
 
-// ---- Replies and the poll state machine ----
 
 TEST_CASE("Pairing request bodies follow the server contract", "[user_account][pairing]")
 {
@@ -168,7 +168,6 @@ TEST_CASE("Pending replies keep polling at the interval", "[user_account][pairin
     CHECK(step.kind == Step::Kind::PollIn);
     CHECK(step.seconds == 5);
 
-    // An unreachable server is not the end of the pairing either.
     CHECK(poller.on_reply(0, "", 1010).kind == Step::Kind::PollIn);
     CHECK(poller.on_reply(502, "", 1015).kind == Step::Kind::PollIn);
 }
@@ -181,7 +180,6 @@ TEST_CASE("Slow down raises the interval by five seconds each time", "[user_acco
     const std::string slow_down = error_body("core.auth/APP_PAIRING_SLOW_DOWN");
     CHECK(poller.on_reply(400, slow_down, 1005).seconds == 10);
     CHECK(poller.on_reply(400, slow_down, 1015).seconds == 15);
-    // and stays raised for pending replies
     CHECK(poller.on_reply(400, error_body("core.auth/APP_PAIRING_PENDING"), 1030).seconds == 15);
 }
 
@@ -231,11 +229,9 @@ TEST_CASE("An approved pairing yields the credential", "[user_account][pairing]"
     CHECK(step.kind == Step::Kind::Succeeded);
     REQUIRE(step.credential);
     CHECK(step.credential->id == "cred-1");
-    // The JWT shaped access_token is the credential, not the opaque token.
     CHECK(step.credential->token == token);
     CHECK(step.credential->expires_at > std::time(nullptr) + 89 * 24 * 3600);
 
-    // An approval without a usable credential.
     CHECK(poller.on_reply(200, "{}", 1010).failure == PairingFailure::ServerError);
 }
 
@@ -247,11 +243,9 @@ TEST_CASE("A credential without the operate scope is refused", "[user_account][p
     const Step step = poller.on_reply(201, credential_body(token, {"read"}), 1005);
     CHECK(step.kind == Step::Kind::Failed);
     CHECK(step.failure == PairingFailure::NoOperateScope);
-    // Handed back so that it can be revoked.
     REQUIRE(step.credential);
     CHECK(step.credential->id == "cred-1");
 
-    // A reply that lists no scopes at all is refused too.
     nlohmann::json without_scopes = nlohmann::json::parse(credential_body(token));
     without_scopes.erase("scopes");
     CHECK(
@@ -259,32 +253,29 @@ TEST_CASE("A credential without the operate scope is refused", "[user_account][p
     );
 }
 
-// ---- Token store ----
 
 TEST_CASE("Offline credential record round-trips", "[user_account][pairing]")
 {
-    const TokenStore::OfflineCredential
+    const TokenStore::ConnectLocalCredential
         credential{"tok.en.jwt", "cred-1", 1800000000, "https://pcl.local:8443/a|b"};
-    const std::string record = TokenStore::serialize_offline_credential(credential);
+    const std::string record = TokenStore::serialize_connect_local_credential(credential);
     CHECK(record == "tok.en.jwt|cred-1|1800000000|https://pcl.local:8443/a|b");
 
-    const std::optional<TokenStore::OfflineCredential> parsed =
-        TokenStore::parse_offline_credential(record);
+    const std::optional<TokenStore::ConnectLocalCredential> parsed =
+        TokenStore::parse_connect_local_credential(record);
     REQUIRE(parsed);
     CHECK(parsed->token == credential.token);
     CHECK(parsed->credential_id == credential.credential_id);
     CHECK(parsed->expires_at == credential.expires_at);
     CHECK(parsed->server_url == credential.server_url);
 
-    CHECK_FALSE(TokenStore::parse_offline_credential(""));
-    CHECK_FALSE(TokenStore::parse_offline_credential("|||"));
-    // The empty record an OAuth reset writes.
-    CHECK_FALSE(TokenStore::parse_offline_credential("||||"));
-    CHECK_FALSE(TokenStore::parse_offline_credential("tok|id|notanumber|http://x"));
-    CHECK_FALSE(TokenStore::parse_offline_credential("tok|id|1"));
+    CHECK_FALSE(TokenStore::parse_connect_local_credential(""));
+    CHECK_FALSE(TokenStore::parse_connect_local_credential("|||"));
+    CHECK_FALSE(TokenStore::parse_connect_local_credential("||||"));
+    CHECK_FALSE(TokenStore::parse_connect_local_credential("tok|id|notanumber|http://x"));
+    CHECK_FALSE(TokenStore::parse_connect_local_credential("tok|id|1"));
 }
 
-// ---- Communication ----
 
 namespace {
 
@@ -307,7 +298,7 @@ struct Request
 
 using Responder = std::function<void(const Request&, Network::MockHttp&)>;
 
-class RecordingListener : public IUserAccountSessionListener
+class RecordingListener : public IUserAccountSessionListener, public IPairingListener
 {
 public:
     void on_action_retry(const Network::IHttp::Retry&) override {}
@@ -371,12 +362,12 @@ struct PairingFixture
     PairingFixture()
     {
         Network::configure_http_factory_with_mock();
-        Network::ServiceConfig::instance().set_mode(Network::ServiceMode::Offline, SERVER);
+        Network::ServiceConfig::instance().set_mode(Network::ServiceMode::ConnectLocal, SERVER);
 
         auto store = std::make_unique<Tests::MemorySecretStore>();
         secrets    = store.get();
         Platform::PlatformServices::instance().set_secret_store(std::move(store));
-        store_available = TokenStore::save_offline_credential({});
+        store_available = TokenStore::save_connect_local_credential({});
 
         Network::MockHttpProvider::get().set_create_fn(
             [this](
@@ -430,13 +421,15 @@ struct PairingFixture
     {
         communication.reset();
         dispatcher.dispatch_enqueued();
-        Network::ServiceConfig::instance().set_mode(Network::ServiceMode::Online);
+        Network::ServiceConfig::instance().set_mode(Network::ServiceMode::Cloud);
     }
 
     void create()
     {
         communication = std::make_unique<UserAccountCommunicationPairing>(dispatcher);
         communication->add_session_listener(&listener);
+        REQUIRE(communication->pairing() == communication.get());
+        communication->pairing()->set_pairing_listener(&listener);
     }
 
     void set_respond(Responder responder)
@@ -457,12 +450,12 @@ struct PairingFixture
         const std::string& id     = "cred-1"
     )
     {
-        TokenStore::save_offline_credential({token, id, std::time(nullptr) + 3600, server});
+        TokenStore::save_connect_local_credential({token, id, std::time(nullptr) + 3600, server});
     }
 
-    std::optional<TokenStore::OfflineCredential> stored() const
+    std::optional<TokenStore::ConnectLocalCredential> stored() const
     {
-        return TokenStore::read_offline_credential().credential;
+        return TokenStore::read_connect_local_credential().credential;
     }
 
     /** @brief Runs the main thread events (results, timers) until pred holds. */
@@ -534,7 +527,6 @@ std::string credential_url(const std::string& id)
 
 std::string started_body()
 {
-    // A one second interval keeps the tests short.
     return nlohmann::json{
         {"device_code", "dev"},
         {"user_code", "BCDF-GHJK"},
@@ -690,7 +682,6 @@ TEST_CASE_METHOD(
     communication->init();
     REQUIRE(answered(1));
 
-    // What the interactor reports for a /me without a public username.
     communication->on_user_id_unusable();
     CHECK_FALSE(communication->is_logged_in());
     CHECK(communication->access_token() == token);
@@ -751,7 +742,6 @@ TEST_CASE_METHOD(
     REQUIRE(replies.size() == 1);
     CHECK(replies[0] == R"({"cookie":{}})");
 
-    // A recent session is handed out again, unless a fresh one is asked for.
     communication->enqueue_page_session_action(record, false);
     REQUIRE(run_until([&]() { return replies.size() == 2; }));
     CHECK(replies[1] == R"({"cookie":{}})");
@@ -876,41 +866,38 @@ TEST_CASE_METHOD(
     communication->on_read_token_store_message();
     CHECK(communication->access_token() == token);
 
-    // The other instance logs out: the store is empty.
-    TokenStore::clear_offline_credential();
+    TokenStore::clear_connect_local_credential();
     communication->on_read_token_store_message();
     CHECK(communication->access_token().empty());
-    // It revoked the credential itself.
     CHECK(count(DELETE, credential_url("cred-1")) == 0);
 }
 
 TEST_CASE_METHOD(
     PairingFixture,
-    "A new pairing replaces an unconfirmed credential",
+    "Signing in with an unconfirmed credential checks it again",
     "[user_account][pairing]"
 )
 {
     if (!store_available) {
         SKIP("Token store is not compiled in this build.");
     }
-    const std::string old_token = make_jwt(std::time(nullptr) + 3600);
-    const std::string new_token = make_jwt(std::time(nullptr) + 7200);
-    store(old_token);
-    set_respond(pairing_server(new_token, unreachable));
+    const std::string token = make_jwt(std::time(nullptr) + 3600);
+    store(token);
+    set_respond(pairing_server(make_jwt(std::time(nullptr) + 7200), unreachable));
     create();
     communication->init();
     REQUIRE(answered(1));
-    REQUIRE(communication->access_token() == old_token);
+    REQUIRE(communication->access_token() == token);
 
     communication->start_pairing();
 
-    // Dropped and revoked before the new pairing, so it cannot win over the new credential.
-    CHECK_FALSE(stored());
-    REQUIRE(run_until([&]() { return communication->access_token() == new_token; }));
-    CHECK(count(DELETE, credential_url("cred-1")) == 1);
+    REQUIRE(run_until([&]() { return !listener.failures.empty(); }));
+    CHECK(listener.failures == std::vector<PairingFailure>{PairingFailure::AccountUnavailable});
+    CHECK(communication->access_token() == token);
     REQUIRE(stored());
-    CHECK(stored()->token == new_token);
-    CHECK(count(DELETE, credential_url("cred-2")) == 0);
+    CHECK(stored()->token == token);
+    CHECK(count(DELETE, credential_url("cred-1")) == 0);
+    CHECK(count(POST, PAIRING_URL) == 0);
 }
 
 TEST_CASE_METHOD(
@@ -976,7 +963,6 @@ TEST_CASE_METHOD(
     communication->start_pairing();
     REQUIRE(run_until([&]() { return !listener.successes.empty(); }));
 
-    // What the interactor reports for a /me without a public username.
     communication->on_user_id_unusable();
     CHECK(listener.failures == std::vector<PairingFailure>{PairingFailure::NoAccount});
     CHECK(communication->access_token().empty());
@@ -997,7 +983,6 @@ TEST_CASE_METHOD(
             if (request.url == PAIRING_URL) {
                 http.invoke_complete(started_body(), 201);
             } else if (request.url == PAIRING_TOKEN_URL) {
-                // The dialog is closed while the approval is on its way.
                 dispatcher.dispatch_on_main_thread([this]() { communication->cancel_pairing(); });
                 http.invoke_complete(credential_body(token, {"operate"}, "cred-2"), 201);
             } else {
@@ -1148,8 +1133,6 @@ TEST_CASE_METHOD(
     communication->start_pairing();
 
     REQUIRE(run_until([&]() { return !listener.successes.empty(); }));
-    // The sign-in dialog deletes the approval page's session cookie on this event, so it must
-    // come before the success that makes the Connect tab open its own page session.
     CHECK(listener.approved == 1);
     CHECK(listener.approved_before_account);
 }

@@ -50,7 +50,11 @@ public:
         load_default_url();
     }
 
+    void destroy_when_safe() override;
+
 private:
+    void destroy_if_requested();
+
     std::unique_ptr<App::Browser::AbstractBrowserLogic> m_logic;
     WebViewHost m_host;
 
@@ -65,6 +69,14 @@ private:
      */
     std::vector<App::Browser::BrowserLogicCommand> m_error_commands;
     bool m_shown{false};
+    bool m_destroy_requested{false};
+    bool m_destroy_scheduled{false};
+    /**
+     * @brief Scripts started with RunScriptAsync() whose result has not arrived. wxWidgets on GTK
+     * completes such a script through a plain pointer to the web view, so the panel must not be
+     * destroyed while one is pending.
+     */
+    int m_pending_scripts{0};
     bool m_load_default_url_on_next_error{false};
 
     void late_create();
@@ -77,6 +89,7 @@ private:
     // and load default page
     void on_show(wxShowEvent& evt);
     void on_script_message(wxWebViewEvent& evt);
+    void on_script_result(wxWebViewEvent& evt);
     void on_navigation_request(wxWebViewEvent& evt);
     void on_loaded(wxWebViewEvent& evt);
     void on_page_will_load();

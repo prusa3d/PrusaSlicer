@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Slic3r/Biz/Lifetime.hpp"
+#include "Slic3r/Biz/UserAccount/IPairingCommunication.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountCommunicationBase.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountPairing.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountTokenStore.hpp"
@@ -18,25 +20,52 @@ namespace Slic3r::Biz::UserAccount {
 class BackgroundWorker;
 
 /**
- * @brief Offline (Connect Local) sign-in by app pairing and a bearer credential.
+ * @brief Connect Local (Connect Local) sign-in by app pairing and a bearer credential.
  *
  * The person approves the pairing on the server's /pair page, the app polls until it gets a
  * credential (an access_token valid for 90 days, without refresh). The credential is the bearer
- * of every request and is kept in the offline token store together with the server it belongs to.
+ * of every request and is kept in the Connect Local token store together with the server it belongs to.
  * When the server refuses it (401) or it expires, the app switches to another valid credential
  * in the store or logs out; a logout the person asks for revokes it on the server.
  *
  * UserAccountSession serves only as the request queue and the holder of the token; none of its
  * OAuth refresh or code exchange paths is used here.
  */
-class UserAccountCommunicationPairing final : public UserAccountCommunicationBase
+class UserAccountCommunicationPairing final : public UserAccountCommunicationBase,
+                                              public IPairingCommunication
 {
 public:
     explicit UserAccountCommunicationPairing(Platform::IMainThreadDispatcher& dispatcher);
     ~UserAccountCommunicationPairing() override;
 
+    bool is_prusa_account() const override
+    {
+        return false;
+    }
+
+    IPairingCommunication* pairing() override
+    {
+        return this;
+    }
+
+    void set_pairing_listener(IPairingListener* listener) override
+    {
+        m_pairing_listener = listener;
+    }
+
     void init() override;
-    void add_session_listener(IUserAccountSessionListener* listener) override;
+
+    void set_refresh_time(int) override {}
+
+    void on_race_lost(const std::string&) override {}
+
+    std::string on_log_in_request(const std::string&, bool, const std::string&) override
+    {
+        return {};
+    }
+
+    void on_log_in_code_response(const std::string&) override {}
+
     void
     on_username_changed(const std::string& username, const std::string& id, bool store) override;
     void on_user_id_unusable() override;
@@ -68,6 +97,10 @@ public:
         bool fresh
     ) override;
 
+    /**
+     * @brief With a credential held but not confirmed yet (the server did not answer), checks
+     * that one again and reports like a new pairing; a refused one ends as CredentialLost.
+     */
     void start_pairing() override;
     void cancel_pairing() override;
     void on_unauthorized(const std::string& access_token) override;
@@ -91,8 +124,8 @@ private:
     void cancel_timer(Platform::TimerQueue::TimerID& id);
 
     /** @brief Uses a credential and checks it with the server (/me). */
-    void adopt(const TokenStore::OfflineCredential& credential);
-    void set_credential(const TokenStore::OfflineCredential& credential);
+    void adopt(const TokenStore::ConnectLocalCredential& credential);
+    void set_credential(const TokenStore::ConnectLocalCredential& credential);
     void enqueue_verification();
     void on_verified(const std::string& token);
     void on_verification_failed(const std::string& token, unsigned status);
@@ -100,12 +133,12 @@ private:
      * @brief The server could not confirm the account of `token`: asks again later, backing off.
      */
     void retry_verification(const std::string& token);
-    bool expired(const TokenStore::OfflineCredential& credential) const;
+    bool expired(const TokenStore::ConnectLocalCredential& credential) const;
     /**
      * @brief A valid credential of this server in the store other than `token`, if the store can
      * tell.
      */
-    std::optional<TokenStore::OfflineCredential>
+    std::optional<TokenStore::ConnectLocalCredential>
     other_stored_credential(const std::string& token) const;
     /**
      * @brief The server refused `token` (401) or it expired: switch to another valid credential
@@ -137,11 +170,11 @@ private:
     void log_out(bool notify_owner, bool revoke_credential, bool clear_store);
 
     Platform::IMainThreadDispatcher& m_dispatcher;
-    std::vector<IUserAccountSessionListener*> m_listeners;
+    IPairingListener* m_pairing_listener{nullptr};
     std::unique_ptr<BackgroundWorker> m_revocation_worker;
 
     /** @brief The credential in use, token empty when none. */
-    TokenStore::OfflineCredential m_credential;
+    TokenStore::ConnectLocalCredential m_credential;
     /**
      * @brief A freshly paired credential whose account is not loaded yet: the dialog waits for it.
      */
@@ -155,19 +188,13 @@ private:
     Platform::TimerQueue::TimerID m_verification_retry_timer;
     std::optional<PageSession> m_page_session;
 
-    // Pairing, main thread only. One step runs at a time: the start request, a poll timer or a
-    // poll request.
     Pairing::Poller m_poller;
     /** @brief Bumped by every start and cancel, replies of an older pairing are ignored. */
     uint64_t m_pairing_id{0};
     Platform::TimerQueue::TimerID m_poll_timer;
 
     /** @brief Expires with this object, so that late callbacks are dropped. */
-    std::shared_ptr<char> m_alive{std::make_shared<char>(0)};
-    /**
-     * @brief Never reassigned, safe to copy from the session thread while m_alive is being reset.
-     */
-    const std::weak_ptr<char> m_alive_weak{m_alive};
+    Biz::Lifetime m_lifetime;
 };
 
 } // namespace Slic3r::Biz::UserAccount

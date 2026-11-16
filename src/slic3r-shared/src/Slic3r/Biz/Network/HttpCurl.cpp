@@ -10,7 +10,6 @@
 
 #include "fmt/format.h"
 #include <boost/nowide/fstream.hpp>
-#include <mutex>
 #include <random>
 #include <thread>
 
@@ -98,26 +97,16 @@ struct CurlGlobalInit
 
 std::unique_ptr<CurlGlobalInit> CurlGlobalInit::instance;
 
-namespace {
-std::mutex server_trust_lookup_mutex;
-HttpCurl::ServerTrustLookup server_trust_lookup;
-
-std::optional<ServerTrust> server_trust_for(const std::string& url)
-{
-    HttpCurl::ServerTrustLookup lookup;
-    {
-        std::lock_guard lock(server_trust_lookup_mutex);
-        lookup = server_trust_lookup;
-    }
-    return lookup ? lookup(url) : std::nullopt;
-}
-} // namespace
-
 constexpr int DEFAULT_TIMEOUT_CONNECT = 10;
 constexpr int DEFAULT_TIMEOUT_MAX     = 0;
 constexpr int DEFAULT_SIZE_LIMIT      = 5 * 1'024 * 1'024;
 
-HttpCurl::HttpCurl(RequestMethod request_method, std::string&& url, RetryFn fn) :
+HttpCurl::HttpCurl(
+    RequestMethod request_method,
+    std::string&& url,
+    RetryFn fn,
+    const std::optional<ServerTrust>& server_trust
+) :
     IHttp(request_method, std::move(url), std::move(fn)),
     m_curl(curl_easy_init()),
     m_error_buffer(CURL_ERROR_SIZE + 1, '\0')
@@ -139,9 +128,8 @@ HttpCurl::HttpCurl(RequestMethod request_method, std::string&& url, RetryFn fn) 
     ::curl_easy_setopt(m_curl.get(), CURLOPT_ERRORBUFFER, &m_error_buffer.front());
     ::curl_easy_setopt(m_curl.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
 
-    // A server with a custom certificate trust (Connect Local) gets it for every request.
-    if (const std::optional<ServerTrust> trust = server_trust_for(m_url)) {
-        apply_server_trust(m_curl.get(), *trust);
+    if (server_trust) {
+        apply_server_trust(m_curl.get(), *server_trust);
     }
 
     switch (m_request_method) {
@@ -199,10 +187,15 @@ void HttpCurl::apply_server_trust(CURL* curl, const ServerTrust& trust)
     }
 }
 
-void HttpCurl::set_server_trust_lookup(ServerTrustLookup lookup)
+std::function<std::unique_ptr<IHttp>(IHttp::RequestMethod, std::string, IHttp::RetryFn)>
+HttpCurl::creator(ServerTrustLookup lookup)
 {
-    std::lock_guard lock(server_trust_lookup_mutex);
-    server_trust_lookup = std::move(lookup);
+    return [lookup = std::move(lookup)](RequestMethod request_method, std::string url, RetryFn fn)
+               -> std::unique_ptr<IHttp>
+    {
+        const std::optional<ServerTrust> trust = lookup ? lookup(url) : std::nullopt;
+        return std::make_unique<HttpCurl>(request_method, std::move(url), std::move(fn), trust);
+    };
 }
 
 bool HttpCurl::ca_file_supported_inner(::CURL* curl)

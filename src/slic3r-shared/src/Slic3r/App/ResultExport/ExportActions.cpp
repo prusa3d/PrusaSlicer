@@ -102,7 +102,10 @@ std::function<void()> send_gcode_to_connect(Biz::ProjectInteractor& project_inte
             };
 
             AppServices::instance().dialog_manager().show_upload_webview_dialog(
-                std::make_unique<Browser::BrowserLogicConnectSelect>(*pi_raw),
+                std::make_unique<Browser::BrowserLogicConnectSelect>(
+                    *pi_raw,
+                    Browser::make_connect_page_auth(pi_raw->user_account_interactor())
+                ),
                 pi_raw,
                 wrapped_callback
             );

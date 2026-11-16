@@ -107,7 +107,7 @@
       Object.keys(texts).forEach(function (key) {
         if (typeof t[key] === 'string' && t[key].length > 0) texts[key] = t[key];
       });
-      connectPages.setModeTexts(t);
+      connectPages.setModeTexts(t, data.showSwitch);
       setText('title', t.title);
       setText('intro', t.intro);
       setText('url-label', t.address);

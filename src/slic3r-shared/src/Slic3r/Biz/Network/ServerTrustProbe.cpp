@@ -25,7 +25,6 @@ constexpr long PROBE_TOTAL_TIMEOUT   = 10;
 int on_progress(void* cancelled, curl_off_t, curl_off_t, curl_off_t, curl_off_t)
 {
     const auto& is_cancelled = *static_cast<const std::function<bool()>*>(cancelled);
-    // Non-zero aborts the handshake (CURLE_ABORTED_BY_CALLBACK).
     return is_cancelled && is_cancelled() ? 1 : 0;
 }
 
@@ -42,7 +41,6 @@ CurlPtr connect_only_handle(
     }
     error_buffer.assign(CURL_ERROR_SIZE + 1, '\0');
     curl_easy_setopt(curl.get(), CURLOPT_URL, url.c_str());
-    // TCP connection and TLS handshake only, no request is sent.
     curl_easy_setopt(curl.get(), CURLOPT_CONNECT_ONLY, 1L);
     curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT, PROBE_CONNECT_TIMEOUT);
     curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT, PROBE_TOTAL_TIMEOUT);
@@ -50,7 +48,6 @@ CurlPtr connect_only_handle(
     curl_easy_setopt(curl.get(), CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl.get(), CURLOPT_XFERINFOFUNCTION, &on_progress);
-    // Lives as long as the handle: both are local to the probe.
     curl_easy_setopt(curl.get(), CURLOPT_XFERINFODATA, &cancelled);
     return curl;
 }
@@ -100,7 +97,6 @@ fetch_presented_certificate(const std::string& url, const std::function<bool()>&
     {
         return std::nullopt;
     }
-    // The first one is the server (leaf) certificate.
     for (curl_slist* field = certinfo->certinfo[0]; field != nullptr; field = field->next) {
         constexpr std::string_view CERT_FIELD = "Cert:";
         if (field->data != nullptr
@@ -153,8 +149,6 @@ TlsProbeResult probe_server_certificate(
         result.status = TlsProbeStatus::Unreachable;
         return result;
     }
-    // Any TLS failure (backends report an untrusted or mismatched certificate differently):
-    // when the server presents a certificate at all, it is the certificate that was refused.
     result.certificate = fetch_presented_certificate(server_url, cancelled);
     result.status =
         result.certificate ? TlsProbeStatus::CertificateRejected : TlsProbeStatus::Unreachable;
@@ -172,11 +166,10 @@ ServerTrustProbe::~ServerTrustProbe()
 void ServerTrustProbe::start(const std::string& server_url, const ServerTrust& trust, DoneFn done)
 {
     cancel();
-    // Unique among all probes: a job of the same name would replace (and wait for) this one.
     static unsigned job_count = 0;
     const unsigned generation = m_generation;
     m_running_job             = fmt::format("{} #{}", m_job_name, ++job_count);
-    std::weak_ptr<char> alive = m_alive;
+    Biz::Lifetime::Token alive = m_lifetime.token();
 
     using StopToken = JThread::StopToken;
     Platform::PlatformServices::instance()
@@ -195,7 +188,6 @@ void ServerTrustProbe::start(const std::string& server_url, const ServerTrust& t
         .on_result(
             [this, alive, generation, done](TlsProbeResult result)
             {
-                // `this` is alive while the token is.
                 if (alive.expired() || generation != m_generation) {
                     return;
                 }
@@ -220,7 +212,6 @@ void ServerTrustProbe::start(const std::string& server_url, const ServerTrust& t
                     return;
                 }
                 m_running_job.clear();
-                // Reported as a failure: the waiting page must not stay in the "checking" state.
                 done(std::move(result));
             }
         )
@@ -231,7 +222,6 @@ void ServerTrustProbe::cancel()
 {
     ++m_generation;
     Platform::PlatformServices& services = Platform::PlatformServices::instance();
-    // Without the job manager (shut down already) no job runs any more.
     if (!m_running_job.empty() && services.has_job_manager()) {
         services.job_manager().request_job_stop(m_running_job);
     }

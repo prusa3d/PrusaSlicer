@@ -33,14 +33,14 @@ private:
 
 /**
  * @brief The logic of the sign-in dialog: Prusa Account signs in in the browser (OAuth), Connect
- * Local (offline mode) by app pairing, see BrowserLogicConnectLocalLogIn.
+ * Local (Connect Local) by app pairing, see BrowserLogicConnectLocalLogIn.
  */
 std::unique_ptr<AbstractBrowserLogic>
 make_log_in_logic(Biz::UserAccount::UserAccountInteractor& user_account);
 
 /**
  * @brief Shows the sign-in dialog of make_log_in_logic(). Online the sign-in ends in the system
- * browser, so the app is brought back to the front; offline it ends inside the dialog, and
+ * browser, so the app is brought back to the front; Connect Local it ends inside the dialog, and
  * raising would only restore and maximize the window again.
  */
 void show_log_in_dialog(Biz::ProjectInteractor& project_interactor);

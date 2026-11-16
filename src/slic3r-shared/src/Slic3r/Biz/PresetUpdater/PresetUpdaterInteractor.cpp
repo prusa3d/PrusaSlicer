@@ -219,6 +219,9 @@ PresetUpdaterInteractor::make_status_callback(
 std::function<std::string(JThread::StopToken)>
 PresetUpdaterInteractor::make_access_token_provider() const
 {
+    if (!m_user_account_interactor.has_prusa_account()) {
+        return [](JThread::StopToken) { return std::string(); };
+    }
     return [this](JThread::StopToken stop_token)
     { return m_user_account_interactor.wait_for_access_token(k_access_token_wait, stop_token); };
 }

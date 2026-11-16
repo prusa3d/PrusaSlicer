@@ -10,28 +10,36 @@
 #include "Slic3r/Assert.hpp"
 #include <nlohmann/json.hpp>
 
+#include <utility>
+
 namespace Slic3r::App::Browser {
 
-BrowserLogicConnectSelect::BrowserLogicConnectSelect(Biz::ProjectInteractor& project_interactor) :
+BrowserLogicConnectSelect::BrowserLogicConnectSelect(
+    Biz::ProjectInteractor& project_interactor,
+    std::unique_ptr<IConnectPageAuth> page_auth
+) :
     AbstractUploadBrowserLogic(
-        // Offline the dialog starts on the loading page and opens the page once its page session
-        // cookie is set (on_loaded_webview_event).
-        Biz::Network::ServiceConfig::instance().is_offline() ?
-            std::string() :
-            Biz::Network::ServiceConfig::instance().connect_select_printer_url(),
+        page_auth->pages_get_token() ?
+            Biz::Network::ServiceConfig::instance().connect_select_printer_url() :
+            std::string(),
         {"_prusaSlicer"},
         "connect_loading",
         "connect_error",
         "Select printer"
     ),
-    AbstractConnectRequestHandler(project_interactor, *this),
+    AbstractConnectRequestHandler(
+        project_interactor,
+        std::move(page_auth),
+        [this](std::vector<BrowserLogicCommand> commands) { push_commands(std::move(commands)); },
+        "connect_error"
+    ),
     m_select_url(Biz::Network::ServiceConfig::instance().connect_select_printer_url())
 {}
 
 std::vector<BrowserLogicCommand>
 BrowserLogicConnectSelect::on_loaded_webview_event(const std::string& url)
 {
-    if (Biz::Network::ServiceConfig::instance().is_offline()
+    if (!page_auth().pages_get_token()
         && !m_select_page_requested
         && url.find("/web/" + m_loading_html) != std::string::npos)
     {

@@ -9,7 +9,7 @@
 #include <vector>
 
 /**
- * @brief Connect Local app pairing (offline sign-in), without any I/O: request bodies, parsing of
+ * @brief Connect Local app pairing (Connect Local sign-in), without any I/O: request bodies, parsing of
  * the server replies and the state of a running pairing. UserAccountCommunicationPairing does the
  * requests and the timing.
  *

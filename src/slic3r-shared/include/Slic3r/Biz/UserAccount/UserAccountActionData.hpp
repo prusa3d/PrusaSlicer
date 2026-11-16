@@ -25,7 +25,6 @@ enum class UserAccountActionID {
     Avatar,
     ConnectDataFromUuid,
     PrintablesSecretToken,
-    // Connect Local (offline mode): app pairing and the page session of its web pages.
     PairingRequest,
     PairingPoll,
     PageSession

@@ -1,6 +1,5 @@
 #include "Slic3r/Biz/PrintHost/PrintHostPrusaConnect.hpp"
 
-#include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Log.hpp"
@@ -21,13 +20,6 @@ namespace Slic3r::Biz::PrintHost {
 namespace {
 
 constexpr size_t LOG_BODY_LIMIT = 4096;
-
-void report_unauthorized(const PhysicalPrinter::ConnectUpload& auth, unsigned status)
-{
-    if (status == 401 && auth.on_unauthorized) {
-        auth.on_unauthorized(auth.access_token);
-    }
-}
 
 std::string truncate_for_log(const std::string& text)
 {
@@ -206,7 +198,8 @@ bool PrintHostPrusaConnect::create_file_record(
     request["size"]          = size;
     std::string request_body = request.dump();
 
-    std::string url = Network::ServiceConfig::instance().connect_organization_files_url(auth.organization_id);
+    std::string url         = auth.files_url;
+    const std::string token = auth.bearer_token();
     log_request(STEP, "POST", url, request_body);
 
     bool res = false;
@@ -216,7 +209,7 @@ bool PrintHostPrusaConnect::create_file_record(
         std::move(url),
         retry_fn
     );
-    http->header("Authorization", "Bearer " + auth.access_token)
+    http->header("Authorization", "Bearer " + token)
         .header("Content-Type", "application/json")
         .set_post_body(std::move(request_body))
         .on_complete([&](std::string body, unsigned status) {
@@ -226,7 +219,7 @@ bool PrintHostPrusaConnect::create_file_record(
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
             log_response(STEP, false, status, error, body);
-            report_unauthorized(auth, status);
+            auth.report_unauthorized(status, token);
             error_fn(authenticated_step_error(
                 _u8L("Failed to register the file in Prusa Connect"),
                 body,
@@ -344,10 +337,8 @@ bool PrintHostPrusaConnect::finish_file_record(
 {
     static constexpr const char* STEP = "finish file";
 
-    std::string url = Network::ServiceConfig::instance().connect_organization_file_url(
-        auth.organization_id,
-        record.file_id
-    );
+    std::string url         = auth.files_url + "/" + record.file_id;
+    const std::string token = auth.bearer_token();
     nlohmann::json request;
     request["upload_finished_at"] = Slic3r::Utils::iso_ext_utc_timestamp();
     std::string request_body      = request.dump();
@@ -359,7 +350,7 @@ bool PrintHostPrusaConnect::finish_file_record(
         std::move(url),
         retry_fn
     );
-    http->header("Authorization", "Bearer " + auth.access_token)
+    http->header("Authorization", "Bearer " + token)
         .header("Content-Type", "application/json")
         .set_post_body(std::move(request_body))
         .on_complete([&](std::string body, unsigned status) {
@@ -368,7 +359,7 @@ bool PrintHostPrusaConnect::finish_file_record(
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
             log_response(STEP, false, status, error, body);
-            report_unauthorized(auth, status);
+            auth.report_unauthorized(status, token);
             error_fn(authenticated_step_error(
                 _u8L("Failed to finish the file upload in Prusa Connect"),
                 body,
@@ -419,7 +410,8 @@ bool PrintHostPrusaConnect::enqueue_on_printer(
         return false;
     }
 
-    std::string url = Network::ServiceConfig::instance().connect_printer_queue_url(auth.printer_uuid);
+    std::string url         = auth.queue_url;
+    const std::string token = auth.bearer_token();
     log_request(STEP, "POST", url, request_body);
 
     bool res = false;
@@ -428,7 +420,7 @@ bool PrintHostPrusaConnect::enqueue_on_printer(
         std::move(url),
         retry_fn
     );
-    http->header("Authorization", "Bearer " + auth.access_token)
+    http->header("Authorization", "Bearer " + token)
         .header("Content-Type", "application/json")
         .set_post_body(std::move(request_body))
         .on_complete([&](std::string body, unsigned status) {
@@ -437,7 +429,7 @@ bool PrintHostPrusaConnect::enqueue_on_printer(
         })
         .on_error([&](std::string body, std::string error, unsigned status) {
             log_response(STEP, false, status, error, body);
-            report_unauthorized(auth, status);
+            auth.report_unauthorized(status, token);
             error_fn(authenticated_step_error(
                 _u8L("Failed to send the file to the printer"),
                 body,
@@ -466,10 +458,14 @@ bool PrintHostPrusaConnect::perform(
         return false;
     }
 
-    const std::string printer_page_url =
-        Network::ServiceConfig::instance().connect_printer_page_url(auth->printer_uuid);
-    if (!printer_page_url.empty()) {
-        info_fn(PrintHostJobInfoTag::ConnectPrinterAddress, printer_page_url);
+    if (auth->files_url.empty() || auth->queue_url.empty()) {
+        SPDLOG_ERROR("PrusaConnect: The upload has no service URLs for printer {}", auth->printer_uuid);
+        error_fn(_u8L("Uploading to Prusa Connect is not available."));
+        return false;
+    }
+
+    if (!auth->printer_page_url.empty()) {
+        info_fn(PrintHostJobInfoTag::ConnectPrinterAddress, auth->printer_page_url);
     }
 
     SPDLOG_INFO(

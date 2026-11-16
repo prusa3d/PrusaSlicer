@@ -7,7 +7,7 @@
 namespace Slic3r::Biz::Network {
 
 /**
- * @brief How the certificate of the Connect Local (offline) server is checked.
+ * @brief How the certificate of the Connect Local (Connect Local) server is checked.
  *
  * Certificate checking is never turned off. System uses the system trust store, as any other
  * https request. PinnedKey accepts exactly one server public key, whatever the host name in the
@@ -29,7 +29,7 @@ struct ServerTrust
 {
     ServerTrustKind kind{ServerTrustKind::System};
     /**
-     * @brief Normalized server URL (ServiceConfig::normalize_offline_server_url) the trust belongs
+     * @brief Normalized server URL (ServiceConfig::normalize_connect_local_server_url) the trust belongs
      * to.
      */
     std::string server_url;

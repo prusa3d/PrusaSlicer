@@ -50,27 +50,25 @@ void UserAccountInteractor::restart(bool app_config_enabled, const std::function
 
 void UserAccountInteractor::start_communication()
 {
-    // Connect Local signs in by app pairing, Prusa Account by OAuth.
-    if (Network::ServiceConfig::instance().is_offline()) {
+    if (Network::ServiceConfig::instance().is_connect_local()) {
         replace_communication(std::make_unique<UserAccountCommunicationPairing>(m_dispatcher));
     } else {
         replace_communication(std::make_unique<UserAccountCommunication>(m_dispatcher));
     }
     m_communication->add_session_listener(this);
+    if (IPairingCommunication* pairing = m_communication->pairing()) {
+        pairing->set_pairing_listener(this);
+    }
     m_communication->init();
 }
 
 void UserAccountInteractor::stop_communication()
 {
     bool was_logged = is_logged_in();
-    // Not a logout the person asked for: nothing is revoked on a Connect Local server.
     m_communication->log_out_locally(was_logged);
     replace_communication(std::make_unique<UserAccountCommunicationDummy>());
     m_communication->add_session_listener(this);
 
-    // This switch ends dispatching from UserAccountSessionDispatchBase before it can asynchrtonously dispatch loggout.
-    // We do it manually here (possible double dispatch is ok).
-    // Cut off of other messages is correct.
     if (was_logged) {
         invoke_listeners<IUserAccountListener>(
             [](auto* listener) { listener->on_user_account_logged_out(); }
@@ -197,14 +195,32 @@ void UserAccountInteractor::request_printables_secret_token()
     m_communication->request_printables_secret_token();
 }
 
+bool UserAccountInteractor::has_prusa_account() const
+{
+    std::lock_guard<std::mutex> lock(m_communication_mutex);
+    return m_communication->is_prusa_account();
+}
+
+bool UserAccountInteractor::is_connect_local_account() const
+{
+    std::lock_guard<std::mutex> lock(m_communication_mutex);
+    return m_communication->pairing() != nullptr;
+}
+
 void UserAccountInteractor::start_pairing()
 {
-    m_communication->start_pairing();
+    if (IPairingCommunication* pairing = m_communication->pairing()) {
+        pairing->start_pairing();
+    } else {
+        SPDLOG_WARN("UserAccountInteractor: the account does not sign in by pairing.");
+    }
 }
 
 void UserAccountInteractor::cancel_pairing()
 {
-    m_communication->cancel_pairing();
+    if (IPairingCommunication* pairing = m_communication->pairing()) {
+        pairing->cancel_pairing();
+    }
 }
 
 void UserAccountInteractor::on_unauthorized(const std::string& access_token)
@@ -215,7 +231,11 @@ void UserAccountInteractor::on_unauthorized(const std::string& access_token)
 void UserAccountInteractor::
     request_page_session(std::function<void(std::optional<std::string>)> done, bool fresh)
 {
-    m_communication->enqueue_page_session_action(std::move(done), fresh);
+    if (IPairingCommunication* pairing = m_communication->pairing()) {
+        pairing->enqueue_page_session_action(std::move(done), fresh);
+    } else if (done) {
+        done(std::nullopt);
+    }
 }
 
 void
@@ -404,6 +424,10 @@ void UserAccountInteractor::on_user_id(const std::string& body)
     std::string public_username = m_account_user_data["public_username"];
     const std::string id = m_account_user_data["id"];
     m_communication->on_username_changed(public_username, id, true);
+    if (!m_communication->is_logged_in()) {
+        SPDLOG_WARN("UserAccountInteractor: the account of the User ID message was not accepted.");
+        return;
+    }
 
     if (m_account_user_data.find("email") != m_account_user_data.end()) {
         m_communication->on_email(m_account_user_data["email"]);
