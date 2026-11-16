@@ -8,10 +8,11 @@
 #include "sort_angles.h"
 #include "LinSpaced.h"
 #include <algorithm>
+#include <cassert>
 
 template <typename DerivedM, typename DerivedR>
 IGL_INLINE void igl::sort_angles(
-        const Eigen::PlainObjectBase<DerivedM>& M,
+        const Eigen::MatrixBase<DerivedM>& M,
         Eigen::PlainObjectBase<DerivedR>& R) {
     const size_t num_rows = M.rows();
     const size_t num_cols = M.cols();
@@ -110,5 +111,5 @@ IGL_INLINE void igl::sort_angles(
 }
 
 #ifdef IGL_STATIC_LIBRARY
-template void igl::sort_angles<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, 1, 0, -1, 1> >(Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> >&);
+template void igl::sort_angles<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, 1, 0, -1, 1> >(Eigen::MatrixBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> >&);
 #endif

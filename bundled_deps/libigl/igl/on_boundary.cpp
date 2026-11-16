@@ -12,6 +12,7 @@
 #include "face_occurrences.h"
 
 // STL includes
+#include <cassert>
 
 template <typename IntegerT>
 IGL_INLINE void igl::on_boundary(
@@ -19,7 +20,6 @@ IGL_INLINE void igl::on_boundary(
   std::vector<bool> & I,
   std::vector<std::vector<bool> > & C)
 {
-  using namespace std;
   if(T.empty())
   {
     I.clear();
@@ -32,7 +32,7 @@ IGL_INLINE void igl::on_boundary(
     case 3:
     {
       // Get a list of all faces
-      vector<vector<IntegerT> > F(T.size()*3,vector<IntegerT>(2));
+      std::vector<std::vector<IntegerT> > F(T.size()*3,std::vector<IntegerT>(2));
       // Gather faces, loop over tets
       for(int i = 0; i< (int)T.size();i++)
       {
@@ -46,9 +46,9 @@ IGL_INLINE void igl::on_boundary(
         F[i*3+2][1] = T[i][1];
       }
       // Counts
-      vector<int> FC;
+      std::vector<int> FC;
       face_occurrences(F,FC);
-      C.resize(T.size(),vector<bool>(3));
+      C.resize(T.size(),std::vector<bool>(3));
       I.resize(T.size(),false);
       for(int i = 0; i< (int)T.size();i++)
       {
@@ -65,7 +65,7 @@ IGL_INLINE void igl::on_boundary(
     case 4:
     {
       // Get a list of all faces
-      vector<vector<IntegerT> > F(T.size()*4,vector<IntegerT>(3));
+      std::vector<std::vector<IntegerT> > F(T.size()*4,std::vector<IntegerT>(3));
       // Gather faces, loop over tets
       for(int i = 0; i< (int)T.size();i++)
       {
@@ -88,9 +88,9 @@ IGL_INLINE void igl::on_boundary(
         F[i*4+3][2] = T[i][2];
       }
       // Counts
-      vector<int> FC;
+      std::vector<int> FC;
       face_occurrences(F,FC);
-      C.resize(T.size(),vector<bool>(4));
+      C.resize(T.size(),std::vector<bool>(4));
       I.resize(T.size(),false);
       for(int i = 0; i< (int)T.size();i++)
       {
@@ -119,13 +119,11 @@ IGL_INLINE void igl::on_boundary(
   Eigen::PlainObjectBase<DerivedC>& C)
 {
   assert(T.cols() == 0 || T.cols() == 4 || T.cols() == 3);
-  using namespace std;
-  using namespace Eigen;
   // Cop out: use vector of vectors version
-  vector<vector<typename DerivedT::Scalar> > vT;
+  std::vector<std::vector<typename DerivedT::Scalar> > vT;
   matrix_to_list(T,vT);
-  vector<bool> vI;
-  vector<vector<bool> > vC;
+  std::vector<bool> vI;
+  std::vector<std::vector<bool> > vC;
   on_boundary(vT,vI,vC);
   list_to_matrix(vI,I);
   list_to_matrix(vC,C);

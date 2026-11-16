@@ -6,27 +6,24 @@
 // v. 2.0. If a copy of the MPL was not distributed with this file, You can
 // obtain one at http://mozilla.org/MPL/2.0/.
 #include "random_dir.h"
-#include <igl/PI.h>
+#include "PI.h"
 #include <cmath>
 
 IGL_INLINE Eigen::Vector3d igl::random_dir()
 {
-  using namespace Eigen;
   double z =  (double)rand() / (double)RAND_MAX*2.0 - 1.0;
   double t =  (double)rand() / (double)RAND_MAX*2.0*PI;
   // http://www.altdevblogaday.com/2012/05/03/generating-uniformly-distributed-points-on-sphere/
   double r = sqrt(1.0-z*z);
   double x = r * cos(t);
   double y = r * sin(t);
-  return Vector3d(x,y,z);
+  return Eigen::Vector3d(x,y,z);
 }
 
 IGL_INLINE Eigen::MatrixXd igl::random_dir_stratified(const int n)
 {
-  using namespace Eigen;
-  using namespace std;
   const double m = std::floor(sqrt(double(n)));
-  MatrixXd N(n,3);
+  Eigen::MatrixXd N(n,3);
   int row = 0;
   for(int i = 0;i<m;i++)
   {

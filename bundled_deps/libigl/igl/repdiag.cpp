@@ -14,12 +14,10 @@ IGL_INLINE void igl::repdiag(
   const int d,
   Eigen::SparseMatrix<T>& B)
 {
-  using namespace std;
-  using namespace Eigen;
   int m = A.rows();
   int n = A.cols();
 #if false
-  vector<Triplet<T> > IJV;
+  vector<Eigen::Triplet<T> > IJV;
   IJV.reserve(A.nonZeros()*d);
   // Loop outer level
   for (int k=0; k<A.outerSize(); ++k)
@@ -29,7 +27,7 @@ IGL_INLINE void igl::repdiag(
     {
       for(int i = 0;i<d;i++)
       {
-        IJV.push_back(Triplet<T>(i*m+it.row(),i*n+it.col(),it.value()));
+        IJV.push_back(Eigen::Triplet<T>(i*m+it.row(),i*n+it.col(),it.value()));
       }
     }
   }
@@ -71,8 +69,7 @@ IGL_INLINE void igl::repdiag(
 {
   int m = A.rows();
   int n = A.cols();
-  B.resize(m*d,n*d);
-  B.array() *= 0;
+  B.setZero(m*d,n*d);
   for(int i = 0;i<d;i++)
   {
     B.block(i*m,i*n,m,n) = A;

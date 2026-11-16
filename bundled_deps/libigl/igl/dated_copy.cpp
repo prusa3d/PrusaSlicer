@@ -20,7 +20,6 @@
 
 IGL_INLINE bool igl::dated_copy(const std::string & src_path, const std::string & dir)
 {
-  using namespace std;
   // Get time and date as string
   char buffer[80];
   time_t rawtime;
@@ -29,33 +28,33 @@ IGL_INLINE bool igl::dated_copy(const std::string & src_path, const std::string 
   timeinfo = localtime (&rawtime);
   // ISO 8601 format with hyphens instead of colons and no timezone offset
   strftime (buffer,80,"%Y-%m-%dT%H-%M-%S",timeinfo);
-  string src_basename = basename(src_path);
-  string dst_basename = src_basename+"-"+buffer;
-  string dst_path = dir+"/"+dst_basename;
-  cerr<<"Saving binary to "<<dst_path;
+  std::string src_basename = basename(src_path);
+  std::string dst_basename = src_basename+"-"+buffer;
+  std::string dst_path = dir+"/"+dst_basename;
+  std::cerr<<"Saving binary to "<<dst_path;
   {
     // http://stackoverflow.com/a/10195497/148668
-    ifstream src(src_path,ios::binary);
+    std::ifstream src(src_path,std::ios::binary);
     if (!src.is_open()) 
     {
-      cerr<<" failed."<<endl;
+      std::cerr<<" failed."<<std::endl;
       return false;
     }
-    ofstream dst(dst_path,ios::binary);
+    std::ofstream dst(dst_path,std::ios::binary);
     if(!dst.is_open())
     {
-      cerr<<" failed."<<endl;
+      std::cerr<<" failed."<<std::endl;
       return false;
     }
     dst << src.rdbuf();
   }
-  cerr<<" succeeded."<<endl;
-  cerr<<"Setting permissions of "<<dst_path;
+  std::cerr<<" succeeded."<<std::endl;
+  std::cerr<<"Setting permissions of "<<dst_path;
   {
     int src_posix = fileno(fopen(src_path.c_str(),"r"));
     if(src_posix == -1)
     {
-      cerr<<" failed."<<endl;
+      std::cerr<<" failed."<<std::endl;
       return false;
     }
     struct stat fst;
@@ -63,22 +62,22 @@ IGL_INLINE bool igl::dated_copy(const std::string & src_path, const std::string 
     int dst_posix = fileno(fopen(dst_path.c_str(),"r"));
     if(dst_posix == -1)
     {
-      cerr<<" failed."<<endl;
+      std::cerr<<" failed."<<std::endl;
       return false;
     }
     //update to the same uid/gid
     if(fchown(dst_posix,fst.st_uid,fst.st_gid))
     {
-      cerr<<" failed."<<endl;
+      std::cerr<<" failed."<<std::endl;
       return false;
     }
     //update the permissions 
     if(fchmod(dst_posix,fst.st_mode) == -1)
     {
-      cerr<<" failed."<<endl;
+      std::cerr<<" failed."<<std::endl;
       return false;
     }
-    cerr<<" succeeded."<<endl;
+    std::cerr<<" succeeded."<<std::endl;
   }
   return true;
 }

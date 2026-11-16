@@ -8,6 +8,8 @@
 #include "setunion.h"
 #include "unique.h"
 
+#include <cassert>
+
 template <
   typename DerivedA,
   typename DerivedB,

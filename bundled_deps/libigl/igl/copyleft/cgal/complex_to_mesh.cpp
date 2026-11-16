@@ -21,7 +21,6 @@ IGL_INLINE bool igl::copyleft::cgal::complex_to_mesh(
   Eigen::PlainObjectBase<DerivedV> & V, 
   Eigen::PlainObjectBase<DerivedF> & F)
 {
-  using namespace Eigen;
   // CGAL/IO/Complex_2_in_triangulation_3_file_writer.h
   using CGAL::Surface_mesher::number_of_facets_on_surface;
 
@@ -140,13 +139,14 @@ IGL_INLINE bool igl::copyleft::cgal::complex_to_mesh(
 
   // CGAL code somehow can end up with unreferenced vertices
   {
-    VectorXi _1;
-    remove_unreferenced( MatrixXd(V), MatrixXi(F), V,F,_1);
+    Eigen::VectorXi _1;
+    remove_unreferenced( Eigen::MatrixXd(V), Eigen::MatrixXi(F), V,F,_1);
   }
 
   return success;
 }
 
 #ifdef IGL_STATIC_LIBRARY
+// Explicit template instantiation
 template bool igl::copyleft::cgal::complex_to_mesh<CGAL::Delaunay_triangulation_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Triangulation_data_structure_3<CGAL::Surface_mesh_vertex_base_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Triangulation_vertex_base_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Triangulation_ds_vertex_base_3<void> > >, CGAL::Delaunay_triangulation_cell_base_with_circumcenter_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Surface_mesh_cell_base_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Triangulation_cell_base_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Triangulation_ds_cell_base_3<void> > > >, CGAL::Sequential_tag>, CGAL::Default, CGAL::Default>, Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1> >(CGAL::Complex_2_in_triangulation_3<CGAL::Delaunay_triangulation_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Triangulation_data_structure_3<CGAL::Surface_mesh_vertex_base_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Triangulation_vertex_base_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Triangulation_ds_vertex_base_3<void> > >, CGAL::Delaunay_triangulation_cell_base_with_circumcenter_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Surface_mesh_cell_base_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Triangulation_cell_base_3<CGAL::Robust_circumcenter_traits_3<CGAL::Epick>, CGAL::Triangulation_ds_cell_base_3<void> > > >, CGAL::Sequential_tag>, CGAL::Default, CGAL::Default>, void> const&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&);
 #endif

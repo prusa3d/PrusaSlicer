@@ -6,11 +6,9 @@
 // v. 2.0. If a copy of the MPL was not distributed with this file, You can 
 // obtain one at http://mozilla.org/MPL/2.0/.
 #include "linprog.h"
-#include "slice.h"
-#include "slice_into.h"
 #include "find.h"
 #include "colon.h"
-#include <iostream>
+#include "placeholders.h"
 
 //#define IGL_LINPROG_VERBOSE
 IGL_INLINE bool igl::linprog(
@@ -22,8 +20,6 @@ IGL_INLINE bool igl::linprog(
 {
   // This is a very literal translation of
   // http://www.mathworks.com/matlabcentral/fileexchange/2166-introduction-to-linear-algebra/content/strang/linprog.m
-  using namespace Eigen;
-  using namespace std;
   bool success = true;
   // number of constraints
   const int m = _A.rows();
@@ -46,29 +42,29 @@ IGL_INLINE bool igl::linprog(
     return Bsign;
   };
   // initial (inverse) basis matrix
-  VectorXd Dv = sign(sign(b).array()+0.5);
+  Eigen::VectorXd Dv = sign(sign(b).array()+0.5);
   Dv.head(k).setConstant(1.);
-  MatrixXd D = Dv.asDiagonal();
+  Eigen::MatrixXd D = Dv.asDiagonal();
   // Incorporate slack variables
-  MatrixXd A(_A.rows(),_A.cols()+D.cols());
+  Eigen::MatrixXd A(_A.rows(),_A.cols()+D.cols());
   A<<_A,D;
   // Initial basis
-  VectorXi B = igl::colon<int>(n,n+m-1);
+  Eigen::VectorXi B = igl::colon<int>(n,n+m-1);
   // non-basis, may turn out that vector<> would be better here
-  VectorXi N = igl::colon<int>(0,n-1);
+  Eigen::VectorXi N = igl::colon<int>(0,n-1);
   int j;
   double bmin = b.minCoeff(&j);
   int phase;
-  VectorXd xb;
-  VectorXd s;
-  VectorXi J;
+  Eigen::VectorXd xb;
+  Eigen::VectorXd s;
+  Eigen::VectorXi J;
   if(k>0 && bmin<0)
   {
     phase = 1;
-    xb = VectorXd::Ones(m);
+    xb = Eigen::VectorXd::Ones(m);
     // super cost
     s.resize(n+m+1);
-    s<<VectorXd::Zero(n+k),VectorXd::Ones(m-k+1);
+    s<<Eigen::VectorXd::Zero(n+k),Eigen::VectorXd::Ones(m-k+1);
     N.resize(n+1);
     N<<igl::colon<int>(0,n-1),B(j);
     J.resize(B.size()-1);
@@ -79,11 +75,10 @@ IGL_INLINE bool igl::linprog(
     J.head(j) = B.head(j);
     J.tail(B.size()-j-1) = B.tail(B.size()-j-1);
     B(j) = n+m;
-    MatrixXd AJ;
-    igl::slice(A,J,2,AJ);
-    const VectorXd a = b - AJ.rowwise().sum();
+    Eigen::MatrixXd AJ = A(igl::placeholders::all,J);
+    const Eigen::VectorXd a = b - AJ.rowwise().sum();
     {
-      MatrixXd old_A = A;
+      Eigen::MatrixXd old_A = A;
       A.resize(A.rows(),A.cols()+a.cols());
       A<<old_A,a;
     }
@@ -95,27 +90,27 @@ IGL_INLINE bool igl::linprog(
     xb = b;
     s.resize(c.size()+m);
     // cost function
-    s<<c,VectorXd::Zero(m);
+    s<<c,Eigen::VectorXd::Zero(m);
   }else //k = 0 or bmin >=0
   {
     phase = 1;
     xb = b.array().abs();
     s.resize(n+m);
     // super cost
-    s<<VectorXd::Zero(n+k),VectorXd::Ones(m-k);
+    s<<Eigen::VectorXd::Zero(n+k),Eigen::VectorXd::Ones(m-k);
   }
   while(phase<3)
   {
     double df = -1;
     int t = std::numeric_limits<int>::max();
     // Lagrange mutipliers fro Ax=b
-    VectorXd yb = D.transpose() * igl::slice(s,B);
+    Eigen::VectorXd yb = D.transpose() * s(B);
     while(true)
     {
       if(MAXIT>0 && it>=MAXIT)
       {
 #ifdef IGL_LINPROG_VERBOSE
-        cerr<<"linprog: warning! maximum iterations without convergence."<<endl;
+        std::cerr<<"linprog: warning! maximum iterations without convergence."<<std::endl;
 #endif
         success = false;
         break;
@@ -126,9 +121,9 @@ IGL_INLINE bool igl::linprog(
         break;
       }
       // reduced costs
-      VectorXd sN = igl::slice(s,N);
-      MatrixXd AN = igl::slice(A,N,2);
-      VectorXd r = sN - AN.transpose() * yb;
+      Eigen::VectorXd sN = s(N);
+      Eigen::MatrixXd AN = A(igl::placeholders::all,N);
+      Eigen::VectorXd r = sN - AN.transpose() * yb;
       int q;
       // determine new basic variable
       double rmin = r.minCoeff(&q);
@@ -145,30 +140,30 @@ IGL_INLINE bool igl::linprog(
         if(MAXIT == -1)
         {
 #ifdef IGL_LINPROG_VERBOSE
-          cerr<<"linprog: warning! degenerate vertex"<<endl;
+          std::cerr<<"linprog: warning! degenerate vertex"<<std::endl;
 #endif
           success = false;
         }
         igl::find((r.array()<0).eval(),J);
-        double Nq = igl::slice(N,J).minCoeff();
+        double Nq = N(J).minCoeff();
         // again seems like q is assumed to be a scalar though matlab code
         // could produce a vector for multiple matches
         (N.array()==Nq).cast<int>().maxCoeff(&q);
       }
-      VectorXd d = D*A.col(N(q));
-      VectorXi I;
+      Eigen::VectorXd d = D*A.col(N(q));
+      Eigen::VectorXi I;
       igl::find((d.array()>tol).eval(),I);
       if(I.size() == 0)
       {
 #ifdef IGL_LINPROG_VERBOSE
-        cerr<<"linprog: warning! solution is unbounded"<<endl;
+        std::cerr<<"linprog: warning! solution is unbounded"<<std::endl;
 #endif
         // This seems dubious:
         it=-it;
         success = false;
         break;
       }
-      VectorXd xbd = igl::slice(xb,I).array()/igl::slice(d,I).array();
+      Eigen::VectorXd xbd = xb(I).array()/d(I).array();
       // new use of r
       int p;
       {
@@ -179,7 +174,7 @@ IGL_INLINE bool igl::linprog(
         if(df>=0)
         {
           igl::find((xbd.array()==r).eval(),J);
-          double Bp = igl::slice(B,igl::slice(I,J)).minCoeff();
+          double Bp = B(I(J)).minCoeff();
           // idiotic way of finding index in B of Bp
           // code down the line seems to assume p is a scalar though the matlab
           // code could find a vector of matches)
@@ -192,8 +187,8 @@ IGL_INLINE bool igl::linprog(
         df = r*rmin;
       }
       // row vector
-      RowVectorXd v = D.row(p)/d(p);
-      yb += v.transpose() * (s(N(q)) - d.transpose()*igl::slice(s,B));
+      Eigen::RowVectorXd v = D.row(p)/d(p);
+      yb += v.transpose() * (s(N(q)) - d.transpose()*s(B));
       d(p)-=1;
       // update inverse basis matrix
       D = D - d*v;
@@ -202,7 +197,7 @@ IGL_INLINE bool igl::linprog(
       if(t>(n+k-1))
       {
         // remove qth entry from N
-        VectorXi old_N = N;
+        Eigen::VectorXi old_N = N;
         N.resize(N.size()-1);
         N.head(q) = old_N.head(q);
         N.head(q) = old_N.head(q);
@@ -213,26 +208,25 @@ IGL_INLINE bool igl::linprog(
       }
     }
     // iterative refinement
-    xb = (xb+D*(b-igl::slice(A,B,2)*xb)).eval();
+    xb = (xb+D*(b-A(igl::placeholders::all,B)*xb)).eval();
     // must be due to rounding
-    VectorXi I;
+    Eigen::VectorXi I;
     igl::find((xb.array()<0).eval(),I);
     if(I.size()>0)
     {
       // so correct
-      VectorXd Z = VectorXd::Zero(I.size(),1);
-      igl::slice_into(Z,I,xb);
+      xb(I) = Eigen::VectorXd::Zero(I.size(),1);
     }
     // B, xb,n,m,res=A(:,B)*xb-b
     if(phase == 2 || it<0)
     {
       break;
     }
-    if(xb.transpose()*igl::slice(s,B) > tol)
+    if(xb.transpose()*s(B) > tol)
     {
       it = -it;
 #ifdef IGL_LINPROG_VERBOSE
-      cerr<<"linprog: warning, no feasible solution"<<endl;
+      std::cerr<<"linprog: warning, no feasible solution"<<std::endl;
 #endif
       success = false;
       break;
@@ -242,8 +236,8 @@ IGL_INLINE bool igl::linprog(
     s*=1e6*c.array().abs().maxCoeff();
     s.head(n) = c;
   }
-  x.resize(std::max(B.maxCoeff()+1,n));
-  igl::slice_into(xb,B,x);
+  x.setZero(std::max(B.maxCoeff()+1,n));
+  x(B) = xb;
   x = x.head(n).eval();
   return success;
 }
@@ -256,15 +250,13 @@ IGL_INLINE bool igl::linprog(
   const Eigen::VectorXd & c,
   Eigen::VectorXd & x)
 {
-  using namespace Eigen;
-  using namespace std;
   const int m = A.rows();
   const int n = A.cols();
   const int p = B.rows();
-  MatrixXd Im = MatrixXd::Identity(m,m);
-  MatrixXd AS(m,n+m);
+  Eigen::MatrixXd Im = Eigen::MatrixXd::Identity(m,m);
+  Eigen::MatrixXd AS(m,n+m);
   AS<<A,Im;
-  MatrixXd bS = b.array().abs();
+  Eigen::MatrixXd bS = b.array().abs();
   for(int i = 0;i<m;i++)
   {
     const auto & sign = [](double x)->double
@@ -273,30 +265,50 @@ IGL_INLINE bool igl::linprog(
     };
     AS.row(i) *= sign(b(i));
   }
-  MatrixXd In = MatrixXd::Identity(n,n);
-  MatrixXd P(n+m,2*n+m);
-  P<<              In, -In, MatrixXd::Zero(n,m),
-     MatrixXd::Zero(m,2*n), Im;
-  MatrixXd ASP = AS*P;
-  MatrixXd BSP(0,2*n+m);
+  Eigen::MatrixXd In = Eigen::MatrixXd::Identity(n,n);
+  Eigen::MatrixXd P(n+m,2*n+m);
+  P<<              In, -In, Eigen::MatrixXd::Zero(n,m),
+     Eigen::MatrixXd::Zero(m,2*n), Im;
+  Eigen::MatrixXd ASP = AS*P;
+  Eigen::MatrixXd BSP(0,2*n+m);
   if(p>0)
   {
-    MatrixXd BS(p,2*n);
-    BS<<B,MatrixXd::Zero(p,n);
+    // B ∈ ℝ^(p × n)
+    Eigen::MatrixXd BS(p,n+m);
+    BS<<B,Eigen::MatrixXd::Zero(p,m);
+    // BS ∈ ℝ^(p × n+m)
     BSP = BS*P;
+    // BSP ∈ ℝ^(p × 2n+m)
   }
 
-  VectorXd fSP = VectorXd::Ones(2*n+m);
+  Eigen::VectorXd fSP = Eigen::VectorXd::Ones(2*n+m);
   fSP.head(2*n) = P.block(0,0,n,2*n).transpose()*f;
-  const VectorXd & cc = fSP;
+  const Eigen::VectorXd & cc = fSP;
 
-  MatrixXd AA(m+p,2*n+m);
+  Eigen::MatrixXd AA(m+p,2*n+m);
   AA<<ASP,BSP;
-  VectorXd bb(m+p);
+  Eigen::VectorXd bb(m+p);
   bb<<bS,c;
 
-  VectorXd xxs;
+  Eigen::VectorXd xxs;
+  // min   ccᵀxxs
+  // s.t.  AA xxs ≤ bb
+  //          xxs ≥ 0
+  //        
+  // x = x⁺ - x⁻
+  //
+  //    P
+  // .--^---.
+  // [I -I 0  [x⁺   = [x
+  //  0  0 I]  x⁻      s]
+  //           s]
+  // Pᵀ [xᵀ sᵀ] = xxsᵀ
+  //
+  // min  [fᵀ -fᵀ 𝟙ᵀ] [x⁺;x⁻;s]
+  // s.t.  AA [x⁺;x⁻;s] ≤ b
+  // s.t.  [x⁺;x⁻;s] ≥ 0
   bool ret = linprog(cc,AA,bb,0,xxs);
+  // x = P(1:n,:) xxs
   x = P.block(0,0,n,2*n+m)*xxs;
   return ret;
 }

@@ -7,7 +7,7 @@
 // obtain one at http://mozilla.org/MPL/2.0/.
 #include "init_render_to_texture.h"
 #include "gl.h"
-#include <cassert>
+#include "../IGL_ASSERT.h"
 
 IGL_INLINE void igl::opengl::init_render_to_texture(
   const size_t width,
@@ -17,7 +17,6 @@ IGL_INLINE void igl::opengl::init_render_to_texture(
   GLuint & fbo_id,
   GLuint & d_id)
 {
-  using namespace std;
   // http://www.opengl.org/wiki/Framebuffer_Object_Examples#Quick_example.2C_render_to_texture_.282D.29
   const auto & gen_tex = [](GLuint & tex_id)
   {
@@ -66,7 +65,7 @@ IGL_INLINE void igl::opengl::init_render_to_texture(
   //Does the GPU support current FBO configuration?
   GLenum status;
   status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-  assert(status == GL_FRAMEBUFFER_COMPLETE);
+  IGL_ASSERT(status == GL_FRAMEBUFFER_COMPLETE);
   // Unbind to clean up
   if(!depth_texture)
   {

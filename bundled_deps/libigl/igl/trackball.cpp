@@ -22,7 +22,6 @@
 template <typename Q_type>
 static IGL_INLINE Q_type _QuatD(double w, double h)
 {
-  using namespace std;
   return (Q_type)(std::abs(w) < std::abs(h) ? std::abs(w) : std::abs(h)) - 4;
 }
 template <typename Q_type>
@@ -144,7 +143,6 @@ IGL_INLINE void igl::trackball(
   const double mouse_y,
   Eigen::Quaternion<Scalarquat> & quat)
 {
-  using namespace std;
   return trackball(
     w,
     h,

@@ -22,13 +22,12 @@ IGL_INLINE bool igl::readBF(
   Eigen::PlainObjectBase<DerivedP> & P,
   Eigen::PlainObjectBase<DerivedO> & O)
 {
-  using namespace std;
-  ifstream is(filename);
+  std::ifstream is(filename);
   if(!is.is_open())
   {
     return false;
   }
-  string line;
+  std::string line;
   std::vector<typename DerivedWI::Scalar> vWI;
   std::vector<typename DerivedP::Scalar> vP;
   std::vector<std::vector<typename DerivedO::Scalar> > vO;
@@ -66,15 +65,13 @@ IGL_INLINE bool igl::readBF(
   Eigen::PlainObjectBase<DerivedBE> & BE,
   Eigen::PlainObjectBase<DerivedP> & P)
 {
-  using namespace Eigen;
-  using namespace std;
   if(!readBF(filename,WI,bfP,offsets))
   {
     return false;
   }
 
   C.resize(WI.rows(),3);
-  vector<bool> computed(C.rows(),false);
+  std::vector<bool> computed(C.rows(),false);
   // better not be cycles in bfP
   std::function<Eigen::RowVector3d(const int)> locate_tip;
   locate_tip = 

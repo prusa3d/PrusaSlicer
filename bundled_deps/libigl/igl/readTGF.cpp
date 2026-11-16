@@ -18,7 +18,6 @@ IGL_INLINE bool igl::readTGF(
   std::vector<std::vector<int> > & CE,
   std::vector<std::vector<int> > & PE)
 {
-  using namespace std;
   // clear output
   C.clear();
   E.clear();
@@ -56,7 +55,7 @@ IGL_INLINE bool igl::readTGF(
     }else if(reading_vertices)
     {
       int index;
-      vector<double> position(3);
+      std::vector<double> position(3);
       int count = 
         sscanf(line,"%d %lg %lg %lg",
           &index,
@@ -73,7 +72,7 @@ IGL_INLINE bool igl::readTGF(
       C.push_back(position);
     }else if(reading_edges)
     {
-      vector<int> edge(2);
+      std::vector<int> edge(2);
       int is_BE = 0;
       int is_PE = 0;
       int is_CE = 0;

@@ -14,7 +14,6 @@ IGL_INLINE bool igl::readWRL(
   std::vector<std::vector<Scalar > > & V,
   std::vector<std::vector<Index > > & F)
 {
-  using namespace std;
   FILE * wrl_file = fopen(wrl_file_name.c_str(),"r");
   if(NULL==wrl_file)
   {
@@ -30,14 +29,12 @@ IGL_INLINE bool igl::readWRL(
   std::vector<std::vector<Scalar > > & V,
   std::vector<std::vector<Index > > & F)
 {
-  using namespace std;
-
   char line[1000];
   // Read lines until seeing "point ["
   // treat other lines in file as "comments"
   bool still_comments = true;
-  string needle("point [");
-  string haystack;
+  std::string needle("point [");
+  std::string haystack;
   while(still_comments)
   {
     if(fgets(line,1000,wrl_file) == NULL)
@@ -46,8 +43,8 @@ IGL_INLINE bool igl::readWRL(
       fclose(wrl_file);
       return false;
     }
-    haystack = string(line);
-    still_comments = string::npos == haystack.find(needle);
+    haystack = std::string(line);
+    still_comments = std::string::npos == haystack.find(needle);
   }
 
   // read points in sets of 3
@@ -58,7 +55,7 @@ IGL_INLINE bool igl::readWRL(
     floats_read = fscanf(wrl_file," %lf %lf %lf,",&x,&y,&z);
     if(floats_read == 3)
     {
-      vector<Scalar > point;
+      std::vector<Scalar > point;
       point.resize(3);
       point[0] = x;
       point[1] = y;
@@ -74,19 +71,19 @@ IGL_INLINE bool igl::readWRL(
   // Read lines until seeing "coordIndex ["
   // treat other lines in file as "comments"
   still_comments = true;
-  needle = string("coordIndex [");
+  needle = std::string("coordIndex [");
   while(still_comments)
   {
     fgets(line,1000,wrl_file);
-    haystack = string(line);
-    still_comments = string::npos == haystack.find(needle);
+    haystack = std::string(line);
+    still_comments = std::string::npos == haystack.find(needle);
   }
   // read F
   int ints_read = 1;
   while(ints_read > 0)
   {
     // read new face indices (until hit -1)
-    vector<Index > face;
+    std::vector<Index > face;
     while(true)
     {
       // indices are 0-indexed
