@@ -30,7 +30,7 @@ constexpr std::chrono::seconds MIN_RETRY_DELAY{1};
 constexpr std::chrono::seconds MAX_RETRY_DELAY{60};
 } // namespace
 
-class MQTTImpl : public virtual mqtt::callback
+class MQTTImpl : public mqtt::callback
 {
 public:
     MQTTImpl(
