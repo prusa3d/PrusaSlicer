@@ -8,6 +8,7 @@
 #include <array>
 #include <cctype>
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <optional>
@@ -140,6 +141,25 @@ bool is_fiber_filled(const std::string &name)
     return false;
 }
 
+// Words as a product name has them: "PLA+" is "PLA Plus"
+std::vector<std::string> product_tokens(std::string s)
+{
+    for (size_t at = s.find('+'); at != std::string::npos; at = s.find('+', at))
+        s.replace(at, 1, " plus ");
+    return tokens(s);
+}
+
+bool has_word(const std::string &s, const char *word)
+{
+    const std::vector<std::string> words = tokens(s);
+    return std::find(words.begin(), words.end(), word) != words.end();
+}
+
+bool is_number(const std::string &w)
+{
+    return std::all_of(w.begin(), w.end(), [](char c) { return std::isdigit((unsigned char) c); });
+}
+
 // What the tool asks for, prepared once.
 struct Wanted
 {
@@ -147,7 +167,10 @@ struct Wanted
     bool                     vendor_known;
     std::string              vendor_key;
     std::vector<std::string> colour;     // color words, may be empty
-    std::set<std::string>    plain_words; // vendor, material and color words of the tool
+    std::set<std::string>    product;     // words of the product name beyond vendor and material
+    std::string              product_end; // the last of them, usually the color's
+    bool                     fiber_filled; // the product name says carbon or glass fiber, or carbon alone
+    std::set<std::string>    plain_words; // vendor, material, color and product words of the tool
     std::string              material_key; // the material's letters and digits, lowercase
 
     explicit Wanted(const PrinterTool &t)
@@ -155,13 +178,20 @@ struct Wanted
         , vendor_known(!is_placeholder_vendor(t.vendor))
         , vendor_key(filament_sync::vendor_key(t.vendor))
         , colour(colour_words(t.color))
+        , fiber_filled(is_fiber_filled(t.product) || has_word(t.product, "carbon"))
     {
         for (const auto &w : tokens(t.vendor)) plain_words.insert(w);
         for (const auto &w : tokens(t.material)) {
             plain_words.insert(w);
             material_key += w;
         }
+        for (const auto &w : product_tokens(t.product))
+            if (!plain_words.count(w)) {
+                product.insert(w);
+                product_end = w;
+            }
         for (const auto &w : colour) plain_words.insert(w);
+        plain_words.insert(product.begin(), product.end());
     }
 };
 
@@ -206,6 +236,77 @@ std::string hex_in_name(const std::string &name)
     return {};
 }
 
+// The words of a preset's name that describe its filament: without a printer scope after "@", and
+// without a nozzle part from its diameter on ("Pro PCTG Translucent Yellow 0.4 Other HF")
+std::vector<std::string> filament_words(const Candidate &c)
+{
+    std::vector<std::string> words = product_tokens(display_name(c));
+    for (size_t i = 0; i + 1 < words.size(); ++i)
+        if (words[i] == "0" && std::isdigit((unsigned char) words[i + 1].front())) {
+            words.resize(i);
+            break;
+        }
+    return words;
+}
+
+// Words of the tool's product name that a preset lacks in its name, vendor and type: "Pro PCTG
+// Daffodil Yellow" lacks "Translucent" of "Pro PCTG, Translucent Yellow".
+int missing_product_words(const Wanted &want, const Candidate &c)
+{
+    const std::vector<std::string> words = filament_words(c);
+    std::set<std::string>          has(words.begin(), words.end());
+    for (const std::string *s : {&c.vendor, &c.type})
+        for (const auto &w : product_tokens(*s)) has.insert(w);
+    return int(std::count_if(want.product.begin(), want.product.end(), [&](const std::string &w) { return !has.count(w); }));
+}
+
+// The tool's vendor, material, color and product words, and the preset's vendor in any spelling
+std::set<std::string> known_words(const Wanted &want, const Candidate &c)
+{
+    std::set<std::string> known = want.plain_words;
+    for (const auto &w : tokens(c.vendor)) known.insert(w);
+    if (vendor_key(c.vendor) == "prusament")
+        for (const char *w : {"prusament", "prusa", "polymers"}) known.insert(w);
+    return known;
+}
+
+// The words of another product than the tool's in a preset's name, 0 without a product name:
+// "Daffodil" for "Pro PCTG, Translucent Yellow", "High Speed" for "PLA Gravity Grey", "PolyTerra"
+// for "Panchroma Satin PLA Teal". Words after its color, or after the name of the system preset
+// it was saved from, name the user's copy ("Tuned") rather than a product.
+int foreign_words(const Wanted &want, const Candidate &c)
+{
+    if (want.product.empty())
+        return 0;
+    std::vector<std::string> words = filament_words(c);
+    const auto colour = std::find_if(words.rbegin(), words.rend(), [&](const std::string &w) {
+        return w == want.product_end || std::find(want.colour.begin(), want.colour.end(), w) != want.colour.end();
+    });
+    const std::vector<std::string> parent = product_tokens(c.parent);
+    if (colour != words.rend())
+        words.erase(std::prev(colour.base()), words.end());
+    else if (!c.is_system && !parent.empty() && words.size() >= parent.size() && std::equal(parent.begin(), parent.end(), words.begin()))
+        words.resize(parent.size());
+    const std::set<std::string> known = known_words(want, c);
+    // A number is a version or a share of a fill ("PLA+ 2.0", "Magnetite 40%") rather than a product
+    return int(std::count_if(words.begin(), words.end(), [&](const std::string &w) { return !known.count(w) && !is_number(w); }));
+}
+
+// How far a preset is from the tool's product name, 0 without one: the product's words it lacks,
+// and the words of another product it has
+int product_mismatch(const Wanted &want, const Candidate &c)
+{
+    return want.product.empty() ? 0 : missing_product_words(want, c) + foreign_words(want, c);
+}
+
+// Whether a preset's name or type says carbon or glass fiber, as an abrasive one's name does with
+// "Carbon" alone ("Extrudr GreenTEC Pro Carbon")
+bool names_fiber(const Candidate &c)
+{
+    const std::string name = display_name(c);
+    return is_fiber_filled(name) || is_fiber_filled(c.type) || (c.is_abrasive && (has_word(name, "carbon") || has_word(name, "glass")));
+}
+
 // 0: the tool's color, by hex or by name. 1: nothing says another color. 2: another color.
 int colour_tier(const Wanted &want, const Candidate &c)
 {
@@ -219,18 +320,20 @@ int colour_tier(const Wanted &want, const Candidate &c)
         return named == printer_tools_detail::normalize_color_hex(want.tool.color_hex) ? 0 : 2;
     if ((!want.tool.color_hex.empty() && rgb_distance(c.colour, want.tool.color_hex) == 0) || contains_sequence(words, want.colour))
         return 0;
+    // A color the product name has too ("Black Silver Glitter") isn't another
     for (const std::string &w : words)
-        if (is_colour_word(w) && std::find(want.colour.begin(), want.colour.end(), w) == want.colour.end())
+        if (is_colour_word(w) && std::find(want.colour.begin(), want.colour.end(), w) == want.colour.end() && !want.product.count(w))
             return 2;
     // A user preset named "<vendor> <material> <color>", as new presets are: what follows the
     // material is a color even when the printer's list doesn't have it (a user color named
     // "Clear"), and the preset's own color differs. In a system preset it names a variant
     // ("Prusament PETG Carbon Fiber"), which the printer can't tell apart, and so it does in a
-    // copy saved from the variant under its name ("Prusament PLA Blend Tuned"). make_plan()
+    // copy saved from the variant under its name ("Prusament PLA Blend Tuned"), and in a preset
+    // with every word of the tool's product name ("Gizmo Dorks HIPS MultiMaterial"). make_plan()
     // starts a new preset from a template that doesn't make it look like such a copy.
     if (!c.is_system && want.vendor_known && !want.tool.color_hex.empty() &&
         !printer_tools_detail::normalize_color_hex(c.colour).empty() && names_more_than_filament(want, words) &&
-        !copies_variant(want, words, c.parent))
+        !copies_variant(want, words, c.parent) && (want.product.empty() || missing_product_words(want, c) > 0))
         return 2;
     // A user preset's color is its filament's, as in Filament DB's presets, whatever the name says
     // ("PolyLite PLA Teal"): one clearly unlike the tool's is another color. One still its system
@@ -242,15 +345,12 @@ int colour_tier(const Wanted &want, const Candidate &c)
     return 1;
 }
 
-// Words of the name beyond vendor, material and color: "Overture PLA White" says less than
-// "Overture PLA Matte White", so it is the closer match.
+// Words of the name beyond vendor, material, color and product: for a white Overture PLA,
+// "Overture PLA White" says less than "Overture PLA Matte White", so it is the closer match.
 int extra_words(const Wanted &want, const Candidate &c)
 {
-    std::set<std::string> plain = want.plain_words;
-    for (const auto &w : tokens(c.vendor)) plain.insert(w);
+    std::set<std::string> plain = known_words(want, c);
     for (const auto &w : tokens(c.type)) plain.insert(w);
-    if (vendor_key(c.vendor) == "prusament")
-        for (const char *w : {"prusament", "prusa", "polymers"}) plain.insert(w);
     int n = 0;
     for (const std::string &w : tokens(display_name(c)))
         if (!plain.count(w))
@@ -268,29 +368,53 @@ int vendor_preference(const Candidate &c)
     return c.is_system ? 2 : 3;
 }
 
-// Lower is better. The first two entries are what the printer can tell apart (abrasive and
-// color); the rest only orders presets that fit equally well.
-using Rank = std::tuple<int, int, int, int, int, std::string>;
+// Lower is better. The first entries are what the tool tells apart: abrasive and color, then the
+// fiber fill and product that a material assigned in Prusa Connect names. The rest only orders
+// presets that fit equally well.
+using Rank = std::tuple<int, int, int, int, int, int, int, std::string>;
 
 Rank rank(const Wanted &want, const Candidate &c)
 {
     const int abrasive = (!want.tool.hardened && c.is_abrasive) ? 1 : 0;
     const int tier     = colour_tier(want, c);
+    // A fiber-filled product ("XPETG CF") isn't its line's unfilled filament, nor the other way round
+    const int fiber    = (!want.product.empty() && want.fiber_filled != names_fiber(c)) ? 1 : 0;
+    const int product  = product_mismatch(want, c);
     if (want.vendor_known)
-        return {abrasive, tier, extra_words(want, c), rgb_distance(c.colour, want.tool.color_hex), c.is_system ? 1 : 0, c.name};
-    return {abrasive, tier, vendor_preference(c), extra_words(want, c), rgb_distance(c.colour, want.tool.color_hex), c.name};
-}
-
-// The printer reports vendor, material and color, not a variant such as matte, silk or carbon
-// fiber, so a selected preset that fits as well as the best one is the user's choice to keep.
-bool fits_as_well(const Rank &a, const Rank &b)
-{
-    return std::get<0>(a) == std::get<0>(b) && std::get<1>(a) == std::get<1>(b);
+        return {abrasive, tier, fiber, product, extra_words(want, c), rgb_distance(c.colour, want.tool.color_hex), c.is_system ? 1 : 0, c.name};
+    return {abrasive, tier, fiber, product, vendor_preference(c), extra_words(want, c), rgb_distance(c.colour, want.tool.color_hex), c.name};
 }
 
 bool fits_better(const Rank &a, const Rank &b)
 {
     return std::make_pair(std::get<0>(a), std::get<1>(a)) < std::make_pair(std::get<0>(b), std::get<1>(b));
+}
+
+// Whether a fits better than b, of as good a color, by what only Prusa Connect's product name
+// tells: the fiber fill, then the product, when a is closer and names no other. Between presets
+// that each name another product ("Toolbox Red" and "Fire Engine Red" for "Iron Red"), fewer
+// words is no better fit. Without a brand, words a product shares with a preset ("Matte") don't
+// say it's that vendor's.
+bool names_product_better(const Wanted &want, const Candidate &a, const Candidate &b)
+{
+    if (!want.vendor_known)
+        return false;
+    const Rank ra = rank(want, a), rb = rank(want, b);
+    if (std::get<0>(ra) != std::get<0>(rb) || std::get<1>(ra) > std::get<1>(rb))
+        return false;
+    if (std::get<2>(ra) != std::get<2>(rb))
+        return std::get<2>(ra) < std::get<2>(rb);
+    return std::get<3>(ra) < std::get<3>(rb) && foreign_words(want, a) == 0;
+}
+
+// A selected preset that fits as well as the best one is the user's choice to keep. The printer
+// reports vendor, material and color, not a variant such as matte, silk or carbon fiber, and a
+// product name from Prusa Connect doesn't say which of the product's presets suits the nozzle.
+bool fits_as_well(const Wanted &want, const Candidate &selected, const Candidate &best)
+{
+    const Rank rs = rank(want, selected), rb = rank(want, best);
+    return std::make_pair(std::get<0>(rs), std::get<1>(rs)) == std::make_pair(std::get<0>(rb), std::get<1>(rb)) &&
+           !names_product_better(want, best, selected);
 }
 
 const Candidate *best_of(const Wanted &want, const std::vector<const Candidate *> &set)
@@ -541,13 +665,15 @@ Plan make_plan(const PrinterTools &tools, const std::vector<ExtruderState> &extr
         const Candidate *pick = best_of(want, visible);
         if (pick) {
             const auto current = std::find_if(visible.begin(), visible.end(), [&](const Candidate *c) { return c->name == ex.selected; });
-            if (current != visible.end() && fits_as_well(rank(want, **current), rank(want, *pick)))
+            if (current != visible.end() && fits_as_well(want, **current, *pick))
                 pick = *current;
         }
-        // A system preset that isn't installed, when nothing installed fits or only another color does
+        // A system preset that isn't installed, when nothing installed fits, only another color
+        // does, or it fits Prusa Connect's product better
         bool install = false;
         if (const Candidate *hidden = best_of(want, invisible_system);
-            hidden && (!pick || (colour_tier(want, *pick) == 2 && fits_better(rank(want, *hidden), rank(want, *pick))))) {
+            hidden && (!pick || (colour_tier(want, *pick) == 2 && fits_better(rank(want, *hidden), rank(want, *pick))) ||
+                       names_product_better(want, *hidden, *pick))) {
             pick    = hidden;
             install = true;
         }

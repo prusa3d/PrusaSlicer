@@ -80,7 +80,9 @@ the filaments from Prusa Connect instead:
    says it reads Prusa Connect.
 3. Sync as below. The preview's **In Prusa Connect** column shows each tool's brand and product,
    and the color name in the product name (`Cyan` in `Pro PCTG, Translucent Cyan`) picks the
-   preset named for it.
+   preset named for it. Among presets of that color, the one whose name is closest to the product
+   name wins, and replaces the selected one when it's closer and names no other product:
+   `Pro PCTG Translucent Yellow` rather than `Pro PCTG Daffodil Yellow`.
 
 ### Sync
 
@@ -133,7 +135,8 @@ as user presets on this computer; they aren't added to Filament DB.
 
 - Syncing is one way: nothing is written to the printer or to Filament DB.
 - The printer can't tell plain, matte, silk or carbon fiber apart, so a selected variant preset that
-  fits as well as the best one is kept.
+  fits as well as the best one is kept. A product name from Prusa Connect can, when your presets
+  are named for it.
 - On printer firmware v6.9.2-hy.3, the tool mapping screen takes the G-code tools' colors from the
   extruder colors in the G-code; the printer's tools show their Filament Slots colors. After the
   color reset the G-code's extruder colors are empty, so its tools show no colors there.

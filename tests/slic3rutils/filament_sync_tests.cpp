@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <fstream>
 #include <iterator>
 #include <map>
@@ -160,6 +161,278 @@ TEST_CASE("A material assigned in Prusa Connect selects the vendor's preset of i
     const ExtruderPlan p = plan_one(t, c, "Generic PCTG");
     CHECK(p.action == Action::Select);
     CHECK(p.preset == "3D-Fuel PCTG Cyan");
+}
+
+TEST_CASE("The product name assigned in Prusa Connect tells presets of one color apart", "[FilamentSync]")
+{
+    // Filament DB presets of one product line, per color and nozzle, saved from the system preset.
+    // Connect's color is nearer Daffodil Yellow's than Translucent Yellow's.
+    const PrinterTool t = connect_tool(R"({"type":"PCTG","name":"Pro PCTG, Translucent Yellow","brand":{"name":"3D Fuel"},)"
+                                       R"("primary_color":{"color_rgba":"#F5BF3Cff"}})");
+    REQUIRE(t.color == "Yellow");
+    const auto fdb = [](const std::string &name, const std::string &colour) {
+        Candidate c     = cand(name, "3D Fuel", "PCTG", colour);
+        c.parent        = "3D-Fuel Pro PCTG";
+        c.parent_colour = "#FF8000";
+        return c;
+    };
+    const std::vector<Candidate> c = {fdb("Pro PCTG Daffodil Yellow 0.4 Other HF", "#FABE3C"),
+                                      fdb("Pro PCTG Daffodil Yellow 0.4 Tungsten Carbide HF", "#FABE3C"),
+                                      fdb("Pro PCTG Translucent Cyan 0.4 Other HF", "#0094BE"),
+                                      fdb("Pro PCTG Translucent Yellow 0.4 Other HF", "#E1C54B"),
+                                      fdb("Pro PCTG Translucent Yellow 0.4 Tungsten Carbide HF", "#E1C54B"),
+                                      sys("3D-Fuel Pro PCTG @COREONE", "3D-Fuel", "PCTG", "#FF8000")};
+
+    // Another product of the color isn't kept
+    const ExtruderPlan p = plan_one(t, c, "Pro PCTG Daffodil Yellow 0.4 Other HF");
+    CHECK(p.action == Action::Select);
+    CHECK(p.preset == "Pro PCTG Translucent Yellow 0.4 Other HF");
+    CHECK(p.preset_colour == "#E1C54B");
+    // The preview offers the product's other preset before the other product's
+    const auto first_existing = std::find_if(p.alternatives.begin(), p.alternatives.end(),
+                                             [](const Alternative &a) { return a.action != Action::Create; });
+    REQUIRE(first_existing != p.alternatives.end());
+    CHECK(first_existing->preset == "Pro PCTG Translucent Yellow 0.4 Tungsten Carbide HF");
+
+    // Which of the product's presets suits the nozzle is the user's choice
+    CHECK(plan_one(t, c, "Pro PCTG Translucent Yellow 0.4 Tungsten Carbide HF").action == Action::Keep);
+    // A Daffodil Yellow spool, in turn, takes the Daffodil Yellow preset
+    PrinterTool daffodil = t;
+    daffodil.product     = "Pro PCTG, Daffodil Yellow";
+    CHECK(plan_one(daffodil, c, "Pro PCTG Translucent Yellow 0.4 Other HF").preset == "Pro PCTG Daffodil Yellow 0.4 Other HF");
+
+    // A word no preset has changes nothing
+    PrinterTool spool = t;
+    spool.product     = "Pro PCTG, Translucent Yellow 1kg";
+    CHECK(plan_one(spool, c, "Pro PCTG Translucent Yellow 0.4 Tungsten Carbide HF").action == Action::Keep);
+    // Words after the color name the user's copy of a preset
+    std::vector<Candidate> tuned = c;
+    tuned.push_back(fdb("3D Fuel Pro PCTG Translucent Yellow Tuned", "#E1C54B"));
+    CHECK(plan_one(t, tuned, "3D Fuel Pro PCTG Translucent Yellow Tuned").action == Action::Keep);
+
+    // Without a product name, as from PrusaLink, a selected preset of the color stays, though
+    // Daffodil Yellow is nearer the tool's color
+    PrinterTool reported = t;
+    reported.product.clear();
+    REQUIRE(plan_one(reported, c).preset == "Pro PCTG Daffodil Yellow 0.4 Other HF");
+    CHECK(plan_one(reported, c, "Pro PCTG Translucent Yellow 0.4 Other HF").action == Action::Keep);
+    // ... and so it does when the product name says no more than vendor and material
+    reported.product = "3D Fuel PCTG";
+    CHECK(plan_one(reported, c, "Pro PCTG Translucent Yellow 0.4 Other HF").action == Action::Keep);
+}
+
+TEST_CASE("Words of another Prusa Connect product count against a preset", "[FilamentSync]")
+{
+    // The preset the sync makes for the tool lacks two words of the product, and another
+    // product's preset of the line and color lacks one and has one: as close, so the selected one
+    // stays, and the one saying the least beyond the product is picked
+    const PrinterTool t = connect_tool(R"({"type":"PCTG","name":"Pro PCTG, Translucent Yellow","brand":{"name":"3D Fuel"},)"
+                                       R"("primary_color":{"color_rgba":"#FADB24ff"}})");
+    const std::vector<Candidate> c = {cand("Pro PCTG Daffodil Yellow 0.4 Other HF", "3D Fuel", "PCTG", "#FABE3C"),
+                                      cand("3D Fuel PCTG Yellow", "3D Fuel", "PCTG", "#FADB24")};
+    CHECK(plan_one(t, c, "3D Fuel PCTG Yellow").action == Action::Keep);
+    CHECK(plan_one(t, c).preset == "3D Fuel PCTG Yellow");
+    CHECK(plan_one(t, c, "Pro PCTG Daffodil Yellow 0.4 Other HF").action == Action::Keep);
+
+    // "PLA Plus" is "PLA+", and a version number names no other product
+    const PrinterTool plus = connect_tool(R"({"type":"PLA","name":"PLA Plus Black","brand":{"name":"SUNLU"},)"
+                                          R"("primary_color":{"color_rgba":"#000000ff"}})");
+    const std::vector<Candidate> sunlu = {sys("Sunlu PLA @COREONE HF0.4", "Sunlu", "PLA"), sys("Sunlu PLA+ 2.0 @COREONE HF0.4", "Sunlu", "PLA")};
+    CHECK(plan_one(plus, sunlu, "Sunlu PLA @COREONE HF0.4").preset == "Sunlu PLA+ 2.0 @COREONE HF0.4");
+    // ... in the name of the system preset a copy was saved from too
+    Candidate tuned     = cand("Sunlu PLA+ 2.0 Tuned", "Sunlu", "PLA", "#1A1A1A");
+    tuned.parent        = "Sunlu PLA+ 2.0";
+    tuned.parent_colour = "#FF8000";
+    CHECK(plan_one(plus, {sys("Sunlu PLA+ 2.0 @COREONE HF0.4", "Sunlu", "PLA", "#FF8000"), tuned}, tuned.name).action == Action::Keep);
+
+    // Between presets that each name another product, the user's choice stays
+    const PrinterTool iron = connect_tool(R"({"type":"PCTG","name":"Pro PCTG, Iron Red","brand":{"name":"3D Fuel"},)"
+                                          R"("primary_color":{"color_rgba":"#98282Fff"}})");
+    const std::vector<Candidate> reds = {cand("Pro PCTG Fire Engine Red 0.4 Other HF", "3D Fuel", "PCTG", "#CE2029"),
+                                         cand("Pro PCTG Toolbox Red 0.4 Other HF", "3D Fuel", "PCTG", "#B22222")};
+    CHECK(plan_one(iron, reds, "Pro PCTG Fire Engine Red 0.4 Other HF").action == Action::Keep);
+
+    // A product whose name another's contains, and a variant the product doesn't name
+    const PrinterTool grey = connect_tool(R"({"type":"PLA","name":"PLA Gravity Grey","brand":{"name":"Prusament"},)"
+                                          R"("primary_color":{"color_rgba":"#A5A5ACff"}})");
+    const std::vector<Candidate> prusament = {cand("Prusament PLA High Speed Gravity Grey", "Prusament", "PLA", "#A5A5AC"),
+                                              cand("Prusament PLA Gravity Grey", "Prusament", "PLA", "#A5A5AC")};
+    CHECK(plan_one(grey, prusament, "Prusament PLA High Speed Gravity Grey").preset == "Prusament PLA Gravity Grey");
+    const PrinterTool white = connect_tool(R"({"type":"PLA","name":"PLA White","brand":{"name":"Overture"},)"
+                                           R"("primary_color":{"color_rgba":"#FFFFFFff"}})");
+    const std::vector<Candidate> overture = {cand("Overture PLA Silk White", "Overture", "PLA", "#FFFFFF"),
+                                             cand("Overture PLA White", "Overture", "PLA", "#FFFEFA")};
+    CHECK(plan_one(white, overture, "Overture PLA Silk White").preset == "Overture PLA White");
+
+    // The "HF" closing Filament DB's names of high-flow nozzle presets isn't Bambu Lab's "PETG HF"
+    const PrinterTool hf = connect_tool(R"({"type":"PETG","name":"PETG HF Black","brand":{"name":"Bambu Lab"},)"
+                                        R"("primary_color":{"color_rgba":"#000000ff"}})");
+    const std::vector<Candidate> bambu = {cand("PETG Basic Black 0.4 Other HF", "Bambu Lab", "PETG", "#000000"),
+                                          cand("PETG HF Black 0.4 Other HF", "Bambu Lab", "PETG", "#000000"),
+                                          cand("Bambu Lab PETG Black", "Bambu Lab", "PETG", "#000000")};
+    CHECK(plan_one(hf, bambu, "PETG Basic Black 0.4 Other HF").preset == "PETG HF Black 0.4 Other HF");
+    CHECK(plan_one(hf, {bambu[0], bambu[2]}, "Bambu Lab PETG Black").action == Action::Keep);
+    const Candidate black = cand("PETG Black 0.4 Other HF", "Bambu Lab", "PETG", "#000000");
+    CHECK(plan_one(hf, {black, cand("Bambu Lab PETG HF Black", "Bambu Lab", "PETG", "#000000")}, black.name).preset ==
+          "Bambu Lab PETG HF Black");
+
+    // A flexible preset of another material than the product's
+    const PrinterTool tpu = connect_tool(R"({"type":"TPU","name":"Flex TPU Air Black","brand":{"name":"Siraya Tech"},)"
+                                         R"("primary_color":{"color_rgba":"#050505ff"}})");
+    const std::vector<Candidate> flex = {cand("Siraya Tech Flex PEBA Air Black", "Siraya Tech", "PEBA", "#000000"),
+                                         cand("Siraya Tech Flex TPU Air Black", "Siraya Tech", "TPU", "#1A1A1A")};
+    CHECK(plan_one(tpu, flex, "Siraya Tech Flex PEBA Air Black").preset == "Siraya Tech Flex TPU Air Black");
+}
+
+TEST_CASE("A preset with the whole Prusa Connect product name isn't another color", "[FilamentSync]")
+{
+    // The products name none of the printer's colors, and Connect's color is near the preset's
+    const PrinterTool hips = connect_tool(R"({"type":"HIPS","name":"HIPS MultiMaterial","brand":{"name":"Gizmo Dorks"},)"
+                                          R"("primary_color":{"color_rgba":"#FFFFE6ff"}})");
+    REQUIRE(hips.color.empty());
+    const std::vector<Candidate> h = {cand("Gizmo Dorks HIPS MultiMaterial", "Gizmo Dorks", "HIPS", "#FFFFD7"),
+                                      sys("Generic HIPS @COREONE", "Generic", "HIPS")};
+    const ExtruderPlan p = plan_one(hips, h, "Generic HIPS @COREONE");
+    CHECK(p.action == Action::Select);
+    CHECK(p.preset == "Gizmo Dorks HIPS MultiMaterial");
+    // ... unless its own color is clearly another
+    std::vector<Candidate> red = h;
+    red.front().colour         = "#FF0000";
+    CHECK(plan_one(hips, red, "Generic HIPS @COREONE").action == Action::Create);
+
+    // A hidden system preset of another product doesn't replace it
+    const PrinterTool ptfe = connect_tool(R"({"type":"PETG","name":"PETG-PTFE","brand":{"name":"Spectrum"},)"
+                                          R"("primary_color":{"color_rgba":"#0000F0ff"}})");
+    Candidate ht100  = sys("Spectrum PETG HT100 @COREONE HF0.4", "Spectrum", "PETG", "#FF8000");
+    ht100.is_visible = false;
+    CHECK(plan_one(ptfe, {cand("Spectrum PETG-PTFE", "Spectrum", "PETG", "#0000FF"), ht100}, "Spectrum PETG-PTFE").action == Action::Keep);
+
+    // A color of the printer's that the product names too isn't another
+    const PrinterTool glitter = connect_tool(R"({"type":"PETG","name":"PETG Black Silver Glitter","primary_color":{"color_rgba":"#1A1A1Aff"}})");
+    REQUIRE(glitter.color == "Black");
+    const std::vector<Candidate> g = {cand("Overture PETG Red", "Overture", "PETG", "#FF0000"),
+                                      cand("Overture PETG Silver Glitter", "Overture", "PETG", "#C0C0C0")};
+    const ExtruderPlan silver = plan_one(glitter, g, "Overture PETG Red");
+    CHECK(silver.preset == "Overture PETG Silver Glitter");
+    CHECK(std::none_of(silver.notes.begin(), silver.notes.end(),
+                       [](const std::string &n) { return n.find("is the closest") != std::string::npos; }));
+}
+
+TEST_CASE("A Prusa Connect product picks among presets that aren't installed", "[FilamentSync]")
+{
+    // A hidden system preset of the product, against an installed one of another product
+    PrinterTool t = connect_tool(R"({"type":"PCTG","name":"Pro PCTG, Matte Black","brand":{"name":"3D Fuel"},)"
+                                 R"("primary_color":{"color_rgba":"#434443ff"}})");
+    t.hardened  = true;
+    Candidate matte   = sys("3D-Fuel Pro PCTG Matte Black @COREONE HF0.4", "3D-Fuel", "PCTG", "#FF8000");
+    matte.is_visible  = false;
+    matte.is_abrasive = true;
+    const std::vector<Candidate> c = {cand("Pro PCTG Midnight Black 0.4 Other HF", "3D Fuel", "PCTG", "#383737"), matte,
+                                      sys("3D-Fuel Pro PCTG @COREONE HF0.4", "3D-Fuel", "PCTG", "#FF8000")};
+    const ExtruderPlan p = plan_one(t, c, "3D-Fuel Pro PCTG @COREONE HF0.4");
+    CHECK(p.action == Action::Install);
+    CHECK(p.preset == matte.name);
+    // ... and against an installed one that names no color
+    const ExtruderPlan q = plan_one(t, {matte, c[2]}, "3D-Fuel Pro PCTG @COREONE HF0.4");
+    CHECK(q.action == Action::Install);
+    CHECK(q.preset == matte.name);
+    // From PrusaLink, an installed preset of the color is enough
+    PrinterTool reported = t;
+    reported.product.clear();
+    CHECK(plan_one(reported, c, "3D-Fuel Pro PCTG @COREONE HF0.4").preset == "Pro PCTG Midnight Black 0.4 Other HF");
+    CHECK(plan_one(reported, {matte, c[2]}, "3D-Fuel Pro PCTG @COREONE HF0.4").action == Action::Keep);
+
+    // Without a brand, a word the product shares with another vendor's preset ("Matte") doesn't
+    // install it
+    const PrinterTool unbranded = connect_tool(R"({"type":"PLA","name":"PLA Matte Black","primary_color":{"color_rgba":"#000000ff"}})");
+    Candidate eolas  = sys("Eolas Prints PLA Matte @COREONE HF0.4", "Eolas Prints", "PLA");
+    eolas.is_visible = false;
+    CHECK(plan_one(unbranded, {sys("Generic PLA @COREONE HF0.4", "Generic", "PLA"), eolas}, "Generic PLA @COREONE HF0.4").action ==
+          Action::Keep);
+}
+
+TEST_CASE("A Prusa Connect product's fiber fill picks a preset that names it", "[FilamentSync]")
+{
+    // Extrudr's XPETG line as the system presets have it, on a hardened nozzle
+    PrinterTool cf = connect_tool(R"({"type":"PETG","name":"XPETG CF black","brand":{"name":"extrudr"},)"
+                                  R"("primary_color":{"color_rgba":"#000000ff"}})");
+    cf.hardened     = true;
+    Candidate xcf   = sys("Extrudr XPETG CF @COREONE", "Extrudr", "PETG");
+    xcf.is_abrasive = true;
+    const std::vector<Candidate> c = {sys("Extrudr XPETG Matt @COREONE HF0.4", "Extrudr", "PETG"), xcf,
+                                      sys("Extrudr PETG @COREONE HF0.4", "Extrudr", "PETG")};
+    CHECK(plan_one(cf, c, "Extrudr XPETG Matt @COREONE HF0.4").preset == xcf.name);
+    // ... and a product without it doesn't take the fiber-filled preset
+    PrinterTool rec = connect_tool(R"({"type":"PETG","name":"XPETG REC black","brand":{"name":"extrudr"},)"
+                                   R"("primary_color":{"color_rgba":"#000000ff"}})");
+    rec.hardened    = true;
+    CHECK(plan_one(rec, c).preset != xcf.name);
+    CHECK(plan_one(rec, c, xcf.name).preset != xcf.name);
+    // "Carbon" alone in an abrasive preset's name is carbon fiber
+    PrinterTool greentec = connect_tool(R"({"type":"PLA","name":"GreenTEC Pro CF black","brand":{"name":"extrudr"},)"
+                                        R"("primary_color":{"color_rgba":"#000000ff"}})");
+    greentec.hardened = true;
+    Candidate carbon   = sys("Extrudr GreenTEC Pro Carbon @COREONE", "Extrudr", "PLA");
+    carbon.is_abrasive = true;
+    CHECK(plan_one(greentec, {sys("Extrudr GreenTEC Pro @COREONE HF0.4", "Extrudr", "PLA"), carbon}).preset == carbon.name);
+    // ... installed over a selected unfilled one, though its name is farther from the product's
+    carbon.is_visible = false;
+    CHECK(plan_one(greentec, {sys("Extrudr GreenTEC Pro @COREONE HF0.4", "Extrudr", "PLA"), carbon},
+                   "Extrudr GreenTEC Pro @COREONE HF0.4").action == Action::Install);
+    // ... and so it is in a product name
+    PrinterTool kimya = connect_tool(R"({"type":"ABS","name":"ABS Carbon Black","brand":{"name":"Kimya"},)"
+                                     R"("primary_color":{"color_rgba":"#000000ff"}})");
+    kimya.hardened   = true;
+    Candidate kevlar = sys("Kimya ABS Kevlar @COREONE", "Kimya", "ABS"), abs_carbon = sys("Kimya ABS Carbon @COREONE", "Kimya", "ABS");
+    kevlar.is_abrasive = abs_carbon.is_abrasive = true;
+    CHECK(plan_one(kimya, {kevlar, abs_carbon}, kevlar.name).preset == abs_carbon.name);
+
+    // An abrasive preset that doesn't name a fiber fill is no closer to one: 3D Fuel's Matte Black
+    // for its carbon fiber Midnight Black, whose color the unfilled preset has
+    PrinterTool cf10 = connect_tool(R"({"type":"PCTG","name":"Pro PCTG-CF10, Midnight Black","brand":{"name":"3D Fuel"},)"
+                                    R"("primary_color":{"color_rgba":"#000000ff"}})");
+    cf10.hardened     = true;
+    Candidate matte   = sys("3D-Fuel Pro PCTG Matte Black @COREONE HF0.4", "3D-Fuel", "PCTG", "#FF8000");
+    matte.is_abrasive = true;
+    CHECK(plan_one(cf10, {cand("Pro PCTG Midnight Black 0.4 Other HF", "3D Fuel", "PCTG", "#383737"), matte}, matte.name).preset ==
+          "Pro PCTG Midnight Black 0.4 Other HF");
+}
+
+TEST_CASE("Words after a system preset's name name the user's copy, not another product", "[FilamentSync]")
+{
+    const PrinterTool t = connect_tool(R"({"type":"PETG","name":"XPETG MATT white","brand":{"name":"extrudr"},)"
+                                       R"("primary_color":{"color_rgba":"#ffffffff"}})");
+    Candidate tuned     = cand("Extrudr XPETG Matt Tuned", "Extrudr", "PETG", "#3A3A3A");
+    tuned.parent        = "Extrudr XPETG Matt";
+    tuned.parent_colour = "#3A3A3A";
+    const std::vector<Candidate> c = {sys("Extrudr XPETG Matt @COREONE HF0.4", "Extrudr", "PETG", "#3A3A3A"), tuned,
+                                      sys("Extrudr PETG @COREONE HF0.4", "Extrudr", "PETG", "#3A3A3A")};
+    CHECK(plan_one(t, c, tuned.name).action == Action::Keep);
+    // A system preset's last words name a product
+    CHECK(plan_one(t, c, "Extrudr PETG @COREONE HF0.4").preset == "Extrudr XPETG Matt @COREONE HF0.4");
+}
+
+TEST_CASE("The product name doesn't outweigh the color", "[FilamentSync]")
+{
+    const PrinterTool t = connect_tool(R"({"type":"PCTG","name":"Pro PCTG, Translucent Yellow","brand":{"name":"3D Fuel"},)"
+                                       R"("primary_color":{"color_rgba":"#E1C54Bff"}})");
+    // A preset of the product in another color, and one of the color that's farther from the
+    // product name
+    const std::vector<Candidate> c = {cand("3D Fuel Pro PCTG Translucent Cyan", "3D Fuel", "PCTG", "#0094BE"),
+                                      cand("3D Fuel PCTG Silk Yellow", "3D Fuel", "PCTG", "#E1C54B")};
+    const ExtruderPlan p = plan_one(t, c, "3D Fuel Pro PCTG Translucent Cyan");
+    CHECK(p.action == Action::Select);
+    CHECK(p.preset == "3D Fuel PCTG Silk Yellow");
+
+    // Without a brand, the product orders the presets of the color, but the selected one stays
+    const PrinterTool unbranded = connect_tool(R"({"type":"PLA","name":"PLA Matte Black","primary_color":{"color_rgba":"#000000ff"}})");
+    REQUIRE(unbranded.vendor.empty());
+    const std::vector<Candidate> pla = {cand("Overture PLA Black", "Overture", "PLA", "#000000"),
+                                        cand("Overture PLA Matte Black", "Overture", "PLA", "#1A1A1A"),
+                                        sys("Generic PLA @SYNC", "Generic", "PLA")};
+    CHECK(plan_one(unbranded, pla).preset == "Overture PLA Matte Black");
+    CHECK(plan_one(unbranded, pla, "Generic PLA @SYNC").preset == "Overture PLA Matte Black");
+    CHECK(plan_one(unbranded, pla, "Overture PLA Black").action == Action::Keep);
 }
 
 TEST_CASE("A tool Prusa Connect only has the printer's report of keeps its color's preset", "[FilamentSync]")

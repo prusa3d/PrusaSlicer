@@ -88,7 +88,8 @@ For each loaded tool, among the filament presets compatible with that extruder:
    matches `PPS-CF10`). `PETG` and `PET` stay apart.
 2. **The current preset is kept** when it fits as well as the best one. The printer reports only
    vendor, material and color, so it can't tell plain from matte, silk or carbon fiber filament:
-   if you picked `Overture PLA Matte White` for a white Overture PLA, it stays.
+   if you picked `Overture PLA Matte White` for a white Overture PLA, it stays. A product name
+   from Prusa Connect can tell them apart (below).
 3. Otherwise the **best fit** is selected:
    - On a nozzle that isn't hardened, presets for abrasive filament (marked abrasive, or carbon or
      glass fiber by name) come last.
@@ -105,12 +106,16 @@ For each loaded tool, among the filament presets compatible with that extruder:
      white tool, `PolyLite PLA Teal` is another color. Shades the printer's color names lump
      together, such as white and off-white, are the same color, and a color your preset still
      shares with the system preset it was saved from doesn't count.
-   - Then the preset whose name says the least beyond vendor, material and color:
+   - From Prusa Connect, then the presets that agree with the product about carbon or glass fiber
+     (`XPETG CF`, `PETG-CF`) by name or type, then the preset whose name is closest to the
+     product name (below).
+   - Then the preset whose name says the least beyond vendor, material, color and product:
      `Overture PLA White` before `Overture PLA Silk White`.
    - Then the closest filament color, then your own presets before system ones.
 4. **Not installed:** a matching system preset you haven't installed in the Configuration Wizard
    is installed and selected when no installed preset fits, or when the installed ones are all
-   another color and it fits better.
+   another color and it fits better, or, from Prusa Connect, when it's closer to the product name
+   (below).
 5. **Nothing matches, or only other colors:** when the printer names a vendor and none of its
    presets of that material fits, or only ones in another color do (`Polymaker PETG Black` for a
    red Polymaker PETG), a user preset is created, named `<vendor> <material> <color>` (for
@@ -128,8 +133,10 @@ For each loaded tool, among the filament presets compatible with that extruder:
 
 When the printer reports no vendor (the filament was loaded by G-code, or the vendor was
 cleared), the current preset is kept if it's the right material, unless it's for abrasive
-filament on a nozzle that isn't hardened; otherwise a Generic one is selected. Nothing is created
-without a vendor. A tool without a color doesn't count against a preset that names one.
+filament on a nozzle that isn't hardened; otherwise a Generic one is selected. A product name from
+Prusa Connect without a brand orders the presets as below, but doesn't replace the current one or
+install one: a word it shares with a preset (`Matte`) doesn't say whose filament it is. Nothing is
+created without a vendor. A tool without a color doesn't count against a preset that names one.
 
 ### From Prusa Connect
 
@@ -145,6 +152,34 @@ A material assigned in Connect's Tools page comes from Connect's material databa
   code. Qualifiers are dropped: `Light Gray` is `Gray`. A product name without one of the
   printer's 16 color names goes by the color code alone: it has a name only when it's exactly one
   of the printer's colors.
+- **Product:** the product name tells presets of one color apart, and the product lines of a
+  vendor's system presets (`Fiberlogy Easy PLA` for `Easy PLA Navy Blue`). A preset is the closer
+  the fewer words of the product name it lacks, and the fewer words of another product it has:
+  for `Pro PCTG, Translucent Yellow`, `Pro PCTG Daffodil Yellow` lacks `Translucent` and has
+  `Daffodil`, so `Pro PCTG Translucent Yellow` fits better. The plain `3D Fuel PCTG Yellow` that
+  a sync creates lacks `Pro` and `Translucent`, so it's as close as `Pro PCTG Daffodil Yellow`.
+  `High Speed` in `Prusament PLA High Speed Gravity
+  Grey` is another product's for `PLA Gravity Grey`, as `Silk` is for `PLA White` and `HD` in
+  `Fiberlogy HD PLA` for `Easy PLA Navy Blue`. `PLA+` reads as `PLA Plus`. Not counted: numbers
+  (`2.0`, `40%`), words of no preset's name (a spool size), words after the color (`Tuned` in your
+  copy of a preset) or after the name of the system preset a copy was saved from, and a nozzle
+  part from its diameter on (`0.4 Tungsten Carbide HF`), so which of a product's presets suits
+  the nozzle is still your choice.
+  A closer preset with no word of another product replaces the current one. Between presets as
+  close, or ones that each name another product (`Pro PCTG Fire Engine Red` and `Pro PCTG Toolbox
+  Red` for `Pro PCTG, Iron Red`), the one you picked stays. A system preset that isn't installed
+  is installed the same way, also over an installed one that fits the color less well (`3D-Fuel Pro PCTG Matte Black` over `3D-Fuel Pro PCTG` for
+  `Pro PCTG, Matte Black`).
+- **Fiber:** a product that names carbon or glass fiber (`XPETG CF`, `Pro PCTG-CF10`) prefers
+  presets that name it too, by name or type, and one that doesn't prefers presets that don't.
+  `Carbon` alone counts too, in a product name (`Kimya ABS Carbon Black`) and in an abrasive
+  preset's name (`Extrudr GreenTEC Pro Carbon`); an abrasive preset that names no fiber fill
+  counts as unfilled. This comes before the product name: a preset that agrees about fiber
+  replaces the current one, or is installed, even when its name is farther from the product's.
+- **Product colors:** a preset with every word of the product name isn't another color for the
+  words after its material (`Gizmo Dorks HIPS MultiMaterial`), only for its own filament color,
+  and a printer color that the product name has too (`Silver` in `PETG Black Silver Glitter`)
+  isn't another color.
 - A tool Connect has no assigned material for reports only the type and the printer's color, with
   no vendor. A color from the printer's palette gets the printer's name for it (`#00FFFF` is
   `Cyan`), as over PrusaLink; a user color has only its color code. Then it's treated like a tool
