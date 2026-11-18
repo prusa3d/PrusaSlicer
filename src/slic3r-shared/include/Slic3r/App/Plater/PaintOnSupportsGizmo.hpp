@@ -63,11 +63,11 @@ protected:
         Domain::ModelVolume& model_volume,
         const Biz::Algorithms::TriangleSelector& triangle_selector
     ) const override;
+    Biz::UndoSnapshotType get_undo_snapshot_type() const override;
 
     void on_cursor_radius_changed(float value) override;
     void on_smart_fill_angle_changed(float value) override;
     void on_clipping_of_view_changed(double value) override;
-    void on_painting_stroke_applied() override;
 
 private:
     void select_facets_by_angle(float threshold_deg);
@@ -78,8 +78,8 @@ private:
         std::optional<Biz::ObjectSupportPointsRef> support_points
     );
 
-    bool apply_generated_support_points(Domain::SlicingId slicing_id);
-    void finish_automatic_painting(bool applied_support_points);
+    void apply_generated_support_points(Domain::SlicingId slicing_id);
+    void finish_automatic_painting();
     void reset_automatic_painting_state();
     void cancel_automatic_painting();
 

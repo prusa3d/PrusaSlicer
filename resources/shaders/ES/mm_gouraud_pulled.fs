@@ -1,4 +1,6 @@
-#version 110
+#version 300 es
+
+precision highp float;
 
 #define INTENSITY_CORRECTION 0.6
 
@@ -21,38 +23,30 @@ struct OverhangDetection
 {
     bool  enabled;
     float max_normal_z;
-    mat3  world_normal_matrix;
 };
 
-uniform vec4 uniform_color;
-
-uniform bool volume_mirrored;
-
-uniform mat4 view_model_matrix;
-uniform mat3 view_normal_matrix;
+uniform mat4 view_matrix;
 uniform OverhangDetection overhang;
 
-varying vec3 clipping_planes_dots;
-varying vec4 model_pos;
+in vec3 clipping_planes_dots;
+in vec3 eye_position;
+in vec3 triangle_eye_normal;
+in vec4 triangle_color;
+
+out vec4 out_color;
 
 void main()
 {
     if (any(lessThan(clipping_planes_dots, ZERO)))
         discard;
 
-    vec3  color = uniform_color.rgb;
-    float alpha = uniform_color.a;
+    vec3  color = triangle_color.rgb;
+    float alpha = triangle_color.a;
 
-    vec3 triangle_normal = normalize(cross(dFdx(model_pos.xyz), dFdy(model_pos.xyz)));
+    vec3 eye_normal = normalize(triangle_eye_normal);
 
-    if (volume_mirrored)
-        triangle_normal = -triangle_normal;
-
-    // First transform the normal into camera space and normalize the result.
-    vec3 eye_normal = normalize(view_normal_matrix * triangle_normal);
-
-    // Z component of normal vector in world coordinate used for overhang detection.
-    float world_normal_z = overhang.enabled ? (normalize(overhang.world_normal_matrix * triangle_normal)).z : 0.0;
+    // Z component of the normal in world coordinates used for overhang detection.
+    float world_normal_z = overhang.enabled ? (transpose(mat3(view_matrix)) * eye_normal).z : 0.0;
 
     // Apply a different color for detected overhangs.
     if (overhang.enabled && world_normal_z < overhang.max_normal_z - EPSILON) {
@@ -67,12 +61,11 @@ void main()
     // x = diffuse, y = specular;
     vec2 intensity = vec2(0.0);
     intensity.x = INTENSITY_AMBIENT + NdotL * LIGHT_TOP_DIFFUSE;
-    vec3 position = (view_model_matrix * model_pos).xyz;
-    intensity.y = LIGHT_TOP_SPECULAR * pow(max(dot(-normalize(position), reflect(-LIGHT_TOP_DIR, eye_normal)), 0.0), LIGHT_TOP_SHININESS);
+    intensity.y = LIGHT_TOP_SPECULAR * pow(max(dot(-normalize(eye_position), reflect(-LIGHT_TOP_DIR, eye_normal)), 0.0), LIGHT_TOP_SHININESS);
 
     // Perform the same lighting calculation for the 2nd light source (no specular applied).
     NdotL = max(dot(eye_normal, LIGHT_FRONT_DIR), 0.0);
     intensity.x += NdotL * LIGHT_FRONT_DIFFUSE;
 
-    gl_FragColor = vec4(vec3(intensity.y) + color * intensity.x, alpha);
+    out_color = vec4(vec3(intensity.y) + color * intensity.x, alpha);
 }

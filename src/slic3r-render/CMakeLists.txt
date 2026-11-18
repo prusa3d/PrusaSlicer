@@ -30,6 +30,8 @@ set(SLIC3R_RENDER_FILES
         include/Slic3r/App/Render/TextureManager.hpp
         src/Slic3r/App/Render/TextureBufferManager.cpp
         include/Slic3r/App/Render/TextureBufferManager.hpp
+        include/Slic3r/App/Render/LinearDataTexture.hpp
+        src/Slic3r/App/Render/LinearDataTexture.cpp
         src/Slic3r/App/Render/ImageCodec.cpp
         include/Slic3r/App/Render/ImageCodec.hpp
         include/Slic3r/App/Render/CommandBuffer.hpp

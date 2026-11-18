@@ -1,7 +1,9 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <concepts>
 #include <numbers>
+#include <type_traits>
 
 namespace Slic3r {
 
@@ -71,6 +73,15 @@ T sign(T val) {
 template <typename T>
 T smoothstep(T val) {
     return val * val * (T(3) - T(2) * val);
+}
+
+/**
+ * @brief Integer division rounded up, e.g. the number of chunks needed to cover the count.
+ */
+template <std::integral Value>
+constexpr Value ceil_div(const Value dividend, const std::type_identity_t<Value> divisor)
+{
+    return (dividend + divisor - 1) / divisor;
 }
 
 } // namespace Slic3r

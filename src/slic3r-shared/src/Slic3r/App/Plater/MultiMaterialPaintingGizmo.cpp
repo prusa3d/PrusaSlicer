@@ -16,6 +16,8 @@
 
 using namespace Slic3r::App::Yoga;
 
+using Slic3r::Biz::UndoSnapshotType;
+using Slic3r::Biz::Algorithms::TriangleSelector;
 using Slic3r::Biz::Scene::ObjectSelection;
 using Slic3r::Biz::Scene::SelectionState;
 using Slic3r::Domain::ColorRGB;
@@ -205,6 +207,11 @@ std::unique_ptr<GizmoWindow> MultiMaterialPaintingGizmo::release_ui_window()
     return m_dialog.release();
 }
 
+UndoSnapshotType MultiMaterialPaintingGizmo::get_undo_snapshot_type() const
+{
+    return UndoSnapshotType::MMPaintingStroke;
+}
+
 FacetsAnnotationKind MultiMaterialPaintingGizmo::get_facets_annotation_kind() const
 {
     return FacetsAnnotationKind::MultiMaterial;
@@ -218,14 +225,11 @@ const Domain::FacetsAnnotation& MultiMaterialPaintingGizmo::get_facets_annotatio
 }
 
 bool MultiMaterialPaintingGizmo::set_facets_annotation(
-    Domain::ModelVolume& model_volume,
-    const Biz::Algorithms::TriangleSelector& triangle_selector
+    ModelVolume& model_volume,
+    const TriangleSelector& triangle_selector
 ) const
 {
-    const bool result{model_volume.mm_segmentation_facets.set_data(triangle_selector.serialize())};
-
-    m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::MMPaintingStroke);
-    return result;
+    return model_volume.mm_segmentation_facets.set_data(triangle_selector.serialize());
 }
 
 Domain::TriangleSelector::TriangleStateType
@@ -393,7 +397,7 @@ void MultiMaterialPaintingGizmo::update_painting_tools_and_geometry()
     this->update_painting_dialog_tools();
 
     for (TriangleSelectorRenderWrapper& wrapper : m_triangle_selector_wrappers) {
-        wrapper.update_painted_geometry(m_device);
+        wrapper.update_painting_palette(m_device);
     }
 }
 

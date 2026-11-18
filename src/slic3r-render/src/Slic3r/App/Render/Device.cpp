@@ -30,9 +30,9 @@ Device::Device(Context& context)
 
 void Device::load_state() { get_internal_as<GL::GLDeviceInternal>().load_state(); }
 
-std::unique_ptr<Texture> Device::create_texture()
+std::unique_ptr<Texture> Device::create_texture(TextureTarget target)
 {
-    return std::unique_ptr<Texture>(new Texture(*this));
+    return std::unique_ptr<Texture>(new Texture(*this, target));
 }
 
 std::unique_ptr<VertexBuffer> Device::create_vertex_buffer()

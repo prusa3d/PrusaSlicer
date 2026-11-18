@@ -100,6 +100,11 @@ public:
         return *static_cast<G*>(ptr.get());
     }
 
+    /**
+     * @brief Lets the active tool update its scene nodes before the scene is rendered.
+     */
+    void prepare_scene_for_rendering();
+
     void render_scene(Render::CommandBuffer& cmd_buffer);
     void render_imgui();
 

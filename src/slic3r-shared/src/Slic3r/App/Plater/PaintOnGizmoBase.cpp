@@ -207,7 +207,6 @@ void PaintOnGizmoBase::seed_fill_unselect_all()
 {
     for (TriangleSelectorRenderWrapper& triangle_selector_wrapper : m_triangle_selector_wrappers) {
         triangle_selector_wrapper.triangle_selector().seed_fill_unselect_all_triangles();
-        triangle_selector_wrapper.update_painted_geometry(m_device);
     }
 
     m_seed_fill_last_mesh_id = -1;
@@ -280,6 +279,11 @@ void PaintOnGizmoBase::
 
 void PaintOnGizmoBase::apply_painting_to_model() const
 {
+    this->apply_painting_to_model(this->get_undo_snapshot_type());
+}
+
+void PaintOnGizmoBase::apply_painting_to_model(const UndoSnapshotType snapshot_type) const
+{
     Domain::ElementRefs volume_refs;
     std::unordered_map<size_t, size_t> volume_id_to_idx;
     for (const PaintableVolume& paintable_volume : m_paintable_volumes) {
@@ -294,8 +298,11 @@ void PaintOnGizmoBase::apply_painting_to_model() const
         volume_id_to_idx[paintable_volume.model_volume.id().id] = volume_idx;
     }
 
+    bool any_volume_changed = false;
     const auto facets_annotations_modificator =
-        [this, &volume_id_to_idx](const Domain::ElementRef& ref, ModelVolume& volume) -> bool
+        [this,
+         &volume_id_to_idx,
+         &any_volume_changed](const Domain::ElementRef& ref, ModelVolume& volume) -> bool
     {
         const size_t volume_idx = volume_id_to_idx.at(ref.volume_id);
 
@@ -303,7 +310,10 @@ void PaintOnGizmoBase::apply_painting_to_model() const
             m_triangle_selector_wrappers[volume_idx];
         const TriangleSelector& triangle_selector = triangle_selector_wrapper.triangle_selector();
 
-        return this->set_facets_annotation(volume, triangle_selector);
+        const bool volume_changed = this->set_facets_annotation(volume, triangle_selector);
+        any_volume_changed |= volume_changed;
+
+        return volume_changed;
     };
 
     m_scene_interactor.modify_facets_annotations(
@@ -311,6 +321,11 @@ void PaintOnGizmoBase::apply_painting_to_model() const
         this->get_facets_annotation_kind(),
         facets_annotations_modificator
     );
+
+    // One undo step for all the volumes, none when nothing was painted.
+    if (any_volume_changed) {
+        m_project_interactor.undo_provider().take_snapshot(snapshot_type);
+    }
 }
 
 void PaintOnGizmoBase::init_main_nodes()
@@ -428,6 +443,15 @@ void PaintOnGizmoBase::set_cursor_type(TriangleSelector::CursorType cursor_type)
     this->seed_fill_unselect_all();
 }
 
+bool PaintOnGizmoBase::uses_seed_fill_selection() const
+{
+    return m_tool_type == ToolType::SMART_FILL
+        || m_tool_type == ToolType::BUCKET_FILL
+        || m_tool_type == ToolType::COLOR_REPLACE
+        || (m_tool_type == ToolType::BRUSH
+            && m_cursor_type == TriangleSelector::CursorType::POINTER);
+}
+
 void PaintOnGizmoBase::update_clipping_plane()
 {
     const Vec4f clipping_plane = get_clipping_plane_data(m_clipping_plane_clipper);
@@ -455,7 +479,6 @@ void PaintOnGizmoBase::clear_all_paintings()
 {
     for (TriangleSelectorRenderWrapper& triangle_selector_wrapper : m_triangle_selector_wrappers) {
         triangle_selector_wrapper.triangle_selector().reset();
-        triangle_selector_wrapper.update_painted_geometry(m_device);
     }
 
     this->apply_painting_to_model();
@@ -637,10 +660,11 @@ bool PaintOnGizmoBase::
                 }
 
                 const VolumeHitPoint& hit = m_raycast_cache.hit;
-                TriangleSelectorRenderWrapper& triangle_selector_wrapper =
-                    m_triangle_selector_wrappers[hit.volume_idx];
-                TriangleSelector& triangle_selector = triangle_selector_wrapper.triangle_selector();
                 if (hit.volume_idx != -1) {
+                    TriangleSelectorRenderWrapper& triangle_selector_wrapper =
+                        m_triangle_selector_wrappers[hit.volume_idx];
+                    TriangleSelector& triangle_selector =
+                        triangle_selector_wrapper.triangle_selector();
                     const PaintableVolume& paintable_volume =
                         this->m_paintable_volumes[hit.volume_idx];
                     const Transform3d& trafo_matrix = paintable_volume.world_trafo;
@@ -674,7 +698,6 @@ bool PaintOnGizmoBase::
                         );
                     }
 
-                    triangle_selector_wrapper.update_painted_geometry(m_device);
                     m_seed_fill_last_mesh_id = hit.volume_idx;
                 }
 
@@ -909,6 +932,12 @@ bool PaintOnGizmoBase::
                         for (TriangleSelectorRenderWrapper& wrapper : m_triangle_selector_wrappers)
                         {
                             const size_t idx = &wrapper - m_triangle_selector_wrappers.data();
+
+                            // The hit volume is selected already.
+                            if (idx == static_cast<size_t>(volume_idx)) {
+                                continue;
+                            }
+
                             const Transform3d& volume_trafo_matrix =
                                 m_paintable_volumes[idx].world_trafo;
                             const TriangleSelector::ClippingPlane& volume_clp =
@@ -922,27 +951,13 @@ bool PaintOnGizmoBase::
                 }
             }
 
-            if (m_tool_type == ToolType::COLOR_REPLACE) {
-                for (TriangleSelectorRenderWrapper& wrapper : m_triangle_selector_wrappers) {
-                    wrapper.update_painted_geometry(m_device);
-                }
-            } else {
-                triangle_selector_wrapper.update_painted_geometry(m_device);
-            }
-
             m_last_mouse_click = gizmo_event.mouse_position;
         }
 
         return true;
     }
 
-    if (gizmo_event.type == PaintOnGizmoEvent::Type::Moving
-        && (m_tool_type == ToolType::SMART_FILL
-            || m_tool_type == ToolType::BUCKET_FILL
-            || m_tool_type == ToolType::COLOR_REPLACE
-            || (m_tool_type == ToolType::BRUSH
-                && m_cursor_type == TriangleSelector::CursorType::POINTER)))
-    {
+    if (gizmo_event.type == PaintOnGizmoEvent::Type::Moving && this->uses_seed_fill_selection()) {
         if (m_triangle_selector_wrappers.empty()) {
             return false;
         }
@@ -1016,6 +1031,12 @@ bool PaintOnGizmoBase::
             if (selected_state.has_value()) {
                 for (TriangleSelectorRenderWrapper& wrapper : m_triangle_selector_wrappers) {
                     const size_t idx = &wrapper - m_triangle_selector_wrappers.data();
+
+                    // The hit volume is selected already.
+                    if (idx == static_cast<size_t>(hit.volume_idx)) {
+                        continue;
+                    }
+
                     const Transform3d& volume_trafo_matrix = m_paintable_volumes[idx].world_trafo;
                     const TriangleSelector::ClippingPlane& volume_clp =
                         this->get_clipping_plane_in_volume_coordinates(volume_trafo_matrix);
@@ -1023,14 +1044,6 @@ bool PaintOnGizmoBase::
                         .select_triangles_by_state_type(selected_state.value(), volume_clp);
                 }
             }
-        }
-
-        if (m_tool_type == ToolType::COLOR_REPLACE) {
-            for (TriangleSelectorRenderWrapper& wrapper : m_triangle_selector_wrappers) {
-                wrapper.update_painted_geometry(m_device);
-            }
-        } else {
-            triangle_selector_wrapper.update_painted_geometry(m_device);
         }
 
         m_seed_fill_last_mesh_id = hit.volume_idx;
@@ -1344,8 +1357,17 @@ void PaintOnGizmoBase::rebuild_paintable_geometry()
     this->update_overhang_detection();
 }
 
-void PaintOnGizmoBase::render_scene(Render::CommandBuffer& cmd_buffer)
+void PaintOnGizmoBase::prepare_scene_for_rendering()
 {
+    if (m_main_node == nullptr) {
+        return;
+    }
+
+    const bool seed_fill_contour_shown = this->uses_seed_fill_selection();
+    for (TriangleSelectorRenderWrapper& triangle_selector_wrapper : m_triangle_selector_wrappers) {
+        triangle_selector_wrapper.upload_changed_painting(m_device, seed_fill_contour_shown);
+    }
+
     this->update_cursors();
 }
 
@@ -1435,6 +1457,9 @@ std::vector<PaintOnGizmoBase::VolumeHitPoints> PaintOnGizmoBase::get_projected_m
             break;
         }
     }
+
+    // The loop left the cache at the last raycast position, the cursor is drawn at the current one.
+    m_raycast_cache = {mouse_position, volume_hit_points.front()};
 
     // Divide volume_hit_points into groups with the same volume_index. It may contain multiple groups with the same volume_index.
     std::vector<VolumeHitPoints> volume_hit_points_by_volume;
@@ -1568,7 +1593,6 @@ bool PaintOnGizmoBase::is_mesh_point_clipped(const Vec3d& point, const Transform
 void PaintOnGizmoBase::finish_painting_stroke()
 {
     this->apply_painting_to_model();
-    this->on_painting_stroke_applied();
     this->reset_painting_stroke_state();
 }
 

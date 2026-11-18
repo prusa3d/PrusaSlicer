@@ -10,7 +10,10 @@
 
 using namespace Slic3r::App::Yoga;
 
+using Slic3r::Biz::UndoSnapshotType;
+using Slic3r::Biz::Algorithms::TriangleSelector;
 using Slic3r::Domain::FacetsAnnotationKind;
+using Slic3r::Domain::ModelVolume;
 
 namespace Slic3r::App::Plater {
 
@@ -77,6 +80,11 @@ std::unique_ptr<GizmoWindow> PaintOnFuzzySkinGizmo::release_ui_window()
     return m_dialog.release();
 }
 
+UndoSnapshotType PaintOnFuzzySkinGizmo::get_undo_snapshot_type() const
+{
+    return UndoSnapshotType::PaintOnFuzzySkinStroke;
+}
+
 FacetsAnnotationKind PaintOnFuzzySkinGizmo::get_facets_annotation_kind() const
 {
     return FacetsAnnotationKind::FuzzySkin;
@@ -90,15 +98,11 @@ const Domain::FacetsAnnotation& PaintOnFuzzySkinGizmo::get_facets_annotation(
 }
 
 bool PaintOnFuzzySkinGizmo::set_facets_annotation(
-    Domain::ModelVolume& model_volume,
-    const Biz::Algorithms::TriangleSelector& triangle_selector
+    ModelVolume& model_volume,
+    const TriangleSelector& triangle_selector
 ) const
 {
-    const bool result{model_volume.fuzzy_skin_facets.set_data(triangle_selector.serialize())};
-    m_project_interactor.undo_provider().take_snapshot(
-        Biz::UndoSnapshotType::PaintOnFuzzySkinStroke
-    );
-    return result;
+    return model_volume.fuzzy_skin_facets.set_data(triangle_selector.serialize());
 }
 
 Domain::TriangleSelector::TriangleStateType

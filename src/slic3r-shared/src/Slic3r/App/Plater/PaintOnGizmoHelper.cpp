@@ -1,11 +1,14 @@
 #include "Slic3r/App/Plater/PaintOnGizmoHelper.hpp"
 
+#include "Slic3r/App/Plater/MMPaintedVolumeRendering.hpp"
 #include "Slic3r/App/Plater/PlaterSceneLayer.hpp"
 #include "Slic3r/App/Render/Device.hpp"
 #include "Slic3r/App/Render/GeometryBuilder.hpp"
 #include "Slic3r/App/Scene/MeshRenderNodeComponent.hpp"
 #include "Slic3r/App/Scene/NodeBuilder.hpp"
 #include "Slic3r/App/Scene/Scene.hpp"
+#include "Slic3r/App/Scene/TextureUnits.hpp"
+#include "Slic3r/App/Scene/VertexPulledRenderNodeComponent.hpp"
 #include "Slic3r/Biz/Algorithms/Color.hpp"
 #include "Slic3r/Biz/Algorithms/Polygon.hpp"
 #include "Slic3r/Biz/Algorithms/Scaling.hpp"
@@ -16,22 +19,24 @@
 #include "Slic3r/Domain/TriangleMesh.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Math.hpp"
-#include "Slic3r/Utils.hpp"
 
+#include <algorithm>
 #include <array>
 #include <numeric>
-#include <optional>
+#include <span>
 
 #include "libslic3r/TriangleMeshSlicer.hpp"
 
 using Slic3r::App::Plater::PaintingPalette;
 using Slic3r::App::Plater::PaletteEntry;
 using Slic3r::App::Plater::TriangleSelectorRenderWrapper;
+using Slic3r::App::Render::LinearDataTexture;
+using Slic3r::Biz::Algorithms::TriangleSelector;
 using Slic3r::Domain::ColorRGBA;
+using Slic3r::Domain::PixelFormat;
 using Slic3r::Domain::Point;
 using Slic3r::Domain::Polygon;
 using Slic3r::Domain::Polygons;
-using Slic3r::Domain::SquareMatrix3f;
 using Slic3r::Domain::Transform3d;
 using Slic3r::Domain::TriangleMesh;
 using Slic3r::Domain::Vec2f;
@@ -45,92 +50,91 @@ using namespace Slic3r::Biz;
 
 namespace {
 
-std::unique_ptr<App::Render::Geometry> create_painted_mesh_geometry(
-    App::Render::Device& device,
-    const Biz::Algorithms::TriangleSelector& triangle_selector,
-    const PaintingPalette& colors,
-    const ColorRGBA& default_volume_color
-)
+/**
+ * @brief Packs the triangle of a slot into its record, unpacked by fetch_triangle_record() in the
+ * mm_gouraud_pulled shader.
+ *
+ * @return Indices of the vertices and state | seed fill << 8 | visible << 9, zero for a freed or
+ * split triangle, which is not drawn.
+ */
+std::array<uint32_t, 4> pack_triangle_record(const TriangleSelector::Triangle& triangle)
 {
-    using namespace Slic3r::App;
-    using namespace Slic3r::Biz::Algorithms;
+    constexpr uint32_t TRIANGLE_RECORD_SEED_FILL_BIT = 1u << 8;
+    constexpr uint32_t TRIANGLE_RECORD_VISIBLE_BIT   = 1u << 9;
+    static_assert(TRIANGLE_STATE_TYPE_COUNT <= TRIANGLE_RECORD_SEED_FILL_BIT);
 
-    const TriangleSelector::Vertices& vertices   = triangle_selector.vertices();
-    const TriangleSelector::Triangles& triangles = triangle_selector.triangles();
-
-    Render::GeometryBuilder<Render::VertexP3> geometry_builder;
-    geometry_builder.reserve(vertices.size(), 3 * triangles.size());
-
-    for (const TriangleSelector::Vertex& vertex : vertices) {
-        geometry_builder.add_vertex(Render::VertexP3(vertex.v));
+    // State and seed fill selection may be read only for a valid leaf.
+    if (!triangle.valid() || triangle.is_split()) {
+        return {0, 0, 0, 0};
     }
 
-    std::array<std::optional<ColorRGBA>, TRIANGLE_STATE_TYPE_COUNT> color_per_state;
-    for (const PaletteEntry& entry : colors) {
-        if (entry.state > 0 && entry.state < color_per_state.size()) {
-            color_per_state[entry.state] = entry.color;
-        }
+    uint32_t flags = static_cast<uint32_t>(triangle.get_state()) | TRIANGLE_RECORD_VISIBLE_BIT;
+    if (triangle.is_selected_by_seed_fill()) {
+        flags |= TRIANGLE_RECORD_SEED_FILL_BIT;
     }
 
-    // The first half of the buckets holds the plain triangles indexed by their state and the
-    // second half the ones selected by the seed fill.
-    std::vector<std::vector<uint32_t>> indices_per_colors(2 * TRIANGLE_STATE_TYPE_COUNT);
-    for (const TriangleSelector::Triangle& tr : triangles) {
-        if (tr.valid() && !tr.is_split()) {
-            const size_t triangle_state = static_cast<size_t>(tr.get_state());
-            assert(triangle_state < color_per_state.size());
-
-            const size_t color = color_per_state[triangle_state].has_value() ? triangle_state : 0;
-            std::vector<uint32_t>& indices_per_color = indices_per_colors
-                [color + tr.is_selected_by_seed_fill() * TRIANGLE_STATE_TYPE_COUNT];
-
-            if (indices_per_color.size() + 3 > indices_per_color.capacity()) {
-                indices_per_color.reserve(
-                    Slic3r::next_highest_power_of_2(indices_per_color.size() + 3)
-                );
-            }
-
-            indices_per_color.emplace_back(tr.verts_idxs[0]);
-            indices_per_color.emplace_back(tr.verts_idxs[1]);
-            indices_per_color.emplace_back(tr.verts_idxs[2]);
-        }
-    }
-
-    const auto get_color_from_color_idx = [&](const size_t color_idx) -> ColorRGBA
-    {
-        const bool is_seed_fill = color_idx >= TRIANGLE_STATE_TYPE_COUNT;
-        const size_t state      = is_seed_fill ? color_idx - TRIANGLE_STATE_TYPE_COUNT : color_idx;
-        const ColorRGBA color   = color_per_state[state].value_or(default_volume_color);
-
-        return is_seed_fill ? TriangleSelectorRenderWrapper::get_seed_fill_color(color) : color;
+    return {
+        uint32_t(triangle.verts_idxs[0]),
+        uint32_t(triangle.verts_idxs[1]),
+        uint32_t(triangle.verts_idxs[2]),
+        flags
     };
+}
 
-    size_t indices_offset = 0;
-    for (std::vector<uint32_t>& indices_per_color : indices_per_colors) {
-        if (indices_per_color.empty()) {
-            continue;
+/**
+ * @brief Half-open range [begin, end) of triangle or vertex slots.
+ */
+struct SlotRange
+{
+    size_t begin;
+    size_t end;
+};
+
+/**
+ * @brief Merged slot ranges of the changed chunks, which are in increasing order.
+ */
+std::vector<SlotRange>
+slot_ranges_of_changed_chunks(const std::vector<int>& changed_chunks, const size_t slot_count)
+{
+    constexpr size_t chunk_size = TriangleSelector::SLOT_CHANGE_CHUNK_SIZE;
+
+    std::vector<SlotRange> slot_ranges;
+    for (const int chunk_idx : changed_chunks) {
+        const size_t begin = static_cast<size_t>(chunk_idx) * chunk_size;
+        if (begin >= slot_count) {
+            break;
         }
 
-        const size_t color_idx   = &indices_per_color - indices_per_colors.data();
-        const size_t num_indices = indices_per_color.size();
-
-        geometry_builder.add_indices(std::move(indices_per_color));
-
-        const Render::Material material =
-            Render::Material().set_uniform("uniform_color", get_color_from_color_idx(color_idx));
-        geometry_builder.add_draw_command(
-            Render::DrawCommand(
-                Render::PrimitiveType::Triangles,
-                indices_offset,
-                num_indices,
-                material
-            )
-        );
-
-        indices_offset += num_indices;
+        const size_t end = std::min(begin + chunk_size, slot_count);
+        if (!slot_ranges.empty() && slot_ranges.back().end == begin) {
+            slot_ranges.back().end = end;
+        } else {
+            slot_ranges.push_back({begin, end});
+        }
     }
 
-    return geometry_builder.build(device);
+    return slot_ranges;
+}
+
+/**
+ * @brief Color of every state followed by the colors of the triangles selected by seed fill.
+ */
+std::vector<ColorRGBA>
+create_painting_palette_colors(const PaintingPalette& colors, const ColorRGBA& default_volume_color)
+{
+    std::vector<ColorRGBA> palette_colors(2 * TRIANGLE_STATE_TYPE_COUNT, default_volume_color);
+    for (const PaletteEntry& entry : colors) {
+        if (entry.state > 0 && entry.state < TRIANGLE_STATE_TYPE_COUNT) {
+            palette_colors[entry.state] = entry.color;
+        }
+    }
+
+    for (size_t state = 0; state < TRIANGLE_STATE_TYPE_COUNT; ++state) {
+        palette_colors[TRIANGLE_STATE_TYPE_COUNT + state] =
+            TriangleSelectorRenderWrapper::get_seed_fill_color(palette_colors[state]);
+    }
+
+    return palette_colors;
 }
 
 std::unique_ptr<App::Render::Geometry> create_painted_contour_geometry(
@@ -153,9 +157,10 @@ std::unique_ptr<App::Render::Geometry> create_painted_contour_geometry(
         geometry_builder.add_vertex(Render::VertexP3(vertices[edge[1]].v));
     }
 
-    const Render::Material material = Render::Material()
-                                          .set_uniform("uniform_color", ColorRGBA::WHITE())
-                                          .set_uniform("offset", 0.00001f);
+    const Render::Material material =
+        Render::Material()
+            .set_uniform("uniform_color", ColorRGBA::WHITE())
+            .set_uniform("offset", 0.00001f);
     geometry_builder.add_draw_command(
         Render::DrawCommand(Render::PrimitiveType::Lines, 0, 2 * contour_edges.size(), material)
     );
@@ -316,36 +321,57 @@ void TriangleSelectorRenderWrapper::init_painted_mesh_node(
     const Transform3d& world_trafo
 )
 {
+    m_triangle_records = std::make_unique<
+        LinearDataTexture>(device, PixelFormat::RGBA32UI, "Painted triangle records");
+    m_vertex_positions = std::make_unique<
+        LinearDataTexture>(device, PixelFormat::RGBA32F, "Painted vertex positions");
+
     const Vec4f clipping_plane = {0.0f, 0.0f, 1.0f, FLT_MAX};
     const Vec2f z_range        = {Domain::SINKING_Z_THRESHOLD, FLT_MAX};
-    const SquareMatrix3f world_normal_matrix =
-        world_trafo.linear().inverse().transpose().cast<float>();
 
     m_painted_mesh_base_material =
         Render::Material{}
-            .set_shader(device.context().shader_manager().shader("mm_gouraud"))
+            .set_shader(device.context().shader_manager().shader("mm_gouraud_pulled"))
             .set_uniform("clipping_plane", clipping_plane)
             .set_uniform("z_range", z_range)
             .set_uniform("overhang.enabled", false)
-            .set_uniform("overhang.world_normal_matrix", world_normal_matrix)
-            .set_uniform("overhang.max_normal_z", -1.f);
-
-    m_painted_mesh_geometry =
-        create_painted_mesh_geometry(device, m_triangle_selector, m_colors, m_default_volume_color);
+            .set_uniform("overhang.max_normal_z", -1.f)
+            .set_texture(
+                Scene::TextureUnits::MULTI_MATERIAL_TRIANGLE_RECORDS,
+                m_triangle_records->texture()
+            )
+            .set_uniform(
+                "triangle_records_tex",
+                Scene::TextureUnits::MULTI_MATERIAL_TRIANGLE_RECORDS
+            )
+            .set_texture(
+                Scene::TextureUnits::MULTI_MATERIAL_VERTEX_POSITIONS,
+                m_vertex_positions->texture()
+            )
+            .set_uniform(
+                "vertex_positions_tex",
+                Scene::TextureUnits::MULTI_MATERIAL_VERTEX_POSITIONS
+            );
 
     Scene::NodeBuilder painted_mesh_node_builder{scene};
     painted_mesh_node_builder.set_debug_name("TriangleSelector - Painted mesh node")
         .set_transform(world_trafo)
-        .set_mesh(
-            m_painted_mesh_geometry.get(),
+        .set_vertex_pulling(
+            device,
+            Render::DrawCommand(Render::PrimitiveType::Triangles, 0, 0, Render::Material{}),
             m_painted_mesh_base_material,
             int(PlaterSceneLayer::DocumentObjects)
         )
         .set_aabb(m_aabb_mesh);
 
     std::unique_ptr<Scene::Node> painted_mesh_node = painted_mesh_node_builder.build();
-    m_painted_mesh_node                            = painted_mesh_node.get();
+    m_painted_mesh_render_component = dynamic_cast<Scene::VertexPulledRenderNodeComponent*>(
+        painted_mesh_node->render_component()
+    );
+    ASSERT(m_painted_mesh_render_component != nullptr);
     scene.add_child(painted_mesh_node.release(), &parent_node);
+
+    this->update_painting_palette(device);
 }
 
 void TriangleSelectorRenderWrapper::init_painted_contour_node(
@@ -373,67 +399,92 @@ void TriangleSelectorRenderWrapper::init_painted_contour_node(
     scene.add_child(painted_contour_node.release(), &parent_node);
 }
 
-void TriangleSelectorRenderWrapper::update_painted_mesh_geometry(
-    Render::Device& device,
-    const std::optional<Render::Material>& new_material
-)
+void TriangleSelectorRenderWrapper::
+    upload_changed_painting(Render::Device& device, const bool seed_fill_contour_shown)
 {
-    ASSERT(
-        m_painted_mesh_node != nullptr
-        && m_painted_mesh_node->has_render_component()
-        && dynamic_cast<Scene::MeshRenderNodeComponent*>(m_painted_mesh_node->render_component())
-            != nullptr
-    );
+    const std::vector<int> changed_triangle_chunks =
+        m_triangle_selector.take_changed_triangle_slot_chunks();
+    const std::vector<int> changed_vertex_chunks =
+        m_triangle_selector.take_changed_vertex_slot_chunks();
 
-    Scene::MeshRenderNodeComponent* render_component =
-        dynamic_cast<Scene::MeshRenderNodeComponent*>(m_painted_mesh_node->render_component());
-    std::unique_ptr<Render::Geometry> new_geometry = create_painted_mesh_geometry(
-        device,
-        this->m_triangle_selector,
-        m_colors,
-        m_default_volume_color
-    );
-    render_component->set_geometry(new_geometry.get());
-    m_painted_mesh_geometry = std::move(new_geometry);
+    const TriangleSelector::Triangles& triangles = m_triangle_selector.triangles();
+    const TriangleSelector::Vertices& vertices   = m_triangle_selector.vertices();
 
-    if (new_material.has_value()) {
-        render_component->replace_material(new_material.value());
+    // A reallocated texture lost its content, so all of it is uploaded.
+    const bool triangle_records_reallocated = m_triangle_records->reserve_texels(triangles.size());
+    const std::vector<SlotRange> triangle_ranges = triangle_records_reallocated ?
+        std::vector<SlotRange>{{0, triangles.size()}} :
+        slot_ranges_of_changed_chunks(changed_triangle_chunks, triangles.size());
+
+    for (const SlotRange& triangle_range : triangle_ranges) {
+        const std::span<const TriangleSelector::Triangle> range_triangles(
+            triangles.data() + triangle_range.begin,
+            triangle_range.end - triangle_range.begin
+        );
+
+        m_packed_triangle_records.resize(range_triangles.size());
+        std::ranges::
+            transform(range_triangles, m_packed_triangle_records.begin(), pack_triangle_record);
+
+        m_triangle_records->upload_texels(
+            triangle_range.begin,
+            m_packed_triangle_records.size(),
+            m_packed_triangle_records.data()
+        );
     }
+
+    // The vertices are uploaded straight from the TriangleSelector without repacking, so the fourth
+    // component holds their reference count, which the shader does not read.
+    static_assert(sizeof(TriangleSelector::Vertex) == 4 * sizeof(float));
+    const bool vertex_positions_reallocated = m_vertex_positions->reserve_texels(vertices.size());
+    const std::vector<SlotRange> vertex_ranges = vertex_positions_reallocated ?
+        std::vector<SlotRange>{{0, vertices.size()}} :
+        slot_ranges_of_changed_chunks(changed_vertex_chunks, vertices.size());
+
+    for (const SlotRange& vertex_range : vertex_ranges) {
+        m_vertex_positions->upload_texels(
+            vertex_range.begin,
+            vertex_range.end - vertex_range.begin,
+            &vertices[vertex_range.begin]
+        );
+    }
+
+    m_painted_mesh_render_component->set_total_vertex_count(3 * triangles.size());
+
+    if (!changed_triangle_chunks.empty()) {
+        m_painted_contour_outdated = true;
+    }
+
+    m_painted_contour_node->set_enabled(seed_fill_contour_shown);
+    if (seed_fill_contour_shown && m_painted_contour_outdated) {
+        this->update_painted_contour_geometry(device);
+        m_painted_contour_outdated = false;
+    }
+}
+
+void TriangleSelectorRenderWrapper::update_painting_palette(Render::Device& device)
+{
+    MMPainting::apply_mm_palette_to_material(
+        device,
+        create_painting_palette_colors(m_colors, m_default_volume_color),
+        m_painted_mesh_base_material
+    );
+    m_painted_mesh_render_component->replace_material(m_painted_mesh_base_material);
 }
 
 void TriangleSelectorRenderWrapper::set_clipping_plane(const Vec4f& clipping_plane)
 {
-    ASSERT(
-        m_painted_mesh_node != nullptr
-        && m_painted_mesh_node->has_render_component()
-        && dynamic_cast<Scene::MeshRenderNodeComponent*>(m_painted_mesh_node->render_component())
-            != nullptr
-    );
-
     m_painted_mesh_base_material.set_uniform("clipping_plane", clipping_plane);
-
-    Scene::MeshRenderNodeComponent* render_component =
-        dynamic_cast<Scene::MeshRenderNodeComponent*>(m_painted_mesh_node->render_component());
-    render_component->replace_material(m_painted_mesh_base_material);
+    m_painted_mesh_render_component->replace_material(m_painted_mesh_base_material);
 }
 
 void TriangleSelectorRenderWrapper::set_overhang_slope_normal(const float angle_in_degrees)
 {
-    ASSERT(
-        m_painted_mesh_node != nullptr
-        && m_painted_mesh_node->has_render_component()
-        && dynamic_cast<Scene::MeshRenderNodeComponent*>(m_painted_mesh_node->render_component())
-            != nullptr
-    );
-
     const float max_normal_z = -std::cos(Slic3r::deg2rad(angle_in_degrees));
 
     m_painted_mesh_base_material.set_uniform("overhang.enabled", angle_in_degrees > 0.f);
     m_painted_mesh_base_material.set_uniform("overhang.max_normal_z", max_normal_z);
-
-    Scene::MeshRenderNodeComponent* render_component =
-        dynamic_cast<Scene::MeshRenderNodeComponent*>(m_painted_mesh_node->render_component());
-    render_component->replace_material(m_painted_mesh_base_material);
+    m_painted_mesh_render_component->replace_material(m_painted_mesh_base_material);
 }
 
 void TriangleSelectorRenderWrapper::update_painted_contour_geometry(Render::Device& device)
@@ -453,12 +504,6 @@ void TriangleSelectorRenderWrapper::update_painted_contour_geometry(Render::Devi
     m_painted_contour_geometry = std::move(new_geometry);
 }
 
-void TriangleSelectorRenderWrapper::update_painted_geometry(Render::Device& device)
-{
-    this->update_painted_mesh_geometry(device);
-    this->update_painted_contour_geometry(device);
-}
-
 void CursorRenderWrapper::set_enabled(const bool enabled)
 {
     ASSERT(m_cursor_node != nullptr);
@@ -472,9 +517,10 @@ void SphereCursorRenderWrapper::init_cursor_node(
     Scene::GeometryDataFactory& data_factory
 )
 {
-    m_material = Render::Material{}
-                     .set_shader(device.context().shader_manager().shader("flat"))
-                     .set_transparent(true);
+    m_material =
+        Render::Material{}
+            .set_shader(device.context().shader_manager().shader("flat"))
+            .set_transparent(true);
     m_cursor_geometry = data_factory.geometry(Scene::GeometryDataId::Sphere);
 
     Scene::NodeBuilder sphere_cursor_node_builder{scene};
@@ -512,15 +558,13 @@ void SphereCursorRenderWrapper::update_cursor_geometry(
     m_cursor_node->set_local_transform(trafo);
 }
 
-void CircleCursorRenderWrapper::init_cursor_node(
-    Render::Device& device,
-    Scene::Scene& scene,
-    Scene::Node& parent_node
-)
+void CircleCursorRenderWrapper::
+    init_cursor_node(Render::Device& device, Scene::Scene& scene, Scene::Node& parent_node)
 {
-    Render::Material material = Render::Material{}
-                                    .set_shader(device.context().shader_manager().shader("flat"))
-                                    .set_uniform("uniform_color", ColorRGBA{0.f, 1.f, 0.3f, 1.f});
+    Render::Material material =
+        Render::Material{}
+            .set_shader(device.context().shader_manager().shader("flat"))
+            .set_uniform("uniform_color", ColorRGBA{0.f, 1.f, 0.3f, 1.f});
 
     m_cursor_geometry = std::make_unique<Render::Geometry>(device);
     m_cached_camera_zoom.reset();
@@ -568,11 +612,8 @@ void CircleCursorRenderWrapper::update_cursor_geometry(
     m_cursor_node->set_local_transform(trafo);
 }
 
-void HeightRangeCursorRenderWrapper::init_cursor_node(
-    Render::Device& device,
-    Scene::Scene& scene,
-    Scene::Node& parent_node
-)
+void HeightRangeCursorRenderWrapper::
+    init_cursor_node(Render::Device& device, Scene::Scene& scene, Scene::Node& parent_node)
 {
     Render::Material material =
         Render::Material{}

@@ -34,6 +34,35 @@ public:
         const void* data,
         bool unpack_row_length = false
     );
+
+    /**
+     * @brief Allocates one level of all layers of a 2D array texture, filled by the data when given.
+     *
+     * @param data Layers one after another, or null to leave the content undefined.
+     */
+    void set_layered_data(
+        Domain::PixelFormat format,
+        int level,
+        int width,
+        int height,
+        int layer_count,
+        const void* data
+    );
+
+    /**
+     * @brief Fills a rectangle of one layer of a 2D array texture.
+     */
+    void set_layer_sub_data(
+        Domain::PixelFormat format,
+        int level,
+        int offset_x,
+        int offset_y,
+        int layer,
+        int width,
+        int height,
+        const void* data
+    );
+
     void set_filtering(TextureMinFilter min_filter, TextureMagFilter mag_filter);
 
     void set_object_name(const std::string& object_name);
@@ -47,7 +76,7 @@ public:
 
 private:
     friend class Device;
-    explicit Texture(Device& device);
+    Texture(Device& device, TextureTarget target);
 
 private:
     Device& m_device;

@@ -313,6 +313,14 @@ void GizmoManager::prepare_cycle()
     }
 }
 
+void GizmoManager::prepare_scene_for_rendering()
+{
+    IToolGizmo* active_tool = current_context().active_tool;
+    if (active_tool != nullptr) {
+        active_tool->prepare_scene_for_rendering();
+    }
+}
+
 void GizmoManager::render_scene(Render::CommandBuffer& cmd_buffer)
 {
     const auto& p = current_context();

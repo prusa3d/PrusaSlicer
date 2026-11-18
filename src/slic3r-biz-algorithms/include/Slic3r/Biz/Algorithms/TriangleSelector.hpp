@@ -6,6 +6,7 @@
 #include <cfloat>
 #include <algorithm>
 #include <array>
+#include <concepts>
 #include <map>
 #include <memory>
 #include <optional>
@@ -35,6 +36,17 @@ using Domain::TriangleSelector::TriangleSplittingData;
 class TriangleSelector
 {
 public:
+    /**
+     * @brief Number of consecutive slots whose change is recorded by one flag.
+     */
+    static constexpr int SLOT_CHANGE_CHUNK_SIZE = 1024;
+
+    /**
+     * @brief Number of consecutive original triangles whose seed fill selection is tracked by one
+     * flag, so the seed fill operations walk only the subtrees of the flagged chunks.
+     */
+    static constexpr int SEED_FILL_ROOT_CHUNK_SIZE = 256;
+
     class Triangle;
     struct Vertex;
 
@@ -479,19 +491,24 @@ public:
     // For all triangles, remove the flag indicating that the triangle was selected by seed fill.
     void seed_fill_unselect_all_triangles();
 
-    // Remove the flag indicating that the triangle was selected by seed fill.
-    void seed_fill_unselect_triangle(int facet_idx);
-
     // For all triangles selected by seed fill, set new TriangleStateType and remove flag indicating that triangle was selected by seed fill.
     // The operation may merge split triangles if they are being assigned the same color.
     void seed_fill_apply_on_triangles(TriangleStateType new_state);
 
-    // For the triangle selected by seed fill, set a new TriangleStateType and remove the flag indicating that the triangle was selected by seed fill.
-    // The operation may merge a split triangle if it is being assigned the same color.
-    void seed_fill_apply_on_single_triangle(TriangleStateType new_state, int facet_idx);
-
     // Compute total area of the triangle.
     double get_triangle_area(const Triangle &triangle) const;
+
+    /**
+     * @brief Returns and forgets the chunks of triangle slots whose content changed, in increasing
+     * order. The content is the vertex indices, validity, division, state and seed fill selection.
+     */
+    std::vector<int> take_changed_triangle_slot_chunks();
+
+    /**
+     * @brief Returns and forgets the chunks of vertex slots whose position changed, in increasing
+     * order.
+     */
+    std::vector<int> take_changed_vertex_slot_chunks();
 
     // Triangle and info about how it's split.
     class Triangle {
@@ -516,16 +533,15 @@ public:
         // Children triangles.
         std::array<int, 4> children;
 
-        // Set the division type.
-        void set_division(int sides_to_split, int special_side_idx);
+        /**
+         * @brief Get current state.
+         */
+        TriangleStateType get_state() const
+        {
+            assert(!is_split());
+            return state;
+        }
 
-        // Get/set current state.
-        void set_state(TriangleStateType type) { assert(! is_split()); state = type; }
-        TriangleStateType get_state() const { assert(! is_split()); return state; }
-
-        // Set if the triangle has been selected or unselected by seed fill.
-        void select_by_seed_fill() { assert(! is_split()); m_selected_by_seed_fill = true; }
-        void unselect_by_seed_fill() { assert(! is_split()); m_selected_by_seed_fill = false; }
         // Get if the triangle has been selected or not by seed fill.
         bool is_selected_by_seed_fill() const { assert(! is_split()); return m_selected_by_seed_fill; }
 
@@ -538,6 +554,38 @@ public:
 
     private:
         friend TriangleSelector;
+
+        /**
+         * @brief Set the division type.
+         */
+        void set_division(int sides_to_split, int special_side_idx);
+
+        /**
+         * @brief Set current state.
+         */
+        void set_state(TriangleStateType type)
+        {
+            assert(!is_split());
+            state = type;
+        }
+
+        /**
+         * @brief Set the triangle as selected by seed fill.
+         */
+        void select_by_seed_fill()
+        {
+            assert(!is_split());
+            m_selected_by_seed_fill = true;
+        }
+
+        /**
+         * @brief Set the triangle as unselected by seed fill.
+         */
+        void unselect_by_seed_fill()
+        {
+            assert(!is_split());
+            m_selected_by_seed_fill = false;
+        }
 
         // Packing the rest of member variables into 4 bytes, aligned to 4 bytes boundary.
         char number_of_splits { 0 };
@@ -594,10 +642,6 @@ protected:
 
     std::unique_ptr<Cursor> m_cursor;
 
-    // Single triangle selected by seed fill. It is used to optimize painting using a single triangle brush.
-    int m_triangle_selected_by_seed_fill = -1;
-
-    // Private functions:
 private:
     bool select_triangle(int facet_idx, TriangleStateType type, bool triangle_splitting);
     bool select_triangle_recursive(int facet_idx, const Domain::Index3 &neighbors, TriangleStateType type, bool triangle_splitting);
@@ -653,6 +697,40 @@ private:
 
     bool is_any_neighbor_selected_by_seed_fill(const Triangle &triangle);
 
+    /**
+     * @brief Sets the state of a leaf triangle.
+     */
+    void set_triangle_state(int triangle_idx, TriangleStateType state);
+
+    /**
+     * @brief Sets how the triangle is split.
+     */
+    void set_triangle_division(int triangle_idx, int sides_to_split, int special_side_idx);
+
+    /**
+     * @brief Selects or unselects a leaf triangle by seed fill.
+     */
+    void set_triangle_selected_by_seed_fill(int triangle_idx, bool selected);
+
+    /**
+     * @brief Sets the state of the leaves of the subtree selected by seed fill.
+     *
+     * @return True when the state of a leaf changed.
+     */
+    bool seed_fill_apply_on_subtree(int triangle_idx, TriangleStateType new_state);
+
+    /**
+     * @brief Unselects the leaves of the subtree selected by seed fill.
+     */
+    void seed_fill_unselect_subtree(int triangle_idx);
+
+    /**
+     * @brief Calls the function with every original triangle of the chunks which may have a leaf
+     * selected by seed fill.
+     */
+    template <std::invocable<int> Function>
+    void for_each_root_of_seed_fill_selected_chunks(const Function& function) const;
+
     void seed_fill_fill_gaps(const std::vector<int> &gap_fill_candidate_facets, // Facet of the original mesh (unsplit), which needs to be checked if the surrounding gap can be filled (selected).
                              float                   seed_fill_gap_area);       // The maximal area that will be automatically selected when the surrounding triangles have already been selected.
 
@@ -662,8 +740,29 @@ private:
                                const std::vector<Domain::Index3> &neighbors,
                                const std::vector<Domain::Index3> &neighbors_propagate);
 
+    void record_change_of_triangle_slot(int triangle_idx);
+    void record_change_of_vertex_slot(int vertex_idx);
+    void record_change_of_all_slots();
+
     int m_free_triangles_head { -1 };
     int m_free_vertices_head { -1 };
+
+    /**
+     * @brief For each chunk of triangle slots, whether a slot of the chunk changed since the last
+     * take_changed_triangle_slot_chunks().
+     */
+    std::vector<bool> m_changed_triangle_slot_chunks;
+
+    /**
+     * @brief For each chunk of vertex slots, whether a slot of the chunk changed since the last
+     * take_changed_vertex_slot_chunks().
+     */
+    std::vector<bool> m_changed_vertex_slot_chunks;
+
+    /**
+     * @brief Chunks of original triangles which may have a leaf selected by seed fill.
+     */
+    std::vector<bool> m_seed_fill_selected_root_chunks;
 };
 
 using TriangleSelectors = std::vector<TriangleSelector>;

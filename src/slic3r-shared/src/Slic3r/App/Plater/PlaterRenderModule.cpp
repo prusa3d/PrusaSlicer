@@ -1252,6 +1252,9 @@ void PlaterRenderModule::render_scene(Render::CommandBuffer& cmd_buffer)
     Render::ScopedDebugGroup event_imgui_render("Plater Render", cmd_buffer);
     m_device->load_state();
 
+    // After load_state(), the active tool may bind GPU resources through the device.
+    m_gizmo_manager->prepare_scene_for_rendering();
+
     cmd_buffer.set_viewport(Render::Rect::from(0, 0, m_screen_info));
     cmd_buffer.set_clear_values({0.61f, 0.61f, 0.61f, 1.00f});
     cmd_buffer.clear_buffers(true, true);
