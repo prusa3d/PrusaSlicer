@@ -33,6 +33,7 @@ enum FDMPrintObjectStep : unsigned int
     posSupportMaterial,
     posEstimateCurledExtrusions,
     posCalculateOverhangingPerimeters,
+    posCalculateExtrusionSpeedLimits,
     posCount,
 };
 

@@ -145,6 +145,23 @@ inline bool operator==(const OverhangAttributes &lhs, const OverhangAttributes &
     return true;
 }
 
+/**
+ * @brief Reasons for limiting the print speed of an extrusion, the limits are resolved during G-code export.
+ */
+enum class ExtrusionSpeedLimit : uint8_t
+{
+    OverSupportInterface,
+    OverBridge,
+};
+
+using ExtrusionSpeedLimits = Domain::enum_bitmask<ExtrusionSpeedLimit>;
+
+template <>
+struct Domain::is_enum_bitmask_type<ExtrusionSpeedLimit>
+{
+    static constexpr const bool enable = true;
+};
+
 struct ExtrusionAttributes : ExtrusionFlow
 {
     ExtrusionAttributes() = default;
@@ -163,12 +180,16 @@ struct ExtrusionAttributes : ExtrusionFlow
     std::optional<OverhangAttributes> overhang_attributes;
     // Set only for external and internal perimeters. The external perimeter has value 0, the first internal perimeter has 1, and so on.
     std::optional<uint16_t> perimeter_index;
+    // Set for parts of extrusions printed over specific areas, see split_extrusions_by_speed_limit_region().
+    ExtrusionSpeedLimits speed_limits;
 };
 
-inline bool operator==(const ExtrusionAttributes &lhs, const ExtrusionAttributes &rhs)
+inline bool operator==(const ExtrusionAttributes& lhs, const ExtrusionAttributes& rhs)
 {
-    return static_cast<const ExtrusionFlow&>(lhs) == static_cast<const ExtrusionFlow&>(rhs) &&
-           lhs.role == rhs.role && lhs.overhang_attributes == rhs.overhang_attributes;
+    return static_cast<const ExtrusionFlow&>(lhs) == static_cast<const ExtrusionFlow&>(rhs)
+        && lhs.role == rhs.role
+        && lhs.overhang_attributes == rhs.overhang_attributes
+        && lhs.speed_limits == rhs.speed_limits;
 }
 
 class ExtrusionPath : public ExtrusionEntity
@@ -295,6 +316,19 @@ public:
             append(dst, p.polyline.points);
     }
     double total_volume() const override { double volume =0.; for (const auto& path : paths) volume += path.total_volume(); return volume; }
+};
+
+/**
+ * @brief ExtrusionMultiPath, which must not be reversed during path planning.
+ */
+class ExtrusionMultiPathOriented : public ExtrusionMultiPath
+{
+public:
+    explicit ExtrusionMultiPathOriented(ExtrusionPaths&& paths);
+
+    ExtrusionEntity* clone() const override;
+    ExtrusionEntity* clone_move() override;
+    bool can_reverse() const override;
 };
 
 // Single continuous extrusion loop, possibly with varying extrusion thickness, extrusion height or bridging / non bridging.

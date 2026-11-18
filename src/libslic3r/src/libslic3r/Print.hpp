@@ -443,6 +443,7 @@ private:
     void generate_support_material();
     void estimate_curled_extrusions();
     void calculate_overhanging_perimeters();
+    void calculate_extrusion_speed_limits();
 
     void slice_volumes();
     // Has any support (not counting the raft).

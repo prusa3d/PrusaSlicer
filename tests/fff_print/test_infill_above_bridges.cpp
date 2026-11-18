@@ -1,84 +1,187 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
-#include <libslic3r/InfillAboveBridges.hpp>
+
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/GCode/ExtrusionProcessor.hpp"
 
 using namespace Slic3r;
 using namespace Slic3r::Biz;
 using Catch::Approx;
 
-const ExPolygon square{
-    scaled(Vec2d{0, 0}),
-    scaled(Vec2d{10, 0}),
-    scaled(Vec2d{10, 10}),
-    scaled(Vec2d{0, 10})
-};
+namespace AABBTreeLines = Slic3r::Biz::Algorithms::AABBTreeLines;
 
-ExPolygon translate(const ExPolygon &polygon, const Point &offset) {
-    ExPolygons result{polygon};
-    Algorithms::ExPolygon::translate(result, offset);
-    return result.front();
+const ExPolygon
+    bridge{scaled(Vec2d{0, 0}), scaled(Vec2d{10, 0}), scaled(Vec2d{10, 10}), scaled(Vec2d{0, 10})};
+
+static Polyline horizontal_line(const double y, const double x_start, const double x_end)
+{
+    return Polyline{scaled(Vec2d{x_start, y}), scaled(Vec2d{x_end, y})};
 }
 
-constexpr bool debug_files{false};
-
-void draw_surfaces(const PrepareInfill::SurfaceRefsByRegion &surfaces, std::string_view file_name) {
-    using PrepareInfill::SurfaceCollectionRef;
-
-    SurfaceCollection to_display;
-    for (const SurfaceCollectionRef &surface_collection : surfaces) {
-        to_display.append(surface_collection.get());
-    }
-    to_display.export_to_svg(file_name.data(), false);
+static bool is_limited_over_bridge(const ExtrusionPath& path)
+{
+    return path.attributes().speed_limits.has(ExtrusionSpeedLimit::OverBridge);
 }
 
-TEST_CASE("Separate infill above bridges", "[PrepareInfill]") {
-    ExPolygons layer_0_region_0_bridge{
-        square
+static ExtrusionEntityCollection
+split_solid_infill_by_bridges(const ExtrusionEntityCollection& fills, const ExPolygons& bridges)
+{
+    const AABBTreeLines::LinesDistancer<Line> bridges_boundary{
+        Algorithms::ExPolygon::to_lines(bridges)
     };
-    ExPolygons layer_0_region_0_internal{
-        translate(square, scaled(Vec2d{10, 0}))
-    };
-    ExPolygons layer_0_region_1_internal{
-        translate(square, scaled(Vec2d{0, 10}))
-    };
-    ExPolygons layer_0_region_1_bridge{
-        translate(square, scaled(Vec2d{10, 10}))
-    };
-    SurfaceCollection layer_0_region_0;
-    layer_0_region_0.append(layer_0_region_0_bridge, stBottomBridge);
-    layer_0_region_0.append(layer_0_region_0_internal, stInternal);
-    SurfaceCollection layer_0_region_1;
-    layer_0_region_1.append(layer_0_region_1_bridge, stBottomBridge);
-    layer_0_region_1.append(layer_0_region_1_internal, stInternal);
+    return ExtrusionProcessor::split_extrusions_by_speed_limit_region(
+        fills,
+        bridges_boundary,
+        ExtrusionSpeedLimit::OverBridge,
+        [](const ExtrusionRole role) { return role == ExtrusionRole::SolidInfill; }
+    );
+}
 
-    PrepareInfill::SurfaceRefsByRegion layer_0{layer_0_region_0, layer_0_region_1};
+const ExtrusionFlow infill_flow{0.1, 0.45f, 0.2f};
 
-    ExPolygons layer_1_region_0_solid{
-        translate(square, scaled(Vec2d{5, 5}))
-    };
-    SurfaceCollection layer_1_region_0;
-    layer_1_region_0.append(layer_1_region_0_solid, stInternalSolid);
-    PrepareInfill::SurfaceRefsByRegion layer_1{layer_1_region_0};
+TEST_CASE("Split solid infill above bridges", "[SpeedLimits]")
+{
+    ExtrusionEntityCollection fills;
+    fills.append(
+        ExtrusionPath{
+            horizontal_line(5, -5, 15),
+            ExtrusionAttributes{ExtrusionRole::SolidInfill, infill_flow}
+        }
+    );
+    fills.append(
+        ExtrusionPathOriented{
+            horizontal_line(2, -5, 15),
+            ExtrusionAttributes{ExtrusionRole::SolidInfill, infill_flow}
+        }
+    );
+    fills.append(
+        ExtrusionPath{
+            horizontal_line(8, -5, 15),
+            ExtrusionAttributes{ExtrusionRole::TopSolidInfill, infill_flow}
+        }
+    );
+    fills.append(
+        ExtrusionPath{
+            horizontal_line(5, 20, 30),
+            ExtrusionAttributes{ExtrusionRole::SolidInfill, infill_flow}
+        }
+    );
+    fills.append(
+        ExtrusionPath{
+            horizontal_line(5, 2, 8),
+            ExtrusionAttributes{ExtrusionRole::SolidInfill, infill_flow}
+        }
+    );
+    // The fills of a surface are stored in a nested collection.
+    ExtrusionEntityCollection surface_fills;
+    surface_fills.no_sort = true;
+    surface_fills.append(
+        ExtrusionPath{
+            horizontal_line(5, -5, 15),
+            ExtrusionAttributes{ExtrusionRole::SolidInfill, infill_flow}
+        }
+    );
+    fills.append(std::move(surface_fills));
 
-    if constexpr (debug_files) {
-        draw_surfaces(layer_0, "layer_0.svg");
+    const ExtrusionEntityCollection result{split_solid_infill_by_bridges(fills, {bridge})};
+
+    // The top level structure has to be preserved, layer islands refer to it by indices.
+    REQUIRE(result.entities.size() == fills.entities.size());
+
+    SECTION("Solid infill crossing the bridge is split, only the part above the bridge is limited")
+    {
+        const ExtrusionMultiPath* multipath{
+            dynamic_cast<const ExtrusionMultiPath*>(result.entities[0])
+        };
+        REQUIRE(multipath != nullptr);
+        CHECK(multipath->can_reverse());
+        REQUIRE(multipath->paths.size() == 3);
+        CHECK(!is_limited_over_bridge(multipath->paths[0]));
+        CHECK(is_limited_over_bridge(multipath->paths[1]));
+        CHECK(!is_limited_over_bridge(multipath->paths[2]));
+        CHECK(multipath->paths[1].length() == Approx(scale_(10.)));
     }
 
-    PrepareInfill::separate_infill_above_bridges({layer_0, layer_1}, 0);
-
-    if constexpr (debug_files) {
-        draw_surfaces(layer_1, "layer_1.svg");
+    SECTION("Parts of an oriented path stay oriented")
+    {
+        const ExtrusionMultiPathOriented* multipath{
+            dynamic_cast<const ExtrusionMultiPathOriented*>(result.entities[1])
+        };
+        REQUIRE(multipath != nullptr);
+        CHECK(!multipath->can_reverse());
+        REQUIRE(multipath->paths.size() == 3);
+        CHECK(is_limited_over_bridge(multipath->paths[1]));
     }
 
-    const Surfaces &result{layer_1.front().get().surfaces};
-    REQUIRE(result.size() == 4);
-    const double expected_area{scale_(5.0) * scale_(5.0)};
-    CHECK(result[0].expolygon.contour.area() == Approx(expected_area));
-    CHECK(result[0].surface_type == stInternalSolid);
-    CHECK(result[1].expolygon.contour.area() == Approx(expected_area));
-    CHECK(result[1].surface_type == stInternalSolid);
-    CHECK(result[2].expolygon.contour.area() == Approx(expected_area));
-    CHECK(result[2].surface_type == stSolidOverBridge);
-    CHECK(result[3].expolygon.contour.area() == Approx(expected_area));
-    CHECK(result[3].surface_type == stSolidOverBridge);
+    SECTION("Other roles are not split")
+    {
+        const ExtrusionPath* path{dynamic_cast<const ExtrusionPath*>(result.entities[2])};
+        REQUIRE(path != nullptr);
+        CHECK(!is_limited_over_bridge(*path));
+    }
+
+    SECTION("Solid infill outside of the bridge is not limited")
+    {
+        const ExtrusionPath* path{dynamic_cast<const ExtrusionPath*>(result.entities[3])};
+        REQUIRE(path != nullptr);
+        CHECK(!is_limited_over_bridge(*path));
+    }
+
+    SECTION("Solid infill inside of the bridge is limited without splitting")
+    {
+        const ExtrusionPath* path{dynamic_cast<const ExtrusionPath*>(result.entities[4])};
+        REQUIRE(path != nullptr);
+        CHECK(is_limited_over_bridge(*path));
+    }
+
+    SECTION("Nested collections are preserved")
+    {
+        const ExtrusionEntityCollection* collection{
+            dynamic_cast<const ExtrusionEntityCollection*>(result.entities[5])
+        };
+        REQUIRE(collection != nullptr);
+        CHECK(collection->no_sort);
+        REQUIRE(collection->entities.size() == 1);
+        const ExtrusionMultiPath* multipath{
+            dynamic_cast<const ExtrusionMultiPath*>(collection->entities.front())
+        };
+        REQUIRE(multipath != nullptr);
+        REQUIRE(multipath->paths.size() == 3);
+        CHECK(is_limited_over_bridge(multipath->paths[1]));
+    }
+}
+
+TEST_CASE("Split solid infill above several bridges", "[SpeedLimits]")
+{
+    const ExPolygon second_bridge{
+        scaled(Vec2d{20, 0}),
+        scaled(Vec2d{30, 0}),
+        scaled(Vec2d{30, 10}),
+        scaled(Vec2d{20, 10})
+    };
+    ExtrusionEntityCollection fills;
+    fills.append(
+        ExtrusionPath{
+            horizontal_line(5, -5, 35),
+            ExtrusionAttributes{ExtrusionRole::SolidInfill, infill_flow}
+        }
+    );
+
+    const ExtrusionEntityCollection result{
+        split_solid_infill_by_bridges(fills, {bridge, second_bridge})
+    };
+
+    const ExtrusionMultiPath* multipath{
+        dynamic_cast<const ExtrusionMultiPath*>(result.entities.front())
+    };
+    REQUIRE(multipath != nullptr);
+    REQUIRE(multipath->paths.size() == 5);
+    CHECK(!is_limited_over_bridge(multipath->paths[0]));
+    CHECK(is_limited_over_bridge(multipath->paths[1]));
+    CHECK(!is_limited_over_bridge(multipath->paths[2]));
+    CHECK(is_limited_over_bridge(multipath->paths[3]));
+    CHECK(!is_limited_over_bridge(multipath->paths[4]));
+    CHECK(multipath->paths[1].length() == Approx(scaled<double>(10.)));
+    CHECK(multipath->paths[3].length() == Approx(scaled<double>(10.)));
 }

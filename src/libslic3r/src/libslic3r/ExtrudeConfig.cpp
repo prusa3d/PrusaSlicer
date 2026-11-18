@@ -7,6 +7,8 @@ ExtrudeConfig::ExtrudeConfig(const Domain::ConfigView& config) :
     first_layer_acceleration_over_raft{
         config.get<std::vector<double>>("first_layer_acceleration_over_raft")
     },
+    over_support_interface_acceleration{config.get<
+        std::vector<double>>("over_support_interface_acceleration")},
     bridge_acceleration{config.get<std::vector<double>>("bridge_acceleration")},
     top_solid_infill_acceleration{config.get<std::vector<double>>("top_solid_infill_acceleration")},
     solid_infill_acceleration{config.get<std::vector<double>>("solid_infill_acceleration")},
@@ -96,6 +98,7 @@ ExtrudeConfig::ExtrudeConfig(const Domain::ConfigView& config) :
     first_layer_speed_over_raft{
         config.get<std::vector<Domain::FloatOrPercentage>>("first_layer_speed_over_raft")
     },
+    over_support_interface_speed{config.get<std::vector<double>>("over_support_interface_speed")},
     avoid_crossing_perimeters_max_detour{
         config.get<double>("avoid_crossing_perimeters_max_detour")
     },

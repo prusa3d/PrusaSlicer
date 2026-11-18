@@ -58,7 +58,6 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/MultiMaterialSegmentation.hpp"
 #include "libslic3r/Point.hpp"
-#include "libslic3r/InfillAboveBridges.hpp"
 #include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 #include "libslic3r/HwConfigUtils.hpp"
 
@@ -449,27 +448,6 @@ void PrintObject::prepare_infill()
     } // for each layer
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
-
-    PrepareInfill::SurfaceRefs surfaces;
-    for (const Layer *layer : m_layers) {
-        surfaces.emplace_back();
-        for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
-            LayerRegion *layerm = layer->m_regions[region_id];
-            if (!layerm->fill_surfaces().empty()
-                && !layerm->region()
-                        .extruder_config_value<Domain::FloatOrPercentage>(
-                            "over_bridge_speed",
-                            FlowRole::frSolidInfill
-                        )
-                        .is_zero())
-            {
-                surfaces.back().push_back(std::ref(layerm->m_fill_surfaces));
-            }
-        }
-    }
-    constexpr double infill_over_bridges_expand{1.0};
-    PrepareInfill::separate_infill_above_bridges(surfaces, infill_over_bridges_expand);
-
     this->set_done(posPrepareInfill);
 }
 
@@ -688,6 +666,209 @@ void PrintObject::calculate_overhanging_perimeters()
     }
 }
 
+/**
+ * @brief Returns the support layer on which the object layer is printed directly, or nullptr.
+ *
+ * This happens with zero contact Z distance only, the top contact layer then ends at the bottom of the object layer.
+ */
+static const SupportLayer*
+support_layer_directly_below(const PrintObject& print_object, const Layer& object_layer)
+{
+    const SlicingParameters& slicing_parameters = print_object.slicing_parameters();
+    // The first object layer lies on the bed or on the raft, which have their own settings.
+    if (!slicing_parameters.soluble_interface
+        || object_layer.id() <= slicing_parameters.raft_layers())
+    {
+        return nullptr;
+    }
+
+    const double bottom_z                              = object_layer.bottom_z();
+    const SpanOfConstPtrs<SupportLayer> support_layers = print_object.support_layers();
+    const auto support_layer_it{std::ranges::lower_bound(
+        support_layers,
+        bottom_z - EPSILON,
+        {},
+        [](const SupportLayer* support_layer) { return support_layer->print_z; }
+    )};
+
+    if (support_layer_it == support_layers.end()
+        || (*support_layer_it)->print_z > bottom_z + EPSILON)
+    {
+        return nullptr;
+    }
+
+    return *support_layer_it;
+}
+
+/**
+ * @brief Checks whether the support islands may overlap the object layer.
+ *
+ * Only the bounding boxes are compared, so that the layers far from the support are not split needlessly.
+ */
+static bool
+may_support_overlap_object_layer(const SupportLayer& support_layer, const Layer& object_layer)
+{
+    return std::ranges::any_of(
+        object_layer.lslices_ex,
+        [&support_layer](const LayerSlice& layer_slice)
+        {
+            return std::ranges::any_of(
+                support_layer.support_islands_bboxes,
+                [&layer_slice](const BoundingBox& support_island_bbox)
+                { return layer_slice.bbox.overlap(support_island_bbox); }
+            );
+        }
+    );
+}
+
+/**
+ * @brief Returns the bridges of the layer below the object layer, expanded to cover the infill anchored over them.
+ */
+static ExPolygons bridges_directly_below(const Layer& object_layer)
+{
+    constexpr double bridges_expansion{1.0};
+
+    if (object_layer.lower_layer == nullptr) {
+        return {};
+    }
+
+    ExPolygons bridges;
+    for (const LayerRegion* lower_layer_region : object_layer.lower_layer->regions()) {
+        for (const Surface* bridge :
+             lower_layer_region->fill_surfaces().filter_by_type(stBottomBridge))
+        {
+            bridges.push_back(bridge->expolygon);
+        }
+    }
+
+    return offset_ex(bridges, scaled<float>(bridges_expansion));
+}
+
+/**
+ * @brief Splits the extrusions at the boundary of the region, the extrusions are backed up before their first split.
+ */
+static void split_and_back_up_extrusions(
+    ExtrusionEntityCollection& extrusions,
+    ExtrusionEntityCollection& extrusions_without_speed_limits,
+    const AABBTreeLines::LinesDistancer<Line>& region_boundary,
+    const ExtrusionSpeedLimit speed_limit,
+    const std::function<bool(ExtrusionRole)>& should_limit_role
+)
+{
+    ExtrusionEntityCollection split_extrusions{
+        ExtrusionProcessor::split_extrusions_by_speed_limit_region(
+            extrusions,
+            region_boundary,
+            speed_limit,
+            should_limit_role
+        )
+    };
+
+    if (extrusions_without_speed_limits.empty()) {
+        extrusions_without_speed_limits.swap(extrusions);
+    }
+
+    extrusions = std::move(split_extrusions);
+}
+
+void PrintObject::calculate_extrusion_speed_limits()
+{
+    if (this->set_started(posCalculateExtrusionSpeedLimits)) {
+        const bool is_limited_over_support_interface =
+            std::ranges::any_of(
+                m_config.get<std::vector<double>>("over_support_interface_speed"),
+                [](const double speed) { return speed > 0.; }
+            )
+            || std::ranges::any_of(
+                m_config.get<std::vector<double>>("over_support_interface_acceleration"),
+                [](const double acceleration) { return acceleration > 0.; }
+            );
+
+        tbb::parallel_for(
+            tbb::blocked_range<size_t>(0, m_layers.size()),
+            [this, is_limited_over_support_interface](const tbb::blocked_range<size_t>& range)
+            {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
+                for (size_t layer_index = range.begin(); layer_index < range.end(); ++layer_index) {
+                    m_print->throw_if_canceled();
+                    Layer& layer                      = *m_layers[layer_index];
+                    const SupportLayer* support_layer = is_limited_over_support_interface ?
+                        support_layer_directly_below(*this, layer) :
+                        nullptr;
+
+                    if (support_layer != nullptr
+                        && may_support_overlap_object_layer(*support_layer, layer))
+                    {
+                        const auto is_any_role = [](const ExtrusionRole) { return true; };
+                        const AABBTreeLines::LinesDistancer<Line> support_boundary{
+                            Algorithms::ExPolygon::to_lines(support_layer->support_islands)
+                        };
+
+                        for (LayerRegion* layer_region : layer.regions()) {
+                            split_and_back_up_extrusions(
+                                layer_region->m_perimeters,
+                                layer_region->m_perimeters_without_speed_limits,
+                                support_boundary,
+                                ExtrusionSpeedLimit::OverSupportInterface,
+                                is_any_role
+                            );
+                            split_and_back_up_extrusions(
+                                layer_region->m_fills,
+                                layer_region->m_fills_without_speed_limits,
+                                support_boundary,
+                                ExtrusionSpeedLimit::OverSupportInterface,
+                                is_any_role
+                            );
+                        }
+                    }
+
+                    std::vector<LayerRegion*> regions_limited_over_bridges;
+                    std::ranges::copy_if(
+                        layer.regions(),
+                        std::back_inserter(regions_limited_over_bridges),
+                        [](const LayerRegion* layer_region)
+                        {
+                            return !layer_region->region()
+                                        .extruder_config_value<Domain::FloatOrPercentage>(
+                                            "over_bridge_speed",
+                                            FlowRole::frSolidInfill
+                                        )
+                                        .is_zero();
+                        }
+                    );
+
+                    if (regions_limited_over_bridges.empty()) {
+                        continue;
+                    }
+
+                    if (const ExPolygons bridges = bridges_directly_below(layer);
+                        !bridges.empty()) {
+                        const auto is_solid_infill = [](const ExtrusionRole role)
+                        { return role == ExtrusionRole::SolidInfill; };
+
+                        const AABBTreeLines::LinesDistancer<Line> bridges_boundary{
+                            Algorithms::ExPolygon::to_lines(bridges)
+                        };
+
+                        for (LayerRegion* layer_region : regions_limited_over_bridges) {
+                            split_and_back_up_extrusions(
+                                layer_region->m_fills,
+                                layer_region->m_fills_without_speed_limits,
+                                bridges_boundary,
+                                ExtrusionSpeedLimit::OverBridge,
+                                is_solid_infill
+                            );
+                        }
+                    }
+                }
+            }
+        );
+
+        m_print->throw_if_canceled();
+        this->set_done(posCalculateExtrusionSpeedLimits);
+    }
+}
+
 std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> PrintObject::prepare_adaptive_infill_data(
     const std::vector<std::pair<const Surface *, float>> &surfaces_w_bottom_z) const
 {
@@ -808,10 +989,19 @@ bool PrintObject::invalidate_all_steps()
 // Called on main thread with stopped or paused background processing to let PrintObject release data for its milestones that were invalidated or canceled.
 void PrintObject::cleanup()
 {
-    if (this->query_reset_dirty_step_unguarded(posInfill))
+    if (this->query_reset_dirty_step_unguarded(posInfill)) {
         this->clear_fills();
-    if (this->query_reset_dirty_step_unguarded(posSupportMaterial))
+    }
+
+    if (this->query_reset_dirty_step_unguarded(posSupportMaterial)) {
         this->clear_support_layers();
+    }
+
+    if (this->query_reset_dirty_step_unguarded(posCalculateExtrusionSpeedLimits)) {
+        for (Layer* layer : m_layers) {
+            layer->restore_extrusions_without_speed_limits();
+        }
+    }
 }
 
 // This function analyzes slices of a region (SurfaceCollection slices).

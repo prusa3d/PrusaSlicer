@@ -207,6 +207,14 @@ private:
     // (this collection contains only ExtrusionEntityCollection objects)
     ExtrusionEntityCollection   m_fills;
 
+    /**
+     * @brief Perimeters and fills before they were split by PrintObject::calculate_extrusion_speed_limits().
+     *
+     * Backed up only for the split regions, PrintObject::cleanup() restores them when the speed limits are invalidated.
+     */
+    ExtrusionEntityCollection m_perimeters_without_speed_limits;
+    ExtrusionEntityCollection m_fills_without_speed_limits;
+
     // collection of expolygons representing the bridged areas (thus not
     // needing support material)
 //  Polygons                    bridged;

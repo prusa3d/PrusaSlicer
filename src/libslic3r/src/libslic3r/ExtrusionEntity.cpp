@@ -102,6 +102,26 @@ Polyline ExtrusionMultiPath::as_polyline() const
     return out;
 }
 
+ExtrusionMultiPathOriented::ExtrusionMultiPathOriented(ExtrusionPaths&& paths)
+{
+    this->paths = std::move(paths);
+}
+
+ExtrusionEntity* ExtrusionMultiPathOriented::clone() const
+{
+    return new ExtrusionMultiPathOriented(*this);
+}
+
+ExtrusionEntity* ExtrusionMultiPathOriented::clone_move()
+{
+    return new ExtrusionMultiPathOriented(std::move(*this));
+}
+
+bool ExtrusionMultiPathOriented::can_reverse() const
+{
+    return false;
+}
+
 double ExtrusionLoop::area() const
 {
     double a = 0;

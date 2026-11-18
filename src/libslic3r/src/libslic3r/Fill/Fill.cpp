@@ -189,8 +189,6 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
                     if (surface.is_solid()) {
                         if (surface.is_top()) {
                             params.extrusion_role = ExtrusionRole::TopSolidInfill;
-                        } else if (surface.surface_type == stSolidOverBridge) {
-                            params.extrusion_role = ExtrusionRole::InfillOverBridge;
                         } else {
                             params.extrusion_role = ExtrusionRole::SolidInfill;
                         }
@@ -346,12 +344,11 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 
     // Use Domain::InfillPattern::ipEnsuring pattern for all internal Solids.
     {
-        for (size_t surface_fill_id = 0; surface_fill_id < surface_fills.size(); ++surface_fill_id)
-            if (SurfaceFill &fill = surface_fills[surface_fill_id];
-                    fill.surface.surface_type == stInternalSolid
-                    || fill.surface.surface_type == stSolidOverBridge) {
+        for (SurfaceFill& fill : surface_fills) {
+            if (fill.surface.surface_type == stInternalSolid) {
                 fill.params.pattern = Domain::InfillPattern::ipEnsuring;
             }
+        }
     }
 
     return surface_fills;
@@ -466,8 +463,11 @@ static void insert_fills_into_islands(Layer &layer, uint32_t fill_region_id, uin
 
 void Layer::clear_fills()
 {
-    for (LayerRegion *layerm : m_regions)
+    for (LayerRegion* layerm : m_regions) {
         layerm->m_fills.clear();
+        layerm->m_fills_without_speed_limits.clear();
+    }
+
     for (LayerSlice &lslice : lslices_ex)
 		for (LayerIsland &island : lslice.islands)
 			island.fills.clear();
