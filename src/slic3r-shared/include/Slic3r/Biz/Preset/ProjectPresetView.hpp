@@ -112,10 +112,14 @@ public:
     using ValueParent = Domain::Preset::EvaluatedPrinterPreset;
     using Value = Domain::Preset::EvaluatedPrinterPreset::Preset;
 
-    PrinterPresetProjectView(const Domain::Preset::Bundle& bundle, const RuntimePresets& presets, std::string  hw_config_id) :
-        m_bundle(bundle),
+    PrinterPresetProjectView(const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets, const RuntimePresets& presets, std::string hw_config_id) :
+        m_evaluated_presets(evaluated_presets),
         m_runtime(presets),
         m_hw_config_id(std::move(hw_config_id))
+    {}
+
+    PrinterPresetProjectView(const Domain::Preset::Bundle& bundle, const RuntimePresets& presets, std::string hw_config_id) :
+        PrinterPresetProjectView(bundle.evaluated_presets, presets, std::move(hw_config_id))
     {}
 
     /**
@@ -134,10 +138,10 @@ public:
      */
     [[nodiscard]] auto items() const
     {
-        auto bundle_it = m_bundle.evaluated_presets.find(m_hw_config_id);
+        auto bundle_it = m_evaluated_presets.find(m_hw_config_id);
         auto runtime_it = m_runtime.printer.find(m_hw_config_id);
 
-        auto bundle_span = bundle_it == m_bundle.evaluated_presets.end() ? std::span<const ValueParent>{} : bundle_it->second;
+        auto bundle_span = bundle_it == m_evaluated_presets.end() ? std::span<const ValueParent>{} : bundle_it->second;
         auto runtime_span = runtime_it == m_runtime.printer.end() ? std::span<const Value>{} : runtime_it->second;
 
         auto bundle_view = bundle_span | ranges::views::transform(&Domain::Preset::EvaluatedPrinterPreset::preset);
@@ -159,7 +163,7 @@ public:
     }
 
 private:
-    const Domain::Preset::Bundle& m_bundle;
+    const Domain::Preset::EvaluatedPrinterPresets& m_evaluated_presets;
     const RuntimePresets& m_runtime;
     const std::string m_hw_config_id;
 };
@@ -176,11 +180,15 @@ public:
     using ValueParent = Domain::Preset::EvaluatedPrintPreset;
     using Value = Domain::Preset::EvaluatedPrintPreset::Preset;
 
-    PrintPresetProjectView(const Domain::Preset::Bundle& bundle, const RuntimePresets& presets, std::string  hw_config_id, std::string  printer_id) :
-        m_bundle(bundle),
+    PrintPresetProjectView(const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets, const RuntimePresets& presets, std::string hw_config_id, std::string printer_id) :
+        m_evaluated_presets(evaluated_presets),
         m_runtime(presets),
         m_hw_config_id(std::move(hw_config_id)),
         m_printer_id(std::move(printer_id))
+    {}
+
+    PrintPresetProjectView(const Domain::Preset::Bundle& bundle, const RuntimePresets& presets, std::string hw_config_id, std::string printer_id) :
+        PrintPresetProjectView(bundle.evaluated_presets, presets, std::move(hw_config_id), std::move(printer_id))
     {}
 
     /**
@@ -199,7 +207,7 @@ public:
      */
     [[nodiscard]] auto items() const
     {
-        auto bundle_printer = m_bundle.find_printer_preset(m_hw_config_id, m_printer_id);
+        auto bundle_printer = Domain::Preset::find_printer_preset(m_evaluated_presets, m_hw_config_id, m_printer_id);
         auto runtime_it = m_runtime.print.find({m_hw_config_id, m_printer_id});
 
         auto bundle_span = bundle_printer == nullptr ? std::span<const ValueParent>{} : bundle_printer->prints;
@@ -224,7 +232,7 @@ public:
     }
 
 private:
-    const Domain::Preset::Bundle& m_bundle;
+    const Domain::Preset::EvaluatedPrinterPresets& m_evaluated_presets;
     const RuntimePresets& m_runtime;
     const std::string m_hw_config_id;
     const std::string m_printer_id;
@@ -242,13 +250,17 @@ public:
     using Value = Domain::Preset::EvaluatedToolPrintPreset::Preset;
     using IteratedValue = std::pair<std::reference_wrapper<const Value>, bool>;
 
-    ToolPrintPresetProjectView(const Domain::Preset::Bundle& bundle, const RuntimePresets& presets, std::string hw_config_id, std::string printer_id, std::string print_id, size_t tool_index) :
-        m_bundle(bundle),
+    ToolPrintPresetProjectView(const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets, const RuntimePresets& presets, std::string hw_config_id, std::string printer_id, std::string print_id, size_t tool_index) :
+        m_evaluated_presets(evaluated_presets),
         m_runtime(presets),
         m_hw_config_id(std::move(hw_config_id)),
         m_printer_id(std::move(printer_id)),
         m_print_id(std::move(print_id)),
         m_tool_index(tool_index)
+    {}
+
+    ToolPrintPresetProjectView(const Domain::Preset::Bundle& bundle, const RuntimePresets& presets, std::string hw_config_id, std::string printer_id, std::string print_id, size_t tool_index) :
+        ToolPrintPresetProjectView(bundle.evaluated_presets, presets, std::move(hw_config_id), std::move(printer_id), std::move(print_id), tool_index)
     {}
 
     /**
@@ -267,7 +279,7 @@ public:
      */
     [[nodiscard]] auto items() const
     {
-        auto bundle_printer = m_bundle.find_printer_preset(m_hw_config_id, m_printer_id);
+        auto bundle_printer = Domain::Preset::find_printer_preset(m_evaluated_presets, m_hw_config_id, m_printer_id);
         auto bundle_print = bundle_printer ? bundle_printer->find_print_preset_by_id(m_print_id) : nullptr;
         auto runtime_it = m_runtime.tool_print.find({m_hw_config_id, m_printer_id, m_print_id});
 
@@ -293,7 +305,7 @@ public:
     }
 
 private:
-    const Domain::Preset::Bundle& m_bundle;
+    const Domain::Preset::EvaluatedPrinterPresets& m_evaluated_presets;
     const RuntimePresets& m_runtime;
     const std::string m_hw_config_id;
     const std::string m_printer_id;
@@ -312,13 +324,17 @@ public:
     using ValueParent = Domain::Preset::EvaluatedMaterialPreset;
     using Value = Domain::Preset::EvaluatedMaterialPreset::Preset;
 
-    MaterialPresetProjectView(const Domain::Preset::Bundle& bundle, const RuntimePresets& runtime, std::string hw_config_id, std::string printer_id, std::string print_id, size_t slot_index) :
-        m_bundle(bundle),
+    MaterialPresetProjectView(const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets, const RuntimePresets& runtime, std::string hw_config_id, std::string printer_id, std::string print_id, size_t slot_index) :
+        m_evaluated_presets(evaluated_presets),
         m_runtime(runtime),
         m_hw_config_id(std::move(hw_config_id)),
         m_printer_id(std::move(printer_id)),
         m_print_id(std::move(print_id)),
         m_slot_index(slot_index)
+    {}
+
+    MaterialPresetProjectView(const Domain::Preset::Bundle& bundle, const RuntimePresets& runtime, std::string hw_config_id, std::string printer_id, std::string print_id, size_t slot_index) :
+        MaterialPresetProjectView(bundle.evaluated_presets, runtime, std::move(hw_config_id), std::move(printer_id), std::move(print_id), slot_index)
     {}
 
     /**
@@ -337,7 +353,7 @@ public:
      */
     [[nodiscard]] auto items() const
     {
-        const auto bundle_printer = m_bundle.find_printer_preset(m_hw_config_id, m_printer_id);
+        const auto bundle_printer = Domain::Preset::find_printer_preset(m_evaluated_presets, m_hw_config_id, m_printer_id);
         const auto bundle_print = bundle_printer ? bundle_printer->find_print_preset_by_id(m_print_id) : nullptr;
         const auto runtime_it = m_runtime.material.find({m_hw_config_id, m_printer_id, m_print_id});
 
@@ -359,7 +375,7 @@ public:
      */
     [[nodiscard]] auto match_rules() const
     {
-        const auto bundle_printer = m_bundle.find_printer_preset(m_hw_config_id, m_printer_id);
+        const auto bundle_printer = Domain::Preset::find_printer_preset(m_evaluated_presets, m_hw_config_id, m_printer_id);
         const auto bundle_print =
             bundle_printer ? bundle_printer->find_print_preset_by_id(m_print_id) : nullptr;
         const auto bundle_span = bundle_print == nullptr ?
@@ -392,11 +408,22 @@ public:
     }
 
 private:
-    const Domain::Preset::Bundle& m_bundle;
+    const Domain::Preset::EvaluatedPrinterPresets& m_evaluated_presets;
     const RuntimePresets& m_runtime;
     const std::string m_hw_config_id;
     const std::string m_printer_id;
     const std::string m_print_id;
     size_t m_slot_index;
 };
+
+/** @brief Returns preset with @p id from preset project @p view, or nullptr. */
+template <typename View>
+const typename View::Value* find_in_view(const View& view, const std::string& id)
+{
+    for (const auto& [preset_ref, is_runtime] : view.items()) {
+        if (preset_ref.get().id == id)
+            return &preset_ref.get();
+    }
+    return nullptr;
+}
 }

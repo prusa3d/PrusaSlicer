@@ -23,12 +23,13 @@ HwPrinterConfig* VendorBundle::find_printer_config(const std::string& id)
 }
 
 
-const EvaluatedPrinterPreset* Bundle::find_printer_preset(
-    const std::string& printer_hw_config_id,
+const EvaluatedPrinterPreset* find_printer_preset(
+    const EvaluatedPrinterPresets& evaluated_presets,
+    const std::string& hw_config_id,
     const std::string& printer_preset_id
-) const
+)
 {
-    const auto& printer_presets = evaluated_presets.find(printer_hw_config_id);
+    const auto& printer_presets = evaluated_presets.find(hw_config_id);
 
     if (printer_presets == evaluated_presets.end())
         return nullptr;
@@ -39,6 +40,19 @@ const EvaluatedPrinterPreset* Bundle::find_printer_preset(
     if (it != printer_presets->second.end())
         return &*it;
     return nullptr;
+}
+
+const EvaluatedPrinterPreset* Bundle::find_printer_preset(
+    const std::string& printer_hw_config_id,
+    const std::string& printer_preset_id
+) const
+{
+    // qualified, the member function hides the free one
+    return Domain::Preset::find_printer_preset(
+        evaluated_presets,
+        printer_hw_config_id,
+        printer_preset_id
+    );
 }
 
 const HwPrinterConfig* Bundle::find_config_with_same_values(const HwPrinterConfig& printer_config) const

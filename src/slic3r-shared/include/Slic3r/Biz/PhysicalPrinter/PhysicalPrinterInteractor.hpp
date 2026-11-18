@@ -10,6 +10,7 @@
 #include "Slic3r/Biz/IListObserver.hpp"
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp"
 #include "Slic3r/Biz/Preset/PrinterPresetSelector.hpp"
+#include "Slic3r/Biz/Preset/PreferredMaterialTypes.hpp"
 #include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
@@ -79,7 +80,11 @@ public:
 
     Preset::PrinterPresetSelector& printer_preset_selector();
 
-    /// Explicit user selection for this session, fails when no printer config matches.
+    /**
+     * @brief Explicit user selection for this session. Asks about unsaved changes before
+     * the printer config is switched.
+     * @return False if no printer config matches or the user canceled the switch.
+     */
     bool select_uuid(const std::string& uuid);
 
     /**
@@ -105,8 +110,10 @@ public:
 
     /**
      * @note Also selects this printer
+     * @return False if the user canceled the switch of the printer config because of unsaved
+     * changes; the printer isn't stored then.
      */
-    void create_or_save_physical_printer(const PhysicalPrinterConfig& printer);
+    bool create_or_save_physical_printer(const PhysicalPrinterConfig& printer);
 
     /**
      * @brief Stores the printer without selecting it.
@@ -162,7 +169,16 @@ private:
     bool is_printer_compatible(size_t index, const Domain::Preset::HwPrinterConfig& config) const;
     /// Selects the printer and remembers it in the current config container.
     bool apply_selection(const std::string& uuid, bool apply_hw_config);
-    void select_connect_materials(const std::string& printer_uuid);
+    /// Same as select_uuid(), but without the check of unsaved changes.
+    bool select_uuid_internal(const std::string& uuid);
+    /**
+     * @brief Checks unsaved changes before the hw config of @p printer is applied.
+     * @return False if the user canceled the switch.
+     */
+    bool can_apply_hw_config(const PhysicalPrinterConfig& printer);
+    /// Types of the materials loaded in the Connect printer, empty for other printers.
+    Preset::PreferredMaterialTypes
+    connect_material_types(const PhysicalPrinterConfig& printer) const;
     void clear_selection();
     void set_last_used(const std::string& uuid);
 

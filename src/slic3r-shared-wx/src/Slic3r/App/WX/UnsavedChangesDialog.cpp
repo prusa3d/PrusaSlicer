@@ -464,7 +464,7 @@ void UnsavedChangesDialog::update_tree(
     case PresetKind::FdmPrint:
     case PresetKind::SlaPrint: {
         preset_name     = fmt::format("{} \"{}\"", _u8L("Print"), name(m_preset_names.print));
-        new_preset_name = name(m_preset_names_new.printer);
+        new_preset_name = name(m_preset_names_new.print);
         if (kind_id.kind == PresetKind::FdmPrint) {
             config_left = &std::get<Domain::ConfigPackFDM>(m_config_original).print;
             config_mid  = &std::get<Domain::ConfigPackFDM>(m_config_selected).print;

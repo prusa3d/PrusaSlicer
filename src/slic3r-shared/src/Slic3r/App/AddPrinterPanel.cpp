@@ -72,7 +72,7 @@ has_template_id(const AddPrinterPanel::PrinterEntry& entry, const std::string& t
 AddPrinterPanel::AddPrinterPanel(
     Biz::ProjectInteractor& project_interactor,
     std::function<void()> close,
-    std::function<void(const Biz::PhysicalPrinter::PhysicalPrinterConfig&)> add_printer
+    std::function<bool(const Biz::PhysicalPrinter::PhysicalPrinterConfig&)> add_printer
 ) :
     m_project_interactor{project_interactor},
     m_add_printer{add_printer},
@@ -314,8 +314,8 @@ void AddPrinterPanel::create_page_details()
     m_physical_printer_form->callbacks().printer_saved =
         [this](const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer)
     {
-        if (m_add_printer) {
-            m_add_printer(printer);
+        if (m_add_printer && !m_add_printer(printer)) {
+            return;
         }
         m_stack_layout->set_current_index(0);
     };

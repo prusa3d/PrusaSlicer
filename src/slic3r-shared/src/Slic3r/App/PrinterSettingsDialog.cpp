@@ -196,10 +196,12 @@ void PrinterSettingsDialog::create_page_list()
     auto factory = PrinterListViewFactory(
         [this](size_t index)
         {
-            m_project_interactor.physical_printer_interactor().select_uuid(
-                m_preset_searcher->at(index).uuid
-            );
-            close_action();
+            if (m_project_interactor.physical_printer_interactor().select_uuid(
+                    m_preset_searcher->at(index).uuid
+                ))
+            {
+                close_action();
+            }
         },
         [this](size_t index) { select_page_settings(m_preset_searcher->at(index)); },
         [this](size_t index)
@@ -295,8 +297,12 @@ void PrinterSettingsDialog::create_page_settings()
     m_physical_printer_form->callbacks().printer_saved =
         [this](const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer)
     {
-        m_project_interactor.physical_printer_interactor().create_or_save_physical_printer(printer);
-        close_action();
+        if (m_project_interactor.physical_printer_interactor().create_or_save_physical_printer(
+                printer
+            ))
+        {
+            close_action();
+        }
     };
 
     m_warning = m_page_settings->emplace_back<WarningPanel>();

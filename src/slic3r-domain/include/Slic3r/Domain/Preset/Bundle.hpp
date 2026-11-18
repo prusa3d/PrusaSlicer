@@ -24,6 +24,16 @@ using VendorBundles = std::map<std::string, VendorBundle>;
 using PrinterConfigs = std::map<std::string, HwPrinterConfig>;
 using EvaluatedPrinterPresets = std::map<std::string, std::vector<EvaluatedPrinterPreset>>;
 
+/**
+ * @brief Returns printer preset @p printer_preset_id evaluated for hw config @p hw_config_id,
+ * or nullptr.
+ */
+const EvaluatedPrinterPreset* find_printer_preset(
+    const EvaluatedPrinterPresets& evaluated_presets,
+    const std::string& hw_config_id,
+    const std::string& printer_preset_id
+);
+
 struct PresetParentPath
 {
     using OptString = std::optional<std::string>;

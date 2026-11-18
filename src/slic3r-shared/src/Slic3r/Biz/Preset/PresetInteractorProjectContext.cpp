@@ -41,6 +41,12 @@ using PrintPreset = RuntimePresets::PrintPreset;
 using ToolPrintPreset = RuntimePresets::ToolPrintPreset;
 using MaterialPreset = RuntimePresets::MaterialPreset;
 
+const RuntimePresets& no_runtime_presets()
+{
+    static const RuntimePresets empty;
+    return empty;
+}
+
 const Domain::Preset::HwPrinterConfig* RuntimePresets::find_printer_config_by_id(const std::string& hw_config_id) const
 {
     auto it = std::find_if(

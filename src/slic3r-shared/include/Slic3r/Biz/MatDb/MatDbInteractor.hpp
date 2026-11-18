@@ -57,7 +57,11 @@ public:
         bool only_favorites
     );
 
-    void select_material_preset(
+    /**
+     * @brief Selects @p preset_id for the material slot and applies the MatDB material to it.
+     * @return False if the user canceled the switch in the unsaved changes dialog.
+     */
+    bool select_material_preset(
         size_t material_index,
         const Domain::MatDb::Material& mat,
         const std::string& preset_id

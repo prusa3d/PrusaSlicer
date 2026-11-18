@@ -616,10 +616,11 @@ public:
                 const std::optional<std::string> preset_id{
                     printer.hw_config ? find_system_preset_id(printer.hw_config->id) : std::nullopt};
                 if (!preset_id) {
-                    return;
+                    return true;
                 }
                 add_printer(PrinterToAdd{*printer.hw_config, *preset_id, printer});
                 show_dialog(false);
+                return true;
             });
         m_dialog->set_flex_grow(1);
         m_dialog->set_visible(false);

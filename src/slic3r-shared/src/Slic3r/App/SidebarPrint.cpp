@@ -96,15 +96,15 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
     {
         if (print_index >= 0) {
             auto& preset_interactor = m_project_interactor.preset_interactor();
+            const size_t selected_index = preset_interactor.print_presets().selected_index();
             const std::string& preset_id =
                 preset_interactor.print_presets().items().at(print_index).id;
             if (Biz::Preset::PresetSelectionCheck::
                     can_select_print_preset(preset_interactor, preset_id))
             {
                 preset_interactor.select_print_preset(preset_id, true);
-                m_last_selected_index = print_index;
             } else {
-                m_combo_print->set_current_index(m_last_selected_index);
+                m_combo_print->set_current_index(static_cast<int>(selected_index));
             }
         }
     };

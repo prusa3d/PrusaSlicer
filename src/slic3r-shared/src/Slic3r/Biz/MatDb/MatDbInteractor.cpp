@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/MatDb/MatDbInteractor.hpp"
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
+#include "Slic3r/Biz/Preset/PresetSelectionCheck.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
 
@@ -85,12 +86,21 @@ void MatDbInteractor::query(
     run_query(m_projects->selected_project_id());
 }
 
-void MatDbInteractor::select_material_preset(
+bool MatDbInteractor::select_material_preset(
     size_t material_index,
     const Domain::MatDb::Material& mat,
     const std::string& preset_id
 )
 {
+    if (!Preset::PresetSelectionCheck::can_select_material_preset(
+            m_preset_interactor,
+            material_index,
+            preset_id
+        ))
+    {
+        return false;
+    }
+
     m_preset_interactor.select_material_preset(material_index, preset_id, true, mat.uuid);
 
     // The material from MDB carries its own color, which should replace the current one.
@@ -102,6 +112,7 @@ void MatDbInteractor::select_material_preset(
         m_project_interactor.selected_config_container_id(),
         static_cast<int>(material_index)
     );
+    return true;
 }
 
 std::optional<std::string> MatDbInteractor::get_color(const std::string& uuid) const

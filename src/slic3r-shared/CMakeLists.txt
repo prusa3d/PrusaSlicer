@@ -901,6 +901,7 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/Preset/IPrinterPresetSelectorListener.hpp
         include/Slic3r/Biz/Preset/PresetSelectionNames.hpp
         include/Slic3r/Biz/Preset/PresetDiffOperation.hpp
+        include/Slic3r/Biz/Preset/PreferredMaterialTypes.hpp
         include/Slic3r/Biz/Preset/IPresetDialogManager.hpp
         include/Slic3r/Biz/Preset/NameValidator.hpp
         src/Slic3r/Biz/Preset/NameValidator.cpp

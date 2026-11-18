@@ -119,8 +119,6 @@ private:
 
     PrintSettingsDialog* m_print_settings_dialog{nullptr};
     PrintModeDialog* m_print_mode_dialog{nullptr};
-
-    int m_last_selected_index{-1};
 };
 
 } // namespace Slic3r::App

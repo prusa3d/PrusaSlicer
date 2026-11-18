@@ -84,7 +84,7 @@ public:
     PrinterAdvancedSettingsDialog& printer_advanced_settings_dialog();
 
 private:
-    void refresh_printer_label_color();
+    void refresh_preset_combobox_label_color();
     void update_color_mix_visibility();
     void update_purging_volumes_button_visibility();
     void update_printer_button();
@@ -133,8 +133,6 @@ private:
 
     Yoga::LayoutButton* m_color_mix_button{nullptr};
     ColorMix::ColorMixDialog* m_color_mix_dialog{nullptr};
-
-    std::string m_selected_printer_preset_name{};
 };
 
 } // namespace Slic3r::App

@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
+#include "Slic3r/Biz/Preset/PresetSelectionCheck.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
@@ -149,10 +150,16 @@ bool PhysicalPrinterInteractor::apply_selection(const std::string& uuid, bool ap
 
     // Hw config can be missing for Connect printers with incomplete data
     if (apply_hw_config && physical_printer.hw_config.has_value()) {
+        const Preset::PreferredMaterialTypes material_types =
+            connect_material_types(physical_printer);
         if (physical_printer.is_runtime) {
-            m_preset_interactor.select_printer_config(physical_printer.hw_config->id);
+            m_preset_interactor.select_printer_config(
+                physical_printer.hw_config->id,
+                material_types
+            );
         } else if (auto result = m_preset_interactor.select_external_printer_config(
-                       physical_printer.hw_config.value()
+                       physical_printer.hw_config.value(),
+                       material_types
                    );
                    !result.has_value())
         {
@@ -166,9 +173,7 @@ bool PhysicalPrinterInteractor::apply_selection(const std::string& uuid, bool ap
             return false;
         }
 
-        if (const auto* upload = std::get_if<ConnectUpload>(&physical_printer.payload)) {
-            select_connect_materials(upload->printer_uuid);
-        }
+        m_printer_preset_selector.warn_material_mismatches(material_types);
     }
 
     m_selected_uuid = uuid;
@@ -185,20 +190,27 @@ bool PhysicalPrinterInteractor::apply_selection(const std::string& uuid, bool ap
     return true;
 }
 
-void PhysicalPrinterInteractor::select_connect_materials(const std::string& printer_uuid)
+Preset::PreferredMaterialTypes
+PhysicalPrinterInteractor::connect_material_types(const PhysicalPrinterConfig& printer) const
 {
+    const auto* upload = std::get_if<ConnectUpload>(&printer.payload);
+    if (upload == nullptr || !printer.hw_config.has_value()) {
+        return {};
+    }
     const ConnectPrinter::ConnectPrinter* connect_printer =
-        m_connect_printer_service.find(printer_uuid);
+        m_connect_printer_service.find(upload->printer_uuid);
     if (connect_printer == nullptr) {
-        return;
+        return {};
     }
     try {
-        m_printer_preset_selector.select_connect_materials(
-            nlohmann::json::parse(connect_printer->json)
+        return Preset::PrinterPresetSelector::connect_material_types(
+            nlohmann::json::parse(connect_printer->json),
+            printer.hw_config->material_slot_count()
         );
     } catch (const nlohmann::json::exception& e) {
         SPDLOG_ERROR("Failed to parse Connect printer json: {}", e.what());
     }
+    return {};
 }
 
 void PhysicalPrinterInteractor::clear_selection()
@@ -212,7 +224,36 @@ void PhysicalPrinterInteractor::clear_selection()
     );
 }
 
+bool PhysicalPrinterInteractor::can_apply_hw_config(const PhysicalPrinterConfig& printer)
+{
+    // the same branches as in apply_selection()
+    if (!printer.hw_config.has_value()) {
+        return true;
+    }
+    const Preset::PreferredMaterialTypes material_types = connect_material_types(printer);
+    if (printer.is_runtime) {
+        return Preset::PresetSelectionCheck::can_select_printer_config(
+            m_preset_interactor,
+            printer.hw_config->id,
+            material_types
+        );
+    }
+    return Preset::PresetSelectionCheck::can_select_external_printer_config(
+        m_preset_interactor,
+        printer.hw_config.value(),
+        material_types
+    );
+}
+
 bool PhysicalPrinterInteractor::select_uuid(const std::string& uuid)
+{
+    if (!can_apply_hw_config(printer_config_at(index_of(uuid)))) {
+        return false;
+    }
+    return select_uuid_internal(uuid);
+}
+
+bool PhysicalPrinterInteractor::select_uuid_internal(const std::string& uuid)
 {
     if (!apply_selection(uuid, true)) {
         return false;
@@ -283,11 +324,17 @@ bool PhysicalPrinterInteractor::is_connect_printer_selected() const
     return printer != nullptr && is_connect_printer(*printer);
 }
 
-void PhysicalPrinterInteractor::create_or_save_physical_printer(
+bool PhysicalPrinterInteractor::create_or_save_physical_printer(
     const PhysicalPrinterConfig& printer
 )
 {
-    select_uuid(save_physical_printer(printer));
+    // checked before the printer is stored, so the stored printer and the selected
+    // printer config are kept in sync on cancel
+    if (!can_apply_hw_config(printer)) {
+        return false;
+    }
+    select_uuid_internal(save_physical_printer(printer));
+    return true;
 }
 
 std::string PhysicalPrinterInteractor::save_physical_printer(const PhysicalPrinterConfig& printer)

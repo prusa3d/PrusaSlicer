@@ -40,8 +40,6 @@ private:
     Biz::ProjectInteractor& m_project_interactor;
     Yoga::ComboBoxListViewSelection<Biz::Preset::PresetItem>* m_combo_box{nullptr};
     Biz::Preset::PresetItemObservableList* m_last_preset_item_observable_list{nullptr};
-
-    int m_last_selected_index{-1};
 };
 
 } // namespace Slic3r::App

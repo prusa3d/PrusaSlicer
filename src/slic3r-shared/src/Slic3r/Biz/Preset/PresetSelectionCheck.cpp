@@ -281,7 +281,7 @@ bool is_selected_printer_dirty(const PresetInteractor& preset_interactor)
 // kust a wrappers for is_dirty_selected_preset()
 bool is_selected_print_dirty(const PresetInteractor& preset_interactor)
 {
-    return is_dirty_selected_preset(preset_interactor, true, false, true, true);
+    return is_dirty_selected_preset(preset_interactor, true, false, false, false);
 }
 
 bool is_selected_tool_print_dirty(const PresetInteractor& preset_interactor, size_t index)
@@ -294,98 +294,201 @@ bool is_selected_material_dirty(const PresetInteractor& preset_interactor, size_
     return is_dirty_selected_preset(preset_interactor, true, true, true, false, index);
 }
 
-static PresetSelectionNames selected_preset_names(const PresetInteractor& preset_interactor)
+/** @brief Presets (without modifications) given by SelectedPresetIds. Non-owning. */
+struct SelectedPresetPtrs
 {
-    auto& selected_preset                         = preset_interactor.selected_printer_preset();
-    const auto& [printer_ref, printer_is_runtime] = preset_interactor.get_printer_preset(
-        selected_preset.hw_config.id,
-        selected_preset.printer.id
-    );
-    const auto& [print_ref, print_is_runtime] = preset_interactor.get_print_preset(
-        selected_preset.hw_config.id,
-        selected_preset.printer.id,
-        selected_preset.print.id
-    );
+    const Domain::Preset::EvaluatedPrinterPreset::Preset* printer{nullptr};
+    const Domain::Preset::EvaluatedPrintPreset::Preset* print{nullptr};
+    std::vector<const Domain::Preset::EvaluatedToolPrintPreset::Preset*> tools;
+    std::vector<const Domain::Preset::EvaluatedMaterialPreset::Preset*> materials;
+};
 
-    PresetSelectionNames names = {
-        .printer = {std::string{printer_ref.get().short_name()}, printer_ref.get().origin},
-        .print   = {std::string{print_ref.get().short_name()}, print_ref.get().origin},
+/** @brief Returns presets from @p evaluated_presets and @p runtime given by @p ids. */
+static SelectedPresetPtrs get_presets_by_ids(
+    const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets,
+    const RuntimePresets& runtime,
+    const SelectedPresetIds& ids
+)
+{
+    SelectedPresetPtrs presets{
+        .printer = find_in_view(
+            PrinterPresetProjectView{evaluated_presets, runtime, ids.hw_config_id},
+            ids.printer_id
+        ),
+        .print = find_in_view(
+            PrintPresetProjectView{evaluated_presets, runtime, ids.hw_config_id, ids.printer_id},
+            ids.print_id
+        )
     };
+    ASSERT(presets.printer != nullptr, std::tuple{ids.hw_config_id, ids.printer_id});
+    ASSERT(presets.print != nullptr, std::tuple{ids.hw_config_id, ids.printer_id, ids.print_id});
 
-    size_t tool_index = 0;
-    for (const auto& tool : selected_preset.tools) {
-        const auto& [ref, is_runtime] = preset_interactor.get_tool_print_preset(
-            selected_preset.hw_config.id,
-            selected_preset.printer.id,
-            selected_preset.print.id,
-            tool_index++,
-            tool.id
-        );
-        names.tools.emplace_back(
-            PresetSelectionNames::PresetName{std::string{ref.get().short_name()}, ref.get().origin}
-        );
+    for (size_t tool_index = 0, n = ids.tool_ids.size(); tool_index < n; ++tool_index) {
+        const ToolPrintPresetProjectView view{
+            evaluated_presets, runtime, ids.hw_config_id, ids.printer_id, ids.print_id, tool_index
+        };
+        presets.tools.emplace_back(find_in_view(view, ids.tool_ids[tool_index]));
+        ASSERT(presets.tools.back() != nullptr, ids.tool_ids[tool_index]);
     }
 
-    size_t material_index = 0;
-    for (const auto& material : selected_preset.materials) {
-        const auto& [ref, is_runtime] = preset_interactor.get_material_preset(
-            selected_preset.hw_config.id,
-            selected_preset.printer.id,
-            selected_preset.print.id,
-            material_index++,
-            material.id
-        );
-        names.materials.emplace_back(
-            PresetSelectionNames::PresetName{std::string{ref.get().short_name()}, ref.get().origin}
-        );
+    for (size_t slot_index = 0, n = ids.material_ids.size(); slot_index < n; ++slot_index) {
+        const MaterialPresetProjectView view{
+            evaluated_presets, runtime, ids.hw_config_id, ids.printer_id, ids.print_id, slot_index
+        };
+        presets.materials.emplace_back(find_in_view(view, ids.material_ids[slot_index]));
+        ASSERT(presets.materials.back() != nullptr, ids.material_ids[slot_index]);
     }
+
+    return presets;
+}
+
+/** @brief Returns presets of the selected project given by @p ids. */
+static SelectedPresetPtrs
+get_presets_by_ids(const PresetInteractor& preset_interactor, const SelectedPresetIds& ids)
+{
+    return get_presets_by_ids(
+        preset_interactor.evaluated_presets(),
+        preset_interactor.selected_runtime_presets(),
+        ids
+    );
+}
+
+static PresetSelectionNames preset_names(const SelectedPresetPtrs& presets)
+{
+    const auto name = [](const auto& preset)
+    { return PresetSelectionNames::PresetName{std::string{preset.short_name()}, preset.origin}; };
+
+    PresetSelectionNames names = {.printer = name(*presets.printer), .print = name(*presets.print)};
+    for (const auto* tool : presets.tools)
+        names.tools.emplace_back(name(*tool));
+    for (const auto* material : presets.materials)
+        names.materials.emplace_back(name(*material));
 
     return names;
 }
 
-static std::tuple<
-    const Domain::Preset::EvaluatedPrinterPreset::Preset&,
-    const Domain::Preset::EvaluatedPrintPreset::Preset&,
-    const Domain::Preset::HwPrinterConfig&,
-    PresetSelectionNames>
-get_printer_and_print_infos(
-    const PresetInteractor& preset_interactor,
-    const std::string& printer_hw_config_id,
-    const std::string& printer_preset_id,
-    const std::string& print_preset_id = std::string()
-)
+static PresetSelectionNames selected_preset_names(const PresetInteractor& preset_interactor)
 {
-    const auto& [printer_ref, printer_is_runtime] =
-        preset_interactor.get_printer_preset(printer_hw_config_id, printer_preset_id);
-    const Domain::Preset::EvaluatedPrinterPreset::Preset& printer_preset = printer_ref.get();
-
-    const auto& [print_ref, print_is_runtime]                        = print_preset_id.empty() ?
-                               preset_interactor.get_print_presets(printer_hw_config_id, printer_preset_id)[0] :
-                               preset_interactor
-            .get_print_preset(printer_hw_config_id, printer_preset_id, print_preset_id);
-    const Domain::Preset::EvaluatedPrintPreset::Preset& print_preset = print_ref.get();
-
-    PresetSelectionNames names = {
-        .printer = {std::string{printer_preset.short_name()}, printer_preset.origin},
-        .print   = {std::string{print_preset.short_name()}, print_preset.origin}
-    };
-
-    const auto [hw_printer_config_ref, is_runtime] =
-        preset_interactor.get_printer_config(printer_hw_config_id);
-
-    return {printer_preset, print_preset, hw_printer_config_ref.get(), names};
+    return preset_names(
+        get_presets_by_ids(preset_interactor, preset_interactor.selected_preset_ids())
+    );
 }
 
-static size_t tool_count(const Domain::Preset::HwPrinterConfig& hw_printer_config)
+/** @brief Returns configuration and names of @p presets. */
+static std::pair<Domain::ConfigPack, PresetSelectionNames>
+config_and_names(const SelectedPresetPtrs& presets)
 {
-    return hw_printer_config.technology == Domain::PrinterTechnology::SLA ?
-        0 :
-        hw_printer_config.tool_count;
+    return {
+        config(*presets.printer, *presets.print, presets.tools, presets.materials),
+        preset_names(presets)
+    };
 }
 
 static std::string dialog_name()
 {
     return Biz::_u8L("Switching presets: unsaved changes");
+}
+
+/**
+ * @brief Shows unsaved changes dialog for switching to @p presets_new
+ * and stores the user's decision in @p preset_interactor.
+ *
+ * @param config_original   Initial configuration of the presets which are going to be switched.
+ * @param presets_new       Presets which are going to be selected. When nullptr (e.g. printer
+ *                          technology is changed), new configuration isn't shown in the dialog.
+ * @return False if the user canceled the switch.
+ */
+static bool resolve_unsaved_changes(
+    PresetInteractor& preset_interactor,
+    const Domain::ConfigPack& config_original,
+    const SelectedPresetPtrs* presets_new,
+    bool new_printer_has_multiple_extruders = false
+)
+{
+    std::optional<std::pair<Domain::ConfigPack, PresetSelectionNames>> config_and_names_new;
+    if (presets_new != nullptr)
+        config_and_names_new = config_and_names(*presets_new);
+
+    PresetsSwitchStates exit_states =
+        preset_interactor.dialog_manager()->show_unsaved_changes_dialog(
+            dialog_name(),
+            config_original,
+            preset_interactor.selected_printer_preset().config(),
+            config_and_names_new ? &config_and_names_new->first : nullptr,
+            selected_preset_names(preset_interactor),
+            config_and_names_new ? config_and_names_new->second : PresetSelectionNames(),
+            preset_interactor,
+            new_printer_has_multiple_extruders
+        );
+
+    const bool ret = !exit_states.empty();
+    preset_interactor.set_unsaved_changes(std::move(exit_states));
+    return ret;
+}
+
+static bool has_multiple_extruders(const Domain::Preset::HwPrinterConfig& hw_config)
+{
+    return Domain::Preset::get_feature<bool>(hw_config.features, "multi_extruder").value_or(false);
+}
+
+/**
+ * @brief Shows unsaved changes dialog for switching to a printer with @p hw_config.
+ * @param get_presets_new  Returns presets which are going to be selected. It isn't called
+ *                         if printer technology is changed (new configuration isn't shown then).
+ */
+template <typename GetPresetsFn>
+static bool resolve_printer_switch(
+    PresetInteractor& preset_interactor,
+    const Domain::Preset::HwPrinterConfig& hw_config,
+    GetPresetsFn&& get_presets_new
+)
+{
+    const bool multi_extruder = has_multiple_extruders(hw_config);
+
+    // if printer technology is changed, there is no need to get new selected configuration
+    // and show it in dialog
+    if (preset_interactor.selected_printer_preset().technology() != hw_config.technology) {
+        return resolve_unsaved_changes(
+            preset_interactor,
+            original_config(preset_interactor),
+            nullptr,
+            multi_extruder
+        );
+    }
+
+    const SelectedPresetPtrs presets_new = get_presets_new();
+    return resolve_unsaved_changes(
+        preset_interactor,
+        original_config(preset_interactor),
+        &presets_new,
+        multi_extruder
+    );
+}
+
+/** @brief Same as can_select_printer_preset(), but without the check of the dirty state. */
+static bool resolve_printer_preset_switch(
+    PresetInteractor& preset_interactor,
+    const std::string& printer_hw_config_id,
+    const std::string& printer_preset_id,
+    const PreferredMaterialTypes& material_types = {}
+)
+{
+    return resolve_printer_switch(
+        preset_interactor,
+        preset_interactor.get_printer_config(printer_hw_config_id).first.get(),
+        [&]
+        {
+            return get_presets_by_ids(
+                preset_interactor,
+                preset_interactor.get_preset_ids_after_selection(
+                    printer_hw_config_id,
+                    printer_preset_id,
+                    {},
+                    material_types
+                )
+            );
+        }
+    );
 }
 
 bool can_select_printer_preset(
@@ -397,85 +500,95 @@ bool can_select_printer_preset(
     if (!is_dirty_selected_preset(preset_interactor))
         return true;
 
-    auto [printer_preset, print_preset, hw_printer_config, names_new] =
-        get_printer_and_print_infos(preset_interactor, printer_hw_config_id, printer_preset_id);
-
-    auto& selected_preset = preset_interactor.selected_printer_preset();
-
-    IPresetDialogManager* dlg_manager = preset_interactor.dialog_manager();
-
-    if (selected_preset.technology() != hw_printer_config.technology) {
-        // if printer technology is changed, there is no need to get new selected configuration and show it in dialog
-        PresetsSwitchStates exit_states = dlg_manager->show_unsaved_changes_dialog(
-            dialog_name(),
-            original_config(preset_interactor),
-            selected_preset.config(),
-            nullptr,
-            selected_preset_names(preset_interactor),
-            PresetSelectionNames(),
-            preset_interactor,
-            Domain::Preset::get_feature<bool>(hw_printer_config.features, "multi_extruder")
-                .value_or(false)
-        );
-
-        const bool ret = !exit_states.empty();
-        preset_interactor.set_unsaved_changes(std::move(exit_states));
-        return ret;
-    }
-
-    std::vector<const Domain::Preset::EvaluatedToolPrintPreset::Preset*> tools;
-    for (size_t tool_index = 0; tool_index < tool_count(hw_printer_config); tool_index++) {
-        const auto& [ref, is_runtime] = preset_interactor.get_tool_print_presets(
-            printer_hw_config_id,
-            printer_preset_id,
-            print_preset.id,
-            tool_index
-        )[0];
-        const Domain::Preset::EvaluatedToolPrintPreset::Preset& tool_print = ref.get();
-        tools.emplace_back(&tool_print);
-        names_new.tools.emplace_back(
-            PresetSelectionNames::PresetName{std::string{tool_print.short_name()}, tool_print.origin}
-        );
-    }
-
-    std::vector<const Domain::Preset::EvaluatedMaterialPreset::Preset*> materials;
-    size_t tool_cnt = hw_printer_config.technology == Domain::PrinterTechnology::SLA ?
-        1 :
-        tool_count(hw_printer_config);
-    for (size_t tool_index = 0; tool_index < tool_cnt; tool_index++) {
-        const auto& [ref, is_runtime] = preset_interactor.get_material_presets(
-            printer_hw_config_id,
-            printer_preset_id,
-            print_preset.id,
-            tool_index
-        )[0];
-        const Domain::Preset::EvaluatedMaterialPreset::Preset& material_preset = ref.get();
-        materials.emplace_back(&material_preset);
-        names_new.materials.emplace_back(
-            PresetSelectionNames::PresetName{
-                std::string{material_preset.short_name()},
-                material_preset.origin
-            }
-        );
-    }
-
-    Domain::ConfigPack config_new = config(printer_preset, print_preset, tools, materials);
-
-    PresetsSwitchStates exit_states = dlg_manager->show_unsaved_changes_dialog(
-        dialog_name(),
-        original_config(preset_interactor),
-        selected_preset.config(),
-        &config_new,
-        selected_preset_names(preset_interactor),
-        names_new,
+    return resolve_printer_preset_switch(
         preset_interactor,
-        Domain::Preset::get_feature<bool>(hw_printer_config.features, "multi_extruder")
-        .value_or(false)
+        printer_hw_config_id,
+        printer_preset_id
     );
+}
 
-    const bool ret = !exit_states.empty();
-    preset_interactor.set_unsaved_changes(std::move(exit_states));
-    return ret;
+/** @brief Same as can_select_printer_config(), but without the check of the dirty state. */
+static bool resolve_printer_config_switch(
+    PresetInteractor& preset_interactor,
+    const std::string& hw_config_id,
+    const PreferredMaterialTypes& material_types
+)
+{
+    // Presets are refilled even when the same hw config is selected,
+    // so the unsaved changes have to be resolved too.
+    return resolve_printer_preset_switch(
+        preset_interactor,
+        hw_config_id,
+        preset_interactor.printer_preset_id_for_hw_config(hw_config_id),
+        material_types
+    );
+}
+
+bool can_select_printer_config(
+    PresetInteractor& preset_interactor,
+    const std::string& hw_config_id,
+    const PreferredMaterialTypes& material_types
+)
+{
+    if (!is_dirty_selected_preset(preset_interactor))
+        return true;
+
+    return resolve_printer_config_switch(preset_interactor, hw_config_id, material_types);
+}
+
+bool can_select_external_printer_config(
+    PresetInteractor& preset_interactor,
+    const Domain::Preset::HwPrinterConfig& printer,
+    const PreferredMaterialTypes& material_types
+)
+{
+    if (!is_dirty_selected_preset(preset_interactor))
+        return true;
+
+    if (const std::optional<std::string> hw_config_id =
+            preset_interactor.find_external_printer_config(printer))
+    {
+        return resolve_printer_config_switch(preset_interactor, *hw_config_id, material_types);
+    }
+
+    // A new hw config is created on selection. Its presets are evaluated without storing them
+    // to get the new presets for the dialog.
+    const tl::expected<Domain::Preset::HwPrinterConfig, std::string> hw_config =
+        preset_interactor.evaluate_external_printer_config(printer);
+    if (!hw_config.has_value())
+        return true; // The selection fails, so presets aren't switched.
+
+    const std::optional<NewHwConfigPresets> new_presets =
+        preset_interactor.evaluate_new_hw_config(*hw_config);
+    if (!new_presets.has_value())
+        return true; // The selection fails, so presets aren't switched.
+
+    return resolve_printer_switch(
+        preset_interactor,
+        new_presets->hw_config,
+        [&]
+        {
+            // a new hw config has no runtime presets
+            const std::string printer_preset_id = preset_interactor.printer_preset_id_for_hw_config(
+                PrinterPresetProjectView{
+                    new_presets->evaluated_presets,
+                    no_runtime_presets(),
+                    new_presets->hw_config.id
+                }
+            );
+            // returned presets point into new_presets, which outlives the dialog
+            return get_presets_by_ids(
+                new_presets->evaluated_presets,
+                no_runtime_presets(),
+                preset_interactor.get_preset_ids_after_selection(
+                    *new_presets,
+                    printer_preset_id,
+                    {},
+                    material_types
+                )
+            );
+        }
+    );
 }
 
 bool can_select_print_preset(PresetInteractor& preset_interactor, const std::string& print_id)
@@ -483,73 +596,20 @@ bool can_select_print_preset(PresetInteractor& preset_interactor, const std::str
     if (!is_selected_print_dirty(preset_interactor))
         return true;
 
-    auto& selected_preset = preset_interactor.selected_printer_preset();
-
-    const std::string& printer_hw_config_id = selected_preset.hw_config.id;
-    const std::string& printer_preset_id    = selected_preset.printer.id;
-
-    auto [printer_preset, print_preset, hw_printer_config, names_new] = get_printer_and_print_infos(
+    const auto& selected_preset = preset_interactor.selected_printer_preset();
+    const SelectedPresetPtrs presets_new = get_presets_by_ids(
         preset_interactor,
-        printer_hw_config_id,
-        printer_preset_id,
-        print_id
+        preset_interactor.get_preset_ids_after_selection(
+            selected_preset.hw_config.id,
+            selected_preset.printer.id,
+            print_id
+        )
     );
-
-    std::vector<const Domain::Preset::EvaluatedToolPrintPreset::Preset*> tools;
-    for (size_t tool_index = 0, n = tool_count(hw_printer_config); tool_index < n; tool_index++) {
-        const auto& [ref, is_runtime] = preset_interactor.get_tool_print_presets(
-            printer_hw_config_id,
-            printer_preset_id,
-            print_preset.id,
-            tool_index
-        )[0];
-        const Domain::Preset::EvaluatedToolPrintPreset::Preset& tool_print = ref.get();
-        tools.emplace_back(&tool_print);
-        names_new.tools.emplace_back(
-            PresetSelectionNames::PresetName{
-                std::string{tool_print.short_name()},
-                tool_print.origin
-            }
-        );
-    }
-
-    std::vector<const Domain::Preset::EvaluatedMaterialPreset::Preset*> materials;
-    size_t tool_cnt = hw_printer_config.technology == Domain::PrinterTechnology::SLA ?
-        1 :
-        tool_count(hw_printer_config);
-    for (size_t tool_index = 0; tool_index < tool_cnt; tool_index++) {
-        const auto& [ref, is_runtime] = preset_interactor.get_material_presets(
-            printer_hw_config_id,
-            printer_preset_id,
-            print_preset.id,
-            0
-        )[0];
-        const Domain::Preset::EvaluatedMaterialPreset::Preset& material_preset = ref.get();
-        materials.emplace_back(&material_preset);
-        names_new.materials.emplace_back(
-            PresetSelectionNames::PresetName{
-                std::string{material_preset.short_name()},
-                material_preset.origin
-            }
-        );
-    }
-
-    Domain::ConfigPack config_new = config(printer_preset, print_preset, tools, materials);
-
-    IPresetDialogManager* dlg_manager = preset_interactor.dialog_manager();
-    PresetsSwitchStates exit_states   = dlg_manager->show_unsaved_changes_dialog(
-        dialog_name(),
+    return resolve_unsaved_changes(
+        preset_interactor,
         original_config(preset_interactor, true),
-        selected_preset.config(),
-        &config_new,
-        selected_preset_names(preset_interactor),
-        names_new,
-        preset_interactor
+        &presets_new
     );
-
-    const bool ret = !exit_states.empty();
-    preset_interactor.set_unsaved_changes(std::move(exit_states));
-    return ret;
 }
 
 bool can_select_tool_print_preset(
@@ -561,90 +621,15 @@ bool can_select_tool_print_preset(
     if (!is_selected_tool_print_dirty(preset_interactor, tool_index))
         return true;
 
-    auto& selected_preset = preset_interactor.selected_printer_preset();
-
-    const std::string& printer_hw_config_id = selected_preset.hw_config.id;
-    const std::string& printer_preset_id    = selected_preset.printer.id;
-    const std::string& print_preset_id      = selected_preset.print.id;
-
-    auto [printer_preset, print_preset, hw_printer_config, names_new] = get_printer_and_print_infos(
+    // only the tool print preset is switched, other presets stay selected
+    SelectedPresetIds ids_new        = preset_interactor.selected_preset_ids();
+    ids_new.tool_ids.at(tool_index) = tool_print_id;
+    const SelectedPresetPtrs presets_new = get_presets_by_ids(preset_interactor, ids_new);
+    return resolve_unsaved_changes(
         preset_interactor,
-        printer_hw_config_id,
-        printer_preset_id,
-        print_preset_id
+        original_config(preset_interactor, true, true, false, true, tool_index),
+        &presets_new
     );
-
-    std::vector<const Domain::Preset::EvaluatedToolPrintPreset::Preset*> tools;
-    for (size_t i = 0, n = tool_count(hw_printer_config); i < n; i++) {
-        const auto& [ref, is_runtime] = preset_interactor.get_tool_print_preset(
-            printer_hw_config_id,
-            printer_preset_id,
-            print_preset.id,
-            i,
-            i == tool_index ? tool_print_id : selected_preset.tools[i].id
-        );
-        const Domain::Preset::EvaluatedToolPrintPreset::Preset& tool_print = ref.get();
-        tools.emplace_back(&tool_print);
-        names_new.tools.emplace_back(
-            PresetSelectionNames::PresetName{
-                std::string{tool_print.short_name()},
-                tool_print.origin
-            }
-        );
-    }
-
-    std::vector<const Domain::Preset::EvaluatedMaterialPreset::Preset*> materials;
-    for (size_t i = 0, n = selected_preset.materials.size(); i < n; i++) {
-        if (i == tool_index) {
-            const auto& [ref, is_runtime] = preset_interactor.get_material_presets(
-                printer_hw_config_id,
-                printer_preset_id,
-                print_preset.id,
-                i
-            )[0];
-            const Domain::Preset::EvaluatedMaterialPreset::Preset& material_preset = ref.get();
-            materials.emplace_back(&material_preset);
-            names_new.materials.emplace_back(
-                PresetSelectionNames::PresetName{
-                    std::string{material_preset.short_name()},
-                    material_preset.origin
-                }
-            );
-        } else {
-            const auto& [ref, is_runtime] = preset_interactor.get_material_preset(
-                printer_hw_config_id,
-                printer_preset_id,
-                print_preset.id,
-                i,
-                selected_preset.materials[i].id
-            );
-            const Domain::Preset::EvaluatedMaterialPreset::Preset& material_preset = ref.get();
-            materials.emplace_back(&material_preset);
-            names_new.materials.emplace_back(
-                PresetSelectionNames::PresetName{
-                    std::string{material_preset.short_name()},
-                    material_preset.origin
-                }
-            );
-        }
-    }
-
-    Domain::ConfigPack config_new = config(printer_preset, print_preset, tools, materials);
-
-    IPresetDialogManager* dlg_manager = preset_interactor.dialog_manager();
-    PresetsSwitchStates exit_states   = dlg_manager->show_unsaved_changes_dialog(
-        dialog_name(),
-        original_config(preset_interactor, true, true, false, false, tool_index),
-        selected_preset.config(),
-        &config_new,
-        selected_preset_names(preset_interactor),
-        names_new,
-        preset_interactor
-    );
-
-    const bool ret = !exit_states.empty();
-    preset_interactor.set_unsaved_changes(std::move(exit_states));
-    return ret;
 }
 
 bool can_select_material_preset(
@@ -656,73 +641,15 @@ bool can_select_material_preset(
     if (!is_selected_material_dirty(preset_interactor, material_index))
         return true;
 
-    auto& selected_preset = preset_interactor.selected_printer_preset();
-
-    const std::string& printer_hw_config_id = selected_preset.hw_config.id;
-    const std::string& printer_preset_id    = selected_preset.printer.id;
-    const std::string& print_preset_id      = selected_preset.print.id;
-
-    auto [printer_preset, print_preset, hw_printer_config, names_new] = get_printer_and_print_infos(
+    // only the material preset is switched, other presets stay selected
+    SelectedPresetIds ids_new                = preset_interactor.selected_preset_ids();
+    ids_new.material_ids.at(material_index) = material_id;
+    const SelectedPresetPtrs presets_new     = get_presets_by_ids(preset_interactor, ids_new);
+    return resolve_unsaved_changes(
         preset_interactor,
-        printer_hw_config_id,
-        printer_preset_id,
-        print_preset_id
-    );
-
-    std::vector<const Domain::Preset::EvaluatedToolPrintPreset::Preset*> tools;
-    for (size_t i = 0, n = tool_count(hw_printer_config); i < n; i++) {
-        const auto& [ref, is_runtime] = preset_interactor.get_tool_print_preset(
-            printer_hw_config_id,
-            printer_preset_id,
-            print_preset.id,
-            i,
-            selected_preset.tools[i].id
-        );
-        const Domain::Preset::EvaluatedToolPrintPreset::Preset& tool_print = ref.get();
-        tools.emplace_back(&tool_print);
-        names_new.tools.emplace_back(
-            PresetSelectionNames::PresetName{
-                std::string{tool_print.short_name()},
-                tool_print.origin
-            }
-        );
-    }
-
-    std::vector<const Domain::Preset::EvaluatedMaterialPreset::Preset*> materials;
-    for (size_t i = 0, n = selected_preset.materials.size(); i < n; i++) {
-        const auto& [ref, is_runtime] = preset_interactor.get_material_preset(
-            printer_hw_config_id,
-            printer_preset_id,
-            print_preset.id,
-            i,
-            i == material_index ? material_id : selected_preset.materials[i].id
-        );
-        const Domain::Preset::EvaluatedMaterialPreset::Preset& material_preset = ref.get();
-        materials.emplace_back(&material_preset);
-        names_new.materials.emplace_back(
-            PresetSelectionNames::PresetName{
-                std::string{material_preset.short_name()},
-                material_preset.origin
-            }
-        );
-    }
-
-    Domain::ConfigPack config_new = config(printer_preset, print_preset, tools, materials);
-
-    IPresetDialogManager* dlg_manager = preset_interactor.dialog_manager();
-    PresetsSwitchStates exit_states   = dlg_manager->show_unsaved_changes_dialog(
-        dialog_name(),
         original_config(preset_interactor, true, true, true, false, material_index),
-        selected_preset.config(),
-        &config_new,
-        selected_preset_names(preset_interactor),
-        names_new,
-        preset_interactor
+        &presets_new
     );
-
-    const bool ret = !exit_states.empty();
-    preset_interactor.set_unsaved_changes(std::move(exit_states));
-    return ret;
 }
 
 } // namespace Slic3r::Biz::Preset::PresetSelectionCheck

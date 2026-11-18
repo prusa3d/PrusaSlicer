@@ -12,6 +12,7 @@
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractorProjectContext.hpp"
 #include "Slic3r/Biz/Preset/PresetDiffOperation.hpp"
+#include "Slic3r/Biz/Preset/PreferredMaterialTypes.hpp"
 #include "Slic3r/Biz/Preset/IPresetDialogManager.hpp"
 #include "Slic3r/Biz/Preset/IMacroOverridesChangedListener.hpp"
 #include "Slic3r/Biz/Preset/IO/BundlePaths.hpp"
@@ -91,6 +92,16 @@ struct SelectedPresetIds
     std::vector<std::string> material_ids;
 };
 
+/**
+ * Presets evaluated for a hw config which isn't stored in the preset bundle yet,
+ * i.e. what PresetInteractor::select_external_printer_config() would store for it.
+ */
+struct NewHwConfigPresets
+{
+    Domain::Preset::HwPrinterConfig hw_config;
+    /// The only entry is for hw_config.id; in the shape read by the preset project views.
+    Domain::Preset::EvaluatedPrinterPresets evaluated_presets;
+};
 
 /**
  * Manipulates presets associated with config containers.
@@ -155,6 +166,39 @@ public:
     const Domain::Preset::HwPrinterConfig& current_printer_config() const;
     const Domain::Preset::EvaluatedPrinterPreset::Preset& current_printer_preset() const;
     const Domain::Preset::SelectedPreset& selected_printer_preset() const;
+    SelectedPresetIds selected_preset_ids() const;
+
+    /**
+     * @brief Returns ids of presets selected after select_printer_preset()
+     * (or after select_print_preset(), when @p print_id is set). Doesn't modify any state.
+     *
+     * Not selected print/tool/material presets are chosen by the same rule as when their lists
+     * are refilled: keep the old one (by id, or by name and origin), otherwise the default one
+     * from the parent preset, otherwise the first one.
+     * @param print_id  Explicitly selected print preset; chosen by the rule above when empty.
+     * @param material_types  Material types preferred over the rule above.
+     */
+    SelectedPresetIds get_preset_ids_after_selection(
+        const std::string& hw_config_id,
+        const std::string& printer_preset_id,
+        const std::string& print_id                 = {},
+        const PreferredMaterialTypes& material_types = {}
+    ) const;
+    /**
+     * @brief Same as above, but for a hw config which isn't stored yet
+     * (see evaluate_new_hw_config()).
+     */
+    SelectedPresetIds get_preset_ids_after_selection(
+        const NewHwConfigPresets& new_presets,
+        const std::string& printer_preset_id,
+        const std::string& print_id                 = {},
+        const PreferredMaterialTypes& material_types = {}
+    ) const;
+
+    /** @brief Printer presets evaluated for hw configs of the preset bundle. */
+    const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets() const;
+    /** @brief Presets loaded at runtime (i.e. coming from 3MF file) of the selected project. */
+    const RuntimePresets& selected_runtime_presets() const;
 
     PresetItemObservableList& printer_configs()
     {
@@ -229,9 +273,20 @@ public:
         return m_object_settings_interactor;
     }
 
+    /** @param material_types  Material types preferred when material presets are selected. */
     void select_printer_config(
-        const std::string& printer_hw_config_id
+        const std::string& printer_hw_config_id,
+        const PreferredMaterialTypes& material_types = {}
     );
+    /**
+     * @brief Returns id of the printer preset which select_printer_config() selects
+     * for @p hw_config_id: the one with the short name of the selected printer preset,
+     * otherwise the first system one.
+     */
+    std::string printer_preset_id_for_hw_config(const std::string& hw_config_id) const;
+    /** @brief Same as above, but chosen from @p printer_presets. */
+    std::string
+    printer_preset_id_for_hw_config(const PrinterPresetProjectView& printer_presets) const;
 
     /**
      * @param user - set this to true if action came from user (e.g. clicking a button)
@@ -300,11 +355,30 @@ public:
     /**
      * @brief Find or create appropriate full hw config for given external one and select it
      * @param printer External hw config
+     * @param material_types  Material types preferred when material presets are selected.
      * @return void or error message why full hw config creation failed.
      */
     tl::expected<void, std::string> select_external_printer_config(
-        const Domain::Preset::HwPrinterConfig& printer
+        const Domain::Preset::HwPrinterConfig& printer,
+        const PreferredMaterialTypes& material_types = {}
     );
+    /**
+     * @brief Returns id of an existing hw config which select_external_printer_config() selects
+     * for @p printer, or std::nullopt if a new hw config would be created.
+     */
+    std::optional<std::string> find_external_printer_config(
+        const Domain::Preset::HwPrinterConfig& printer
+    ) const;
+    /**
+     * @brief Evaluates presets of @p hw_config, which isn't stored in the preset bundle yet,
+     * i.e. what select_external_printer_config() stores for a new hw config.
+     * Doesn't modify any state.
+     * @return std::nullopt if select_external_printer_config() fails for @p hw_config
+     *         (no printer presets, or no system one).
+     */
+    std::optional<NewHwConfigPresets> evaluate_new_hw_config(
+        const Domain::Preset::HwPrinterConfig& hw_config
+    ) const;
 
     /**
      * @brief Create full hw config from the preset bundle for given external one
@@ -796,22 +870,6 @@ public:
         );
     }
 
-    bool is_printer_preset_selected_and_dirty(
-        const std::string& hw_config_id,
-        const std::string& printer_preset_id) const;
-
-    bool is_print_preset_selected_and_dirty(
-        const std::string& hw_config_id,
-        const std::string& printer_preset_id,
-        const std::string& print_preset_id) const;
-
-    bool is_tool_print_preset_selected_and_dirty(
-        const std::string& hw_config_id,
-        const std::string& printer_preset_id,
-        const std::string& print_preset_id,
-        const std::string& tool_print_preset_id,
-        size_t tool_index) const;
-
     bool is_tool_material_preset_selected_and_dirty(
         const std::string& hw_config_id,
         const std::string& printer_preset_id,
@@ -881,7 +939,15 @@ public:
     [[nodiscard]] SheetItems
     get_sheet_items(const Domain::Preset::HwPrinterConfig& hw_config);
 
-    bool update_changed_printer_configs(const std::vector<Domain::Preset::HwPrinterConfig>& hw_configs);
+    /**
+     * @param select_same_root_printer_preset  If true, the printer preset with the root id
+     *        of the selected one is selected from @p hw_configs. Set to false, when the caller
+     *        selects the printer preset itself (the unsaved changes are applied only once).
+     */
+    bool update_changed_printer_configs(
+        const std::vector<Domain::Preset::HwPrinterConfig>& hw_configs,
+        bool select_same_root_printer_preset = true
+    );
 
     tl::expected<bool, std::string> migrate_hw_config(
         Domain::Preset::HwPrinterConfig& hw_config
@@ -942,11 +1008,29 @@ private:
     std::vector<Domain::Preset::EvaluatedPrinterPreset>
     evaluate_presets_for_hw_config(const Domain::Preset::HwPrinterConfig& hw_config) const;
     /**
+     * @brief Common implementation of the public get_preset_ids_after_selection() overloads:
+     * presets of @p hw_config are taken from @p evaluated_presets and @p runtime.
+     */
+    SelectedPresetIds get_preset_ids_after_selection(
+        const Domain::Preset::EvaluatedPrinterPresets& evaluated_presets,
+        const RuntimePresets& runtime,
+        const Domain::Preset::HwPrinterConfig& hw_config,
+        const std::string& printer_preset_id,
+        const std::string& print_id,
+        const PreferredMaterialTypes& material_types
+    ) const;
+    /**
      * @brief Updates presets for changed hw configuration
      * @return Returns true if the updated presets are valid, otherwise false---the caller is then
      * responsible to revert changes to changed hw_config of selected config container.
      */
     bool update_changed_selected_preset_hw_config(Domain::Preset::HwPrinterConfig& hw_config);
+
+    /**
+     * @brief Returns hw configuration which changes of selected config container start from:
+     * the pending invalid one (if it belongs to the selected printer), otherwise the selected one.
+     */
+    Domain::Preset::HwPrinterConfig hw_config_to_change(Domain::SelectionId project_id) const;
 
     const std::string& selected_hw_config_id() const;
 
@@ -972,13 +1056,15 @@ private:
     void select_printer_config_internal(
         const std::string& printer_hw_config_id,
         bool no_data_update,
-        ListenerInvokeLaterBag& bag
+        ListenerInvokeLaterBag& bag,
+        const PreferredMaterialTypes& material_types = {}
     );
     void select_printer_preset_internal(
         const std::string& printer_hw_config_id,
         const std::string printer_preset_id,
         bool no_data_update,
-        ListenerInvokeLaterBag& bag
+        ListenerInvokeLaterBag& bag,
+        const PreferredMaterialTypes& material_types = {}
     );
     void select_print_preset_internal(
         const std::string id,
@@ -1003,7 +1089,12 @@ private:
     bool tool_print_has_unsaved_changes(size_t tool_index) const;
     bool material_has_unsaved_changes(size_t tool_index) const;
 
-    void fill_printer_configs(bool no_data_update, ListenerInvokeLaterBag& bag);
+    /**
+     * @brief Fills the printer config items. The printer config is selected again only if
+     * the selected hw config or its printer preset doesn't exist anymore.
+     * @return true if the selection was changed and propagated.
+     */
+    bool fill_printer_configs(bool no_data_update, ListenerInvokeLaterBag& bag);
     void fill_printer_presets(bool no_data_update, ListenerInvokeLaterBag& bag);
     void fill_print_presets(
         const Domain::Preset::SelectedPreset& selected_preset,
@@ -1018,7 +1109,8 @@ private:
     void fill_materials_presets(
         Domain::Preset::SelectedPreset& selected_preset,
         bool no_data_update,
-        ListenerInvokeLaterBag& bag
+        ListenerInvokeLaterBag& bag,
+        const PreferredMaterialTypes& material_types = {}
     );
     void fill_tool_items(const Domain::Preset::HwPrinterConfig& hw_config);
 
@@ -1033,7 +1125,20 @@ private:
         Domain::SelectionId config_container_id
     );
 
+    /** @brief Returns count of config containers (in all projects) using hw config @p hw_config_id. */
+    size_t hw_config_use_count(const std::string& hw_config_id) const;
     bool duplicate_hw_config_if_needed_and_update(Domain::Preset::HwPrinterConfig& hw_config, ListenerInvokeLaterBag& bag);
+    /**
+     * @brief Same as update_changed_printer_configs(), but listeners and other deferred work
+     * run with @p bag, i.e. at the end of the caller's operation.
+     * @note If the selected hw config is changed in place and @p select_same_root_printer_preset
+     * is false, the caller has to select the printer config itself to apply the changes.
+     */
+    bool update_changed_printer_configs_internal(
+        const std::vector<Domain::Preset::HwPrinterConfig>& hw_configs,
+        bool select_same_root_printer_preset,
+        ListenerInvokeLaterBag& bag
+    );
 
     void invoke_slicing_input_changed();
     void invoke_on_preset_value_changed(const Domain::ConfigItem& config_item);
