@@ -530,12 +530,14 @@ PhysicalPrinterConfig PhysicalPrinterInteractor::create_connect_printer_config(
     hw_config.vendor_id  = full_hw_config->vendor_id;
     hw_config.visual     = full_hw_config->visual;
     hw_config.sheet      = full_hw_config->sheet;
+    hw_config.tool_count = full_hw_config->tool_count;
     for (size_t i = 0; i < std::min(hw_config.tools.size(), full_hw_config->tools.size()); ++i) {
         hw_config.tools[i].id   = full_hw_config->tools[i].id;
         hw_config.tools[i].name = full_hw_config->tools[i].name;
     }
     for (const auto& [addr, feeder] : full_hw_config->feeders) {
         hw_config.feeders[addr].id = feeder.id;
+        hw_config.feeders[addr].slot_count = feeder.slot_count;
     }
 
     auto vendor_it = m_workbench.preset_bundle().vendor_bundles.find(full_hw_config->vendor_id);
