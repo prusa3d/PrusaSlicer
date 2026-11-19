@@ -17,8 +17,8 @@ if (EMSCRIPTEN)
 endif ()
 
 add_cmake_project(Boost
-    URL "https://github.com/boostorg/boost/releases/download/boost-1.86.0/boost-1.86.0-cmake.zip"
-    URL_HASH SHA256=a66084ec52c9dfa838b3b225a29f29869b2d11e201b3f9e4b989431d95b671c2
+    URL "https://github.com/boostorg/boost/releases/download/boost-1.92.0/boost-1.92.0-cmake.zip"
+    URL_HASH SHA256=f47ee00d5870f006ef95a7be307be6553a769428d48ee98f20e856b9c3dfd3a2
     #EMSCRIPTEN_PORT boost_headers
     LIST_SEPARATOR |
     PATCH_COMMAND ${PATCH_CMD} ${CMAKE_CURRENT_LIST_DIR}/locale.patch
