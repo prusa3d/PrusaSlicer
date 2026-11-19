@@ -3662,8 +3662,13 @@ void fff_tree_support_generate(PrintObject &print_object, std::function<void()> 
             break;
         ++idx;
     }
-    FFFTreeSupport::generate_support_areas(*print_object.print(), 
-        BuildVolume(Pointfs{ Vec2d{ -300., -300. }, Vec2d{ -300., +300. }, Vec2d{ +300., +300. }, Vec2d{ +300., -300. } }, 0.), { idx }, 
+    // The plate is a real collision volume for the generator, so pass the configured bed instead of
+    // the historical hardcoded square. A degenerate bed shape keeps the old unconstrained behaviour
+    // (calculateMachineBorderCollision() then returns an empty border).
+    const PrintConfigView &print_config = print_object.print()->config();
+    BuildVolume build_volume(print_config.get<std::vector<Vec2d>>("bed_shape"),
+                             print_config.get<double>("max_print_height"));
+    FFFTreeSupport::generate_support_areas(*print_object.print(), build_volume, { idx },
         throw_on_cancel);
 }
 

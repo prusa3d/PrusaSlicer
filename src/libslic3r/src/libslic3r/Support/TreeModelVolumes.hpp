@@ -479,8 +479,14 @@ private:
     coord_t m_increase_until_radius;
 
     /*!
+     * \brief The build plate itself, positive winding.
+     * m_machine_border is the complement of it and is only usable as a collision volume; layer 0
+     * placeable areas need "where on the plate", so they use this polygon instead.
+     */
+    Polygons m_bed_polygon;
+    /*!
      * \brief Polygons representing the limits of the printable area of the
-     * machine
+     * machine: everything off the plate, inside a bounded box.
      */
     Polygons m_machine_border;
     /*!

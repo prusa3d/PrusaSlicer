@@ -583,3 +583,75 @@ Old Perl tests, which were disabled by Vojtech at the time of first Support Gene
 }
 
 */
+
+// ---------------------------------------------------------------------------
+// Tree / organic supports must keep their footprint on the build plate.
+// The generator used to run with an empty machine-border collision volume, so branches (and their
+// elephant-foot pads) were free to leave the plate whenever the model reached the plate edge.
+// ---------------------------------------------------------------------------
+static Polygons bed_polygon(const Slic3r::Print &print)
+{
+    const std::vector<Vec2d> bed_shape = print.config().get<std::vector<Vec2d>>("bed_shape");
+    Polygons bed;
+    bed.emplace_back();
+    for (const Vec2d &p : bed_shape)
+        bed.back().points.emplace_back(Point(scaled<coord_t>(p.x()), scaled<coord_t>(p.y())));
+    return bed;
+}
+
+static Polygons support_contours(const Slic3r::Print &print)
+{
+    Polygons out;
+    for (const SupportLayer *layer : print.objects().front()->support_layers())
+        for (const ExPolygon &island : layer->support_islands)
+            out.emplace_back(island.contour);
+    return out;
+}
+
+// Mushroom whose cap overhangs the plate on purpose, so part of its underside has no legal support
+// contact area.
+static Domain::TriangleMesh mushroom(float cap_x, float cap_y)
+{
+    Domain::TriangleMesh pillar = Biz::Algorithms::TriangleMesh::make_cube(40., 40., 10.);
+    Domain::TriangleMesh cap    = Biz::Algorithms::TriangleMesh::make_cube(double(cap_x), double(cap_y), 4.);
+    cap.translate(Domain::Vec3f(20.f - cap_x / 2.f, 20.f - cap_y / 2.f, 10.f));
+    pillar.merge(cap);
+    return pillar;
+}
+
+TEST_CASE("TreeSupport: supports stay on the build plate", "[SupportMaterial][TreeSupport]")
+{
+    Slic3r::Print print;
+    TestConfig    config;
+    config.print.items.opt("support_material").set(SupportMode::Everywhere);
+    config.print.items.opt("support_material_style").set(Domain::SupportMaterialStyle::smsOrganic);
+
+    // Cap much wider than the test plate: the overhanging ends cannot be reached from the plate.
+    Slic3r::Test::init_and_process_print({ mushroom(300.f, 200.f) }, print, config);
+
+    const Polygons bed = bed_polygon(print);
+    REQUIRE(! bed.empty());
+
+    const Polygons support = support_contours(print);
+    REQUIRE(! support.empty());
+
+    // 10 um of slack for Clipper rounding at the plate boundary.
+    CHECK(diff(support, offset(bed, scaled<coord_t>(0.01))).empty());
+}
+
+TEST_CASE("TreeSupport: a part that fits keeps its supports", "[SupportMaterial][TreeSupport]")
+{
+    Slic3r::Print print;
+    TestConfig    config;
+    config.print.items.opt("support_material").set(SupportMode::Everywhere);
+    config.print.items.opt("support_material_style").set(Domain::SupportMaterialStyle::smsOrganic);
+
+    Slic3r::Test::init_and_process_print({ mushroom(100.f, 100.f) }, print, config);
+
+    const Polygons bed = bed_polygon(print);
+    REQUIRE(! bed.empty());
+
+    const Polygons support = support_contours(print);
+    REQUIRE(! support.empty());
+    CHECK(diff(support, offset(bed, scaled<coord_t>(0.01))).empty());
+}
