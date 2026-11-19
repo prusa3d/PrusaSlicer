@@ -4,6 +4,7 @@
 #include "libslic3r/Layer.hpp"
 
 #include "test_data.hpp" // get access to init_print, etc
+#include "libslic3r/ClipperUtils.hpp"
 
 using namespace Slic3r::Test;
 using namespace Slic3r;
@@ -582,12 +583,10 @@ Old Perl tests, which were disabled by Vojtech at the time of first Support Gene
         'no support material layer is as thin as object layers';
 }
 
-*/
-
-// ---------------------------------------------------------------------------
+*/// ---------------------------------------------------------------------------
 // Tree / organic supports must keep their footprint on the build plate.
 // The generator used to run with an empty machine-border collision volume, so branches (and their
-// elephant-foot pads) were free to leave the plate whenever the model reached the plate edge.
+// layer 0 pads) were free to leave the plate whenever the model reached the plate edge.
 // ---------------------------------------------------------------------------
 static Polygons bed_polygon(const Slic3r::Print &print)
 {
@@ -604,30 +603,33 @@ static Polygons support_contours(const Slic3r::Print &print)
     Polygons out;
     for (const SupportLayer *layer : print.objects().front()->support_layers())
         for (const ExPolygon &island : layer->support_islands)
-            out.emplace_back(island.contour);
+            out.emplace_back(island.contour); // Outer contour only: containment is a superset test.
     return out;
 }
 
-// Mushroom whose cap overhangs the plate on purpose, so part of its underside has no legal support
-// contact area.
-static Domain::TriangleMesh mushroom(float cap_x, float cap_y)
+// A 110 x 110 plate: the 43 x 50 mm test part fits while arranging, but init_and_process_print then
+// re-centres every instance on (100, 100), so the part ends up hanging over the plate edge and part
+// of its overhang has no legal support area at all.
+static void set_small_bed(TestConfig &config)
 {
-    Domain::TriangleMesh pillar = Biz::Algorithms::TriangleMesh::make_cube(40., 40., 10.);
-    Domain::TriangleMesh cap    = Biz::Algorithms::TriangleMesh::make_cube(double(cap_x), double(cap_y), 4.);
-    cap.translate(Domain::Vec3f(20.f - cap_x / 2.f, 20.f - cap_y / 2.f, 10.f));
-    pillar.merge(cap);
-    return pillar;
+    config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} });
+}
+
+static TestConfig organic_config()
+{
+    TestConfig config;
+    config.print.items.opt("support_material").set(SupportMode::Everywhere);
+    config.print.items.opt("support_material_style").set(Domain::SupportMaterialStyle::smsOrganic);
+    return config;
 }
 
 TEST_CASE("TreeSupport: supports stay on the build plate", "[SupportMaterial][TreeSupport]")
 {
     Slic3r::Print print;
-    TestConfig    config;
-    config.print.items.opt("support_material").set(SupportMode::Everywhere);
-    config.print.items.opt("support_material_style").set(Domain::SupportMaterialStyle::smsOrganic);
+    TestConfig    config = organic_config();
+    set_small_bed(config);
 
-    // Cap much wider than the test plate: the overhanging ends cannot be reached from the plate.
-    Slic3r::Test::init_and_process_print({ mushroom(300.f, 200.f) }, print, config);
+    Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
 
     const Polygons bed = bed_polygon(print);
     REQUIRE(! bed.empty());
@@ -636,22 +638,20 @@ TEST_CASE("TreeSupport: supports stay on the build plate", "[SupportMaterial][Tr
     REQUIRE(! support.empty());
 
     // 10 um of slack for Clipper rounding at the plate boundary.
-    CHECK(diff(support, offset(bed, scaled<coord_t>(0.01))).empty());
+    CHECK(diff(support, offset(bed, 0.01f)).empty());
 }
 
-TEST_CASE("TreeSupport: a part that fits keeps its supports", "[SupportMaterial][TreeSupport]")
+TEST_CASE("TreeSupport: a part inside the plate keeps its supports", "[SupportMaterial][TreeSupport]")
 {
     Slic3r::Print print;
-    TestConfig    config;
-    config.print.items.opt("support_material").set(SupportMode::Everywhere);
-    config.print.items.opt("support_material_style").set(Domain::SupportMaterialStyle::smsOrganic);
+    TestConfig    config = organic_config();
 
-    Slic3r::Test::init_and_process_print({ mushroom(100.f, 100.f) }, print, config);
+    Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
 
     const Polygons bed = bed_polygon(print);
     REQUIRE(! bed.empty());
 
     const Polygons support = support_contours(print);
     REQUIRE(! support.empty());
-    CHECK(diff(support, offset(bed, scaled<coord_t>(0.01))).empty());
+    CHECK(diff(support, offset(bed, 0.01f)).empty());
 }
