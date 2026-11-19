@@ -2,6 +2,7 @@
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/Platform/IFileExplorerHandler.hpp"
 #include "Slic3r/Biz/FileDownloader/FileDownloaderJob.hpp"
+#include "Slic3r/Biz/FileOpen/FileLoadProgress.hpp"
 #include "Slic3r/App/DisplayStrings.hpp"
 
 #include "Slic3r/Biz/I18N/I18N.hpp"
@@ -154,6 +155,8 @@ void PopNotificationCenter::on_job_manager_status_changed(const JobManagerStatus
             on_download_job_status_changed(job_name, progress);
         } else if (job_name.starts_with("arrange")) {
             on_arrange_job_progress(job_name, progress);
+        } else if (job_name.starts_with(Biz::FileOpen::FILE_LOAD_JOB_PREFIX)) {
+            // Shown by LoadingProgressDialog.
         } else if (const JobNotificationSpec* spec{find_job_spec(job_name)}) {
             on_job_progress(*spec, job_name, progress);
         }

@@ -167,6 +167,12 @@ private:
 
     RenderModuleBase* current_render_module();
 
+    /**
+     * @brief Shows the opened modal dialog in the module switched to, when the dialog doesn't
+     * depend on the module which opened it. Only ModalDialog::LoadingProgress is moved.
+     */
+    void move_modal_dialog_to_current_module();
+
 private:
     struct ProjectContext
     {
@@ -185,6 +191,8 @@ private:
     Platform::AbstractRenderCanvas* m_canvas{nullptr};
     bool m_object_list_collapsed{false};
     ModalDialog m_current_modal_dialog{ModalDialog::None};
+    /// Module which shows the opened modal dialog, nullptr when none is opened.
+    RenderModuleBase* m_modal_dialog_module{nullptr};
 };
 
 } // namespace Slic3r::App

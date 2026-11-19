@@ -17,6 +17,8 @@
 #include "Slic3r/Biz/UserAccount/ConnectUtils.hpp"
 #include "Slic3r/Biz/Platform/JobManager/JobManager.hpp"
 #include "Slic3r/Biz/FileLoadingLogic.hpp"
+#include "Slic3r/Biz/FileOpen/FileLoadProgress.hpp"
+#include "Slic3r/Biz/MainThreadDialogProvider.hpp"
 #include "Slic3r/Biz/Scene/BedFactory.hpp"
 #include "Slic3r/Biz/Algorithms/Point.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleSelector.hpp"
@@ -250,6 +252,144 @@ tl::expected<SelectionId, std::string> ProjectInteractor::do_load_project(
     return project_id;
 }
 
+namespace {
+
+const std::string PROJECT_LOAD_JOB_NAME{std::string(FileOpen::FILE_LOAD_JOB_PREFIX) + "_project"};
+
+/**
+ * @brief Each file takes the same share, the rest is left for adding to the scene.
+ */
+double file_load_progress(
+    FileOpen::FileLoadStage stage,
+    const FileOpen::FileLoadProgressPayload& payload
+)
+{
+    constexpr double reading_share{0.9};
+    if (stage == FileOpen::FileLoadStage::AddingToScene) {
+        return reading_share;
+    }
+    const double file_share{reading_share / static_cast<double>(std::max<size_t>(payload.file_count, 1))};
+    const double stage_offset{stage == FileOpen::FileLoadStage::Reading ? 0.1 : 0.7};
+    return (static_cast<double>(payload.file_index) + stage_offset) * file_share;
+}
+
+/**
+ * @brief Reports stages of a file loading job to its tracker.
+ *
+ * It throws FileLoadCancelled when the job is asked to stop.
+ */
+FileOpen::FileLoadProgressFn make_file_load_progress_fn(
+    const Biz::JThread::StopToken& stop_token,
+    Platform::JobManager::ProgressTracker& progress_tracker
+)
+{
+    return [&stop_token, &progress_tracker](
+               FileOpen::FileLoadStage stage,
+               const FileOpen::FileLoadProgressPayload& payload
+           )
+    {
+        if (stop_token.stop_requested()) {
+            throw FileOpen::FileLoadCancelled{};
+        }
+        progress_tracker.set_progress_detail({static_cast<int>(stage), payload});
+        progress_tracker.set(Domain::Percentage{file_load_progress(stage, payload)});
+    };
+}
+
+/**
+ * @return Provider which shows the dialogs on the main thread, empty without a provider.
+ */
+std::optional<MainThreadDialogProvider> make_job_dialog_provider(
+    IMessageDialogProvider* dialog_provider,
+    Platform::IMainThreadDispatcher& dispatcher,
+    const Biz::JThread::StopToken& stop_token
+)
+{
+    if (dialog_provider == nullptr) {
+        return std::nullopt;
+    }
+    return std::make_optional<MainThreadDialogProvider>(*dialog_provider, dispatcher, stop_token);
+}
+
+Project load_project_job(
+    Biz::JThread::StopToken stop_token,
+    Platform::IMainThreadDispatcher& dispatcher,
+    Platform::JobManager::ProgressTracker progress_tracker,
+    const boost::filesystem::path& file_path,
+    const Domain::Preset::Bundle& preset_bundle,
+    IMessageDialogProvider* dialog_provider
+)
+{
+    std::optional<MainThreadDialogProvider> job_dialog_provider{
+        make_job_dialog_provider(dialog_provider, dispatcher, stop_token)
+    };
+    const FileOpen::FileLoadProgressFn report_progress{
+        make_file_load_progress_fn(stop_token, progress_tracker)
+    };
+
+    Project project{FileLoadingLogic::load_file_as_project(
+        file_path,
+        preset_bundle,
+        job_dialog_provider ? &*job_dialog_provider : nullptr,
+        report_progress
+    )};
+    report_progress(FileOpen::FileLoadStage::AddingToScene, {file_path.filename().string()});
+    return project;
+}
+
+/**
+ * @brief STEP import settings shared by a job, which may change them, and its result handlers,
+ * which store them on the main thread.
+ */
+using SharedStepImportSettings = std::shared_ptr<std::optional<FileLoadingLogic::StepImportSettings>>;
+
+SharedStepImportSettings make_shared_step_import_settings()
+{
+    return std::make_shared<std::optional<FileLoadingLogic::StepImportSettings>>(
+        FileLoadingLogic::load_step_import_settings()
+    );
+}
+
+void store_shared_step_import_settings(const SharedStepImportSettings& step_settings)
+{
+    if (step_settings->has_value()) {
+        FileLoadingLogic::store_step_import_settings(step_settings->value());
+    }
+}
+
+std::vector<FileLoadingLogic::ImportedFileData> read_files_job(
+    Biz::JThread::StopToken stop_token,
+    Platform::IMainThreadDispatcher& dispatcher,
+    Platform::JobManager::ProgressTracker progress_tracker,
+    const std::vector<boost::filesystem::path>& paths,
+    int tool_count,
+    IMessageDialogProvider* dialog_provider,
+    const SharedStepImportSettings& step_settings
+)
+{
+    std::optional<MainThreadDialogProvider> job_dialog_provider{
+        make_job_dialog_provider(dialog_provider, dispatcher, stop_token)
+    };
+    const FileOpen::FileLoadProgressFn report_progress{
+        make_file_load_progress_fn(stop_token, progress_tracker)
+    };
+
+    std::vector<FileLoadingLogic::ImportedFileData> data{FileLoadingLogic::read_files_for_import(
+        paths,
+        tool_count,
+        job_dialog_provider ? &*job_dialog_provider : nullptr,
+        step_settings->has_value() ? &step_settings->value() : nullptr,
+        report_progress
+    )};
+    report_progress(
+        FileOpen::FileLoadStage::AddingToScene,
+        {paths.size() == 1 ? paths.front().filename().string() : std::string{}, 0, paths.size()}
+    );
+    return data;
+}
+
+} // namespace
+
 void ProjectInteractor::load_project(
     const boost::filesystem::path& file_path,
     EmptyProjectAction empty_project_action,
@@ -305,6 +445,11 @@ void ProjectInteractor::load_project(
                       std::string description = "Unknown error";
                       try {
                           std::rethrow_exception(eptr);
+                      } catch (FileOpen::FileLoadCancelled&) {
+                          if (on_done) {
+                              on_done();
+                          }
+                          return;
                       } catch (Loaded3MFException& e) {
                           description = fmt::format("Loading file failed: {}", e.issue.msg);
                       } catch (std::exception& e) {
@@ -320,14 +465,19 @@ void ProjectInteractor::load_project(
     Platform::PlatformServices::instance()
         .job_manager()
         .create_job(
-            "project_load",
+            PROJECT_LOAD_JOB_NAME,
             // TODO: preset_bundle may change, making its copy wouldn't help
             [&preset_bundle = m_workbench.preset_bundle(), dialog_provider = m_dialog_provider](
                 Biz::JThread::StopToken stop_token,
+                Platform::IMainThreadDispatcher& dispatcher,
+                Platform::JobManager::ProgressTracker progress_tracker,
                 const boost::filesystem::path file_path
             ) -> Domain::Project
             {
-                return FileLoadingLogic::load_file_as_project(
+                return load_project_job(
+                    stop_token,
+                    dispatcher,
+                    std::move(progress_tracker),
                     file_path,
                     preset_bundle,
                     dialog_provider
@@ -374,12 +524,19 @@ void ProjectInteractor::load_projects(
         Platform::PlatformServices::instance()
             .job_manager()
             .create_job(
-                "project_load",
+                PROJECT_LOAD_JOB_NAME,
                 [&preset_bundle = m_workbench.preset_bundle(),
-                 dialog_provider =
-                     m_dialog_provider](Biz::JThread::StopToken, boost::filesystem::path file_path)
+                 dialog_provider = m_dialog_provider](
+                    Biz::JThread::StopToken stop_token,
+                    Platform::IMainThreadDispatcher& dispatcher,
+                    Platform::JobManager::ProgressTracker progress_tracker,
+                    boost::filesystem::path file_path
+                )
                 {
-                    return FileLoadingLogic::load_file_as_project(
+                    return load_project_job(
+                        stop_token,
+                        dispatcher,
+                        std::move(progress_tracker),
                         file_path,
                         preset_bundle,
                         dialog_provider
@@ -418,6 +575,9 @@ void ProjectInteractor::load_projects(
 
                     try {
                         std::rethrow_exception(eptr);
+                    } catch (FileOpen::FileLoadCancelled&) {
+                        state->next();
+                        return;
                     } catch (Loaded3MFException& e) {
                         description = fmt::format("Loading file failed: {}", e.issue.msg);
                     } catch (std::exception& e) {
@@ -1176,47 +1336,182 @@ void ProjectInteractor::set_output_extension(Domain::SelectionId project_id, con
     it->second.directory_storage().set_output_extension(extension);
 }
 
-void ProjectInteractor::load_models_to_project(std::vector<boost::filesystem::path> paths, bool temporary_sources)
+std::string ProjectInteractor::next_file_load_job_name(const std::string& kind)
+{
+    return std::string(FileOpen::FILE_LOAD_JOB_PREFIX) + "_" + kind + "_"
+        + std::to_string(++m_file_load_job_counter);
+}
+
+void ProjectInteractor::report_file_load_job_failure(std::exception_ptr eptr)
+{
+    std::string description = "Unknown error";
+    try {
+        std::rethrow_exception(eptr);
+    } catch (const FileOpen::FileLoadCancelled&) {
+        return;
+    } catch (const std::exception& e) {
+        description = fmt::format("Loading file failed: {}", e.what());
+    } catch (...) {
+    }
+
+    SPDLOG_ERROR(description);
+    invoke_listeners<IProjectsChangedListener>([&description](IProjectsChangedListener* l)
+                                               { l->on_project_load_failed(description); });
+}
+
+void ProjectInteractor::load_models_to_project(
+    std::vector<boost::filesystem::path> paths,
+    bool temporary_sources,
+    std::function<void()> on_done
+)
 {
     invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
         l->on_file_load_started();
     });
 
-    const auto& proj            = m_workbench.project(selected_project_id());
-    Domain::BedRef selected_bed = scene_interactor().bed_selection().last_selected_bed();
-    const Domain::ConfigContainer* cc =
-        proj.find_config_container(selected_bed.config_container_id);
-    const Domain::BedInstance& inst = cc->find_bed_instance(selected_bed.instance_id);
-    int slot_count             = cc->selected_preset().hw_config.material_slot_count();
-    const FileLoadingLogic::ImportToSceneResult import_result = FileLoadingLogic::import_files_and_add_to_scene(
-        paths,
-        slot_count,
-        scene_interactor(),
-        cc->bed().center() + Biz::Algorithms::Point::to_2d(inst.transformation.get_offset()),
-        m_dialog_provider,
-        FileLoadingLogic::ImportOptions{.temporary_sources = temporary_sources}
-    );
+    const SelectionId project_id{selected_project_id()};
+    const Domain::BedRef selected_bed{scene_interactor().bed_selection().last_selected_bed()};
+    const Domain::ConfigContainer* cc{
+        m_workbench.project(project_id).find_config_container(selected_bed.config_container_id)
+    };
+    const int slot_count{static_cast<int>(cc->selected_preset().hw_config.material_slot_count())};
 
-    if (import_result.instances.empty()) {
-        return;
-    }
+    auto on_result{[this, project_id, first_path = paths.front(), temporary_sources](
+                       std::vector<FileLoadingLogic::ImportedFileData> data
+                   )
+    {
+        if (project_exists(project_id)) {
+            if (selected_project_id() != project_id) {
+                select_project(project_id);
+            }
 
-    if (!temporary_sources) {
-        set_project_dir(selected_project_id(), paths.front());
-    }
+            // The bed is taken now, the user could change it during the loading.
+            const Domain::BedRef bed{scene_interactor().bed_selection().last_selected_bed()};
+            const Domain::ConfigContainer* config_container{
+                m_workbench.project(project_id).find_config_container(bed.config_container_id)
+            };
+            const Domain::BedInstance& bed_instance{
+                config_container->find_bed_instance(bed.instance_id)
+            };
+            const FileLoadingLogic::ImportToSceneResult import_result{
+                FileLoadingLogic::add_imported_files_to_scene(
+                    std::move(data),
+                    scene_interactor(),
+                    config_container->bed().center()
+                        + Biz::Algorithms::Point::to_2d(bed_instance.transformation.get_offset()),
+                    FileLoadingLogic::ImportOptions{.temporary_sources = temporary_sources}
+                )
+            };
 
-    arrange_interactor().arrange_added_instances(
-        selected_project_id(),
-        import_result.instances,
-        selected_bed,
-        UndoSnapshotType::AddObject
-    );
+            if (!import_result.instances.empty()) {
+                if (!temporary_sources) {
+                    set_project_dir(project_id, first_path);
+                }
 
-    if (import_result.geometry_only_3mf) {
-        invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
-            l->on_geometry_only_imported();
-        });
-    }
+                arrange_interactor().arrange_added_instances(
+                    project_id,
+                    import_result.instances,
+                    bed,
+                    UndoSnapshotType::AddObject
+                );
+
+                if (import_result.geometry_only_3mf) {
+                    invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
+                        l->on_geometry_only_imported();
+                    });
+                }
+            }
+        }
+    }};
+
+    start_file_read_job("models", std::move(paths), slot_count, project_id, on_result, on_done);
+}
+
+void ProjectInteractor::load_volumes_to_selected_object(
+    std::vector<boost::filesystem::path> paths,
+    Domain::ModelVolumeType volume_type,
+    std::function<void()> on_done
+)
+{
+    const SelectionId project_id{selected_project_id()};
+    const Scene::ObjectSelection selection{scene_interactor().object_selection()};
+
+    auto on_result{[this, project_id, selection, volume_type](
+                       std::vector<FileLoadingLogic::ImportedFileData> data
+                   )
+    {
+        if (selected_project_id() == project_id
+            && scene_interactor().object_selection() == selection)
+        {
+            FileLoadingLogic::add_imported_volumes_to_selected_object(
+                std::move(data),
+                volume_type,
+                scene_interactor()
+            );
+        } else {
+            SPDLOG_WARN("Loaded volumes were dropped, the selection changed during the loading");
+        }
+    }};
+
+    start_file_read_job("volumes", std::move(paths), 1, project_id, on_result, on_done);
+}
+
+void ProjectInteractor::start_file_read_job(
+    const std::string& kind,
+    std::vector<boost::filesystem::path> paths,
+    int tool_count,
+    SelectionId project_id,
+    std::function<void(std::vector<FileLoadingLogic::ImportedFileData>)> apply,
+    std::function<void()> on_done
+)
+{
+    SharedStepImportSettings step_settings{make_shared_step_import_settings()};
+
+    Platform::PlatformServices::instance()
+        .job_manager()
+        .create_job(
+            next_file_load_job_name(kind),
+            [tool_count, dialog_provider = m_dialog_provider, step_settings](
+                Biz::JThread::StopToken stop_token,
+                Platform::IMainThreadDispatcher& dispatcher,
+                Platform::JobManager::ProgressTracker progress_tracker,
+                std::vector<boost::filesystem::path> paths
+            )
+            {
+                return read_files_job(
+                    stop_token,
+                    dispatcher,
+                    std::move(progress_tracker),
+                    paths,
+                    tool_count,
+                    dialog_provider,
+                    step_settings
+                );
+            },
+            std::move(paths)
+        )
+        .set_project_id(project_id)
+        .on_result(
+            [apply, on_done, step_settings](std::vector<FileLoadingLogic::ImportedFileData> data)
+            {
+                store_shared_step_import_settings(step_settings);
+                apply(std::move(data));
+                if (on_done) {
+                    on_done();
+                }
+            }
+        )
+        .on_exception(
+            [this, on_done, step_settings](std::exception_ptr eptr)
+            {
+                store_shared_step_import_settings(step_settings);
+                report_file_load_job_failure(eptr);
+                if (on_done) {
+                    on_done();
+                }
+            }
+        )
+        .start();
 }
 
 Domain::SelectionId ProjectInteractor::add_config_container()

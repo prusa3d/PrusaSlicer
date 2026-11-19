@@ -50,6 +50,10 @@ class IConfigContainerListChangedListener;
 class IProjectsChangedListener;
 class IMessageDialogProvider;
 
+namespace FileLoadingLogic {
+struct ImportedFileData;
+} // namespace FileLoadingLogic
+
 enum class EmptyProjectAction
 {
     Keep,
@@ -565,10 +569,29 @@ public:
     }
 
     /**
+     * @brief Reads the files in a job and adds them as new objects into the selected project.
      * @note Files opened by the user go through file_opening_interactor().open().
      * @param temporary_sources Imported objects keep no source path, reload from disk is disabled.
+     * @param on_done Called when the loading is finished, failed or cancelled.
      */
-    void load_models_to_project(std::vector<boost::filesystem::path> paths, bool temporary_sources = false);
+    void load_models_to_project(
+        std::vector<boost::filesystem::path> paths,
+        bool temporary_sources       = false,
+        std::function<void()> on_done = {}
+    );
+
+    /**
+     * @brief Reads the files in a job and adds them as volumes into the selected object.
+     *
+     * The volumes are dropped when the selection changed during the loading.
+     *
+     * @param on_done Called when the loading is finished, failed or cancelled.
+     */
+    void load_volumes_to_selected_object(
+        std::vector<boost::filesystem::path> paths,
+        Domain::ModelVolumeType volume_type,
+        std::function<void()> on_done = {}
+    );
 
     /**
      * @brief Callback from AppInstanceMessageHandler.
@@ -764,6 +787,31 @@ private:
 
     void report_connect_upload_error(const std::string& msg);
 
+    /**
+     * @return Unique name of a job which loads models or volumes.
+     */
+    std::string next_file_load_job_name(const std::string& kind);
+
+    /**
+     * @brief Reads the files for import in a job.
+     * @param project_id Closing the project cancels the job.
+     * @param apply Adds the read files into the scene, called on the main thread.
+     * @param on_done Called after apply, or when the job failed or was cancelled.
+     */
+    void start_file_read_job(
+        const std::string& kind,
+        std::vector<boost::filesystem::path> paths,
+        int tool_count,
+        Domain::SelectionId project_id,
+        std::function<void(std::vector<FileLoadingLogic::ImportedFileData>)> apply,
+        std::function<void()> on_done
+    );
+
+    /**
+     * @brief Reports a failed model or volume loading job, a cancelled one is not reported.
+     */
+    void report_file_load_job_failure(std::exception_ptr eptr);
+
 private:
     struct Selection
     {
@@ -805,6 +853,7 @@ private:
     ObservableProjectList m_project_list;
     IMessageDialogProvider* m_dialog_provider{ nullptr };
     std::unique_ptr<IUndoProvider> m_undo_provider;
+    size_t m_file_load_job_counter{0};
 
 
     /*

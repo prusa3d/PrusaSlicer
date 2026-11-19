@@ -596,6 +596,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Wildcards.cpp
 
         include/Slic3r/Biz/IMessageDialogProvider.hpp
+        include/Slic3r/Biz/MainThreadDialogProvider.hpp
+        src/Slic3r/Biz/MainThreadDialogProvider.cpp
 
         src/Slic3r/Biz/I18N/LanguageInfo.cpp
         include/Slic3r/Biz/I18N/LanguageInfo.hpp
@@ -796,6 +798,10 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/CommandBindingManager.cpp
         include/Slic3r/App/CrashedProjectsDialog.hpp
         src/Slic3r/App/CrashedProjectsDialog.cpp
+        include/Slic3r/App/LoadingProgressController.hpp
+        src/Slic3r/App/LoadingProgressController.cpp
+        include/Slic3r/App/LoadingProgressDialog.hpp
+        src/Slic3r/App/LoadingProgressDialog.cpp
         include/Slic3r/App/ProjectSaver.hpp
         src/Slic3r/App/ProjectSaver.cpp
         include/Slic3r/App/ModalDialog.hpp
@@ -1210,6 +1216,7 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/FileLoadingLogic.hpp
         src/Slic3r/Biz/FileLoadingLogic.cpp
         include/Slic3r/Biz/FileOpen/ArchiveEntry.hpp
+        include/Slic3r/Biz/FileOpen/FileLoadProgress.hpp
         include/Slic3r/Biz/FileOpen/FileOpeningInteractor.hpp
         src/Slic3r/Biz/FileOpen/FileOpeningInteractor.cpp
         include/Slic3r/Biz/MeshExportLogic.hpp
@@ -1791,6 +1798,8 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/FileOpen/ArchiveTestUtils.hpp
             test/Slic3r/Biz/FileOpen/ArchiveExtractionTests.cpp
             test/Slic3r/Biz/FileOpen/FileOpeningInteractorTests.cpp
+
+            test/Slic3r/Biz/MainThreadDialogProviderTests.cpp
 
         test/Slic3r/Biz/UserAccount/UserAccountSessionTests.cpp
 

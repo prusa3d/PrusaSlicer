@@ -22,6 +22,7 @@ namespace Slic3r::App {
 
 class SidebarStackLayout;
 class ToolBar;
+class LoadingProgressDialog;
 
 namespace Scene {
 class IToolGizmo;
@@ -88,6 +89,7 @@ public:
     ToolBar* mode_toolbar() const;
 
     MsgBoxHandler& msg_box_handler();
+    LoadingProgressDialog& loading_progress_dialog();
 
     Yoga::RootItem& root_item();
 
@@ -142,6 +144,8 @@ protected:
     Yoga::SizeInfo m_info;
 
     MsgBoxHandler m_msg_box_handler;
+
+    LoadingProgressDialog* m_loading_progress_dialog = nullptr;
 
     // Inserted from render module
     Yoga::Passthrough<TopBar> m_top_bar;

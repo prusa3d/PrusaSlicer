@@ -149,8 +149,15 @@ public:
     /**
      * @brief Opens files from any source: a single 3MF as a project, everything else as models.
      * Archives are extracted in a job.
+     *
+     * @param on_done Called when the files, which aren't archives, are loaded, failed or cancelled.
+     *                It isn't called when only archives are opened.
      */
-    void open(std::vector<boost::filesystem::path> paths, OpenFilesOptions options = {});
+    void open(
+        std::vector<boost::filesystem::path> paths,
+        OpenFilesOptions options      = {},
+        std::function<void()> on_done = {}
+    );
 
     /**
      * @brief Lets the user choose files when an archive contains more than one, without it all are opened.
@@ -182,8 +189,14 @@ private:
     );
     /**
      * @param to_new_project A new project is created unless the selected one is empty.
+     * @param on_done Called when the models are loaded, failed or cancelled.
      */
-    void import_models(std::vector<boost::filesystem::path> files, bool to_new_project, bool temporary_files);
+    void import_models(
+        std::vector<boost::filesystem::path> files,
+        bool to_new_project,
+        bool temporary_files,
+        std::function<void()> on_done = {}
+    );
     void report_archive_error(const std::string& message);
 
     ProjectInteractor& m_project_interactor;

@@ -78,6 +78,7 @@
 #include "Slic3r/App/Wildcards.hpp"
 #include "Slic3r/App/PreferencesDialog.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
+#include "Slic3r/App/LoadingProgressDialog.hpp"
 #include "Slic3r/App/SidebarStackLayout.hpp"
 #include "Slic3r/App/ColorMix/ColorMixDialog.hpp"
 #include "Slic3r/App/PrinterSettingsDialog.hpp"
@@ -174,6 +175,7 @@ void PlaterRenderModule::set_modal_dialog(ModalDialog modal_dialog)
     handle_dialog(m_preset_updater_dialog.get(), ModalDialog::PresetUpdater);
     handle_dialog(m_invalid_data_dialog.get(), ModalDialog::InvalidData);
     handle_dialog(m_effective_values_dialog.get(), ModalDialog::EffectiveValues);
+    handle_dialog(&m_layout->loading_progress_dialog(), ModalDialog::LoadingProgress);
     if (modal_dialog == ModalDialog::MsgBox) {
         msg_box_handler()->open_modal();
     } else {

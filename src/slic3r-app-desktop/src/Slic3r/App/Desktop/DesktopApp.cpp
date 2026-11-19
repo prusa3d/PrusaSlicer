@@ -19,6 +19,7 @@
 #include <Slic3r/App/ThumbnailStoreUpdater.hpp>
 #include <Slic3r/App/PopNotification/PopNotificationCenter.hpp>
 #include <Slic3r/App/AppServices.hpp>
+#include <Slic3r/App/LoadingProgressController.hpp>
 #include <Slic3r/App/PresetUpdater/PresetUpdaterController.hpp>
 #include <Slic3r/App/AppConfig.hpp>
 #include <Slic3r/App/AppConfigInteractor.hpp>
@@ -411,6 +412,13 @@ bool DesktopApp::OnInit()
     app_services.set_pop_notification_center(
         std::make_unique<PopNotification::PopNotificationCenter>(*m_project_interactor.get())
     );
+    app_services.set_loading_progress_controller(
+        std::make_unique<LoadingProgressController>(
+            navigator,
+            platform_services.job_manager(),
+            platform_services.timer_queue()
+        )
+    );
 
     app_services.set_mouse_3d_controller(
         std::make_unique<Mouse3D::Mouse3DController>(
@@ -759,6 +767,10 @@ DesktopApp::~DesktopApp()
     if (app_services.has_preset_updater_controller()) {
         app_services.preset_updater_controller().shutdown();
         app_services.navigator().shutdown();
+    }
+    // Before Biz::Platform::close(), which destroys the job manager and the timer queue.
+    if (app_services.has_loading_progress_controller()) {
+        app_services.loading_progress_controller().shutdown();
     }
     if (m_project_interactor) {
         m_project_interactor->file_opening_interactor().set_archive_dialog(nullptr);

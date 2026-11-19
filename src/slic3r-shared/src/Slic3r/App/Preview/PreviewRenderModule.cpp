@@ -30,6 +30,7 @@
 #include "Slic3r/App/Material/MaterialSettingsDialog.hpp"
 #include "Slic3r/App/PrintModeDialog.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
+#include "Slic3r/App/LoadingProgressDialog.hpp"
 #include "Slic3r/App/UIItemCommand.hpp"
 #include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/App/Config/ToolToFeatureDialog.hpp"
@@ -443,6 +444,7 @@ void PreviewRenderModule::set_modal_dialog(ModalDialog modal_dialog)
     handle_dialog(m_preset_updater_dialog.get(), ModalDialog::PresetUpdater);
     handle_dialog(m_invalid_data_dialog.get(), ModalDialog::InvalidData);
     handle_dialog(m_effective_values_dialog.get(), ModalDialog::EffectiveValues);
+    handle_dialog(&m_layout->loading_progress_dialog(), ModalDialog::LoadingProgress);
     if (modal_dialog == ModalDialog::MsgBox) {
         msg_box_handler()->open_modal();
     } else {

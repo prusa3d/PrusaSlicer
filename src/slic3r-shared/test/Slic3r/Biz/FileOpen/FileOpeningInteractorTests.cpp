@@ -197,6 +197,7 @@ TEST_CASE_METHOD(FileOpeningInteractorFixture, "FileOpeningInteractor imports mo
     SECTION("3mf as geometry") {
         const fs::path file = project_file("project.3mf");
         opener().open({file}, {.as_geometry = true});
+        REQUIRE(wait_until([&] { return !selected_objects().empty(); }));
         CHECK(workbench.projects().size() == 1);
         CHECK(selected_project().loaded_file_path().empty());
         CHECK_FALSE(selected_objects().empty());
@@ -205,6 +206,7 @@ TEST_CASE_METHOD(FileOpeningInteractorFixture, "FileOpeningInteractor imports mo
         const fs::path file = project_file("project.3mf");
         const fs::path stl  = stl_file("part.stl");
         opener().open({file, stl}, {.new_project = true});
+        REQUIRE(wait_until([&] { return selected_objects().size() >= 2; }));
         CHECK(workbench.projects().size() == 1);
         const auto& objects = selected_objects();
         CHECK(objects.size() >= 2);
@@ -214,10 +216,10 @@ TEST_CASE_METHOD(FileOpeningInteractorFixture, "FileOpeningInteractor imports mo
     }
     SECTION("to a new project when the selected one is not empty") {
         opener().open({stl_file("part.stl")});
-        REQUIRE(selected_objects().size() == 1);
+        REQUIRE(wait_until([&] { return selected_objects().size() == 1; }));
         opener().open({stl_file("part2.stl")}, {.new_project = true});
         CHECK(workbench.projects().size() == 2);
-        CHECK(selected_objects().size() == 1);
+        CHECK(wait_until([&] { return selected_objects().size() == 1; }));
     }
 }
 
@@ -305,8 +307,8 @@ TEST_CASE_METHOD(FileOpeningInteractorFixture, "FileOpeningInteractor lets the d
         CHECK(selected_objects().empty());
 
         done(ArchiveSelection{.models = {offered[1].path}});
-        CHECK(selected_objects().size() == 1);
-        CHECK_FALSE(fs::exists(offered[0].path.parent_path()));
+        REQUIRE(wait_until([&] { return selected_objects().size() == 1; }));
+        CHECK(wait_until([&] { return !fs::exists(offered[0].path.parent_path()); }));
     }
     SECTION("dialog cancelled") {
         std::vector<ArchiveFile> offered;

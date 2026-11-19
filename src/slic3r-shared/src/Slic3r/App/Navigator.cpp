@@ -66,7 +66,8 @@ void Navigator::on_init(
 }
 
 void Navigator::shutdown() {
-    m_project_contexts = {};
+    m_project_contexts    = {};
+    m_modal_dialog_module = nullptr;
 }
 
 bool Navigator::has_modules() const
@@ -104,6 +105,8 @@ void Navigator::set_render_module_type(Render::ModuleType type)
     } else if (type == Render::ModuleType::Preview) {
         m_canvas->set_next_render_module(m_preview_module);
     }
+
+    move_modal_dialog_to_current_module();
 
     if (force_render_modele_switch && m_callbacks.render_module_switched) {
         m_callbacks.render_module_switched();
@@ -181,6 +184,7 @@ void Navigator::set_modal_dialog(ModalDialog modal_dialog)
     m_current_modal_dialog = modal_dialog;
     current_render_module()->set_modal_dialog(modal_dialog);
     m_current_modal_dialog = modal_dialog;
+    m_modal_dialog_module  = modal_dialog == ModalDialog::None ? nullptr : current_render_module();
 
     if (m_callbacks.modal_dialog_changed) {
         m_callbacks.modal_dialog_changed(modal_dialog);
@@ -195,6 +199,20 @@ ModalDialog Navigator::current_modal_dialog() const
 bool Navigator::is_any_modal_dialog_opened() const
 {
     return m_current_modal_dialog != ModalDialog::None;
+}
+
+void Navigator::move_modal_dialog_to_current_module()
+{
+    RenderModuleBase* module{current_render_module()};
+    if (m_current_modal_dialog != ModalDialog::LoadingProgress || m_modal_dialog_module == nullptr
+        || module == nullptr || m_modal_dialog_module == module)
+    {
+        return;
+    }
+
+    m_modal_dialog_module->set_modal_dialog(ModalDialog::None);
+    module->set_modal_dialog(m_current_modal_dialog);
+    m_modal_dialog_module = module;
 }
 
 bool Navigator::object_list_collapsed() const
