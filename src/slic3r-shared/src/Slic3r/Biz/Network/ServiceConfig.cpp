@@ -19,7 +19,7 @@ namespace Slic3r::Biz::Network {
 
 namespace {
 constexpr std::string_view CONNECT_LOCAL_SELECT_PRINTER_PATH =
-    "/m/com.github.aux.prusa-research.prusaslicer3-compat/select-printer?embed=1";
+    "/m/com.github.aux.prusa3d.prusaslicer3-compat/select-printer?embed=1";
 constexpr std::string_view CONNECT_LOCAL_CONNECT_PAGE_PATH = "/";
 constexpr std::string_view CONNECT_LOCAL_ACCOUNT_API_PATH  = "/account";
 constexpr std::string_view CONNECT_LOCAL_CONNECT_API_PATH  = "/connect";

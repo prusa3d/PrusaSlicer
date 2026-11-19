@@ -111,7 +111,7 @@ TEST_CASE("Offline service URLs are derived from the Connect Local server", "[Se
     sc.set_mode(ServiceMode::ConnectLocal, "http://192.168.1.10:8080/");
 
     const std::string S = "http://192.168.1.10:8080";
-    const std::string M = S + "/api/v1/modules/com.github.aux.prusa-research.prusaslicer3-compat";
+    const std::string M = S + "/api/v1/modules/com.github.aux.prusa3d.prusaslicer3-compat";
 
     CHECK(sc.mode() == ServiceMode::ConnectLocal);
     CHECK(sc.is_connect_local());
@@ -133,7 +133,7 @@ TEST_CASE("Offline service URLs are derived from the Connect Local server", "[Se
     CHECK(sc.connect_page_url() == S + "/");
     CHECK(
         sc.connect_select_printer_url()
-        == S + "/m/com.github.aux.prusa-research.prusaslicer3-compat/select-printer?embed=1"
+        == S + "/m/com.github.aux.prusa3d.prusaslicer3-compat/select-printer?embed=1"
     );
 
     CHECK(sc.connect_printer_list_url() == M + "/connect/slicer/v2/printers");

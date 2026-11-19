@@ -512,7 +512,7 @@ struct PairingFixture
 };
 
 const std::string ME_URL =
-    SERVER + "/api/v1/modules/com.github.aux.prusa-research.prusaslicer3-compat/account/api/v1/me/";
+    SERVER + "/api/v1/modules/com.github.aux.prusa3d.prusaslicer3-compat/account/api/v1/me/";
 const std::string PAIRING_URL       = SERVER + "/api/v1/auth/app-pairings";
 const std::string PAIRING_TOKEN_URL = PAIRING_URL + "/token";
 const std::string PAGE_SESSION_URL  = PAIRING_URL + "/session";
