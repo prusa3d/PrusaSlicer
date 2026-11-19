@@ -44,17 +44,6 @@ static constexpr const double volume_threshold_inches = 9.0; // 9 = 3*3*3;
 static constexpr const double volume_threshold_meters = 0.001; // 0.001 = 0.1*0.1*0.1
 static constexpr const double zero_volume             = 0.0000001;
 
-struct ReturnData
-{
-    std::string file_name;
-    boost::filesystem::path file_path;
-    std::optional<Domain::TriangleMesh> mesh;
-    std::optional<Domain::Model> model;
-    bool geometry_only_3mf        = false;
-    bool is_converted_from_inches = false;
-    bool is_converted_from_meters = false;
-};
-
 struct FileLoadError
 {
     std::string message;
@@ -197,7 +186,7 @@ struct StepLoadingMultiple
 };
 
 static void process_mesh(
-    ReturnData& file_data,
+    ImportedFileData& file_data,
     Answer* answer_convert_from_meters,
     Answer* answer_convert_from_imperial_units,
     IMessageDialogProvider* dialog_provider
@@ -726,13 +715,14 @@ static std::string skipped_painting_warning_text(const Read3mfIssues& issues)
     );
 }
 
-static tl::expected<ReturnData, FileLoadError> read_data_from_file(
+static tl::expected<ImportedFileData, FileLoadError> read_data_from_file(
     const boost::filesystem::path& input_file_path,
     IMessageDialogProvider* dialog_provider,
+    StepImportSettings* step_settings,
     StepLoadingMultiple* step_loading_multiple
 )
 {
-    ReturnData ret       = {input_file_path.filename().string(), input_file_path};
+    ImportedFileData ret = {input_file_path.filename().string(), input_file_path};
     std::string path_str = input_file_path.string();
     const bool is_stl = boost::algorithm::iends_with(path_str, ".stl");
     const bool is_3mf = boost::algorithm::iends_with(path_str, ".3mf");
@@ -783,14 +773,11 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
             ));
         }
     } else if (is_step) {
-        Platform::PlatformServices& platform_services = Platform::PlatformServices::instance();
-
         std::optional<std::pair<double, double>> step_linear_and_angle_deflections;
-        if (platform_services.has_app_config_provider()) {
-            Biz::Platform::IAppConfigProvider& app_config = platform_services.app_config_provider();
-            double linear_precision = app_config.get_step_linear_precision();
-            double angle_precision = app_config.get_step_angle_precision();
-            bool show_dialog = app_config.get_show_step_import_parameters();
+        if (step_settings) {
+            double linear_precision = step_settings->linear_precision;
+            double angle_precision = step_settings->angle_precision;
+            bool show_dialog = step_settings->show_dialog;
 
             // Check if we should skip the dialog because "Apply to all" was clicked on a previous file
             if (step_loading_multiple && step_loading_multiple->dismiss) {
@@ -815,10 +802,11 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
                 linear_precision = dialog_result->linear_precision;
                 angle_precision = dialog_result->angle_precision;
                 if (dialog_result->do_not_show_again) {
-                    app_config.set_show_step_import_parameters(false);
+                    step_settings->show_dialog = false;
                 }
-                app_config.set_step_linear_precision(linear_precision);
-                app_config.set_step_angle_precision(angle_precision);
+                step_settings->linear_precision = linear_precision;
+                step_settings->angle_precision  = angle_precision;
+                step_settings->changed          = true;
 
                 // If "Apply to all" was clicked, store the values and suppress dialog for remaining files
                 if (dialog_result->apply_to_all && step_loading_multiple) {
@@ -853,16 +841,22 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
 }
 
 // Loading model from a file, it may be a simple geometry file as STL or OBJ, however it may be a project file as well.
-static tl::expected<ReturnData, FileLoadError> read_and_process_file(
+static tl::expected<ImportedFileData, FileLoadError> read_and_process_file(
     const boost::filesystem::path& input_file_path,
     int tool_count,
     IMessageDialogProvider* dialog_provider,
+    StepImportSettings* step_settings,
     Answer* answer_convert_from_meters         = nullptr,
     Answer* answer_convert_from_imperial_units = nullptr,
     StepLoadingMultiple* step_loading_multiple = nullptr
 )
 {
-    auto data = read_data_from_file(input_file_path, dialog_provider, step_loading_multiple);
+    auto data = read_data_from_file(
+        input_file_path,
+        dialog_provider,
+        step_settings,
+        step_loading_multiple
+    );
     if (!data) {
         return data;
     }
@@ -895,21 +889,50 @@ static tl::expected<ReturnData, FileLoadError> read_and_process_file(
     return data;
 }
 
-// Loading vector of meshs(from simple geometry file as STL or OBJ) or models(from a 3mf-file) from several files
-static std::vector<ReturnData> import_files(
+std::optional<StepImportSettings> load_step_import_settings()
+{
+    Platform::PlatformServices& platform_services = Platform::PlatformServices::instance();
+    if (!platform_services.has_app_config_provider()) {
+        return std::nullopt;
+    }
+    const Platform::IAppConfigProvider& app_config = platform_services.app_config_provider();
+    return StepImportSettings{
+        .linear_precision = app_config.get_step_linear_precision(),
+        .angle_precision  = app_config.get_step_angle_precision(),
+        .show_dialog      = app_config.get_show_step_import_parameters()
+    };
+}
+
+void store_step_import_settings(const StepImportSettings& settings)
+{
+    Platform::PlatformServices& platform_services = Platform::PlatformServices::instance();
+    if (!settings.changed || !platform_services.has_app_config_provider()) {
+        return;
+    }
+    Platform::IAppConfigProvider& app_config = platform_services.app_config_provider();
+    if (!settings.show_dialog) {
+        app_config.set_show_step_import_parameters(false);
+    }
+    app_config.set_step_linear_precision(settings.linear_precision);
+    app_config.set_step_angle_precision(settings.angle_precision);
+}
+
+std::vector<ImportedFileData> read_files_for_import(
     const std::vector<boost::filesystem::path>& input_file_paths,
+    int tool_count,
     IMessageDialogProvider* dialog_provider,
-    int tool_count = 1
+    StepImportSettings* step_settings,
+    const FileOpen::FileLoadProgressFn& on_progress
 )
 {
     Answer answer_convert_from_meters         = Answer::Default;
     Answer answer_convert_from_imperial_units = Answer::Default;
     StepLoadingMultiple step_loading_multiple;
 
-    std::vector<ReturnData> ret;
+    std::vector<ImportedFileData> ret;
     std::string errors;
 
-    Domain::Model* extra_model = nullptr;
+    std::unique_ptr<Domain::Model> extra_model;
     {
         // We are offering the option to convert loaded meshes into multi-part objects only
         // if all meshes are loaded from non-project files and
@@ -926,14 +949,23 @@ static std::vector<ReturnData> import_files(
         // To enable converting loaded meshes into a multi-part object,
         // we need a model containing separate objects based on those meshes.
         if (can_convert_to_multipart)
-            extra_model = new Domain::Model();
+            extra_model = std::make_unique<Domain::Model>();
     }
 
-    for (const auto& path : input_file_paths) {
+    for (size_t file_index = 0; file_index < input_file_paths.size(); ++file_index) {
+        const boost::filesystem::path& path = input_file_paths[file_index];
+        if (on_progress) {
+            on_progress(
+                FileOpen::FileLoadStage::Reading,
+                {path.filename().string(), file_index, input_file_paths.size()}
+            );
+        }
+
         auto data = read_and_process_file(
             path,
             tool_count,
             dialog_provider,
+            step_settings,
             &answer_convert_from_meters,
             &answer_convert_from_imperial_units,
             input_file_paths.size() > 1 ? &step_loading_multiple : nullptr
@@ -982,7 +1014,7 @@ static std::vector<ReturnData> import_files(
             if (convert) {
                 // Perform a conversion and return processed model
                 convert_to_multipart_object(*extra_model, tool_count);
-                ReturnData data;
+                ImportedFileData data;
                 data.model = *extra_model;
                 ret.emplace_back(data);
             }
@@ -993,7 +1025,7 @@ static std::vector<ReturnData> import_files(
             for (const ModelObject* object : extra_model->objects) {
                 const ModelVolume& volume = *object->volumes.front();
 
-                ReturnData data;
+                ImportedFileData data;
                 data.file_name                = object->name;
                 data.file_path                = object->input_file;
                 data.mesh                     = volume.mesh();
@@ -1110,10 +1142,25 @@ static Project convert_to_project(Loaded3MF&& loaded_3mf, IMessageDialogProvider
 Domain::Project load_file_as_project(
     const boost::filesystem::path& project_file_path,
     const Domain::Preset::Bundle& bundle,
-    IMessageDialogProvider* dialog_provider
+    IMessageDialogProvider* dialog_provider,
+    const FileOpen::FileLoadProgressFn& on_progress
 )
 {
+    const auto report_stage{
+        [&on_progress, payload = FileOpen::FileLoadProgressPayload{project_file_path.filename().string()}](
+            FileOpen::FileLoadStage stage
+        )
+        {
+            if (on_progress) {
+                on_progress(stage, payload);
+            }
+        }
+    };
+
+    report_stage(FileOpen::FileLoadStage::Reading);
     Loaded3MF loaded_3mf = load_from_project(project_file_path, bundle);
+
+    report_stage(FileOpen::FileLoadStage::Converting);
     if (!loaded_3mf.model.objects.empty()) {
         remove_objects_with_zero_volume(
             loaded_3mf.model,
@@ -1126,7 +1173,7 @@ Domain::Project load_file_as_project(
 }
 
 namespace {
-std::optional<ModelVolume::Source> volume_source_from_file_data(const ReturnData& file_data)
+std::optional<ModelVolume::Source> volume_source_from_file_data(const ImportedFileData& file_data)
 {
     if (file_data.file_path.empty()) {
         return std::nullopt;
@@ -1141,7 +1188,7 @@ std::optional<ModelVolume::Source> volume_source_from_file_data(const ReturnData
     };
 }
 
-void forget_source_paths(ReturnData& file_data)
+void forget_source_paths(ImportedFileData& file_data)
 {
     file_data.file_path.clear();
     if (!file_data.model) {
@@ -1159,20 +1206,16 @@ void forget_source_paths(ReturnData& file_data)
 }
 } // namespace
 
-ImportToSceneResult import_files_and_add_to_scene(
-    const std::vector<boost::filesystem::path>& file_paths,
-    int tool_count,
+ImportToSceneResult add_imported_files_to_scene(
+    std::vector<ImportedFileData> data,
     Scene::SceneInteractor& scene_interactor,
     const Domain::Vec2d& bed_center,
-    IMessageDialogProvider* dialog_provider,
     const ImportOptions& options
 )
 {
-    auto data = Biz::FileLoadingLogic::import_files(file_paths, dialog_provider, tool_count);
-
     ImportToSceneResult result;
     ElementRefs& added_instances = result.instances;
-    for (Biz::FileLoadingLogic::ReturnData& file_data : data) {
+    for (Biz::FileLoadingLogic::ImportedFileData& file_data : data) {
         result.geometry_only_3mf |= file_data.geometry_only_3mf;
         if (options.temporary_sources) {
             forget_source_paths(file_data);
@@ -1219,19 +1262,13 @@ ImportToSceneResult import_files_and_add_to_scene(
     return result;
 }
 
-/**
- * Load meshes from multiple source files and add them into selected object
- */
-void import_volumes_into_selected_object(
-    const std::vector<boost::filesystem::path>& file_paths,
+void add_imported_volumes_to_selected_object(
+    std::vector<ImportedFileData> data,
     const Domain::ModelVolumeType& volume_type,
-    Scene::SceneInteractor& scene_interactor,
-    IMessageDialogProvider* dialog_provider
+    Scene::SceneInteractor& scene_interactor
 )
 {
-    auto data = Biz::FileLoadingLogic::import_files(file_paths, dialog_provider);
-
-    for (Biz::FileLoadingLogic::ReturnData& file_data : data) {
+    for (Biz::FileLoadingLogic::ImportedFileData& file_data : data) {
         if (file_data.mesh) {
             scene_interactor.add_volume_from_mesh(
                 std::move(file_data.mesh.value()),
@@ -1267,8 +1304,16 @@ tl::expected<Domain::Model, std::string>
 read_model_from_file(const std::string& input_file, IMessageDialogProvider* dialog_provider)
 {
     const boost::filesystem::path input_file_path = boost::filesystem::path(input_file);
-    tl::expected<ReturnData, FileLoadError> processed_file =
-        read_and_process_file(input_file_path, 1, dialog_provider);
+    std::optional<StepImportSettings> step_settings{load_step_import_settings()};
+    tl::expected<ImportedFileData, FileLoadError> processed_file = read_and_process_file(
+        input_file_path,
+        1,
+        dialog_provider,
+        step_settings ? &*step_settings : nullptr
+    );
+    if (step_settings) {
+        store_step_import_settings(*step_settings);
+    }
     if (!processed_file) {
         const FileLoadError& error = processed_file.error();
         // Convert FileLoadError back to string for the public API

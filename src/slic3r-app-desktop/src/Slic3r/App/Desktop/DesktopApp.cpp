@@ -760,6 +760,10 @@ DesktopApp::~DesktopApp()
         app_services.preset_updater_controller().shutdown();
         app_services.navigator().shutdown();
     }
+    // Before Biz::Platform::close(), which destroys the job manager and the timer queue.
+    if (m_plater_module) {
+        m_plater_module->shutdown();
+    }
     if (m_project_interactor) {
         m_project_interactor->file_opening_interactor().set_archive_dialog(nullptr);
     }

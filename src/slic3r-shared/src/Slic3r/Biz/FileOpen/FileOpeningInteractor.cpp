@@ -492,7 +492,11 @@ void remove_stale_extractions(std::chrono::hours max_age, const fs::path& root)
     }
 }
 
-void FileOpeningInteractor::open(std::vector<fs::path> paths, OpenFilesOptions options)
+void FileOpeningInteractor::open(
+    std::vector<fs::path> paths,
+    OpenFilesOptions options,
+    FileLoadDoneFn on_done
+)
 {
     std::vector<fs::path> archives;
     std::erase_if(paths, [&archives](const fs::path& path) {
@@ -512,12 +516,14 @@ void FileOpeningInteractor::open(std::vector<fs::path> paths, OpenFilesOptions o
     if (!options.as_geometry && paths.size() == 1 && FileLoadingLogic::is_project_file(paths.front().string())) {
         m_project_interactor.load_project(
             paths.front(),
-            options.new_project ? EmptyProjectAction::Replace : EmptyProjectAction::Keep
+            options.new_project ? EmptyProjectAction::Replace : EmptyProjectAction::Keep,
+            false,
+            std::move(on_done)
         );
         return;
     }
 
-    import_models(std::move(paths), options.new_project, false);
+    import_models(std::move(paths), options.new_project, false, std::move(on_done));
 }
 
 void FileOpeningInteractor::open_archives(std::vector<fs::path> archives, OpenFilesOptions options)
@@ -632,16 +638,31 @@ void FileOpeningInteractor::open_archive_selection(
     std::vector<fs::path> directories
 )
 {
-    if (!selection.models.empty()) {
-        import_models(std::move(selection.models), selection.models_to_new_project, true);
-    }
-    if (selection.projects.empty()) {
-        remove_directories(directories);
+    // Extracted files are removed only after they are read.
+    auto open_projects{[this,
+                        projects = std::move(selection.projects),
+                        replace_empty_project,
+                        directories = std::move(directories)](FileLoadResult models_result)
+    {
+        if (projects.empty() || models_result == FileLoadResult::Cancelled) {
+            remove_directories(directories);
+            return;
+        }
+        m_project_interactor.arrange_interactor().run_when_added_arranged(
+            [this, projects, replace_empty_project, directories]()
+            { open_archive_projects(projects, replace_empty_project, directories); }
+        );
+    }};
+
+    if (selection.models.empty()) {
+        open_projects(FileLoadResult::Loaded);
         return;
     }
-    m_project_interactor.arrange_interactor().run_when_added_arranged(
-        [this, projects = std::move(selection.projects), replace_empty_project, directories = std::move(directories)]()
-        { open_archive_projects(projects, replace_empty_project, directories); }
+    import_models(
+        std::move(selection.models),
+        selection.models_to_new_project,
+        true,
+        std::move(open_projects)
     );
 }
 
@@ -661,17 +682,30 @@ void FileOpeningInteractor::open_archive_projects(
         file,
         replace_empty_project ? EmptyProjectAction::Replace : EmptyProjectAction::Keep,
         true,
-        [this, projects = std::move(projects), directories = std::move(directories)]()
-        { open_archive_projects(projects, false, directories); }
+        [this, projects = std::move(projects), directories = std::move(directories)](
+            FileLoadResult result
+        )
+        {
+            open_archive_projects(
+                result == FileLoadResult::Cancelled ? std::vector<fs::path>{} : projects,
+                false,
+                directories
+            );
+        }
     );
 }
 
-void FileOpeningInteractor::import_models(std::vector<fs::path> files, bool to_new_project, bool temporary_files)
+void FileOpeningInteractor::import_models(
+    std::vector<fs::path> files,
+    bool to_new_project,
+    bool temporary_files,
+    FileLoadDoneFn on_done
+)
 {
     if (to_new_project && !m_project_interactor.selected_project_is_empty()) {
         m_project_interactor.new_project();
     }
-    m_project_interactor.load_models_to_project(std::move(files), temporary_files);
+    m_project_interactor.load_models_to_project(std::move(files), temporary_files, std::move(on_done));
 }
 
 void FileOpeningInteractor::report_archive_error(const std::string& message)

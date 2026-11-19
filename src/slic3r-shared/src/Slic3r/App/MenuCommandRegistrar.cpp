@@ -1198,14 +1198,20 @@ void MenuCommandRegistrar::load_object(Wildcards::TypeFlag specific_type)
         [this](bool success, const std::vector<boost::filesystem::path>& file_paths)
     {
         if (success) {
-            m_project_interactor.file_opening_interactor().open(file_paths, {.as_geometry = true});
-            if (m_render_module.has_command(CommandName::SvgGizmo)
-                && m_render_module.command(CommandName::SvgGizmo).enabled())
-            {
-                // open SvgGizmo, when svg volume is selected(was imported)
-                m_render_module.command(CommandName::SvgGizmo).execute();
-            }
-            m_navigator.navigate_to_module_type(App::Render::ModuleType::Plater);
+            m_project_interactor.file_opening_interactor().open(
+                file_paths,
+                {.as_geometry = true},
+                [this](Biz::FileOpen::FileLoadResult result)
+                {
+                    if (result == Biz::FileOpen::FileLoadResult::Loaded
+                        && m_render_module.has_command(CommandName::SvgGizmo)
+                        && m_render_module.command(CommandName::SvgGizmo).enabled())
+                    {
+                        // open SvgGizmo, when svg volume is selected(was imported)
+                        m_render_module.command(CommandName::SvgGizmo).execute();
+                    }
+                }
+            );
         }
     };
 
@@ -1318,17 +1324,17 @@ MenuCommandRegistrar::load_volume(Domain::ModelVolumeType type, Wildcards::TypeF
         auto svg_transform = svg_loading ?
             get_svg_guess_tr(file_paths, m_project_interactor, *m_scene_provider) :
             std::nullopt;
-        Biz::FileLoadingLogic::import_volumes_into_selected_object(
+        m_project_interactor.load_volumes_to_selected_object(
             file_paths,
             type,
-            m_project_interactor.scene_interactor(),
-            &AppServices::instance().dialog_manager()
+            [this, svg_loading, svg_transform](Biz::FileOpen::FileLoadResult result)
+            {
+                // open SvgGizmo, when svg volume is selected(was imported)
+                if (svg_loading && result == Biz::FileOpen::FileLoadResult::Loaded) {
+                    open_svg_gizmo(svg_transform, m_project_interactor, m_render_module);
+                }
+            }
         );
-
-        // open SvgGizmo, when svg volume is selected(was imported)
-        if (svg_loading) {
-            open_svg_gizmo(svg_transform, m_project_interactor, m_render_module);
-        }
     };
 
     auto& dlg_manager = AppServices::instance().dialog_manager();

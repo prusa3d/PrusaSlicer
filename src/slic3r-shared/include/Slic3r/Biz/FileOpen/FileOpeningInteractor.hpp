@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Slic3r/Biz/FileOpen/FileLoadJob.hpp"
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
 
 #include <boost/filesystem/path.hpp>
@@ -149,8 +150,15 @@ public:
     /**
      * @brief Opens files from any source: a single 3MF as a project, everything else as models.
      * Archives are extracted in a job.
+     *
+     * @param on_done Called when the files, which aren't archives, are loaded, failed or cancelled.
+     *                It isn't called when only archives are opened.
      */
-    void open(std::vector<boost::filesystem::path> paths, OpenFilesOptions options = {});
+    void open(
+        std::vector<boost::filesystem::path> paths,
+        OpenFilesOptions options = {},
+        FileLoadDoneFn on_done   = {}
+    );
 
     /**
      * @brief Lets the user choose files when an archive contains more than one, without it all are opened.
@@ -164,6 +172,7 @@ private:
     void open_archives(std::vector<boost::filesystem::path> archives, OpenFilesOptions options);
     /**
      * @brief Projects are opened once the imported models are arranged, opening a project selects it.
+     * Cancelled loading of the models or of a project skips the projects which follow.
      * @param directories Removed once everything is opened.
      */
     void open_archive_selection(
@@ -182,8 +191,14 @@ private:
     );
     /**
      * @param to_new_project A new project is created unless the selected one is empty.
+     * @param on_done Called when the models are loaded, failed or cancelled.
      */
-    void import_models(std::vector<boost::filesystem::path> files, bool to_new_project, bool temporary_files);
+    void import_models(
+        std::vector<boost::filesystem::path> files,
+        bool to_new_project,
+        bool temporary_files,
+        FileLoadDoneFn on_done = {}
+    );
     void report_archive_error(const std::string& message);
 
     ProjectInteractor& m_project_interactor;

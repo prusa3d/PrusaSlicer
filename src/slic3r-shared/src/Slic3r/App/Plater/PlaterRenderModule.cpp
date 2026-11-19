@@ -78,6 +78,8 @@
 #include "Slic3r/App/Wildcards.hpp"
 #include "Slic3r/App/PreferencesDialog.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
+#include "Slic3r/App/LoadingProgressDialog.hpp"
+#include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/App/SidebarStackLayout.hpp"
 #include "Slic3r/App/ColorMix/ColorMixDialog.hpp"
 #include "Slic3r/App/PrinterSettingsDialog.hpp"
@@ -157,6 +159,11 @@ PlaterRenderModule::~PlaterRenderModule()
     }
 }
 
+void PlaterRenderModule::shutdown()
+{
+    m_loading_progress_dialog->shutdown();
+}
+
 void PlaterRenderModule::set_modal_dialog(ModalDialog modal_dialog)
 {
     auto handle_dialog = [&](Yoga::Popup* dialog, ModalDialog modal)
@@ -174,6 +181,7 @@ void PlaterRenderModule::set_modal_dialog(ModalDialog modal_dialog)
     handle_dialog(m_preset_updater_dialog.get(), ModalDialog::PresetUpdater);
     handle_dialog(m_invalid_data_dialog.get(), ModalDialog::InvalidData);
     handle_dialog(m_effective_values_dialog.get(), ModalDialog::EffectiveValues);
+    handle_dialog(m_loading_progress_dialog.get(), ModalDialog::LoadingProgress);
     if (modal_dialog == ModalDialog::MsgBox) {
         msg_box_handler()->open_modal();
     } else {
@@ -578,6 +586,11 @@ void PlaterRenderModule::init_scene_layout()
     );
     m_crashed_projects_dialog =
         std::make_unique<CrashedProjectsDialog>(m_project_interactor, *m_render_module_navigator);
+    m_loading_progress_dialog = std::make_unique<LoadingProgressDialog>(
+        AppServices::instance().navigator(),
+        Biz::Platform::PlatformServices::instance().job_manager(),
+        Biz::Platform::PlatformServices::instance().timer_queue()
+    );
 
     // >> This code is same for Plater/PreviewRenderModule
     m_top_bar = std::make_unique<TopBar>(
@@ -638,7 +651,8 @@ void PlaterRenderModule::init_scene_layout()
         m_effective_values_dialog.release(),
         m_plugin_system.init_dialog().release(),
         m_crashed_projects_dialog.release(),
-        m_preset_updater_dialog.release()
+        m_preset_updater_dialog.release(),
+        m_loading_progress_dialog.release()
     ));
     m_layout->init();
 

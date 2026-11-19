@@ -39,6 +39,7 @@ class PreferencesDialog;
 class ToolBarButton;
 class ToolBarSwitchButton;
 class CrashedProjectsDialog;
+class LoadingProgressDialog;
 class ProjectSaver;
 class PresetUpdaterDialog;
 class MsgBoxHandler;
@@ -105,6 +106,11 @@ public:
         std::shared_ptr<ProjectSaver> project_saver
     );
     ~PlaterRenderModule() override;
+
+    /**
+     * @brief Stops tracking the loading jobs, to be called before the platform services close.
+     */
+    void shutdown();
 
     void render_scene(Render::CommandBuffer& cmd_buffer) override;
     void render_imgui(Render::CommandBuffer& cmd_buffer) override;
@@ -221,6 +227,7 @@ private:
     Yoga::Passthrough<PresetUpdaterDialog> m_preset_updater_dialog;
     Yoga::Passthrough<WelcomeDialog> m_welcome_dialog;
     Yoga::Passthrough<CrashedProjectsDialog> m_crashed_projects_dialog;
+    Yoga::Passthrough<LoadingProgressDialog> m_loading_progress_dialog;
 
     ToolBarButton* m_toolbar_add                     = nullptr;
     ToolBarButton* m_toolbar_delete                  = nullptr;

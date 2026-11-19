@@ -90,6 +90,12 @@ public:
 
     void navigate_to_module_type(Render::ModuleType type);
 
+    /**
+     * @brief Navigates to the module type, unlike navigate_to_module_type() it keeps the opened
+     * dialog when the module type is already selected.
+     */
+    void ensure_module_type(Render::ModuleType type);
+
     void on_selected_project_changed(size_t index) override;
 
     void set_opened_dialog(Yoga::Dialog* opened_dialog);

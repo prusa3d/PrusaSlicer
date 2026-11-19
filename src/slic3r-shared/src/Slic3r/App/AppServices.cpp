@@ -37,6 +37,7 @@ void AppServices::set_navigator(std::unique_ptr<Navigator>&& navigator)
     m_navigator = std::move(navigator);
 }
 
+
 void AppServices::set_file_explorer_handler(
     std::unique_ptr<Platform::IFileExplorerHandler>&& handler
 )
@@ -86,6 +87,7 @@ Navigator& AppServices::navigator() const
     ASSERT(m_navigator != nullptr);
     return *m_navigator;
 }
+
 
 Platform::IFileExplorerHandler& AppServices::file_explorer_handler() const
 {

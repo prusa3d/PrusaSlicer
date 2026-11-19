@@ -93,6 +93,13 @@ void Navigator::navigate_to_module_type(Render::ModuleType type)
     set_render_module_type(type);
 }
 
+void Navigator::ensure_module_type(Render::ModuleType type)
+{
+    if (has_modules() && m_project_contexts->selected().type != type) {
+        navigate_to_module_type(type);
+    }
+}
+
 void Navigator::set_render_module_type(Render::ModuleType type)
 {
     ProjectContext& context               = m_project_contexts->selected();

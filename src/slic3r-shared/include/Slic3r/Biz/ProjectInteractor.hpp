@@ -28,6 +28,7 @@
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterInteractor.hpp"
 #include "Slic3r/Biz/RemovableDrive/RemovableDriveService.hpp"
 #include "Slic3r/Biz/FileDownloader/FileDownloaderInteractor.hpp"
+#include "Slic3r/Biz/FileOpen/FileLoadJob.hpp"
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 #include "Slic3r/Biz/ExportDestination/ExportDestinationInteractor.hpp"
 #include "Slic3r/Biz/IUndoProvider.hpp"
@@ -35,6 +36,8 @@
 #include "Slic3r/Biz/BackupStore.hpp"
 #include "Slic3r/Biz/MatDb/MatDbInteractor.hpp"
 #include "Slic3r/Biz/FileOpen/FileOpeningInteractor.hpp"
+
+#include <set>
 
 namespace Slic3r::Domain {
 class Model;
@@ -49,6 +52,10 @@ class ISelectedConfigContainerChangedListener;
 class IConfigContainerListChangedListener;
 class IProjectsChangedListener;
 class IMessageDialogProvider;
+
+namespace FileLoadingLogic {
+struct ImportedFileData;
+} // namespace FileLoadingLogic
 
 enum class EmptyProjectAction
 {
@@ -211,13 +218,13 @@ public:
      * @param empty_project_action Replace takes over the selected project instead of adding a new
      * one, when that project is still empty once the file is loaded.
      * @param temporary_file The project is loaded without a path to the file and stays unmodified.
-     * @param on_done Called on the main thread after the project is loaded or failed.
+     * @param on_done Called on the main thread after the project is loaded, failed or cancelled.
      */
     void load_project(
         const boost::filesystem::path& file_path,
         EmptyProjectAction empty_project_action = EmptyProjectAction::Keep,
         bool temporary_file                     = false,
-        std::function<void()> on_done           = {}
+        FileOpen::FileLoadDoneFn on_done        = {}
     );
     /**
      * @brief Load projects from files
@@ -312,6 +319,9 @@ public:
         return m_selection.config_container_id();
     }
 
+    /**
+     * @return false also when files are still being read into the selected project.
+     */
     bool selected_project_is_empty() const;
 
     /** @} */
@@ -565,10 +575,31 @@ public:
     }
 
     /**
+     * @brief Reads the files in a job and adds them as new objects into the selected project.
      * @note Files opened by the user go through file_opening_interactor().open().
      * @param temporary_sources Imported objects keep no source path, reload from disk is disabled.
+     * @param on_done Called when the loading is finished, failed or cancelled. Failed when no
+     * object was added, Cancelled when the project was closed meanwhile, Loaded for empty paths.
      */
-    void load_models_to_project(std::vector<boost::filesystem::path> paths, bool temporary_sources = false);
+    void load_models_to_project(
+        std::vector<boost::filesystem::path> paths,
+        bool temporary_sources           = false,
+        FileOpen::FileLoadDoneFn on_done = {}
+    );
+
+    /**
+     * @brief Reads the files in a job and adds them as volumes into the selected object.
+     *
+     * The volumes are dropped when the selection changed during the loading.
+     *
+     * @param on_done Called when the loading is finished, failed or cancelled. Failed when the
+     * volumes were dropped, Loaded for empty paths.
+     */
+    void load_volumes_to_selected_object(
+        std::vector<boost::filesystem::path> paths,
+        Domain::ModelVolumeType volume_type,
+        FileOpen::FileLoadDoneFn on_done = {}
+    );
 
     /**
      * @brief Callback from AppInstanceMessageHandler.
@@ -764,6 +795,43 @@ private:
 
     void report_connect_upload_error(const std::string& msg);
 
+    /**
+     * @return Unique name of a job which loads models or volumes.
+     */
+    std::string next_file_load_job_name(const std::string& kind);
+
+    /**
+     * @brief Reads the files for import in a job.
+     * @param project_id Closing the project cancels the job.
+     * @param apply Adds the read files into the scene, called on the main thread. Its result,
+     * or Failed when it throws, is passed to on_done.
+     * @param on_done Called after apply, or when the job failed or was cancelled.
+     */
+    void start_file_read_job(
+        const std::string& kind,
+        std::vector<boost::filesystem::path> paths,
+        int tool_count,
+        Domain::SelectionId project_id,
+        std::function<FileOpen::FileLoadResult(std::vector<FileLoadingLogic::ImportedFileData>)> apply,
+        FileOpen::FileLoadDoneFn on_done
+    );
+
+    /**
+     * @brief Stops counting a finished job of start_file_read_job in selected_project_is_empty.
+     */
+    void end_file_read(Domain::SelectionId project_id);
+
+    /**
+     * @brief Logs the error and notifies on_project_load_failed.
+     */
+    void report_file_load_failure(const std::string& description);
+
+    /**
+     * @brief Handles the exception of a file loading job, reports it unless the job was cancelled.
+     * @return Cancelled or Failed.
+     */
+    FileOpen::FileLoadResult handle_file_load_job_exception(std::exception_ptr eptr);
+
 private:
     struct Selection
     {
@@ -805,6 +873,9 @@ private:
     ObservableProjectList m_project_list;
     IMessageDialogProvider* m_dialog_provider{ nullptr };
     std::unique_ptr<IUndoProvider> m_undo_provider;
+    size_t m_file_load_job_counter{0};
+    /// Projects which files are read into, once per running job.
+    std::multiset<Domain::SelectionId> m_projects_with_file_reads;
 
 
     /*

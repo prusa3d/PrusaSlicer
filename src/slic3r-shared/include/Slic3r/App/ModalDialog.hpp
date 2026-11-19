@@ -12,6 +12,7 @@ enum class ModalDialog
     EffectiveValues,
     MsgBox, ///< One-of modal dialogs created by MsgBoxHandler
     InvalidData,
+    LoadingProgress,
 };
 
 } // namespace Slic3r::App
