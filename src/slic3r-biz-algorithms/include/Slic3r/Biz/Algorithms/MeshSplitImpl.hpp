@@ -125,9 +125,14 @@ struct SplitOutputFn {
     SplitOutputFn& operator++() { return *this; };
 };
 
-// Splits a mesh into multiple meshes when possible.
-template<class Its, class OutputIt>
-void its_split(const Its &m, OutputIt out_it)
+/**
+ * @brief Splits a mesh into its connected components.
+ * @param on_component Called once for every component as on_component(component_its, source_facet_indices), where
+ *                     source_facet_indices[i] is the index of the facet of the original mesh, which the facet i of the component
+ *                     is a renumbered copy of (the facets of the component have new vertex indices, so only the index identifies the original facet).
+ */
+template <class Its, class OnComponent>
+void its_split_components(const Its& m, OnComponent on_component)
 {
     using namespace meshsplit_detail;
 
@@ -172,9 +177,24 @@ void its_split(const Its &m, OutputIt out_it)
             mesh.indices.emplace_back(new_face);
         }
 
-        *out_it = std::move(mesh);
-        ++out_it;
+        on_component(std::move(mesh), facets);
     }
+}
+
+/**
+ * @brief Splits a mesh into its connected components written to out_it.
+ */
+template <class Its, class OutputIt>
+void its_split(const Its& m, OutputIt out_it)
+{
+    its_split_components(
+        m,
+        [&out_it](indexed_triangle_set&& component, const std::vector<size_t>&)
+        {
+            *out_it = std::move(component);
+            ++out_it;
+        }
+    );
 }
 
 template<class Its>

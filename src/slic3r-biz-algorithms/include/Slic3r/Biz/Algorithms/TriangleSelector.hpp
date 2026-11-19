@@ -31,6 +31,10 @@ using Domain::Transform3d;
 using Domain::TriangleSelector::TriangleStateType;
 using Domain::TriangleSelector::TriangleSplittingData;
 
+namespace TriangleMesh {
+struct SourceFacet;
+} // namespace TriangleMesh
+
 // Following class holds information about selected triangles. It also has power
 // to recursively subdivide the triangles and make the selection finer.
 class TriangleSelector
@@ -495,6 +499,19 @@ public:
     // The operation may merge split triangles if they are being assigned the same color.
     void seed_fill_apply_on_triangles(TriangleStateType new_state);
 
+    /**
+     * @brief Painting of derived_mesh, whose facets originate from the facets of source_mesh painted by source_data.
+     *
+     * @param source_mesh Mesh painted by source_data, in the coordinate system of derived_mesh.
+     * @param source_facets SourceFacet of every facet of derived_mesh, in the order of its facets.
+     */
+    static TriangleSplittingData remap_to_derived_mesh(
+        const TriangleSplittingData& source_data,
+        const Domain::TriangleMesh& source_mesh,
+        const Domain::TriangleMesh& derived_mesh,
+        const std::vector<TriangleMesh::SourceFacet>& source_facets
+    );
+
     // Compute total area of the triangle.
     double get_triangle_area(const Triangle &triangle) const;
 
@@ -676,6 +693,26 @@ private:
 
     // Check if the triangle index is the original triangle from mesh, or it was additionally created by splitting.
     bool is_original_triangle(int triangle_idx) const { return triangle_idx < m_orig_size_indices; }
+
+    /**
+     * @brief Unsplit triangle of the split tree of facet_idx at the point, the closest one when rounding puts the point outside all of them.
+     */
+    int closest_unsplit_triangle_at_point(int facet_idx, const Vec3f &point) const;
+
+    /**
+     * @brief Size of the finest leaf of the split tree of facet_idx, measured by its longest edge, used as the edge limit for repainting.
+     */
+    float finest_leaf_edge_length(int facet_idx) const;
+
+    /**
+     * @brief Whether the tested triangle, lying in the plane of triangle_idx, overlaps a leaf of its split tree in another state than expected_state.
+     */
+    bool is_painted_in_other_state_under(int triangle_idx, const std::array<Vec3f, 3> &tested_triangle, TriangleStateType expected_state) const;
+
+    /**
+     * @brief Paints facet_idx by the painting of source_facet_idx of source_selector, splitting it along its borders.
+     */
+    void repaint_by_source_facet(int facet_idx, const Domain::Index3 &neighbors, const TriangleSelector &source_selector, int source_facet_idx);
 
 #ifndef NDEBUG
     bool verify_triangle_neighbors(const Triangle& tr, const Domain::Index3& neighbors) const;

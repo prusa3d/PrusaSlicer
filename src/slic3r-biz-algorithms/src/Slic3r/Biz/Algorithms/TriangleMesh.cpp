@@ -332,22 +332,46 @@ bool is_front_up_left(const TriangleMesh &trinagle_mesh1, const TriangleMesh &tr
     return min1.x() < min2.x();
 }
 
+std::vector<TriangleMeshWithSourceFacets> split_to_components(const TriangleMesh& mesh)
+{
+    std::vector<TriangleMeshWithSourceFacets> components;
+    Slic3r::its_split_components(
+        mesh.its,
+        [&components](
+            indexed_triangle_set&& component_its,
+            const std::vector<size_t>& source_facet_idxs
+        )
+        {
+            // The TriangleMesh constructor shall fill in the mesh statistics including volume.
+            TriangleMeshWithSourceFacets& component = components.emplace_back(
+                TriangleMeshWithSourceFacets{construct(std::move(component_its))}
+            );
+            // Some source mesh parts may be incorrectly oriented. Correct them.
+            const bool facets_flipped = component.mesh.volume() < 0;
+            if (facets_flipped) {
+                component.mesh.flip_triangles();
+            }
+
+            component.source_facets.reserve(source_facet_idxs.size());
+            for (const size_t source_facet_idx : source_facet_idxs) {
+                component.source_facets.push_back(
+                    {.index = int(source_facet_idx), .is_unchanged = !facets_flipped}
+                );
+            }
+        }
+    );
+
+    return components;
+}
+
 std::vector<TriangleMesh> split(const TriangleMesh& mesh)
 {
-    using Biz::Algorithms::TriangleMesh::construct;
-
-    std::vector<indexed_triangle_set> itss = its_split(mesh.its);
-    std::vector<TriangleMesh> out;
-    out.reserve(itss.size());
-    for (indexed_triangle_set &m : itss) {
-        // The TriangleMesh constructor shall fill in the mesh statistics including volume.
-        out.push_back(construct(std::move(m)));
-        if (TriangleMesh &triangle_mesh = out.back(); triangle_mesh.volume() < 0)
-            // Some source mesh parts may be incorrectly oriented. Correct them.
-            triangle_mesh.flip_triangles();
-
+    std::vector<TriangleMesh> meshes;
+    for (TriangleMeshWithSourceFacets& component : split_to_components(mesh)) {
+        meshes.push_back(std::move(component.mesh));
     }
-    return out;
+
+    return meshes;
 }
 
 bool write_obj_file(const TriangleMesh& mesh, const char* output_file)

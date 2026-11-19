@@ -10,6 +10,7 @@
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Exception.hpp"
 
+#include <algorithm>
 #include <ranges>
 #include <iostream>
 
@@ -541,23 +542,23 @@ void split(Domain::ModelObject* object, Domain::ModelObjectPtrs* new_objects)
         if (volume->text_configuration.has_value())
             volume->text_configuration.reset();
 
-        std::vector<Domain::TriangleMesh> meshes =
-            Slic3r::Biz::Algorithms::TriangleMesh::split(volume->mesh());
-        std::sort(
-            meshes.begin(),
-            meshes.end(),
-            Slic3r::Biz::Algorithms::TriangleMesh::is_front_up_left
+        std::vector<TriangleMesh::TriangleMeshWithSourceFacets> components =
+            TriangleMesh::split_to_components(volume->mesh());
+        std::ranges::sort(
+            components,
+            TriangleMesh::is_front_up_left,
+            &TriangleMesh::TriangleMeshWithSourceFacets::mesh
         );
 
         size_t counter = 1;
-        for (Domain::TriangleMesh& mesh : meshes) {
+        for (auto& [mesh, source_facets] : components) {
             // FIXME: crashes if not satisfied
             if (mesh.facets_count() < 3 || mesh.has_zero_volume())
                 continue;
 
             // XXX: this seems to be the only real usage of m_model, maybe refactor this so that it's not needed?
             Domain::ModelObject* new_object = object->get_model()->add_object();
-            if (meshes.size() == 1) {
+            if (components.size() == 1) {
                 new_object->name                = volume->name;
                 new_object->object_settings     = object->object_settings.overrides.empty() ?
                     create_object_settings_from_volume_settings<Domain::ObjectSettings>(
@@ -571,7 +572,7 @@ void split(Domain::ModelObject* object, Domain::ModelObjectPtrs* new_objects)
                     object->object_settings_sla;
             } else {
                 new_object->name =
-                    object->name + (meshes.size() > 1 ? "_" + std::to_string(counter++) : "");
+                    object->name + (components.size() > 1 ? "_" + std::to_string(counter++) : "");
                 new_object->object_settings     = object->object_settings;
                 new_object->object_settings_sla = object->object_settings_sla;
             }
@@ -581,7 +582,8 @@ void split(Domain::ModelObject* object, Domain::ModelObjectPtrs* new_objects)
                 new_object->add_instance(*model_instance);
 
             Domain::ModelVolume* new_vol =
-                Algorithms::ModelObject::add_volume(new_object, *volume, std::move(mesh));
+                ModelObject::add_volume(new_object, *volume, std::move(mesh));
+            ModelVolume::remap_facets_annotations(*volume, volume->mesh(), source_facets, *new_vol);
 
             // Invalidate extruder value in volume's config,
             // otherwise there will no way to change extruder for object after splitting,

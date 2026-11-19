@@ -73,6 +73,39 @@ void TriangleSplittingData::update_used_states(const size_t bitstream_start_idx)
     }
 }
 
+void TriangleSplittingData::append(const TriangleSplittingData& appended, const int facet_offset)
+{
+    // The mappings have to stay sorted by the facet index.
+    ASSERT(
+        this->triangles_to_split.empty()
+        || appended.triangles_to_split.empty()
+        || this->triangles_to_split.back().triangle_idx
+            < appended.triangles_to_split.front().triangle_idx + facet_offset
+    );
+
+    const int bitstream_offset = static_cast<int>(this->bitstream.size());
+    for (const TriangleBitStreamMapping& mapping : appended.triangles_to_split) {
+        this->triangles_to_split.emplace_back(
+            mapping.triangle_idx + facet_offset,
+            mapping.bitstream_start_idx + bitstream_offset
+        );
+    }
+
+    this->bitstream
+        .insert(this->bitstream.end(), appended.bitstream.begin(), appended.bitstream.end());
+
+    ASSERT(this->used_states.size() == appended.used_states.size());
+    for (size_t state_idx = 0; state_idx < this->used_states.size(); ++state_idx) {
+        this->used_states[state_idx] =
+            this->used_states[state_idx] || appended.used_states[state_idx];
+    }
+
+    // All facets of an unpainted mesh are in the NONE state.
+    if (appended.triangles_to_split.empty()) {
+        this->used_states[static_cast<int>(TriangleStateType::NONE)] = true;
+    }
+}
+
 size_t TriangleSplittingData::minimum_required_painting_version() const
 {
     // States 0-16 fit into version 1 encoding (2 or 6 bits).

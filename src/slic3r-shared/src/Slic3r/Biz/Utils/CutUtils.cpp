@@ -17,6 +17,17 @@
 
 #include "libslic3r/TriangleMeshSlicer.hpp" // cut_mesh
 
+using Slic3r::Biz::Algorithms::TriangleMesh::IndexedTriangleSetCut;
+using Slic3r::Biz::Algorithms::TriangleMesh::IndexedTriangleSetWithSourceFacets;
+using Slic3r::Biz::Algorithms::TriangleMesh::SourceFacet;
+using Slic3r::Biz::Algorithms::TriangleMesh::TriangleMeshWithSourceFacets;
+using Slic3r::Domain::TriangleMesh;
+
+using Slic3r::Biz::Algorithms::ModelObject::add_volume;
+using Slic3r::Biz::Algorithms::ModelVolume::merge_facets_annotations;
+using Slic3r::Biz::Algorithms::ModelVolume::remap_facets_annotations;
+using Slic3r::Biz::Algorithms::TriangleMesh::construct;
+
 namespace Slic3r::Biz {
 
 using namespace Algorithms::Geometry;
@@ -24,7 +35,6 @@ using namespace Domain;
 
 namespace tm = Algorithms::TriangleMesh;
 namespace mv = Algorithms::ModelVolume;
-using Domain::TriangleMesh;
 
 static void apply_tolerance(Domain::ModelVolume* vol)
 {
@@ -58,41 +68,96 @@ static void apply_tolerance(Domain::ModelVolume* vol)
     vol->set_offset(vol->get_offset() + rot_norm * z_offset);
 }
 
-static void add_cut_volume(TriangleMesh& mesh, Domain::ModelObject* object, const Domain::ModelVolume* src_volume, const Transform3d& cut_matrix, const std::string& suffix = {}, Domain::ModelVolumeType type = Domain::ModelVolumeType::MODEL_PART)
+/**
+ * @brief Parts of a volume cut by a plane, in the coordinate system of the plane until add_cut_volume() moves them.
+ */
+struct VolumeCut
 {
-    if (mesh.empty())
-        return;
+    /// Mesh of the volume with the orientation of its painting, in the coordinate system of the added parts.
+    TriangleMesh source_mesh;
+    TriangleMeshWithSourceFacets upper;
+    TriangleMeshWithSourceFacets lower;
+};
 
-    mesh.transform(cut_matrix);
-    Domain::ModelVolume* vol = Algorithms::ModelObject::add_volume(object, mesh);
+static void add_cut_volume(
+    TriangleMeshWithSourceFacets& cut_part,
+    const TriangleMesh& source_mesh,
+    ModelObject* object,
+    const ModelVolume* src_volume,
+    const Transform3d& cut_matrix,
+    const std::string& suffix = {},
+    ModelVolumeType type      = ModelVolumeType::MODEL_PART
+)
+{
+    if (cut_part.mesh.empty()) {
+        return;
+    }
+
+    cut_part.mesh.transform(cut_matrix);
+    ModelVolume* vol = add_volume(object, cut_part.mesh);
     vol->set_type(type);
 
-    vol->name = src_volume->name + suffix;
-    vol->cut_info = src_volume->cut_info;
+    vol->name            = src_volume->name + suffix;
+    vol->cut_info        = src_volume->cut_info;
     vol->volume_settings = src_volume->volume_settings;
+
+    remap_facets_annotations(*src_volume, source_mesh, cut_part.source_facets, *vol);
 }
 
-static void process_volume_cut(Domain::ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
-                                ModelObjectCutAttributes attributes, TriangleMesh& upper_mesh, TriangleMesh& lower_mesh)
+static VolumeCut process_volume_cut(
+    ModelVolume* volume,
+    const Transform3d& instance_matrix,
+    const Transform3d& cut_matrix,
+    ModelObjectCutAttributes attributes
+)
 {
     const auto volume_matrix = volume->get_matrix();
 
     const Transformation cut_transformation = Transformation(cut_matrix);
     const Transform3d invert_cut_matrix = cut_transformation.get_rotation_matrix().inverse() * translation_transform(-1 * cut_transformation.get_offset());
+    const Transform3d mesh_matrix = invert_cut_matrix * instance_matrix * volume_matrix;
 
     // Transform the mesh by the combined transformation matrix.
-    // Flip the triangles in case the composite transformation is left handed.
     TriangleMesh mesh(volume->mesh());
-    mesh.transform(invert_cut_matrix * instance_matrix * volume_matrix, true);
+    mesh.transform(mesh_matrix);
 
-    using Biz::Algorithms::TriangleMesh::construct;
+    VolumeCut cut;
+    if (volume->is_painted()) {
+        cut.source_mesh = mesh;
+        cut.source_mesh.transform(cut_matrix);
+    }
 
-    indexed_triangle_set upper_its, lower_its;
-    cut_mesh(mesh.its, 0.0f, &upper_its, &lower_its);
-    if (attributes.keep_upper)
-        upper_mesh = TriangleMesh(construct(upper_its));
-    if (attributes.keep_lower)
-        lower_mesh = TriangleMesh(construct(lower_its));
+    // Flip the triangles in case the composite transformation is left handed, the painting keeps the source orientation.
+    const bool facets_flipped = Transformation(mesh_matrix).is_left_handed();
+    if (facets_flipped) {
+        mesh.flip_triangles();
+    }
+
+    IndexedTriangleSetCut cut_parts = cut_mesh(mesh.its, 0.f);
+    if (facets_flipped) {
+        // The flipped facets have the opposite vertex order than their source facets, so they are repainted instead of taking over the split trees.
+        for (IndexedTriangleSetWithSourceFacets* cut_part : {&cut_parts.upper, &cut_parts.lower}) {
+            for (SourceFacet& source_facet : cut_part->source_facets) {
+                source_facet.is_unchanged = false;
+            }
+        }
+    }
+
+    if (attributes.keep_upper) {
+        cut.upper = {
+            .mesh          = construct(std::move(cut_parts.upper.its)),
+            .source_facets = std::move(cut_parts.upper.source_facets)
+        };
+    }
+
+    if (attributes.keep_lower) {
+        cut.lower = {
+            .mesh          = construct(std::move(cut_parts.lower.its)),
+            .source_facets = std::move(cut_parts.lower.source_facets)
+        };
+    }
+
+    return cut;
 }
 
 static void process_connector_cut(Domain::ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
@@ -156,16 +221,15 @@ static void process_connector_cut(Domain::ModelVolume* volume, const Transform3d
         apply_tolerance(volume);
 
         // Perform cut
-        TriangleMesh upper_mesh, lower_mesh;
-        process_volume_cut(volume, Transform3d::Identity(), cut_matrix, attributes, upper_mesh, lower_mesh);
+        VolumeCut cut = process_volume_cut(volume, Transform3d::Identity(), cut_matrix, attributes);
 
         // add small Z offset to better preview
-        upper_mesh.translate((-0.05 * Vec3d::UnitZ()).cast<float>());
-        lower_mesh.translate((0.05 * Vec3d::UnitZ()).cast<float>());
+        cut.upper.mesh.translate((-0.05 * Vec3d::UnitZ()).cast<float>());
+        cut.lower.mesh.translate((0.05 * Vec3d::UnitZ()).cast<float>());
 
         // Add cut parts to the related objects
-        add_cut_volume(upper_mesh, upper, volume, cut_matrix, "_A", volume->type());
-        add_cut_volume(lower_mesh, lower, volume, cut_matrix, "_B", volume->type());
+        add_cut_volume(cut.upper, cut.source_mesh, upper, volume, cut_matrix, "_A", volume->type());
+        add_cut_volume(cut.lower, cut.source_mesh, lower, volume, cut_matrix, "_B", volume->type());
     }
 }
 
@@ -196,25 +260,27 @@ static void process_solid_part_cut(Domain::ModelVolume* volume, const Transform3
                             ModelObjectCutAttributes attributes, Domain::ModelObject* upper, Domain::ModelObject* lower)
 {
     // Perform cut
-    TriangleMesh upper_mesh, lower_mesh;
-    process_volume_cut(volume, instance_matrix, cut_matrix, attributes, upper_mesh, lower_mesh);
+    VolumeCut cut = process_volume_cut(volume, instance_matrix, cut_matrix, attributes);
 
     // Add required cut parts to the objects
 
     if (attributes.keep_as_parts) {
-        add_cut_volume(upper_mesh, upper, volume, cut_matrix, "_A");
-        if (!lower_mesh.empty()) {
-            add_cut_volume(lower_mesh, upper, volume, cut_matrix, "_B");
+        add_cut_volume(cut.upper, cut.source_mesh, upper, volume, cut_matrix, "_A");
+        if (!cut.lower.mesh.empty()) {
+            add_cut_volume(cut.lower, cut.source_mesh, upper, volume, cut_matrix, "_B");
             upper->volumes.back()->cut_info.is_from_upper = false;
         }
+
         return;
     }
 
-    if (attributes.keep_upper)
-        add_cut_volume(upper_mesh, upper, volume, cut_matrix);
+    if (attributes.keep_upper) {
+        add_cut_volume(cut.upper, cut.source_mesh, upper, volume, cut_matrix);
+    }
 
-    if (attributes.keep_lower && !lower_mesh.empty())
-        add_cut_volume(lower_mesh, lower, volume, cut_matrix);
+    if (attributes.keep_lower && !cut.lower.mesh.empty()) {
+        add_cut_volume(cut.lower, cut.source_mesh, lower, volume, cut_matrix);
+    }
 }
 
 static void reset_instance_transformation(Domain::ModelObject* object, size_t src_instance_idx,
@@ -341,8 +407,6 @@ const Domain::ModelObjectPtrs& Cut::perform_with_plane()
     const Transform3d       inverse_cut_matrix = cut_transformation.get_rotation_matrix().inverse() * translation_transform(-1. * cut_transformation.get_offset());
 
     for (Domain::ModelVolume* volume : mo->volumes) {
-        volume->reset_extra_facets();
-
         if (!volume->is_model_part()) {
             if (volume->cut_info.is_processed)
                 process_modifier_cut(volume, instance_matrix, inverse_cut_matrix, m_attributes, upper, lower);
@@ -432,17 +496,24 @@ static void merge_solid_parts_inside_object(Domain::ModelObjectPtrs& objects)
 {
     for (Domain::ModelObject* mo : objects) {
         TriangleMesh mesh;
+        std::vector<const ModelVolume*> merged_volumes;
         // Merge all SolidPart but not Connectors
         for (const Domain::ModelVolume* mv : mo->volumes) {
             if (mv->is_model_part() && !mv->is_cut_connector()) {
                 TriangleMesh m = mv->mesh();
                 m.transform(mv->get_matrix());
                 mesh.merge(m);
+                merged_volumes.push_back(mv);
             }
         }
+
         if (!mesh.empty()) {
-            Domain::ModelVolume* new_volume = Algorithms::ModelObject::add_volume(mo, mesh);
-            new_volume->name = mo->name;
+            ModelVolume* new_volume = add_volume(mo, mesh);
+            new_volume->name        = mo->name;
+
+            // The merged mesh consists of the facets of the merged parts in their order, with their vertex order kept.
+            merge_facets_annotations(merged_volumes, *new_volume);
+
             // Delete all merged SolidPart but not Connectors
             for (int i = int(mo->volumes.size()) - 2; i >= 0; --i) {
                 const Domain::ModelVolume* mv = mo->volumes[i];

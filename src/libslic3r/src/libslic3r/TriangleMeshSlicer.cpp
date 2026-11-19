@@ -2323,7 +2323,7 @@ void slice_mesh_slabs(
 
 // Remove duplicates of slice_vertices, optionally triangulate the cut.
 static void triangulate_slice(
-    indexed_triangle_set    &its, 
+    TriMesh::IndexedTriangleSetWithSourceFacets &part,
     IntersectionLines       &lines, 
     std::vector<int>        &slice_vertices,
     // Vertices of the original (unsliced) mesh. Newly added vertices are those on the slice.
@@ -2333,6 +2333,10 @@ static void triangulate_slice(
     bool                     triangulate, 
     bool                     normals_down)
 {
+    indexed_triangle_set& its                        = part.its;
+    std::vector<TriMesh::SourceFacet>& source_facets = part.source_facets;
+    assert(source_facets.size() == its.indices.size());
+
     sort_remove_duplicates(slice_vertices);
 
     // 1) Create map of the slice vertices from positions to mesh indices.
@@ -2381,6 +2385,9 @@ static void triangulate_slice(
                 // Remove degenerate face.
                 f = its.indices.back();
                 its.indices.pop_back();
+
+                source_facets[i] = source_facets.back();
+                source_facets.pop_back();
             } else
                 // Keep the face.
                 ++ i;
@@ -2416,6 +2423,9 @@ static void triangulate_slice(
             if (facet[0] != facet[1] && facet[0] != facet[2] && facet[1] != facet[2])
                 its.indices.emplace_back(facet);
         }
+
+        // The cap faces appended above get the default SourceFacet with the index -1, which marks a face without a source facet.
+        source_facets.resize(its.indices.size());
     }
 
     // Remove vertices, which are not referenced by any face.
@@ -2442,11 +2452,21 @@ Polygons project_mesh(
     return union_(union_parallel_reduce(top.front()), union_parallel_reduce(bottom.back()));
 }
 
-void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *upper, indexed_triangle_set *lower, bool triangulate_caps)
+TriMesh::IndexedTriangleSetCut
+cut_mesh(const indexed_triangle_set& mesh, const float z, const bool triangulate_caps)
 {
-    assert(upper || lower);
-    if (upper == nullptr && lower == nullptr)
-        return;
+    TriMesh::IndexedTriangleSetCut cut;
+    TriMesh::IndexedTriangleSetWithSourceFacets& upper = cut.upper;
+    TriMesh::IndexedTriangleSetWithSourceFacets& lower = cut.lower;
+
+    const auto add_facet =
+        [](TriMesh::IndexedTriangleSetWithSourceFacets& part,
+           const Index3& facet,
+           const TriMesh::SourceFacet& source_facet)
+    {
+        part.its.indices.emplace_back(facet);
+        part.source_facets.push_back(source_facet);
+    };
 
 #ifndef NDEBUG
     const size_t had_degenerate_faces = TriMesh::its_num_degenerate_faces(mesh);
@@ -2454,16 +2474,10 @@ void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *u
 
     SPDLOG_TRACE("cut_mesh - slicing object");
 
-    if (upper) {
-        upper->clear();
-        upper->vertices = mesh.vertices;
-        upper->indices.reserve(mesh.indices.size());
-    }
-
-    if (lower) {
-        lower->clear();
-        lower->vertices = mesh.vertices;
-        lower->indices.reserve(mesh.indices.size());
+    for (TriMesh::IndexedTriangleSetWithSourceFacets* part : {&upper, &lower}) {
+        part->its.vertices = mesh.vertices;
+        part->its.indices.reserve(mesh.indices.size());
+        part->source_facets.reserve(mesh.indices.size());
     }
 
 #ifndef NDEBUG
@@ -2502,26 +2516,22 @@ void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *u
             if (line.edge_type == IntersectionLine::FacetEdgeType::Top) {
                 lower_slice_vertices.emplace_back(line.a_id);
                 lower_slice_vertices.emplace_back(line.b_id);
-                if (lower) {
-                    lower_lines.emplace_back(line);
-                    if (triangulate_caps) {
-                        // Snap these vertices to coord_t grid, so that they will be matched with the vertices produced
-                        // by triangulating opening on the cut.
-                        lower->vertices[line.a_id] = contour_point_to_v3f(line.a, z);
-                        lower->vertices[line.b_id] = contour_point_to_v3f(line.b, z);
-                    }
+                lower_lines.emplace_back(line);
+                if (triangulate_caps) {
+                    // Snap these vertices to coord_t grid, so that they will be matched with the vertices produced
+                    // by triangulating opening on the cut.
+                    lower.its.vertices[line.a_id] = contour_point_to_v3f(line.a, z);
+                    lower.its.vertices[line.b_id] = contour_point_to_v3f(line.b, z);
                 }
             } else if (line.edge_type == IntersectionLine::FacetEdgeType::Bottom) {
                 upper_slice_vertices.emplace_back(line.a_id);
                 upper_slice_vertices.emplace_back(line.b_id);
-                if (upper) {
-                    upper_lines.emplace_back(line);
-                    if (triangulate_caps) {
-                        // Snap these vertices to coord_t grid, so that they will be matched with the vertices produced
-                        // by triangulating opening on the cut.
-                        upper->vertices[line.a_id] = contour_point_to_v3f(line.a, z);
-                        upper->vertices[line.b_id] = contour_point_to_v3f(line.b, z);
-                    }
+                upper_lines.emplace_back(line);
+                if (triangulate_caps) {
+                    // Snap these vertices to coord_t grid, so that they will be matched with the vertices produced
+                    // by triangulating opening on the cut.
+                    upper.its.vertices[line.a_id] = contour_point_to_v3f(line.a, z);
+                    upper.its.vertices[line.b_id] = contour_point_to_v3f(line.b, z);
                 }
             } else if (line.edge_type == IntersectionLine::FacetEdgeType::General && triangulate_caps) {
                 lower_lines.emplace_back(line);
@@ -2531,12 +2541,10 @@ void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *u
         
         if (min_z > z || (min_z == z && max_z > z)) {
             // facet is above the cut plane and does not belong to it
-            if (upper != nullptr)
-                upper->indices.emplace_back(facet);
+            add_facet(upper, facet, {.index = facet_idx, .is_unchanged = true});
         } else if (max_z < z || (max_z == z && min_z < z)) {
             // facet is below the cut plane and does not belong to it
-            if (lower != nullptr)
-                lower->indices.emplace_back(facet);
+            add_facet(lower, facet, {.index = facet_idx, .is_unchanged = true});
         } else if (min_z < z && max_z > z) {
             // Facet is cut by the slicing plane.
             assert(slice_type == FacetSliceType::Slicing);
@@ -2573,7 +2581,7 @@ void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *u
             const int         iv2 = facet[iv];
 
             // intersect v0-v1 and v2-v0 with cutting plane and make new vertices
-            auto new_vertex = [upper, lower, &upper_slice_vertices, &lower_slice_vertices](const Vec3f &a, const int ia, const Vec3f &b, const int ib, const Vec3f &c) {
+            auto new_vertex = [&upper, &lower, &upper_slice_vertices, &lower_slice_vertices](const Vec3f &a, const int ia, const Vec3f &b, const int ib, const Vec3f &c) {
                 int iupper, ilower;
                 if (c == a)
                     iupper = ilower = ia;
@@ -2581,24 +2589,22 @@ void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *u
                     iupper = ilower = ib;
                 else {
                     // Insert a new vertex into upper / lower.
-                    if (upper) {
-                        iupper = int(upper->vertices.size());
-                        upper->vertices.emplace_back(c);
-                        upper_slice_vertices.emplace_back(iupper);
-                    }
-                    if (lower) {
-                        ilower = int(lower->vertices.size());
-                        lower->vertices.emplace_back(c);
-                        lower_slice_vertices.emplace_back(ilower);
-                    }
+                    iupper = int(upper.its.vertices.size());
+                    upper.its.vertices.emplace_back(c);
+                    upper_slice_vertices.emplace_back(iupper);
+
+                    ilower = int(lower.its.vertices.size());
+                    lower.its.vertices.emplace_back(c);
+                    lower_slice_vertices.emplace_back(ilower);
                 }
                 return std::make_pair(iupper, ilower);
             };
             auto [iv0v1_upper, iv0v1_lower] = new_vertex(v1, iv1, v0, iv0, v0v1);
             auto [iv2v0_upper, iv2v0_lower] = new_vertex(v2, iv2, v0, iv0, v2v0);
-            auto new_face = [](indexed_triangle_set *its, int i, int j, int k) {
-                if (its != nullptr && i != j && i != k && j != k)
-                    its->indices.emplace_back(Index3{i, j, k});
+            auto new_face = [&add_facet, facet_idx](TriMesh::IndexedTriangleSetWithSourceFacets &part, int i, int j, int k) {
+                if (i != j && i != k && j != k) {
+                    add_facet(part, Index3{i, j, k}, {.index = facet_idx, .is_unchanged = false});
+                }
             };
 
             if (v0.z() > z) {
@@ -2629,31 +2635,40 @@ void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *u
 */
     }
 
-    assert(had_degenerate_faces || ! upper || TriMesh::its_num_degenerate_faces(*upper) == 0);
-    assert(had_degenerate_faces || ! lower || TriMesh::its_num_degenerate_faces(*lower) == 0);
+    assert(had_degenerate_faces || TriMesh::its_num_degenerate_faces(upper.its) == 0);
+    assert(had_degenerate_faces || TriMesh::its_num_degenerate_faces(lower.its) == 0);
 
-    if (upper != nullptr) {
-        triangulate_slice(*upper, upper_lines, upper_slice_vertices, int(mesh.vertices.size()), z, triangulate_caps, NORMALS_DOWN);
+    triangulate_slice(upper, upper_lines, upper_slice_vertices, int(mesh.vertices.size()), z, triangulate_caps, NORMALS_DOWN);
+    triangulate_slice(lower, lower_lines, lower_slice_vertices, int(mesh.vertices.size()), z, triangulate_caps, NORMALS_UP);
 #ifndef NDEBUG
-        if (triangulate_caps) {
-            size_t num_open_edges_new = TriMesh::its_num_open_edges(*upper);
-            assert(num_open_edges_new <= num_open_edges_old);
-        }
+    if (triangulate_caps) {
+        assert(TriMesh::its_num_open_edges(upper.its) <= num_open_edges_old);
+        assert(TriMesh::its_num_open_edges(lower.its) <= num_open_edges_old);
+    }
 #endif // NDEBUG
+
+    assert(had_degenerate_faces || TriMesh::its_num_degenerate_faces(upper.its) == 0);
+    assert(had_degenerate_faces || TriMesh::its_num_degenerate_faces(lower.its) == 0);
+
+    return cut;
+}
+
+void cut_mesh(
+    const indexed_triangle_set& mesh,
+    float z,
+    indexed_triangle_set* upper,
+    indexed_triangle_set* lower,
+    bool triangulate_caps
+)
+{
+    TriMesh::IndexedTriangleSetCut cut = cut_mesh(mesh, z, triangulate_caps);
+    if (upper != nullptr) {
+        *upper = std::move(cut.upper.its);
     }
 
     if (lower != nullptr) {
-        triangulate_slice(*lower, lower_lines, lower_slice_vertices, int(mesh.vertices.size()), z, triangulate_caps, NORMALS_UP);
-#ifndef NDEBUG
-        if (triangulate_caps) {
-            size_t num_open_edges_new = TriMesh::its_num_open_edges(*lower);
-            assert(num_open_edges_new <= num_open_edges_old);
-        }
-#endif // NDEBUG
+        *lower = std::move(cut.lower.its);
     }
-
-    assert(had_degenerate_faces || ! upper || TriMesh::its_num_degenerate_faces(*upper) == 0);
-    assert(had_degenerate_faces || ! lower || TriMesh::its_num_degenerate_faces(*lower) == 0);
 }
 
 } // namespace Slic3r

@@ -54,10 +54,31 @@ bool ModelVolume::is_the_only_one_part() const
 
 void ModelVolume::reset_extra_facets()
 {
-    this->supported_facets.reset();
-    this->seam_facets.reset();
-    this->mm_segmentation_facets.reset();
-    this->fuzzy_skin_facets.reset();
+    for (const FacetsAnnotationKind kind : facets_annotation_kinds) {
+        this->facets_annotation(kind).reset();
+    }
+}
+
+FacetsAnnotation& ModelVolume::facets_annotation(const FacetsAnnotationKind kind)
+{
+    switch (kind) {
+    case FacetsAnnotationKind::FdmSupports:
+        return this->supported_facets;
+    case FacetsAnnotationKind::Seam:
+        return this->seam_facets;
+    case FacetsAnnotationKind::MultiMaterial:
+        return this->mm_segmentation_facets;
+    case FacetsAnnotationKind::FuzzySkin:
+        return this->fuzzy_skin_facets;
+    }
+
+    ASSERT(false);
+    return this->supported_facets;
+}
+
+const FacetsAnnotation& ModelVolume::facets_annotation(const FacetsAnnotationKind kind) const
+{
+    return const_cast<ModelVolume&>(*this).facets_annotation(kind);
 }
 
 // Extract the current extruder ID based on this ModelVolume's config and the parent ModelObject's config.

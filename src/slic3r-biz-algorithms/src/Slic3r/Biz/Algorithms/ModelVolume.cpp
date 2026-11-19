@@ -5,8 +5,10 @@
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
 #include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleSelector.hpp"
 #include "Slic3r/Domain/TriangleMesh.hpp"
 
+#include <algorithm>
 #include <boost/filesystem/path.hpp>
 
 using namespace Slic3r::Biz::Algorithms;
@@ -115,26 +117,76 @@ void mirror(Domain::ModelVolume& model_volume, const Domain::Axis axis)
     model_volume.set_mirror(mirror);
 }
 
+void remap_facets_annotations(
+    const Domain::ModelVolume& source_volume,
+    const Domain::TriangleMesh& source_mesh,
+    const std::vector<TriangleMesh::SourceFacet>& source_facets,
+    Domain::ModelVolume& derived_volume
+)
+{
+    for (const Domain::FacetsAnnotationKind kind : Domain::ModelVolume::facets_annotation_kinds) {
+        if (const Domain::FacetsAnnotation& source_annotation =
+                source_volume.facets_annotation(kind);
+            !source_annotation.empty())
+        {
+            derived_volume.facets_annotation(kind).set_data(
+                TriangleSelector::remap_to_derived_mesh(
+                    source_annotation.get_data(),
+                    source_mesh,
+                    derived_volume.mesh(),
+                    source_facets
+                )
+            );
+        }
+    }
+}
+
+void merge_facets_annotations(
+    const std::vector<const Domain::ModelVolume*>& merged_volumes,
+    Domain::ModelVolume& merged_volume
+)
+{
+    for (const Domain::FacetsAnnotationKind kind : Domain::ModelVolume::facets_annotation_kinds) {
+        if (std::ranges::all_of(
+                merged_volumes,
+                [kind](const Domain::ModelVolume* volume)
+                { return volume->facets_annotation(kind).empty(); }
+            ))
+        {
+            continue;
+        }
+
+        TriangleSplittingData merged_data;
+        int facet_offset = 0;
+        for (const Domain::ModelVolume* volume : merged_volumes) {
+            merged_data.append(volume->facets_annotation(kind).get_data(), facet_offset);
+            facet_offset += static_cast<int>(volume->mesh().facets_count());
+        }
+
+        merged_volume.facets_annotation(kind).set_data(std::move(merged_data));
+    }
+}
+
 // Split this volume, append the result to the object owning this volume.
 // Return the number of volumes created from this one.
 // This is useful to assign different materials to different volumes of an object.
 size_t split(Domain::ModelVolume* volume, unsigned int max_extruders)
 {
-    std::vector<Domain::TriangleMesh> meshes = TriangleMesh::split(volume->mesh());
-    if (meshes.size() <= 1)
+    std::vector<TriangleMesh::TriangleMeshWithSourceFacets> components =
+        TriangleMesh::split_to_components(volume->mesh());
+    if (components.size() <= 1) {
         return 1;
+    }
 
-    std::sort(
-        meshes.begin(),
-        meshes.end(),
-        Slic3r::Biz::Algorithms::TriangleMesh::is_front_up_left
+    std::ranges::sort(
+        components,
+        TriangleMesh::is_front_up_left,
+        &TriangleMesh::TriangleMeshWithSourceFacets::mesh
     );
 
     // splited volume should not be text object
     if (volume->text_configuration.has_value())
         volume->text_configuration.reset();
-
-    volume->reset_extra_facets();
 
     // The SLA support points and drain holes go to the parts they sit on.
     const Domain::SLA::SupportPoints sla_support_points = std::move(volume->sla_support_points);
@@ -152,7 +204,10 @@ size_t split(Domain::ModelVolume* volume, unsigned int max_extruders)
     int extruder_counter = 0;
     const Domain::Vec3d offset = volume->get_offset();
 
-    for (Domain::TriangleMesh& mesh : meshes) {
+    const std::shared_ptr<const Domain::TriangleMesh> source_mesh              = volume->mesh_ptr();
+    const std::vector<TriangleMesh::SourceFacet>* kept_component_source_facets = nullptr;
+
+    for (auto& [mesh, source_facets] : components) {
         if (mesh.empty() || mesh.has_zero_volume())
             // Repair may have removed unconnected triangles, thus emptying the mesh.
             continue;
@@ -164,9 +219,13 @@ size_t split(Domain::ModelVolume* volume, unsigned int max_extruders)
             volume->set_new_unique_id();
             // reset the source to disable reload from disk
             volume->source = Domain::ModelVolume::Source();
+
+            kept_component_source_facets = &source_facets;
+        } else {
+            Domain::ModelVolume* split_volume =
+                ModelObject::insert_volume(object, (++ivolume), *volume, std::move(mesh));
+            remap_facets_annotations(*volume, *source_mesh, source_facets, *split_volume);
         }
-        else
-            Algorithms::ModelObject::insert_volume(object, (++ivolume), *volume, std::move(mesh));
 
         object->volumes[ivolume]->set_offset(Domain::Vec3d::Zero());
         Algorithms::ModelVolume::translate(*object->volumes[ivolume], offset);
@@ -177,6 +236,12 @@ size_t split(Domain::ModelVolume* volume, unsigned int max_extruders)
         ++idx;
         if (static_cast<unsigned int>(extruder_counter) == max_extruders)
             extruder_counter = 0;
+    }
+
+    // The painting of this volume is the source for all the components, so it is remapped onto the component kept in this volume
+    // only after the other components took it over.
+    if (kept_component_source_facets != nullptr) {
+        remap_facets_annotations(*volume, *source_mesh, *kept_component_source_facets, *volume);
     }
 
     // discard volumes for which the convex hull was not generated or is degenerate
