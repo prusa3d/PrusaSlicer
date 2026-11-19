@@ -1,0 +1,280 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -22,7 +22,7 @@
+ 
+ # # # # sol2
+ # # # Required minimum version statement
+-cmake_minimum_required(VERSION 3.26.0)
++cmake_minimum_required(VERSION 3.26...4.2)
+ # # # Project Include - file that is included after project declaration is finished
+ set(CMAKE_PROJECT_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Includes/Project.cmake")
+ 
+@@ -42,7 +42,7 @@
+ 
+ # # # Configuration
+ # # Cached defines, strings, paths and options
+-set(SOL2_LUA_VERSION "5.4.4" CACHE STRING "The version of Lua needed. Can be 5.1, 5.2, 5.3, 5.4, LuaJIT, or a more specific 3-part version number for a specifc Lua (e.g., 5.4.4 or luajit-2.0.5)")
++set(SOL2_LUA_VERSION "5.5.0" CACHE STRING "The version of Lua needed. Can be 5.1, 5.2, 5.3, 5.4, 5.5, LuaJIT, or a more specific 3-part version number for a specifc Lua (e.g., 5.5.0 or luajit-2.0.5)")
+ set(SOL2_BUILD_LUA TRUE CACHE BOOL "Always build Lua, do not search for it in the system")
+ set(SOL2_PLATFORM "x64" CACHE STRING "Target platform to compile for when building binaries (x86, x64)")
+ option(SOL2_CI "Whether or not we are in continguous integration mode" OFF)
+@@ -242,6 +242,9 @@
+ 		elseif(NORMALIZED_LUA_VERSION MATCHES "5.4")
+ 			set(CREATE_LUALIB_TARGET TRUE)
+ 			find_package(Lua 5.4 EXACT REQUIRED)
++		elseif(NORMALIZED_LUA_VERSION MATCHES "5.5")
++			set(CREATE_LUALIB_TARGET TRUE)
++			find_package(Lua 5.5 EXACT REQUIRED)
+ 		elseif(NORMALIZED_LUA_VERSION MATCHES "luajit")
+ 			set(CREATE_LUALIB_TARGET TRUE)
+ 			find_package(LuaJIT REQUIRED)
+--- a/cmake/Packages/FindLuaBuild.cmake
++++ b/cmake/Packages/FindLuaBuild.cmake
+@@ -107,7 +107,7 @@
+ 	endif()
+ endif()
+ if (NOT LUA_VERSION)
+-	set(LUA_VERSION 5.4.4)
++	set(LUA_VERSION 5.5.0)
+ endif()
+ find_lua_build(${LUA_VERSION})
+ unset(find_lua_build)
+--- a/cmake/Packages/FindLuaBuild/LuaVanilla.cmake
++++ b/cmake/Packages/FindLuaBuild/LuaVanilla.cmake
+@@ -35,7 +35,8 @@
+ set(LUA_VANILLA_5.1_LATEST_VERSION 5.1.5)
+ set(LUA_VANILLA_5.2_LATEST_VERSION 5.2.4)
+ set(LUA_VANILLA_5.3_LATEST_VERSION 5.3.6)
+-set(LUA_VANILLA_5.4_LATEST_VERSION 5.4.4)
++set(LUA_VANILLA_5.4_LATEST_VERSION 5.4.8)
++set(LUA_VANILLA_5.5_LATEST_VERSION 5.5.0)
+ 
+ # Clean up some variables
+ if (LUA_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
+@@ -52,6 +53,8 @@
+ 			set(LUA_VANILLA_VERSION ${LUA_VANILLA_5.3_LATEST_VERSION})
+ 		elseif (${CMAKE_MATCH_2} EQUAL 4)
+ 			set(LUA_VANILLA_VERSION ${LUA_VANILLA_5.4_LATEST_VERSION})
++		elseif (${CMAKE_MATCH_2} EQUAL 5)
++			set(LUA_VANILLA_VERSION ${LUA_VANILLA_5.5_LATEST_VERSION})
+ 		else()			
+ 			# default to whatever the first two
+ 			# numbers happen to be, plus build 0
+@@ -143,8 +146,19 @@
+ 		set(LUA_VANILLA_LUAC_SOURCES luac.c)
+ 	endif()
+ 	set(LUA_VANILLA_GENERATE_LUA_HPP false)
++elseif (LUA_VANILLA_VERSION MATCHES "^5\\.5")
++	set(LUA_VANILLA_LIB_SOURCES lapi.c lauxlib.c lbaselib.c lcode.c lcorolib.c 
++		lctype.c ldblib.c ldebug.c ldo.c ldump.c lfunc.c lgc.c linit.c liolib.c
++		llex.c lmathlib.c lmem.c loadlib.c lobject.c lopcodes.c loslib.c
++		lparser.c lstate.c lstring.c lstrlib.c ltable.c ltablib.c ltm.c lundump.c
++		lutf8lib.c lvm.c lzio.c)
++	set(LUA_VANILLA_LUA_SOURCES lua.c)
++	if (LUA_BUILD_LUA_COMPILER)
++		set(LUA_VANILLA_LUAC_SOURCES luac.c)
++	endif()
++	set(LUA_VANILLA_GENERATE_LUA_HPP false)
+ else()
+-	MESSAGE(WARNING "Using Lua 5.4.4 file list for ${LUA_VERSION} version")
++	MESSAGE(WARNING "Using Lua 5.5.0 file list for ${LUA_VERSION} version")
+ 	set(LUA_VANILLA_LIB_SOURCES lapi.c lauxlib.c lbaselib.c lcode.c lcorolib.c 
+ 		lctype.c ldblib.c ldebug.c ldo.c ldump.c lfunc.c lgc.c linit.c liolib.c
+ 		llex.c lmathlib.c lmem.c loadlib.c lobject.c lopcodes.c loslib.c
+@@ -172,14 +186,18 @@
+ 	set(LUA_VANILLA_INCLUDE_DIRS ${LUA_VANILLA_INCLUDE_DIRS} "${LUA_VANILLA_SOURCE_DIR}/include")
+ else()
+ 	include(FetchContent)
+-	FetchContent_Declare(
+-		lua-vanilla
+-		URL ${LUA_VANILLA_DOWNLOAD_URL})
++	FetchContent_Declare(lua-vanilla URL ${LUA_VANILLA_DOWNLOAD_URL})
+ 	FetchContent_GetProperties(lua-vanilla)
+ 	if ( NOT lua-vanilla_POPULATED)
+ 		# Fetch the content using previously declared details
+-		FetchContent_Populate(lua-vanilla)
+ 		# do not add_subdirectory / build: we are JUST using ti as a download step!
++		# cmake >= 3.30 FetchContent_MakeAvailable will skip add_subdirectory silent when
++		# CMakeLists not present in lua-vanilla
++		if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.30)
++			FetchContent_MakeAvailable(lua-vanilla)
++		else()
++			FetchContent_Populate(lua-vanilla)
++		endif()
+ 	endif()
+ 	list(TRANSFORM LUA_VANILLA_LIB_SOURCES PREPEND "${lua-vanilla_SOURCE_DIR}/src/")
+ 	list(TRANSFORM LUA_VANILLA_LUA_SOURCES PREPEND "${lua-vanilla_SOURCE_DIR}/src/")
+--- a/documentation/source/api/state.rst
++++ b/documentation/source/api/state.rst
+@@ -182,6 +182,22 @@
+ Attempts to run the garbage collector. Note that this is subject to the same rules as the Lua API's collect_garbage function: memory may or may not be freed, depending on dangling references or other things, so make sure you don't have tables or other stack-referencing items currently alive or referenced that you want to be collected.
+ 
+ 
++On Lua 5.4 and 5.5, ``change_gc_mode_incremental`` leaves zero parameters
++unchanged and interprets the step size as a base-2 logarithm. Lua 5.5 converts
++positive step sizes to bytes and clamps them to the native ``int`` range before
++Lua compresses them. Negative step sizes leave the Lua 5.5 parameter unchanged.
++
++``step_gc`` retains its kilobyte budget. On Lua 5.5, the budget must be
++nonnegative and its byte count must fit the linked Lua build's memory type.
++Zero requests a basic collector step; older negative-budget debt adjustments
++have no portable Lua 5.5 equivalent.
++
++On Lua 5.5, ``change_gc_mode_generational`` sets the minor multiplier and the
++minor-to-major transition multiplier. Zero leaves either unchanged. The second
++parameter is not equivalent to Lua 5.4's major multiplier. Both mode-changing
++functions return the previous mode; older Lua behavior is unchanged.
++
++
+ .. code-block:: cpp
+ 	:caption: function: make a table
+ 
+--- a/include/sol/compatibility/compat-5.3.h
++++ b/include/sol/compatibility/compat-5.3.h
+@@ -405,11 +405,11 @@
+ 
+ 
+ /* other Lua versions */
+-#if !defined(LUA_VERSION_NUM) || LUA_VERSION_NUM < 501 || LUA_VERSION_NUM > 504
++#if !defined(LUA_VERSION_NUM) || LUA_VERSION_NUM < 501 || LUA_VERSION_NUM > 505
+ 
+-#  error "unsupported Lua version (i.e. not Lua 5.1, 5.2, 5.3, or 5.4)"
++#  error "unsupported Lua version (i.e. not Lua 5.1, 5.2, 5.3, 5.4, or 5.5)"
+ 
+-#endif /* other Lua versions except 5.1, 5.2, 5.3, and 5.4 */
++#endif /* other Lua versions except 5.1, 5.2, 5.3, 5.4, and 5.5 */
+ 
+ 
+ 
+--- a/include/sol/compatibility/compat-5.4.h
++++ b/include/sol/compatibility/compat-5.4.h
+@@ -17,15 +17,15 @@
+ }
+ #endif
+ 
+-#if defined(LUA_VERSION_NUM) && LUA_VERSION_NUM == 504
++#if defined(LUA_VERSION_NUM) && LUA_VERSION_NUM >= 504
+ 
+ #if !defined(LUA_ERRGCMM)
+-/* So Lua 5.4 actually removes this, which breaks sol2...
++/* So Lua 5.4 or later actually removes this, which breaks sol2...
+  man, this API is quite unstable...!
+ */
+ #  define LUA_ERRGCMM (LUA_ERRERR + 2)
+ #endif /* LUA_ERRGCMM define */
+ 
+-#endif // Lua 5.4 only
++#endif // Lua 5.4 or later
+ 
+ #endif // NOT_KEPLER_PROJECT_COMPAT54_H_
+\ No newline at end of file
+--- a/include/sol/state.hpp
++++ b/include/sol/state.hpp
+@@ -27,6 +27,21 @@
+ #include <sol/state_view.hpp>
+ #include <sol/thread.hpp>
+ 
++inline lua_State* sol_lua_newstate(lua_Alloc f, void* ud,
++     [[maybe_unused]] unsigned seed
++#if LUA_VERSION_NUM >= 505
++     = luaL_makeseed(nullptr)
++#else
++     = 0
++#endif
++) {
++#if LUA_VERSION_NUM >= 505
++	return ::lua_newstate(f, ud, seed);
++#else
++	return ::lua_newstate(f, ud);
++#endif
++}
++
+ namespace sol {
+ 
+ 	class state : private std::unique_ptr<lua_State, detail::state_deleter>, public state_view {
+@@ -39,7 +54,7 @@
+ 		}
+ 
+ 		state(lua_CFunction panic, lua_Alloc alfunc, void* alpointer = nullptr)
+-		: unique_base(lua_newstate(alfunc, alpointer)), state_view(unique_base::get()) {
++		: unique_base(sol_lua_newstate(alfunc, alpointer)), state_view(unique_base::get()) {
+ 			set_default_state(unique_base::get(), panic);
+ 		}
+ 
+--- a/include/sol/state_view.hpp
++++ b/include/sol/state_view.hpp
+@@ -32,6 +32,7 @@
+ 
+ #include <memory>
+ #include <cstddef>
++#include <limits>
+ 
+ namespace sol {
+ 
+@@ -676,7 +677,9 @@
+ 			// THOUGHT: std::chrono-alikes to map "kilobyte size" here...?
+ 			// Make it harder to give MB or KB to a B parameter...?
+ 			// Probably overkill for now.
+-#if SOL_LUA_VERSION_I_ >= 504
++#if SOL_LUA_VERSION_I_ >= 505
++			return lua_gc(lua_state(), LUA_GCSTEP, static_cast<std::size_t>(step_size_kilobytes) * 1024) != 0;
++#elif SOL_LUA_VERSION_I_ >= 504
+ 			// The manual implies that this function is almost always successful...
+ 			// is it?? It could depend on the GC mode...
+ 			return lua_gc(lua_state(), LUA_GCSTEP, step_size_kilobytes) != 0;
+@@ -694,6 +697,7 @@
+ 		}
+ 
+ 		// Returns the old GC mode. Check support using the supports_gc_mode function.
++		// On Lua 5.4 and 5.5, zero preserves each parameter. The step size is a base-2 logarithm.
+ 		gc_mode change_gc_mode_incremental(int pause, int step_multiplier, int step_byte_size) {
+ 			// "What the fuck does any of this mean??"
+ 			// http://www.lua.org/manual/5.4/manual.html#2.5.1
+@@ -701,8 +705,22 @@
+ 			// THOUGHT: std::chrono-alikes to map "byte size" here...?
+ 			// Make it harder to give MB or KB to a B parameter...?
+ 			// Probably overkill for now.
+-#if SOL_LUA_VERSION_I_ >= 504
++#if SOL_LUA_VERSION_I_ >= 505
++			if (pause != 0) {
++				lua_gc(lua_state(), LUA_GCPARAM, LUA_GCPPAUSE, pause);
++			}
++			if (step_multiplier != 0) {
++				lua_gc(lua_state(), LUA_GCPARAM, LUA_GCPSTEPMUL, step_multiplier);
++			}
++			if (step_byte_size > 0) {
++				int step_bytes = step_byte_size < std::numeric_limits<int>::digits ? 1 << step_byte_size : (std::numeric_limits<int>::max)();
++				lua_gc(lua_state(), LUA_GCPARAM, LUA_GCPSTEPSIZE, step_bytes);
++			}
++			int old_mode = lua_gc(lua_state(), LUA_GCINC);
++#elif SOL_LUA_VERSION_I_ >= 504
+ 			int old_mode = lua_gc(lua_state(), LUA_GCINC, pause, step_multiplier, step_byte_size);
++#endif
++#if SOL_LUA_VERSION_I_ >= 504
+ 			if (old_mode == LUA_GCGEN) {
+ 				return gc_mode::generational;
+ 			}
+@@ -718,11 +736,23 @@
+ 		}
+ 
+ 		// Returns the old GC mode. Check support using the supports_gc_mode function.
++		// On Lua 5.5, major_multiplier controls the minor-to-major transition,
++		// not Lua 5.4's major multiplier. Zero preserves each parameter.
+ 		gc_mode change_gc_mode_generational(int minor_multiplier, int major_multiplier) {
+ #if SOL_LUA_VERSION_I_ >= 504
+ 			// "What does this shit mean?"
+ 			// http://www.lua.org/manual/5.4/manual.html#2.5.2
++#if SOL_LUA_VERSION_I_ >= 505
++			if (minor_multiplier != 0) {
++				lua_gc(lua_state(), LUA_GCPARAM, LUA_GCPMINORMUL, minor_multiplier);
++			}
++			if (major_multiplier != 0) {
++				lua_gc(lua_state(), LUA_GCPARAM, LUA_GCPMINORMAJOR, major_multiplier);
++			}
++			int old_mode = lua_gc(lua_state(), LUA_GCGEN);
++#else
+ 			int old_mode = lua_gc(lua_state(), LUA_GCGEN, minor_multiplier, major_multiplier);
++#endif
+ 			if (old_mode == LUA_GCGEN) {
+ 				return gc_mode::generational;
+ 			}
