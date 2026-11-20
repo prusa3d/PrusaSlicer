@@ -1,4 +1,4 @@
-find_package(Eigen3 3.4.0 REQUIRED)
+find_package(Eigen3 5.0.1 REQUIRED)
 
 add_library(slic3r-domain-types INTERFACE)
 target_include_directories(slic3r-domain-types INTERFACE include)
