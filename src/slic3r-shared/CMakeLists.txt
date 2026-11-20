@@ -963,6 +963,7 @@ set(SLIC3R_SHARED_FILES
 
         include/Slic3r/Biz/PrintModeInteractor.hpp
         src/Slic3r/Biz/PrintModeInteractor.cpp
+        include/Slic3r/Biz/Preset/PresetEvalException.hpp
         include/Slic3r/Biz/Preset/PresetEvaluator.hpp
         src/Slic3r/Biz/Preset/PresetEvaluator.cpp
         src/Slic3r/Biz/Preset/PresetCollectionEvaluator.hpp

@@ -11,6 +11,7 @@ namespace Slic3r::Biz::Preset {
 using EvalPresetValueMap = boost::unordered_flat_map<std::string, Domain::Preset::PresetValue>;
 
 class PresetCollectionEvaluator;
+struct ScopedPresetEvalAssertHandler;
 
 class PresetEvaluator
 {
@@ -24,12 +25,8 @@ public:
     PresetEvaluator(
         const Domain::Preset::PresetCollection& presets,
         const Domain::Preset::VendorInfo& vendor_info
-    ) :
-        m_presets(presets),
-        m_vendor_info(vendor_info)
-    {
-        build_named_presets();
-    }
+    );
+    ~PresetEvaluator();
 
     EvaluatedPrinterPresets evaluate(const HwPrinterConfig& hw_config, bool use_material_cache = true) const;
 
@@ -91,6 +88,7 @@ private:
     static EvalPresetContexts merged_same_presets(EvalPresetContexts presets);
 
 private:
+    std::unique_ptr<ScopedPresetEvalAssertHandler> m_assert_handler_scope;
     const Domain::Preset::PresetCollection& m_presets;
     const Domain::Preset::VendorInfo& m_vendor_info;
     IdentifiedPresetsCollection m_preset_ids;

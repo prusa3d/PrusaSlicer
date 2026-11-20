@@ -1,4 +1,5 @@
 #include "Slic3r/Biz/Preset/PresetCollectionEvaluator.hpp"
+#include "Slic3r/Biz/Preset/PresetEvalException.hpp"
 
 #include <Slic3r/Biz/Preset/JsonUtils.hpp>
 #include <Slic3r/Log.hpp>
@@ -32,10 +33,16 @@ using namespace Domain::Preset;
 thread_local std::stack<SourceLocation> last_location;
 
 [[noreturn]]
+void throw_eval_exception(const std::string& message)
+{
+    throw PresetEvalException(message);
+}
+
+[[noreturn]]
 void preset_eval_assert_handler(const libassert::assertion_info& info)
 {
     std::string prefix = "[" + (last_location.empty() ? SourceLocation{} : last_location.top()).to_string() +  "]";
-    handle_assert(info, prefix);
+    handle_assert(info, prefix, throw_eval_exception);
 };
 
 
@@ -146,16 +153,37 @@ PresetEvaluator::EvalPresetContexts PresetCollectionEvaluator::eval_preset(
 #if !HAS_RANGES_VIEWS
     PresetEvaluator::EvalPresetContexts ret;
     for (const auto& preset : m_presets) {
-        auto eval_presets = eval_preset(preset, preset.id, preset.origin, {{preset.id}}, overrides);
-        auto it           = only_public ?
-                      std::remove_if(
-                eval_presets.begin(),
-                eval_presets.end(),
-                [](const auto& ep) { return !Domain::Preset::is_public_name(ep.name); }
-            ) :
-                      eval_presets.end();
+        try {
+            auto eval_presets = eval_preset(
+                preset,
+                preset.id,
+                preset.origin,
+                preset.user_file,
+                {{.origin = preset.origin, .root_id = preset.id, .user_file = preset.user_file}},
+                overrides.empty() ? ValueMaps{{}} : overrides,
+                expr_combine
+            );
+            auto it = only_public ?
+                std::remove_if(
+                    eval_presets.begin(),
+                    eval_presets.end(),
+                    [](const auto& ep) { return !Domain::Preset::is_public_name(ep.name); }
+                ) :
+                eval_presets.end();
 
-        ret.insert(ret.end(), std::make_move_iterator(eval_presets.begin()), std::make_move_iterator(it));
+            ret.insert(
+                ret.end(),
+                std::make_move_iterator(eval_presets.begin()),
+                std::make_move_iterator(it)
+            );
+        }
+        catch (std::exception& e) {
+            SPDLOG_ERROR(
+                "Evaluation of preset {} failed with exception: {}",
+                preset.source_location.to_string(),
+                e.what()
+            );
+        }
     }
     return ret;
 #else
@@ -180,22 +208,31 @@ PresetEvaluator::EvalPresetContexts PresetCollectionEvaluator::eval_preset(
                     return included;
                 };
 
-                ScopedPresetEvalAssertHandler sah;
-
-                return eval_preset(
-                           preset,
-                           preset.id,
-                           preset.origin,
-                           preset.user_file,
-                           {{
-                             .origin    = preset.origin,
-                             .root_id   = preset.id,
-                             .user_file = preset.user_file
-                           }},
-                           overrides.empty() ? ValueMaps{{}} : overrides,
-                           expr_combine
-                       )
-                    | std::views::filter(pred);
+                try {
+                    return eval_preset(
+                               preset,
+                               preset.id,
+                               preset.origin,
+                               preset.user_file,
+                               {{
+                                 .origin    = preset.origin,
+                                 .root_id   = preset.id,
+                                 .user_file = preset.user_file
+                               }},
+                               overrides.empty() ? ValueMaps{{}} : overrides,
+                               expr_combine
+                           )
+                        | std::views::filter(pred);
+                }
+                catch (std::exception& e) {
+                    SPDLOG_ERROR(
+                        "Evaluation of preset {} failed with exception: {}",
+                        preset.source_location.to_string(),
+                        e.what()
+                    );
+                }
+                return PresetEvaluator::EvalPresetContexts{}
+                        | std::views::filter(pred);
             }
         )
         | std::views::join;

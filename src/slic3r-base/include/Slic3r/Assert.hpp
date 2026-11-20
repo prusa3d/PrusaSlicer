@@ -10,10 +10,19 @@
 
 #include "libassert/assert.hpp"
 
+#include <functional>
+
 namespace Slic3r {
 void init_assert();
-[[noreturn]]
-void handle_assert(const libassert::assertion_info& info, std::string_view message_prefix="");
+
+using AbortHandler = std::function<void(const std::string& message)>;
+
+
+[[noreturn]] void handle_assert(
+    const libassert::assertion_info& info,
+    std::string_view message_prefix = "",
+    AbortHandler&& abort_handler    = nullptr
+);
 
 struct ScopedAssertHandler final
 {

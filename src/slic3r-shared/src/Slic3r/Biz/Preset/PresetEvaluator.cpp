@@ -416,7 +416,6 @@ Domain::Preset::EvaluatedPreset<FdmConfigType, SlaConfigType> PresetEvaluator::p
 )
 {
 
-    ScopedPresetEvalAssertHandler assert_scope;
     ScopedSourceLocation location_scope{context.last_node_location};
     std::vector<std::string> conditions;
     if (!context.conditions.empty() || !context.negative_conditions.empty()) {
@@ -521,6 +520,19 @@ void PresetEvaluator::fill_missing_tool_overrides_from_print(
         }
     }
 }
+
+PresetEvaluator::PresetEvaluator(
+    const Domain::Preset::PresetCollection& presets,
+    const Domain::Preset::VendorInfo& vendor_info
+) :
+    m_assert_handler_scope(std::make_unique<ScopedPresetEvalAssertHandler>()),
+    m_presets(presets),
+    m_vendor_info(vendor_info)
+{
+    build_named_presets();
+}
+
+PresetEvaluator::~PresetEvaluator() = default;
 
 PresetEvaluator::EvaluatedPrinterPresets PresetEvaluator::evaluate(const HwPrinterConfig& hw_config, bool use_material_cache) const
 {

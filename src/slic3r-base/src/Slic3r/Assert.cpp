@@ -22,7 +22,11 @@ void init_assert()
     set_failure_handler(assert_failure_handler);
 }
 
-void handle_assert(const assertion_info& info, std::string_view message_prefix)
+void handle_assert(
+    const assertion_info& info,
+    std::string_view message_prefix,
+    AbortHandler&& abort_handler
+)
 {
     enable_virtual_terminal_processing_if_needed(); // for terminal colors on windows
     std::string message = info.to_string();
@@ -38,7 +42,11 @@ void handle_assert(const assertion_info& info, std::string_view message_prefix)
     case assert_type::panic:
     case assert_type::unreachable:
         (void)fflush(stderr);
-        std::abort();
+        if (abort_handler != nullptr) {
+            abort_handler(message);
+        } else {
+            std::abort();
+        }
         // Breaking here as debug CRT allows aborts to be ignored, if someone wants to make a debug build of
         // this library
         break;
