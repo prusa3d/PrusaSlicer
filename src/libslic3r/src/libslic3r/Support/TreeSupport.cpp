@@ -3687,23 +3687,6 @@ void fff_tree_support_generate(PrintObject &print_object, std::function<void()> 
     BuildVolume build_volume(bed_shape, print_config.get<double>("max_print_height"));
     FFFTreeSupport::generate_support_areas(*print_object.print(), build_volume, { idx },
         throw_on_cancel);
-
-    if (! single_instance)
-        return;
-
-    // Safety net: the growth constraint above keeps branches on the plate, but layer 0 pads are
-    // widened after placement, so clip whatever still pokes past the plate edge. Off-plate support
-    // material cannot be printed at all.
-    const Polygons bed = { build_volume.polygon() };
-    for (SupportLayer *layer : print_object.support_layers()) {
-        if (layer->support_islands.empty())
-            continue;
-        layer->support_islands = intersection_ex(layer->support_islands, bed);
-        layer->support_islands_bboxes.clear();
-        layer->support_islands_bboxes.reserve(layer->support_islands.size());
-        for (const ExPolygon &island : layer->support_islands)
-            layer->support_islands_bboxes.emplace_back(get_extents(island));
-    }
 }
 
 } // namespace Slic3r

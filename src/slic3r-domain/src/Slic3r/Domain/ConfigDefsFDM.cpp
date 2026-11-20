@@ -4081,9 +4081,9 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->location = Print;
     def->overrides_in = Locations{ Object, MacroOverrides };
     def->label = L("Keep supports on build plate");
-    def->option_group = ConfigItemDef::OptionGroup::Print_Supports_Generation;
+    def->option_group = ConfigItemDef::OptionGroup::Print_Supports_OrganicSupports;
     def->category = ConfigItemDef::Category::Print_Supports;
-    def->order = 6;
+    def->order = 8;
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     def->tooltip = L("Constrain organic supports to the build volume: no branch and no base pad is generated outside it, at any height. "
                      "Enable this if an object that fits inside the build volume gets supports that start or wander outside it.");

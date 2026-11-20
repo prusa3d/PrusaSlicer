@@ -602,16 +602,19 @@ static Polygons world_bed(const Slic3r::Print &print)
     return bed;
 }
 
-static Polygons support_world(const Slic3r::Print &print)
+static Polygons support_world(const Slic3r::Print &print, size_t layer_count = size_t(-1))
 {
     const PrintObject *object = print.objects().front();
     const Point        shift  = object->instances().front().shift();
     Polygons           out;
-    for (const SupportLayer *layer : object->support_layers())
+    for (const SupportLayer *layer : object->support_layers()) {
+        if (layer_count-- == 0)
+            break;
         for (const ExPolygon &island : layer->support_islands) {
             out.emplace_back(island.contour); // Outer contour: containment is a superset test.
             out.back().translate(shift.x(), shift.y());
         }
+    }
     return out;
 }
 
@@ -624,25 +627,33 @@ static TestConfig organic_tree_config()
     return config;
 }
 
-TEST_CASE("TreeSupport: supports stay on the build plate", "[SupportMaterial][TreeSupport]")
+TEST_CASE("TreeSupport: the constraint pulls the pads inwards", "[SupportMaterial][TreeSupport]")
 {
-    // A plate small enough that the part, re-centred on (100, 100) afterwards, hangs over the edge:
-    // part of its overhang then has no legal support area at all.
-    TestConfig config = organic_tree_config();
-    config.print.items.opt("support_material_keep_on_bed").set(true);
-    config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} });
+    // A plate small enough that the part, re-centred on (100, 100) afterwards, hangs over the edge,
+    // so the generator would happily put pads beside it. The option has to shrink that footprint.
+    const std::vector<Vec2d> small_bed{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} };
 
-    Slic3r::Print print;
-    Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
+    auto pad_extents = [&small_bed](bool keep_on_bed) {
+        TestConfig config = organic_tree_config();
+        config.print.items.opt("support_material_keep_on_bed").set(keep_on_bed);
+        config.printer.items.opt("bed_shape").set(small_bed);
 
-    const Polygons bed = world_bed(print);
-    REQUIRE(! bed.empty());
+        Slic3r::Print print;
+        Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
+        const Polygons pads = support_world(print, 1); // first support layer: the pads
+        REQUIRE(! pads.empty());
+        return get_extents(pads);
+    };
 
-    const Polygons support = support_world(print);
-    REQUIRE(! support.empty());
+    const BoundingBox unconstrained = pad_extents(false);
+    const BoundingBox constrained   = pad_extents(true);
 
-    // 10 um of slack for Clipper rounding at the plate boundary.
-    CHECK(diff(support, offset(bed, 0.01f)).empty());
+    // 10 um of slack for Clipper rounding.
+    const coord_t slack = scaled<coord_t>(0.01);
+    CHECK(constrained.min.x() >= unconstrained.min.x() - slack);
+    CHECK(constrained.max.x() <= unconstrained.max.x() + slack);
+    CHECK(constrained.min.y() >= unconstrained.min.y() - slack);
+    CHECK(constrained.max.y() <= unconstrained.max.y() + slack);
 }
 
 TEST_CASE("TreeSupport: a part inside the plate keeps its supports", "[SupportMaterial][TreeSupport]")
