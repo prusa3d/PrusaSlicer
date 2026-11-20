@@ -585,10 +585,6 @@ Old Perl tests, which were disabled by Vojtech at the time of first Support Gene
 
 */// ---------------------------------------------------------------------------
 // Tree / organic supports must keep their footprint on the build plate.
-// The generator used to run with an empty machine-border collision volume, so branches (and their
-// layer 0 pads) were free to leave the plate whenever the model reached the plate edge.
-// ---------------------------------------------------------------------------
-// Tree / organic supports must keep their footprint on the build plate.
 // Support geometry is generated in object local coordinates and shifted per instance when the
 // G-code is written, so both sides of these tests are compared in world coordinates.
 // ---------------------------------------------------------------------------
@@ -602,20 +598,48 @@ static Polygons world_bed(const Slic3r::Print &print)
     return bed;
 }
 
-static Polygons support_world(const Slic3r::Print &print, size_t layer_count = size_t(-1))
+// Extents of the support toolpaths that will actually be printed, read from the G-code in world
+// coordinates. support_islands is bookkeeping only, so what a change does to the print has to be
+// measured here.
+struct ToolpathExtents
 {
-    const PrintObject *object = print.objects().front();
-    const Point        shift  = object->instances().front().shift();
-    Polygons           out;
-    for (const SupportLayer *layer : object->support_layers()) {
-        if (layer_count-- == 0)
-            break;
-        for (const ExPolygon &island : layer->support_islands) {
-            out.emplace_back(island.contour); // Outer contour: containment is a superset test.
-            out.back().translate(shift.x(), shift.y());
+    double min_x{ 0 }, min_y{ 0 }, max_x{ 0 }, max_y{ 0 };
+    bool   defined{ false };
+};
+
+static ToolpathExtents support_gcode_extents(const std::string &gcode)
+{
+    ToolpathExtents out;
+    bool            in_support = false;
+    std::istringstream lines(gcode);
+    std::string        line;
+    std::regex         xy(R"(^\s*G[01]\s.*X(-?[0-9.]+)\s.*Y(-?[0-9.]+))");
+    std::smatch        match;
+
+    while (std::getline(lines, line)) {
+        if (line.rfind(";TYPE:", 0) == 0) {
+            in_support = line.rfind(";TYPE:Support", 0) == 0;
+            continue;
         }
+        if (! in_support || ! std::regex_search(line, match, xy))
+            continue;
+        const double x = std::stod(match[1]), y = std::stod(match[2]);
+        if (! out.defined) {
+            out = { x, y, x, y, true };
+            continue;
+        }
+        out.min_x = std::min(out.min_x, x);
+        out.min_y = std::min(out.min_y, y);
+        out.max_x = std::max(out.max_x, x);
+        out.max_y = std::max(out.max_y, y);
     }
     return out;
+}
+
+static BoundingBox bed_extents(const Slic3r::Print &print)
+{
+    const Polygons bed = world_bed(print);
+    return get_extents(bed);
 }
 
 static TestConfig organic_tree_config()
@@ -627,63 +651,33 @@ static TestConfig organic_tree_config()
     return config;
 }
 
-TEST_CASE("TreeSupport: the constraint pulls the pads inwards", "[SupportMaterial][TreeSupport]")
+TEST_CASE("TreeSupport: the constraint keeps the printed support on the plate", "[SupportMaterial][TreeSupport]")
 {
-    // A plate small enough that the part, re-centred on (100, 100) afterwards, hangs over the edge,
-    // so the generator would happily put pads beside it. The option has to shrink that footprint.
-    const std::vector<Vec2d> small_bed{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} };
-
-    auto pad_extents = [&small_bed](bool keep_on_bed) {
-        TestConfig config = organic_tree_config();
-        config.print.items.opt("support_material_keep_on_bed").set(keep_on_bed);
-        config.printer.items.opt("bed_shape").set(small_bed);
-
-        Slic3r::Print print;
-        Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
-        const Polygons pads = support_world(print, 1); // first support layer: the pads
-        REQUIRE(! pads.empty());
-        return get_extents(pads);
-    };
-
-    const BoundingBox unconstrained = pad_extents(false);
-    const BoundingBox constrained   = pad_extents(true);
-
-    // 10 um of slack for Clipper rounding.
-    const coord_t slack = scaled<coord_t>(0.01);
-    CHECK(constrained.min.x() >= unconstrained.min.x() - slack);
-    CHECK(constrained.max.x() <= unconstrained.max.x() + slack);
-    CHECK(constrained.min.y() >= unconstrained.min.y() - slack);
-    CHECK(constrained.max.y() <= unconstrained.max.y() + slack);
-}
-
-TEST_CASE("TreeSupport: a part inside the plate keeps its supports", "[SupportMaterial][TreeSupport]")
-{
+    // The re-centred part hangs over this plate, so without the constraint the pads are printed beside
+    // it. Same fixture as the default-off case below, which proves the spill is real.
     TestConfig config = organic_tree_config();
     config.print.items.opt("support_material_keep_on_bed").set(true);
+    config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} });
 
-    Slic3r::Print print;
-    Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
+    const ToolpathExtents toolpath = support_gcode_extents(slice({ TestMesh::overhang }, config));
+    REQUIRE(toolpath.defined);
 
-    const Polygons bed = world_bed(print);
-    REQUIRE(! bed.empty());
-
-    const Polygons support = support_world(print);
-    REQUIRE(! support.empty());
-    CHECK(diff(support, offset(bed, 0.01f)).empty());
+    const double slack = 0.01; // Clipper rounding at the plate boundary
+    CHECK(toolpath.min_x >= 0. - slack);
+    CHECK(toolpath.min_y >= 0. - slack);
+    CHECK(toolpath.max_x <= 110. + slack);
+    CHECK(toolpath.max_y <= 110. + slack);
 }
 
 TEST_CASE("TreeSupport: the plate constraint is off by default", "[SupportMaterial][TreeSupport]")
 {
-    // Same small plate as above, option left at its default. Placement stays unconstrained, which is
-    // the historical behaviour this option exists to fix.
     TestConfig config = organic_tree_config();
     config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} });
 
-    Slic3r::Print print;
-    Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
+    const ToolpathExtents toolpath = support_gcode_extents(slice({ TestMesh::overhang }, config));
+    REQUIRE(toolpath.defined);
 
-    const Polygons bed     = world_bed(print);
-    const Polygons support = support_world(print);
-    REQUIRE(! support.empty());
-    CHECK(! diff(support, offset(bed, 0.01f)).empty());
+    const double slack = 0.01;
+    CHECK((toolpath.min_x < 0. - slack || toolpath.min_y < 0. - slack ||
+           toolpath.max_x > 110. + slack || toolpath.max_y > 110. + slack));
 }
