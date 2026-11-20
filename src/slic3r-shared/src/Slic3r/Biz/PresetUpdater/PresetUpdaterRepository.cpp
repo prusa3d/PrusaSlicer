@@ -65,7 +65,17 @@ bool unzip_repository(const fs::path& source_path, const fs::path& target_path)
             );
             return false;
         }
-        fs::path extracted_path = target_path / file_stat.m_filename;
+        const fs::path entry_path(file_stat.m_filename);
+        if (!stays_inside_destination(entry_path)) {
+            SPDLOG_ERROR(
+                "Refusing to unzip {}: the entry {} points outside {}",
+                source_path.string(),
+                file_stat.m_filename,
+                target_path.string()
+            );
+            return false;
+        }
+        fs::path extracted_path = target_path / entry_path;
         if (file_stat.m_is_directory) {
             // Create directory if it doesn't exist
             if (!fs::create_directories(extracted_path, ec) && ec) {

@@ -64,6 +64,19 @@ FileOpResult safe_move(const boost::filesystem::path& source, const boost::files
     return {};
 }
 
+bool stays_inside_destination(const fs::path& entry_path)
+{
+    if (entry_path.empty() || entry_path.has_root_path()) {
+        return false;
+    }
+    for (const fs::path& component : entry_path) {
+        if (component == "..") {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool copy_file_wrapper(const fs::path& source, const fs::path& target, PresetUpdaterProcessStatus* process_status)
 {
     SPDLOG_INFO("PresetUpdater: Copying {} -> {}", source.string(), target.string());

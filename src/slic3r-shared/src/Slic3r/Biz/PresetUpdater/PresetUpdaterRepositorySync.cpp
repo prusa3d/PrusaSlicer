@@ -213,19 +213,6 @@ bool move_file(
     return true;
 }
 
-bool stays_inside_destination(const fs::path& entry_path)
-{
-    if (entry_path.empty() || entry_path.has_root_path()) {
-        return false;
-    }
-    for (const fs::path& component : entry_path) {
-        if (component == "..") {
-            return false;
-        }
-    }
-    return true;
-}
-
 bool unzip_files_from_bundle_zip(
     const boost::filesystem::path& zip_file,
     const boost::filesystem::path& dest_dir,

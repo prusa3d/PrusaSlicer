@@ -28,6 +28,13 @@ using FileOpResult = tl::expected<void, std::string>;
 
 FileOpResult safe_move(const boost::filesystem::path& source, const boost::filesystem::path& target);
 
+/**
+ * Whether a relative path taken from an archive entry stays inside the directory it is appended
+ * to, i.e. it is neither absolute nor rooted (e.g. "/a", "C:a", "\\a" on Windows) and contains
+ * no ".." component. Check the same fs::path object that is then appended to the destination.
+ */
+bool stays_inside_destination(const boost::filesystem::path& entry_path);
+
 bool copy_file_wrapper(
     const boost::filesystem::path& source,
     const boost::filesystem::path& target,

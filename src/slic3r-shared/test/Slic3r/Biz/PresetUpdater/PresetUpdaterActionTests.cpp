@@ -1,6 +1,7 @@
 ﻿#include "Slic3r/Biz/PresetUpdater/PresetUpdaterTestFixture.hpp"
 
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterProcessStatus.hpp"
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -122,6 +123,31 @@ TEST_CASE("PresetUpdater adds and removes a local repository", "[preset_updater]
         CHECK(repo.descriptor.uuid != local_uuid);
     }
     CHECK_FALSE(fs::exists(fx.data_dir / "local_repositories" / local_uuid));
+}
+
+TEST_CASE("PresetUpdater refuses a local repository with entries pointing outside", "[preset_updater]")
+{
+    Fixture fx;
+
+    CaptureListener listener(fx.interactor());
+
+    // The archive is extracted into data_dir/local_repositories/<uuid>, two levels below data_dir.
+    const std::string manifest = R"({"name": "Evil", "id": "evil", "url": "https://example.com/"})";
+    const std::string payload  = "payload";
+    const fs::path local_zip   = fx.data_dir / "zip_slip.zip";
+    {
+        Algorithms::ZipArchive writer =
+            Algorithms::ZipArchive::open(local_zip.string(), Algorithms::ZipArchive::Mode::Write);
+        REQUIRE(writer.is_open());
+        REQUIRE(writer.add_entry("manifest.json", manifest.data(), manifest.size()));
+        REQUIRE(writer.add_entry("../../zip_slip.txt", payload.data(), payload.size()));
+    }
+
+    fx.interactor().add_local_repository(local_zip);
+    REQUIRE(fx.wait(listener));
+    CHECK(listener.got_error());
+    CHECK_FALSE(fs::exists(fx.data_dir / "zip_slip.txt"));
+    CHECK(fs::is_empty(fx.data_dir / "local_repositories"));
 }
 
 TEST_CASE("PresetUpdater fetches no vendor data while only checking", "[preset_updater]")
