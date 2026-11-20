@@ -6,6 +6,7 @@
 // v. 2.0. If a copy of the MPL was not distributed with this file, You can 
 // obtain one at http://mozilla.org/MPL/2.0/.
 #include "arap_dof.h"
+#include "IGL_ASSERT.h"
 
 #include "cotmatrix.h"
 #include "massmatrix.h"
@@ -25,14 +26,35 @@
 #include "verbose.h"
 #include "print_ijv.h"
 
-#include "get_seconds_hires.h"
 //#include "MKLEigenInterface.h"
-#include "min_quad_dense.h"
+#include "kkt_inverse.h"
 #include "get_seconds.h"
 #include "columnize.h"
+#include <type_traits>
 
 // defined if no early exit is supported, i.e., always take a fixed number of iterations
 #define IGL_ARAP_DOF_FIXED_ITERATIONS_COUNT
+
+// To avoid putting _any_ dense slices in the static library use a work around
+// so that we can slice LbsMatrixType as sparse or dense below.
+#if __cplusplus < 201703L
+template <typename Mat, bool IsSparse> struct arap_dof_slice_helper;
+template <typename Mat> struct arap_dof_slice_helper<Mat,true>
+{
+  static void slice(const Mat & A, const Eigen::VectorXi & I, const Eigen::VectorXi & J, Mat & B)
+  {
+    static_assert(std::is_base_of<Eigen::SparseMatrixBase<Mat>, Mat>::value, "Mat must be sparse");
+    igl::slice(A,I,J,B);
+  }
+};
+template <typename Mat> struct arap_dof_slice_helper<Mat,false>
+{
+  static void slice(const Mat & A, const Eigen::VectorXi & I, const Eigen::VectorXi & J, Mat & B)
+  {
+    B = A(I,J);
+  }
+};
+#endif
 
 // A careful derivation of this implementation is given in the corresponding
 // matlab function arap_dof.m
@@ -44,8 +66,7 @@ IGL_INLINE bool igl::arap_dof_precomputation(
   const Eigen::Matrix<int,Eigen::Dynamic,1> & G,
   ArapDOFData<LbsMatrixType, SSCALAR> & data)
 {
-  using namespace Eigen;
-  typedef Matrix<SSCALAR, Dynamic, Dynamic> MatrixXS;
+  typedef Eigen::Matrix<SSCALAR, Eigen::Dynamic, Eigen::Dynamic> MatrixXS;
   // number of mesh (domain) vertices
   int n = V.rows();
   // cache problem size
@@ -73,11 +94,11 @@ IGL_INLINE bool igl::arap_dof_precomputation(
   //printf("n=%d; dim=%d; m=%d;\n",n,data.dim,data.m);
 
   // Build cotangent laplacian
-  SparseMatrix<double> Lcot;
+  Eigen::SparseMatrix<double> Lcot;
   //printf("cotmatrix()\n");
   cotmatrix(V,F,Lcot);
   // Discrete laplacian (should be minus matlab version)
-  SparseMatrix<double> Lapl = -2.0*Lcot;
+  Eigen::SparseMatrix<double> Lapl = -2.0*Lcot;
 #ifdef EXTREME_VERBOSE
   cout<<"LaplIJV=["<<endl;print_ijv(Lapl,1);cout<<endl<<"];"<<
     endl<<"Lapl=sparse(LaplIJV(:,1),LaplIJV(:,2),LaplIJV(:,3),"<<
@@ -86,7 +107,7 @@ IGL_INLINE bool igl::arap_dof_precomputation(
 
   // Get group sum scatter matrix, when applied sums all entries of the same
   // group according to G
-  SparseMatrix<double> G_sum;
+  Eigen::SparseMatrix<double> G_sum;
   if(G.size() == 0)
   {
     speye(n,G_sum);
@@ -96,12 +117,10 @@ IGL_INLINE bool igl::arap_dof_precomputation(
     Eigen::Matrix<int,Eigen::Dynamic,1> GG;
     if(data.energy == ARAP_ENERGY_TYPE_ELEMENTS)
     {
-      MatrixXi GF(F.rows(),F.cols());
+      Eigen::MatrixXi GF(F.rows(),F.cols());
       for(int j = 0;j<F.cols();j++)
       {
-        Matrix<int,Eigen::Dynamic,1> GFj;
-        slice(G,F.col(j),GFj);
-        GF.col(j) = GFj;
+        GF.col(j) = G(F.col(j));
       }
       mode<int>(GF,2,GG);
     }else
@@ -120,7 +139,7 @@ IGL_INLINE bool igl::arap_dof_precomputation(
 
   // Get covariance scatter matrix, when applied collects the covariance matrices
   // used to fit rotations to during optimization
-  SparseMatrix<double> CSM;
+  Eigen::SparseMatrix<double> CSM;
   //printf("covariance_scatter_matrix()\n");
   covariance_scatter_matrix(V,F,data.energy,CSM);
 #ifdef EXTREME_VERBOSE
@@ -147,7 +166,7 @@ IGL_INLINE bool igl::arap_dof_precomputation(
   // S((k-1)*dim + 1:dim,:)
 
   // Apply group sum to each dimension's block of covariance scatter matrix
-  SparseMatrix<double> G_sum_dim;
+  Eigen::SparseMatrix<double> G_sum_dim;
   repdiag(G_sum,data.dim,G_sum_dim);
   CSM = (G_sum_dim * CSM).eval();
 #ifdef EXTREME_VERBOSE
@@ -183,13 +202,26 @@ IGL_INLINE bool igl::arap_dof_precomputation(
     //printf("CSM_M(): Mi\n");
     LbsMatrixType M_i;
     //printf("CSM_M(): slice\n");
-    slice(M,(span_n.array()+i*n).matrix().eval(),span_mlbs_cols,M_i);
+#if __cplusplus >= 201703L
+    // Check if LbsMatrixType is a sparse matrix
+    if constexpr (std::is_base_of<Eigen::SparseMatrixBase<LbsMatrixType>, LbsMatrixType>::value)
+    {
+      slice(M,(span_n.array()+i*n).matrix().eval(),span_mlbs_cols,M_i);
+    }
+    else
+    {
+      M_i = M((span_n.array()+i*n).eval(),span_mlbs_cols);
+    }
+#else
+    constexpr bool LbsMatrixTypeIsSparse = std::is_base_of<Eigen::SparseMatrixBase<LbsMatrixType>, LbsMatrixType>::value;
+    arap_dof_slice_helper<LbsMatrixType,LbsMatrixTypeIsSparse>::slice(M,(span_n.array()+i*n).matrix().eval(),span_mlbs_cols,M_i);
+#endif
     LbsMatrixType M_i_dim;
     data.CSM_M[i].resize(k*data.dim,data.m*data.dim*(data.dim+1));
     assert(data.CSM_M[i].cols() == M.cols());
     for(int j = 0;j<data.dim;j++)
     {
-      SparseMatrix<double> CSMj;
+      Eigen::SparseMatrix<double> CSMj;
       //printf("CSM_M(): slice\n");
       slice(
         CSM,
@@ -203,7 +235,7 @@ IGL_INLINE bool igl::arap_dof_precomputation(
       {
         // Convert to full
         //printf("CSM_M(): full\n");
-        MatrixXd CSMjM_ifull(CSMjM_i);
+        Eigen::MatrixXd CSMjM_ifull(CSMjM_i);
 //        printf("CSM_M[%d]: %d %d\n",i,data.CSM_M[i].rows(),data.CSM_M[i].cols());
 //        printf("CSM_M[%d].block(%d*%d=%d,0,%d,%d): %d %d\n",i,j,k,CSMjM_i.rows(),CSMjM_i.cols(),
 //            data.CSM_M[i].block(j*k,0,CSMjM_i.rows(),CSMjM_i.cols()).rows(),
@@ -223,7 +255,7 @@ IGL_INLINE bool igl::arap_dof_precomputation(
 
   // precompute arap_rhs matrix
   //printf("arap_rhs()\n");
-  SparseMatrix<double> K;
+  Eigen::SparseMatrix<double> K;
   arap_rhs(V,F,V.cols(),data.energy,K);
 //#ifdef EXTREME_VERBOSE
 //  cout<<"KIJV=["<<endl;print_ijv(K,1);cout<<endl<<"];"<<
@@ -231,8 +263,8 @@ IGL_INLINE bool igl::arap_dof_precomputation(
 //    K.rows()<<","<<K.cols()<<");"<<endl;
 //#endif
   // Precompute left muliplication by M and right multiplication by G_sum
-  SparseMatrix<double> G_sumT = G_sum.transpose();
-  SparseMatrix<double> G_sumT_dim_dim;
+  Eigen::SparseMatrix<double> G_sumT = G_sum.transpose();
+  Eigen::SparseMatrix<double> G_sumT_dim_dim;
   repdiag(G_sumT,data.dim*data.dim,G_sumT_dim_dim);
   LbsMatrixType MT = M.transpose();
   // If this is a bottle neck then consider reordering matrix multiplication
@@ -245,7 +277,7 @@ IGL_INLINE bool igl::arap_dof_precomputation(
 
   // Precompute system matrix
   //printf("A()\n");
-  SparseMatrix<double> A;
+  Eigen::SparseMatrix<double> A;
   repdiag(Lapl,data.dim,A);
   data.Q = MT * (A * M);
 //#ifdef EXTREME_VERBOSE
@@ -258,19 +290,19 @@ IGL_INLINE bool igl::arap_dof_precomputation(
   //if(data.with_dynamics)
   //{
     // Build cotangent laplacian
-    SparseMatrix<double> Mass;
+    Eigen::SparseMatrix<double> Mass;
     //printf("massmatrix()\n");
     massmatrix(V,F,(F.cols()>3?MASSMATRIX_TYPE_BARYCENTRIC:MASSMATRIX_TYPE_VORONOI),Mass);
     //cout<<"MIJV=["<<endl;print_ijv(Mass,1);cout<<endl<<"];"<<
     //  endl<<"M=sparse(MIJV(:,1),MIJV(:,2),MIJV(:,3),"<<
     //  Mass.rows()<<","<<Mass.cols()<<");"<<endl;
     //speye(data.n,Mass);
-    SparseMatrix<double> Mass_rep;
+    Eigen::SparseMatrix<double> Mass_rep;
     repdiag(Mass,data.dim,Mass_rep);
 
     // Multiply either side by weights matrix (should be dense)
     data.Mass_tilde = MT * Mass_rep * M;
-    MatrixXd ones(data.dim*data.n,data.dim);
+    Eigen::MatrixXd ones(data.dim*data.n,data.dim);
     for(int i = 0;i<data.n;i++)
     {
       for(int d = 0;d<data.dim;d++)
@@ -498,8 +530,7 @@ IGL_INLINE bool igl::arap_dof_recomputation(
   const Eigen::SparseMatrix<double> & A_eq,
   ArapDOFData<LbsMatrixType, SSCALAR> & data)
 {
-  using namespace Eigen;
-  typedef Matrix<SSCALAR, Dynamic, Dynamic> MatrixXS;
+  typedef Eigen::Matrix<SSCALAR, Eigen::Dynamic, Eigen::Dynamic> MatrixXS;
 
   LbsMatrixType * Q;
   LbsMatrixType Qdyn;
@@ -543,17 +574,17 @@ IGL_INLINE bool igl::arap_dof_recomputation(
 #endif
 
   // Compute dense solve matrix (alternative of matrix factorization)
-  //printf("min_quad_dense_precompute()\n");
-  MatrixXd Qfull(*Q);
-  MatrixXd A_eqfull(A_eq);
-  MatrixXd M_Solve;
+  //printf("kkt_inverse()\n");
+  Eigen::MatrixXd Qfull(*Q);
+  Eigen::MatrixXd A_eqfull(A_eq);
+  Eigen::MatrixXd M_Solve;
 
-  double timer0_start = get_seconds_hires();
+  double timer0_start = get_seconds();
   bool use_lu = data.effective_dim != 2;
   //use_lu = false;
   //printf("use_lu: %s\n",(use_lu?"TRUE":"FALSE"));
-  min_quad_dense_precompute(Qfull, A_eqfull, use_lu,M_Solve);
-  double timer0_end = get_seconds_hires();
+  kkt_inverse(Qfull, A_eqfull, use_lu,M_Solve);
+  double timer0_end = get_seconds();
   verbose("Bob timing: %.20f\n", (timer0_end - timer0_start)*1000.0);
 
   // Precompute full solve matrix:
@@ -613,17 +644,16 @@ IGL_INLINE bool igl::arap_dof_update(
   Eigen::MatrixXd & L
   )
 {
-  using namespace Eigen;
-  typedef Matrix<SSCALAR, Dynamic, Dynamic> MatrixXS;
+  typedef Eigen::Matrix<SSCALAR, Eigen::Dynamic, Eigen::Dynamic> MatrixXS;
 #ifdef ARAP_GLOBAL_TIMING
-  double timer_start = get_seconds_hires();
+  double timer_start = get_seconds();
 #endif
 
   // number of dimensions
-  assert((int)data.CSM_M.size() == data.dim);
-  assert((int)L0.size() == (data.m)*data.dim*(data.dim+1));
-  assert(max_iters >= 0);
-  assert(tol >= 0);
+  IGL_ASSERT((int)data.CSM_M.size() == data.dim);
+  IGL_ASSERT((int)L0.size() == (data.m)*data.dim*(data.dim+1));
+  IGL_ASSERT(max_iters >= 0);
+  IGL_ASSERT(tol >= 0);
 
   // timing variables
   double 
@@ -667,10 +697,9 @@ IGL_INLINE bool igl::arap_dof_update(
   MatrixXS S(k*data.dim,data.dim);
   MatrixXS R(data.dim,data.dim*k);
   Eigen::Matrix<SSCALAR,Eigen::Dynamic,1> Rcol(data.dim * data.dim * k);
-  Matrix<SSCALAR,Dynamic,1> B_eq_SSCALAR = B_eq.cast<SSCALAR>();
-  Matrix<SSCALAR,Dynamic,1> B_eq_fix_SSCALAR;
-  Matrix<SSCALAR,Dynamic,1> L0SSCALAR = L0.cast<SSCALAR>();
-  slice(L0SSCALAR, data.fixed_dim, B_eq_fix_SSCALAR);    
+  Eigen::Matrix<SSCALAR ,Eigen::Dynamic,1> B_eq_SSCALAR = B_eq.cast<SSCALAR>();
+  Eigen::Matrix<SSCALAR ,Eigen::Dynamic,1> L0SSCALAR = L0.cast<SSCALAR>();
+  Eigen::Matrix<SSCALAR ,Eigen::Dynamic,1> B_eq_fix_SSCALAR = L0SSCALAR(data.fixed_dim);
   //MatrixXS rhsFull(Rcol.rows() + B_eq.rows() + B_eq_fix_SSCALAR.rows(), 1); 
 
   MatrixXS Lsep(data.m*(data.dim + 1), 3);  
@@ -686,7 +715,7 @@ IGL_INLINE bool igl::arap_dof_update(
   MatrixXS L_part1(data.dim * (data.dim + 1) * data.m, 1);
 
 #ifdef ARAP_GLOBAL_TIMING
-    double timer_prepFinished = get_seconds_hires();
+    double timer_prepFinished = get_seconds();
 #endif
 
 #ifdef IGL_ARAP_DOF_FIXED_ITERATIONS_COUNT
@@ -697,7 +726,7 @@ IGL_INLINE bool igl::arap_dof_update(
   {  
     if(data.print_timings)
     {
-      sec_start = get_seconds_hires();
+      sec_start = get_seconds();
     }
 
 #ifndef IGL_ARAP_DOF_FIXED_ITERATIONS_COUNT
@@ -722,7 +751,7 @@ IGL_INLINE bool igl::arap_dof_update(
     
     if(data.print_timings)
     {
-      sec_covGather = get_seconds_hires();
+      sec_covGather = get_seconds();
     }
 
 #ifdef EXTREME_VERBOSE
@@ -747,7 +776,7 @@ IGL_INLINE bool igl::arap_dof_update(
 
     if(data.print_timings)
     {
-      sec_fitRotations = get_seconds_hires();
+      sec_fitRotations = get_seconds();
     }
   
     ///////////////////////////////////////////////////////////////////////////
@@ -766,7 +795,7 @@ IGL_INLINE bool igl::arap_dof_update(
     
     if(data.print_timings)
     {
-      sec_prepMult = get_seconds_hires();
+      sec_prepMult = get_seconds();
     }  
     
     L_part1xyz = data.CSolveBlock1 * Rxyz;
@@ -799,13 +828,13 @@ IGL_INLINE bool igl::arap_dof_update(
           ( (-1.0/(data.h*data.h)) * data.L0.array() + 
             (1.0/(data.h)) * data.Lvel0.array()
             ).matrix();
-      MatrixXd temp_d = temp.template cast<double>();
+      Eigen::MatrixXd temp_d = temp.template cast<double>();
 
-      MatrixXd temp_g = data.fgrav*(data.grav_mag*data.grav_dir);
+      Eigen::MatrixXd temp_g = data.fgrav*(data.grav_mag*data.grav_dir);
 
       assert(data.fext.rows() == temp_g.rows());
       assert(data.fext.cols() == temp_g.cols());
-      MatrixXd temp2 = data.Mass_tilde * temp_d + temp_g + data.fext.template cast<double>();
+      Eigen::MatrixXd temp2 = data.Mass_tilde * temp_d + temp_g + data.fext.template cast<double>();
       MatrixXS temp2_f = temp2.template cast<SSCALAR>();
       L_part1_dyn = data.Pi_1 * temp2_f;
       L_part1.array() = L_part1.array() + L_part1_dyn.array();
@@ -824,7 +853,7 @@ IGL_INLINE bool igl::arap_dof_update(
 
     if(data.print_timings)
     {
-      sec_solve = get_seconds_hires();
+      sec_solve = get_seconds();
     }
 
 #ifndef IGL_ARAP_DOF_FIXED_ITERATIONS_COUNT
@@ -835,7 +864,7 @@ IGL_INLINE bool igl::arap_dof_update(
 
     if(data.print_timings)
     {
-      sec_end = get_seconds_hires();
+      sec_end = get_seconds();
 #ifndef WIN32
       // trick to get sec_* variables to compile without warning on mac
       if(false)
@@ -861,7 +890,7 @@ IGL_INLINE bool igl::arap_dof_update(
   assert(L.cols() == 1);
 
 #ifdef ARAP_GLOBAL_TIMING
-  double timer_finito = get_seconds_hires();
+  double timer_finito = get_seconds();
   printf(
     "ARAP preparation = %f, "
     "all %i iterations = %f [ms]\n", 

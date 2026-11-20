@@ -8,18 +8,17 @@
 #include "is_boundary_edge.h"
 #include "unique_rows.h"
 #include "sort.h"
+#include <cassert>
 
 template <
   typename DerivedF,
   typename DerivedE,
   typename DerivedB>
 void igl::is_boundary_edge(
-  const Eigen::PlainObjectBase<DerivedE> & E,
-  const Eigen::PlainObjectBase<DerivedF> & F,
+  const Eigen::MatrixBase<DerivedE> & E,
+  const Eigen::MatrixBase<DerivedF> & F,
   Eigen::PlainObjectBase<DerivedB> & B)
 {
-  using namespace Eigen;
-  using namespace std;
   // Should be triangles
   assert(F.cols() == 3);
   // Should be edges
@@ -27,7 +26,7 @@ void igl::is_boundary_edge(
   // number of faces
   const int m = F.rows();
   // Collect all directed edges after E
-  MatrixXi EallE(E.rows()+3*m,2);
+  Eigen::MatrixXi EallE(E.rows()+3*m,2);
   EallE.block(0,0,E.rows(),E.cols()) = E;
   for(int e = 0;e<3;e++)
   {
@@ -41,14 +40,20 @@ void igl::is_boundary_edge(
     }
   }
   // sort directed edges into undirected edges
-  MatrixXi sorted_EallE,_;
-  sort(EallE,2,true,sorted_EallE,_);
+  Eigen::MatrixXi sorted_EallE;
+  {
+    Eigen::MatrixXi _;
+    sort(EallE,2,true,sorted_EallE,_);
+  }
   // Determine unique undirected edges E and map to directed edges EMAP
-  MatrixXi uE;
-  VectorXi EMAP;
-  unique_rows(sorted_EallE,uE,_,EMAP);
+  Eigen::MatrixXi uE;
+  Eigen::VectorXi EMAP;
+  {
+    Eigen::VectorXi _;
+    unique_rows(sorted_EallE,uE,_,EMAP);
+  }
   // Counts of occurrences
-  VectorXi N = VectorXi::Zero(uE.rows());
+  Eigen::VectorXi N = Eigen::VectorXi::Zero(uE.rows());
   for(int e = 0;e<EMAP.rows();e++)
   {
     N(EMAP(e))++;
@@ -68,19 +73,22 @@ template <
   typename DerivedB,
   typename DerivedEMAP>
 void igl::is_boundary_edge(
-  const Eigen::PlainObjectBase<DerivedF> & F,
+  const Eigen::MatrixBase<DerivedF> & F,
   Eigen::PlainObjectBase<DerivedB> & B,
   Eigen::PlainObjectBase<DerivedE> & E,
   Eigen::PlainObjectBase<DerivedEMAP> & EMAP)
 {
-  using namespace Eigen;
-  using namespace std;
+  // B and EMAP need to have RowsAtCompileTime == 1 or ColsAtCompileTime == 1
+  static_assert(
+    (DerivedB::RowsAtCompileTime == 1 || DerivedB::ColsAtCompileTime == 1) &&
+    (DerivedEMAP::RowsAtCompileTime == 1 || DerivedEMAP::ColsAtCompileTime == 1),
+    "B and EMAP need to have RowsAtCompileTime == 1 or ColsAtCompileTime == 1");
   // Should be triangles
   assert(F.cols() == 3);
   // number of faces
   const int m = F.rows();
   // Collect all directed edges after E
-  MatrixXi allE(3*m,2);
+  Eigen::MatrixXi allE(3*m,2);
   for(int e = 0;e<3;e++)
   {
     for(int f = 0;f<m;f++)
@@ -93,12 +101,18 @@ void igl::is_boundary_edge(
     }
   }
   // sort directed edges into undirected edges
-  MatrixXi sorted_allE,_;
-  sort(allE,2,true,sorted_allE,_);
+  Eigen::MatrixXi sorted_allE;
+  {
+    Eigen::MatrixXi _;
+    sort(allE,2,true,sorted_allE,_);
+  }
   // Determine unique undirected edges E and map to directed edges EMAP
-  unique_rows(sorted_allE,E,_,EMAP);
+  {
+    Eigen::VectorXi _;
+    unique_rows(sorted_allE,E,_,EMAP);
+  }
   // Counts of occurrences
-  VectorXi N = VectorXi::Zero(E.rows());
+  Eigen::VectorXi N = Eigen::VectorXi::Zero(E.rows());
   for(int e = 0;e<EMAP.rows();e++)
   {
     N(EMAP(e))++;
@@ -112,11 +126,11 @@ void igl::is_boundary_edge(
 }
 
 #ifdef IGL_STATIC_LIBRARY
-// Explicit template instantiation:
-template void igl::is_boundary_edge<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<double, -1, 1, 0, -1, 1> >(Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, 1, 0, -1, 1> >&);
-template void igl::is_boundary_edge<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<bool, -1, 1, 0, -1, 1> >(Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<bool, -1, 1, 0, -1, 1> >&);
-template void igl::is_boundary_edge<Eigen::Matrix<unsigned int, -1, -1, 1, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<bool, -1, 1, 0, -1, 1> >(Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<unsigned int, -1, -1, 1, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<bool, -1, 1, 0, -1, 1> >&);
-template void igl::is_boundary_edge<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<bool, -1, 1, 0, -1, 1>, Eigen::Matrix<int, -1, 1, 0, -1, 1> >(Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<bool, -1, 1, 0, -1, 1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> >&);
-template void igl::is_boundary_edge<Eigen::Matrix<unsigned int, -1, -1, 1, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<bool, -1, 1, 0, -1, 1>, Eigen::Matrix<int, -1, 1, 0, -1, 1> >(Eigen::PlainObjectBase<Eigen::Matrix<unsigned int, -1, -1, 1, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<bool, -1, 1, 0, -1, 1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> >&);
-template void igl::is_boundary_edge<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<double, -1, 1, 0, -1, 1>, Eigen::Matrix<int, -1, 1, 0, -1, 1> >(Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, 1, 0, -1, 1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> >&);
+// Explicit template instantiation
+// generated by autoexplicit.sh
+template void igl::is_boundary_edge<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Array<bool, -1, 1, 0, -1, 1>, Eigen::Matrix<int, -1, 1, 0, -1, 1> >(Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Array<bool, -1, 1, 0, -1, 1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> >&);
+template void igl::is_boundary_edge<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<bool, -1, 1, 0, -1, 1> >(Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<bool, -1, 1, 0, -1, 1> >&);
+template void igl::is_boundary_edge<Eigen::Matrix<unsigned int, -1, -1, 1, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<bool, -1, 1, 0, -1, 1> >(Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::MatrixBase<Eigen::Matrix<unsigned int, -1, -1, 1, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<bool, -1, 1, 0, -1, 1> >&);
+template void igl::is_boundary_edge<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<bool, -1, 1, 0, -1, 1>, Eigen::Matrix<int, -1, 1, 0, -1, 1> >(Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<bool, -1, 1, 0, -1, 1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> >&);
+template void igl::is_boundary_edge<Eigen::Matrix<unsigned int, -1, -1, 1, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<bool, -1, 1, 0, -1, 1>, Eigen::Matrix<int, -1, 1, 0, -1, 1> >(Eigen::MatrixBase<Eigen::Matrix<unsigned int, -1, -1, 1, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<bool, -1, 1, 0, -1, 1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> >&);
 #endif

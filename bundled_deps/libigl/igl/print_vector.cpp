@@ -13,7 +13,6 @@
 template <typename T>
 IGL_INLINE void igl::print_vector( std::vector<T>& v)
 {
-  using namespace std;
   for (int i=0; i<v.size(); ++i)
     std::cerr << v[i] << " ";
   std::cerr << std::endl;
@@ -22,7 +21,6 @@ IGL_INLINE void igl::print_vector( std::vector<T>& v)
 template <typename T>
 IGL_INLINE void igl::print_vector( std::vector< std::vector<T> >& v)
 {
-  using namespace std;
   for (int i=0; i<v.size(); ++i)
   {
     std::cerr << i << ": ";
@@ -36,7 +34,6 @@ IGL_INLINE void igl::print_vector( std::vector< std::vector<T> >& v)
 template <typename T>
 IGL_INLINE void igl::print_vector( std::vector< std::vector< std::vector<T> > >& v)
 {
-  using namespace std;
   for (int m=0; m<v.size(); ++m)
   {
     std::cerr << "Matrix " << m << std::endl;

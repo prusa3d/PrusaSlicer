@@ -7,6 +7,7 @@
 // obtain one at http://mozilla.org/MPL/2.0/.
 #include "all_pairs_distances.h"
 #include <Eigen/Dense>
+#include <cassert>
 
 template <typename Mat>
 IGL_INLINE void igl::all_pairs_distances(

@@ -11,6 +11,7 @@
 #include "../../sample_edges.h"
 #include "../../cat.h"
 
+#include <cassert>
 #include <iostream>
 // Default settings pq2Y tell tetgen to mesh interior of triangle mesh and
 // to produce a graded tet mesh
@@ -29,51 +30,47 @@ IGL_INLINE bool igl::copyleft::tetgen::mesh_with_skeleton(
   Eigen::MatrixXi & TT,
   Eigen::MatrixXi & FF)
 {
-  using namespace Eigen;
-  using namespace std;
-  const string eff_tetgen_flags = 
+  const std::string eff_tetgen_flags =
     (tetgen_flags.length() == 0?DEFAULT_TETGEN_FLAGS:tetgen_flags);
   // Collect all edges that need samples:
-  MatrixXi BECE = cat(1,BE,CE);
-  MatrixXd S;
+  Eigen::MatrixXi BECE = cat(1,BE,CE);
+  Eigen::MatrixXd S;
   // Sample each edge with 10 samples. (Choice of 10 doesn't seem to matter so
   // much, but could under some circumstances)
   sample_edges(C,BECE,samples_per_bone,S);
   // Vertices we'll constrain tet mesh to meet
-  MatrixXd VS = cat(1,V,S);
+  Eigen::MatrixXd VS = cat(1,V,S);
   // Use tetgen to mesh the interior of surface, this assumes surface:
   //   * has no holes
   //   * has no non-manifold edges or vertices
   //   * has consistent orientation
   //   * has no self-intersections
   //   * has no 0-volume pieces
-  cerr<<"tetgen begin()"<<endl;
   int status = tetrahedralize( VS,F,eff_tetgen_flags,VV,TT,FF);
-  cerr<<"tetgen end()"<<endl;
   if(FF.rows() != F.rows())
   {
     // Issue a warning if the surface has changed
-    cerr<<"mesh_with_skeleton: Warning: boundary faces != input faces"<<endl;
+    std::cerr<<"mesh_with_skeleton: Warning: boundary faces != input faces"<<std::endl;
   }
   if(status != 0)
   {
-    cerr<<
-      "***************************************************************"<<endl<<
-      "***************************************************************"<<endl<<
-      "***************************************************************"<<endl<<
-      "***************************************************************"<<endl<<
-      "* mesh_with_skeleton: tetgen failed. Just meshing convex hull *"<<endl<<
-      "***************************************************************"<<endl<<
-      "***************************************************************"<<endl<<
-      "***************************************************************"<<endl<<
-      "***************************************************************"<<endl;
+    std::cerr<<
+      "***************************************************************"<<std::endl<<
+      "***************************************************************"<<std::endl<<
+      "***************************************************************"<<std::endl<<
+      "***************************************************************"<<std::endl<<
+      "* mesh_with_skeleton: tetgen failed. Just meshing convex hull *"<<std::endl<<
+      "***************************************************************"<<std::endl<<
+      "***************************************************************"<<std::endl<<
+      "***************************************************************"<<std::endl<<
+      "***************************************************************"<<std::endl;
     // If meshing convex hull then use more regular mesh
     status = tetrahedralize(VS,F,"q1.414",VV,TT,FF);
     // I suppose this will fail if the skeleton is outside the mesh
     assert(FF.maxCoeff() < VV.rows());
     if(status != 0)
     {
-      cerr<<"mesh_with_skeleton: tetgen failed again."<<endl;
+      std::cerr<<"mesh_with_skeleton: tetgen failed again."<<std::endl;
       return false;
     }
   }

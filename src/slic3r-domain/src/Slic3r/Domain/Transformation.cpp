@@ -1,4 +1,5 @@
 #include <numbers>
+#include <cassert>
 
 #include "Slic3r/Domain/Transformation.hpp"
 #include "Slic3r/Domain/Constants.hpp"

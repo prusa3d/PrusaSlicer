@@ -26,9 +26,8 @@ igl::BBWData::BBWData():
 
 void igl::BBWData::print()
 {
-  using namespace std;
-  cout<<"partition_unity: "<<partition_unity<<endl;
-  cout<<"W0=["<<endl<<W0<<endl<<"];"<<endl;
+  std::cout<<"partition_unity: "<<partition_unity<<std::endl;
+  std::cout<<"W0=["<<std::endl<<W0<<std::endl<<"];"<<std::endl;
 }
 
 
@@ -39,16 +38,14 @@ template <
   typename Derivedbc,
   typename DerivedW>
 IGL_INLINE bool igl::bbw(
-  const Eigen::PlainObjectBase<DerivedV> & V,
-  const Eigen::PlainObjectBase<DerivedEle> & Ele,
-  const Eigen::PlainObjectBase<Derivedb> & b,
-  const Eigen::PlainObjectBase<Derivedbc> & bc,
+  const Eigen::MatrixBase<DerivedV> & V,
+  const Eigen::MatrixBase<DerivedEle> & Ele,
+  const Eigen::MatrixBase<Derivedb> & b,
+  const Eigen::MatrixBase<Derivedbc> & bc,
   igl::BBWData & data,
   Eigen::PlainObjectBase<DerivedW> & W
   )
 {
-  using namespace std;
-  using namespace Eigen;
   assert(!data.partition_unity && "partition_unity not implemented yet");
   // number of domain vertices
   int n = V.rows();
@@ -59,23 +56,23 @@ IGL_INLINE bool igl::bbw(
   harmonic(V,Ele,2,Q);
   W.derived().resize(n,m);
   // No linear terms
-  VectorXd c = VectorXd::Zero(n);
+  Eigen::VectorXd c = Eigen::VectorXd::Zero(n);
   // No linear constraints
-  SparseMatrix<typename DerivedW::Scalar> A(0,n),Aeq(0,n),Aieq(0,n);
-  VectorXd Beq(0,1),Bieq(0,1);
+  Eigen::SparseMatrix<typename DerivedW::Scalar> A(0,n),Aeq(0,n),Aieq(0,n);
+  Eigen::VectorXd Beq(0,1),Bieq(0,1);
   // Upper and lower box constraints (Constant bounds)
-  VectorXd ux = VectorXd::Ones(n);
-  VectorXd lx = VectorXd::Zero(n);
+  Eigen::VectorXd ux = Eigen::VectorXd::Ones(n);
+  Eigen::VectorXd lx = Eigen::VectorXd::Zero(n);
   active_set_params eff_params = data.active_set_params;
   if(data.verbosity >= 1)
   {
-    cout<<"BBW: max_iter: "<<data.active_set_params.max_iter<<endl;
-    cout<<"BBW: eff_max_iter: "<<eff_params.max_iter<<endl;
+    std::cout<<"BBW: max_iter: "<<data.active_set_params.max_iter<<std::endl;
+    std::cout<<"BBW: eff_max_iter: "<<eff_params.max_iter<<std::endl;
   }
   if(data.verbosity >= 1)
   {
-    cout<<"BBW: Computing initial weights for "<<m<<" handle"<<
-      (m!=1?"s":"")<<"."<<endl;
+    std::cout<<"BBW: Computing initial weights for "<<m<<" handle"<<
+      (m!=1?"s":"")<<"."<<std::endl;
   }
   min_quad_with_fixed_data<typename DerivedW::Scalar > mqwf;
   min_quad_with_fixed_precompute(Q,b,Aeq,true,mqwf);
@@ -95,11 +92,11 @@ IGL_INLINE bool igl::bbw(
     if(data.verbosity >= 1)
     {
       std::lock_guard<std::mutex> lock(critical);
-      cout<<"BBW: Computing weight for handle "<<i+1<<" out of "<<m<<
-        "."<<endl;
+      std::cout<<"BBW: Computing weight for handle "<<i+1<<" out of "<<m<<
+        "."<<std::endl;
     }
-    VectorXd bci = bc.col(i);
-    VectorXd Wi;
+    Eigen::VectorXd bci = bc.col(i);
+    Eigen::VectorXd Wi;
     // use initial guess
     Wi = W.col(i);
     SolverStatus ret = active_set(
@@ -109,15 +106,20 @@ IGL_INLINE bool igl::bbw(
       case SOLVER_STATUS_CONVERGED:
         break;
       case SOLVER_STATUS_MAX_ITER:
+#ifdef IGL_BBW_DEBUG
         cerr<<"active_set: max iter without convergence."<<endl;
+#endif
         break;
       case SOLVER_STATUS_ERROR:
       default:
+#ifdef IGL_BBW_DEBUG
         cerr<<"active_set error."<<endl;
+#endif
         error = true;
     }
     W.col(i) = Wi;
   };
+
   parallel_for(m,optimize_weight,2);
   if(error)
   {
@@ -128,8 +130,8 @@ IGL_INLINE bool igl::bbw(
   const double min_rowsum = W.rowwise().sum().array().abs().minCoeff();
   if(min_rowsum < 0.1)
   {
-    cerr<<"bbw.cpp: Warning, minimum row sum is very low. Consider more "
-      "active set iterations or enforcing partition of unity."<<endl;
+    std::cerr<<"bbw.cpp: Warning, minimum row sum is very low. Consider more "
+      "active set iterations or enforcing partition of unity."<<std::endl;
   }
 #endif
 
@@ -138,6 +140,6 @@ IGL_INLINE bool igl::bbw(
 
 #ifdef IGL_STATIC_LIBRARY
 // Explicit template instantiation
-template bool igl::bbw<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, 1, 0, -1, 1>, Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<double, -1, -1, 0, -1, -1> >(Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, igl::BBWData&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> >&);
+template bool igl::bbw<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, 1, 0, -1, 1>, Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<double, -1, -1, 0, -1, -1>>(Eigen::MatrixBase<Eigen::Matrix<double, -1, -1, 0, -1, -1>> const&, Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1>> const&, Eigen::MatrixBase<Eigen::Matrix<int, -1, 1, 0, -1, 1>> const&, Eigen::MatrixBase<Eigen::Matrix<double, -1, -1, 0, -1, -1>> const&, igl::BBWData&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1>>&);
 #endif
 

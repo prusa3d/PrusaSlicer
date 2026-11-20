@@ -16,7 +16,6 @@ IGL_INLINE bool igl::readOFF(
   std::vector<std::vector<Scalar > > & N,
   std::vector<std::vector<Scalar > > & C)
 {
-  using namespace std;
   FILE * off_file = fopen(off_file_name.c_str(),"r");
   if(NULL==off_file)
   {
@@ -34,7 +33,6 @@ IGL_INLINE bool igl::readOFF(
   std::vector<std::vector<Scalar > > & N,
   std::vector<std::vector<Scalar > > & C)
 {
-  using namespace std;
   V.clear();
   F.clear();
   N.clear();
@@ -47,16 +45,16 @@ IGL_INLINE bool igl::readOFF(
   const std::string COFF("COFF");
   if(fscanf(off_file,"%s\n",header)!=1
      || !(
-       string(header).compare(0, OFF.length(), OFF)==0 ||
-       string(header).compare(0, COFF.length(), COFF)==0 ||
-       string(header).compare(0,NOFF.length(),NOFF)==0))
+       std::string(header).compare(0, OFF.length(), OFF)==0 ||
+       std::string(header).compare(0, COFF.length(), COFF)==0 ||
+       std::string(header).compare(0,NOFF.length(),NOFF)==0))
   {
     printf("Error: readOFF() first line should be OFF or NOFF or COFF, not %s...",header);
     fclose(off_file);
     return false;
   }
-  bool has_normals = string(header).compare(0,NOFF.length(),NOFF)==0;
-  bool has_vertexColors = string(header).compare(0,COFF.length(),COFF)==0;
+  bool has_normals = std::string(header).compare(0,NOFF.length(),NOFF)==0;
+  bool has_vertexColors = std::string(header).compare(0,COFF.length(),COFF)==0;
   // Second line is #vertices #faces #edges
   int number_of_vertices;
   int number_of_faces;

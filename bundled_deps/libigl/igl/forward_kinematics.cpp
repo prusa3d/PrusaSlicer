@@ -8,6 +8,7 @@
 #include "forward_kinematics.h"
 #include <functional>
 #include <iostream>
+#include <cassert>
 
 IGL_INLINE void igl::forward_kinematics(
   const Eigen::MatrixXd & C,
@@ -20,17 +21,15 @@ IGL_INLINE void igl::forward_kinematics(
     Eigen::Quaterniond,Eigen::aligned_allocator<Eigen::Quaterniond> > & vQ,
   std::vector<Eigen::Vector3d> & vT)
 {
-  using namespace std;
-  using namespace Eigen;
-  const int m = BE.rows(); 
+  const int m = BE.rows();
   assert(m == P.rows());
   assert(m == (int)dQ.size());
   assert(m == (int)dT.size());
-  vector<bool> computed(m,false);
+  std::vector<bool> computed(m,false);
   vQ.resize(m);
   vT.resize(m);
   // Dynamic programming
-  function<void (int) > fk_helper = [&] (int b)
+  std::function<void (int) > fk_helper = [&] (int b)
   {
     if(!computed[b])
     {
@@ -38,7 +37,7 @@ IGL_INLINE void igl::forward_kinematics(
       {
         // base case for roots
         vQ[b] = dQ[b];
-        const Vector3d r = C.row(BE(b,0)).transpose();
+        const Eigen::Vector3d r = C.row(BE(b,0)).transpose();
         vT[b] = r-dQ[b]*r + dT[b];
       }else
       {
@@ -46,7 +45,7 @@ IGL_INLINE void igl::forward_kinematics(
         const int p = P(b);
         fk_helper(p);
         vQ[b] = vQ[p] * dQ[b];
-        const Vector3d r = C.row(BE(b,0)).transpose();
+        const Eigen::Vector3d r = C.row(BE(b,0)).transpose();
         vT[b] = vT[p] - vQ[b]*r + vQ[p]*(r + dT[b]);
       }
       computed[b] = true;
@@ -81,16 +80,14 @@ IGL_INLINE void igl::forward_kinematics(
   const std::vector<Eigen::Vector3d> & dT,
   Eigen::MatrixXd & T)
 {
-  using namespace Eigen;
-  using namespace std;
-  vector< Quaterniond,aligned_allocator<Quaterniond> > vQ;
-  vector< Vector3d> vT;
+  std::vector< Eigen::Quaterniond,Eigen::aligned_allocator<Eigen::Quaterniond> > vQ;
+  std::vector< Eigen::Vector3d> vT;
   forward_kinematics(C,BE,P,dQ,dT,vQ,vT);
   const int dim = C.cols();
   T.resize(BE.rows()*(dim+1),dim);
   for(int e = 0;e<BE.rows();e++)
   {
-    Affine3d a = Affine3d::Identity();
+    Eigen::Affine3d a = Eigen::Affine3d::Identity();
     a.translate(vT[e]);
     a.rotate(vQ[e]);
     T.block(e*(dim+1),0,dim+1,dim) =

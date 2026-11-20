@@ -10,25 +10,25 @@
 #include "igl_inline.h"
 #include <Eigen/Core>
 #include <Eigen/Geometry>
-#include <functional>
+#include <vector>
 namespace igl
 {
-  // Construct an axis-aligned bounding box containing a shape undergoing a
-  // motion sampled at `steps` discrete momements.
-  //
-  // Inputs:
-  //   n  number of mesh vertices
-  //   V  function handle so that V(i,t) returns the 3d position of vertex
-  //     i at time t, for t∈[0,1]
-  //   steps  number of time steps: steps=3 --> t∈{0,0.5,1}
-  // Outputs:
-  //   box  box containing mesh under motion
+  /// Construct an axis-aligned bounding box containing a shape undergoing a
+  /// motion sampled at a list of discrete rigid transformations.
+  ///
+  /// @param[in] V  #V by 3 list of mesh positions in reference pose
+  /// @param[in] transforms  #transforms list of rigid transformations, one per
+  ///     time step
+  /// @param[out] box  box containing mesh under motion
+  template <
+    typename DerivedV,
+    typename TScalar,
+    typename TAlloc>
   IGL_INLINE void swept_volume_bounding_box(
-    const size_t & n,
-    const std::function<
-      Eigen::RowVector3d(const size_t vi, const double t)> & V,
-    const size_t & steps,
-    Eigen::AlignedBox3d & box);
+    const Eigen::MatrixBase<DerivedV> & V,
+    const std::vector<Eigen::Transform<TScalar,3,Eigen::Affine>,TAlloc> &
+      transforms,
+    Eigen::AlignedBox<TScalar,3> & box);
 }
 
 #ifndef IGL_STATIC_LIBRARY

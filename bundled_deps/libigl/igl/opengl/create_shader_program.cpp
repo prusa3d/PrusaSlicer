@@ -19,12 +19,11 @@ IGL_INLINE bool igl::opengl::create_shader_program(
   const std::map<std::string,GLuint> & attrib,
   GLuint & id)
 {
-  using namespace std;
   if(vert_source == "" && frag_source == "")
   {
-    cerr<<
+    std::cerr<<
       "create_shader_program() could not create shader program,"
-      " both .vert and .frag source given were empty"<<endl;
+      " both .vert and .frag source given were empty"<<std::endl;
     return false;
   }
 
@@ -32,7 +31,7 @@ IGL_INLINE bool igl::opengl::create_shader_program(
   id = glCreateProgram();
   if(id == 0)
   {
-    cerr<<"create_shader_program() could not create shader program."<<endl;
+    std::cerr<<"create_shader_program() could not create shader program."<<std::endl;
     return false;
   }
   GLuint g = 0,f = 0,v = 0;
@@ -43,7 +42,7 @@ IGL_INLINE bool igl::opengl::create_shader_program(
     g = igl::opengl::load_shader(geom_source.c_str(),GL_GEOMETRY_SHADER);
     if(g == 0)
     {
-      cerr<<"geometry shader failed to compile."<<endl;
+      std::cerr<<"geometry shader failed to compile."<<std::endl;
       return false;
     }
     glAttachShader(id,g);
@@ -55,7 +54,7 @@ IGL_INLINE bool igl::opengl::create_shader_program(
     v = igl::opengl::load_shader(vert_source.c_str(),GL_VERTEX_SHADER);
     if(v == 0)
     {
-      cerr<<"vertex shader failed to compile."<<endl;
+      std::cerr<<"vertex shader failed to compile."<<std::endl;
       return false;
     }
     glAttachShader(id,v);
@@ -67,7 +66,7 @@ IGL_INLINE bool igl::opengl::create_shader_program(
     f = igl::opengl::load_shader(frag_source.c_str(),GL_FRAGMENT_SHADER);
     if(f == 0)
     {
-      cerr<<"fragment shader failed to compile."<<endl;
+      std::cerr<<"fragment shader failed to compile."<<std::endl;
       return false;
     }
     glAttachShader(id,f);

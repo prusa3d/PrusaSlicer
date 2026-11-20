@@ -6,23 +6,48 @@
 // v. 2.0. If a copy of the MPL was not distributed with this file, You can 
 // obtain one at http://mozilla.org/MPL/2.0/.
 #include "swept_volume_bounding_box.h"
-#include "LinSpaced.h"
 
+template <
+  typename DerivedV,
+  typename TScalar,
+  typename TAlloc>
 IGL_INLINE void igl::swept_volume_bounding_box(
-  const size_t & n,
-  const std::function<Eigen::RowVector3d(const size_t vi, const double t)> & V,
-  const size_t & steps,
-  Eigen::AlignedBox3d & box)
+  const Eigen::MatrixBase<DerivedV> & V,
+  const std::vector<Eigen::Transform<TScalar,3,Eigen::Affine>,TAlloc> &
+    transforms,
+  Eigen::AlignedBox<TScalar,3> & box)
 {
-  using namespace Eigen;
   box.setEmpty();
-  const VectorXd t = igl::LinSpaced<VectorXd >(steps,0,1);
   // Find extent over all time steps
-  for(int ti = 0;ti<t.size();ti++)
+  for(const Eigen::Transform<TScalar,3,Eigen::Affine> & T : transforms)
   {
-    for(size_t vi = 0;vi<n;vi++)
+    for(int vi = 0;vi<V.rows();vi++)
     {
-      box.extend(V(vi,t(ti)).transpose());
+      const Eigen::Matrix<TScalar,3,1> v =
+        V.row(vi).transpose().template cast<TScalar>();
+      box.extend(T*v);
     }
   }
 }
+
+#ifdef IGL_STATIC_LIBRARY
+// Explicit template instantiation
+template void igl::swept_volume_bounding_box<
+  Eigen::Matrix<double,-1,-1,0,-1,-1>,
+  double,
+  Eigen::aligned_allocator<Eigen::Transform<double,3,Eigen::Affine> > >(
+  Eigen::MatrixBase<Eigen::Matrix<double,-1,-1,0,-1,-1> > const &,
+  std::vector<
+    Eigen::Transform<double,3,Eigen::Affine>,
+    Eigen::aligned_allocator<Eigen::Transform<double,3,Eigen::Affine> > > const &,
+  Eigen::AlignedBox<double,3> &);
+template void igl::swept_volume_bounding_box<
+  Eigen::Matrix<double,-1,-1,0,-1,-1>,
+  double,
+  std::allocator<Eigen::Transform<double,3,Eigen::Affine> > >(
+  Eigen::MatrixBase<Eigen::Matrix<double,-1,-1,0,-1,-1> > const &,
+  std::vector<
+    Eigen::Transform<double,3,Eigen::Affine>,
+    std::allocator<Eigen::Transform<double,3,Eigen::Affine> > > const &,
+  Eigen::AlignedBox<double,3> &);
+#endif

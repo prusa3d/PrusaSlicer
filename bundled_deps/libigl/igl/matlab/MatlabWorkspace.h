@@ -20,130 +20,132 @@ namespace igl
 {
   namespace matlab
   {
-    // It would be really great to replicate this for a simple XML-based
-    // workspace.
-    //
-    // Class which contains data of a matlab workspace which can be written to a
-    // .mat file and loaded from matlab
-    // 
-    // This depends on matlab at compile time (though it shouldn't necessarily
-    // have to) but it does not depend on running the matlab engine at run-time.
-    //
-    // Known bugs: Treats all matrices as doubles (this may actually be desired
-    // for some "index" matrices since matlab's sparse command takes doubles
-    // rather than int class matrices). It is of course not desired when dealing
-    // with logicals or uint's for images.
+    /// Class which contains data of a matlab workspace which can be written to a
+    /// .mat file and loaded from matlab
+    /// 
+    /// This depends on matlab at compile time (though it shouldn't necessarily
+    /// have to) but it does not depend on running the matlab engine at run-time.
+    ///
+    /// \bug Treats all matrices as doubles (this may actually be desired
+    /// for some "index" matrices since matlab's sparse command takes doubles
+    /// rather than int class matrices). It is of course not desired when dealing
+    /// with logicals or uint's for images.
+    ///
     class MatlabWorkspace
     {
       private:
-        // KNOWN BUG: Why not use a map? Any reason to allow duplicate names?
-        //
-        // List of names
+        /// List of names
+        /// \bug Why not use a map? Any reason to allow duplicate names?
         std::vector<std::string> names;
-        // List of data pointers
+        /// List of data pointers
         std::vector<mxArray*> data;
       public:
         MatlabWorkspace();
         ~MatlabWorkspace();
-        // Clear names and data of variables in workspace
+        /// Clear names and data of variables in workspace
         inline void clear();
-        // Save current list of variables
-        //
-        // Inputs:
-        //   path  path to .mat file
-        // Returns true on success, false on failure
+        /// Save current list of variables
+        ///
+        /// @param[in] path  path to .mat file
+        /// @return true on success, false on failure
         inline bool write(const std::string & path) const;
-        // Load list of variables from .mat file
-        //
-        // Inputs:
-        //   path  path to .mat file
-        // Returns true on success, false on failure
+        /// Load list of variables from .mat file
+        ///
+        /// @param[in] path  path to .mat file
+        /// @return true on success, false on failure
         inline bool read(const std::string & path);
-        // Assign data to a variable name in the workspace
-        //
-        // Template: 
-        //   DerivedM  eigen matrix (e.g. MatrixXd)
-        // Inputs:
-        //   M  data (usually a matrix)
-        //   name  variable name to save into work space
-        // Returns true on success, false on failure
-        //
-        // Known Bugs: Assumes Eigen is using column major ordering
+        /// Assign data to a variable name in the workspace
+        ///
+        /// @tparam DerivedM  eigen matrix (e.g. Eigen::MatrixXd)
+        /// @param[in] M  data (usually a matrix)
+        /// @param[in] name  variable name to save into work space
+        /// @return true on success, false on failure
+        ///
+        /// \bug Assumes DerivedM is using column major ordering
         template <typename DerivedM>
         inline MatlabWorkspace& save(
-          const Eigen::PlainObjectBase<DerivedM>& M,
+          const Eigen::MatrixBase<DerivedM>& M,
           const std::string & name);
-        // Template:
-        //   MT  sparse matrix type (e.g. double)
+        /// \overload
+        /// @tparam MT  sparse matrix type (e.g. double)
         template <typename MT>
         inline MatlabWorkspace& save(
           const Eigen::SparseMatrix<MT>& M,
           const std::string & name);
-        // Templates:
-        //   ScalarM  scalar type, e.g. double
+        /// \overload
+        /// @tparam ScalarM scalar type, e.g. double
         template <typename ScalarM>
         inline MatlabWorkspace& save(
           const std::vector<std::vector<ScalarM> > & vM,
           const std::string & name);
-        // Templates:
-        //   ScalarV  scalar type, e.g. double
+        /// \overload
+        /// @tparam ScalarV  scalar type, e.g. double
         template <typename ScalarV>
         inline MatlabWorkspace& save(
           const std::vector<ScalarV> & vV,
           const std::string & name);
-        // NOTE: Eigen stores quaternions coefficients as (i,j,k,1), but most of
-        // our matlab code stores them as (1,i,j,k) This takes a quaternion and
-        // saves it as a (1,i,j,k) row vector
-        //
-        // Templates:
-        //   Q  quaternion type
+        ///  @tparam Q  quaternion type
+        ///
+        /// NOTE: Eigen stores quaternions coefficients as (i,j,k,1), but most of
+        /// our matlab code stores them as (1,i,j,k) This takes a quaternion and
+        /// saves it as a (1,i,j,k) row vector
         template <typename Q>
         inline MatlabWorkspace& save(
           const Eigen::Quaternion<Q> & q,
           const std::string & name);
+        /// \overload
         inline MatlabWorkspace& save(
           const double d,
           const std::string & name);
-        // Same as save() but adds 1 to each element, useful for saving "index"
-        // matrices like lists of faces or elements
+        /// Same as save() but adds 1 to each element, useful for saving "index"
+        /// matrices like lists of faces or elements
+        /// @tparam DerivedM  eigen matrix (e.g. Eigen::MatrixXd)
         template <typename DerivedM>
         inline MatlabWorkspace& save_index(
           const Eigen::DenseBase<DerivedM>& M,
           const std::string & name);
+        /// \overload
+        /// @tparam MT  sparse matrix type (e.g. double)
         template <typename ScalarM>
         inline MatlabWorkspace& save_index(
           const std::vector<std::vector<ScalarM> > & vM,
           const std::string & name);
+        /// \overload
+        /// @tparam ScalarV  scalar type, e.g. double
         template <typename ScalarV>
         inline MatlabWorkspace& save_index(
           const std::vector<ScalarV> & vV,
           const std::string & name);
-        // Find a certain matrix by name.
-        //
-        // KNOWN BUG: Outputs the first found (not necessarily unique lists).
-        //
-        // Template: 
-        //   DerivedM  eigen matrix (e.g. MatrixXd)
-        // Inputs:
-        //   name  exact name of matrix as string
-        // Outputs:
-        //   M  matrix
-        // Returns true only if found.
+        /// Find a certain matrix by name.
+        ///
+        /// \bug Outputs the first found (not necessarily unique lists).
+        ///
+        /// @tparam DerivedM  eigen matrix (e.g. Eigen::MatrixXd)
+        /// @param[in] name  exact name of matrix as string
+        /// @param[out] M  matrix
+        /// @return true only if found.
         template <typename DerivedM>
         inline bool find( 
           const std::string & name,
           Eigen::PlainObjectBase<DerivedM>& M);
+        /// \overload
+        /// @tparam MT  sparse matrix type (e.g. double)
         template <typename MT>
         inline bool find( 
           const std::string & name,
           Eigen::SparseMatrix<MT>& M);
+        /// \overload
         inline bool find( 
           const std::string & name,
           double & d);
+        /// \overload
         inline bool find( 
           const std::string & name,
           int & v);
-        // Subtracts 1 from all entries
+        /// Subtracts 1 from all entries
+        /// @tparam DerivedM  eigen matrix (e.g. Eigen::MatrixXd)
+        /// @param[in] name  exact name of matrix as string
+        /// @param[out] M  matrix
         template <typename DerivedM>
         inline bool find_index( 
           const std::string & name,
@@ -189,7 +191,6 @@ inline void igl::matlab::MatlabWorkspace::clear()
 
 inline bool igl::matlab::MatlabWorkspace::write(const std::string & path) const
 {
-  using namespace std;
   MATFile * mat_file = matOpen(path.c_str(), "w");
   if(mat_file == NULL)
   {
@@ -204,8 +205,8 @@ inline bool igl::matlab::MatlabWorkspace::write(const std::string & path) const
     int status = matPutVariable(mat_file,names[i].c_str(), data[i]);
     if(status != 0) 
     {
-      cerr<<"^MatlabWorkspace::save Error: matPutVariable ("<<names[i]<<
-        ") failed"<<endl;
+      std::cerr<<"^MatlabWorkspace::save Error: matPutVariable ("<<names[i]<<
+        ") failed"<<std::endl;
       return false;
     } 
   }
@@ -219,21 +220,20 @@ inline bool igl::matlab::MatlabWorkspace::write(const std::string & path) const
 
 inline bool igl::matlab::MatlabWorkspace::read(const std::string & path)
 {
-  using namespace std;
 
   MATFile * mat_file;
 
   mat_file = matOpen(path.c_str(), "r");
   if (mat_file == NULL) 
   {
-    cerr<<"Error: failed to open "<<path<<endl;
+    std::cerr<<"Error: failed to open "<<path<<std::endl;
     return false;
   }
 
   int ndir;
   const char ** dir = (const char **)matGetDir(mat_file, &ndir);
   if (dir == NULL) {
-    cerr<<"Error reading directory of file "<< path<<endl;
+    std::cerr<<"Error reading directory of file "<< path<<std::endl;
     return false;
   }
   mxFree(dir);
@@ -241,13 +241,13 @@ inline bool igl::matlab::MatlabWorkspace::read(const std::string & path)
   // Must close and reopen
   if(matClose(mat_file) != 0)
   {
-    cerr<<"Error: failed to close file "<<path<<endl;
+    std::cerr<<"Error: failed to close file "<<path<<std::endl;
     return false;
   }
   mat_file = matOpen(path.c_str(), "r");
   if (mat_file == NULL) 
   {
-    cerr<<"Error: failed to open "<<path<<endl;
+    std::cerr<<"Error: failed to open "<<path<<std::endl;
     return false;
   }
   
@@ -259,7 +259,7 @@ inline bool igl::matlab::MatlabWorkspace::read(const std::string & path)
     mxArray * mx_data = matGetNextVariable(mat_file, &name);
     if (mx_data == NULL) 
     {
-      cerr<<"Error: matGetNextVariable failed in "<<path<<endl;
+      std::cerr<<"Error: matGetNextVariable failed in "<<path<<std::endl;
       return false;
     } 
     const int dims = mxGetNumberOfDimensions(mx_data);
@@ -278,7 +278,7 @@ inline bool igl::matlab::MatlabWorkspace::read(const std::string & path)
 
   if(matClose(mat_file) != 0)
   {
-    cerr<<"Error: failed to close file "<<path<<endl;
+    std::cerr<<"Error: failed to close file "<<path<<std::endl;
     return false;
   }
 
@@ -288,10 +288,9 @@ inline bool igl::matlab::MatlabWorkspace::read(const std::string & path)
 // Treat everything as a double
 template <typename DerivedM>
 inline igl::matlab::MatlabWorkspace& igl::matlab::MatlabWorkspace::save(
-  const Eigen::PlainObjectBase<DerivedM>& M,
+  const Eigen::MatrixBase<DerivedM>& M,
   const std::string & name)
 {
-  using namespace std;
   const int m = M.rows();
   const int n = M.cols();
   mxArray * mx_data = mxCreateDoubleMatrix(m,n,mxREAL);
@@ -311,7 +310,6 @@ inline igl::matlab::MatlabWorkspace& igl::matlab::MatlabWorkspace::save(
   const Eigen::SparseMatrix<MT>& M,
   const std::string & name)
 {
-  using namespace std;
   const int m = M.rows();
   const int n = M.cols();
   // THIS WILL NOT WORK FOR ROW-MAJOR
@@ -421,7 +419,6 @@ inline bool igl::matlab::MatlabWorkspace::find(
   const std::string & name,
   Eigen::PlainObjectBase<DerivedM>& M)
 {
-  using namespace std;
   const int i = std::find(names.begin(), names.end(), name)-names.begin();
   if(i>=(int)names.size())
   {
@@ -456,8 +453,6 @@ inline bool igl::matlab::MatlabWorkspace::find(
   const std::string & name,
   Eigen::SparseMatrix<MT>& M)
 {
-  using namespace std;
-  using namespace Eigen;
   const int i = std::find(names.begin(), names.end(), name)-names.begin();
   if(i>=(int)names.size())
   {
@@ -482,7 +477,7 @@ inline bool igl::matlab::MatlabWorkspace::find(
   double * pr = mxGetPr(mx_data);
   mwIndex * ir = mxGetIr(mx_data);
   mwIndex * jc = mxGetJc(mx_data);
-  vector<Triplet<MT> > MIJV;
+  std::vector<Eigen::Triplet<MT> > MIJV;
   const int nnz = mxGetNzmax(mx_data);
   MIJV.reserve(nnz);
   // Iterate over outside
@@ -495,7 +490,7 @@ inline bool igl::matlab::MatlabWorkspace::find(
       //cout<<ir[k]<<" "<<j<<" "<<pr[k]<<endl;
       assert((int)ir[k]<m);
       assert((int)j<n);
-      MIJV.push_back(Triplet<MT >(ir[k],j,pr[k]));
+      MIJV.push_back(Eigen::Triplet<MT >(ir[k],j,pr[k]));
       k++;
     }
   }
@@ -509,7 +504,6 @@ inline bool igl::matlab::MatlabWorkspace::find(
   const std::string & name,
   int & v)
 {
-  using namespace std;
   const int i = std::find(names.begin(), names.end(), name)-names.begin();
   if(i>=(int)names.size())
   {
@@ -521,7 +515,7 @@ inline bool igl::matlab::MatlabWorkspace::find(
   assert(mxGetNumberOfDimensions(mx_data) == 2);
   //cout<<name<<": "<<mxGetM(mx_data)<<" "<<mxGetN(mx_data)<<endl;
   assert(mxGetNumberOfElements(mx_data) == 1);
-  copy(
+  std::copy(
     mxGetPr(mx_data),
     mxGetPr(mx_data)+mxGetNumberOfElements(mx_data),
     &v);
@@ -532,7 +526,6 @@ inline bool igl::matlab::MatlabWorkspace::find(
   const std::string & name,
   double & d)
 {
-  using namespace std;
   const int i = std::find(names.begin(), names.end(), name)-names.begin();
   if(i>=(int)names.size())
   {
@@ -544,7 +537,7 @@ inline bool igl::matlab::MatlabWorkspace::find(
   assert(mxGetNumberOfDimensions(mx_data) == 2);
   //cout<<name<<": "<<mxGetM(mx_data)<<" "<<mxGetN(mx_data)<<endl;
   assert(mxGetNumberOfElements(mx_data) == 1);
-  copy(
+  std::copy(
     mxGetPr(mx_data),
     mxGetPr(mx_data)+mxGetNumberOfElements(mx_data),
     &d);
@@ -570,8 +563,8 @@ inline bool igl::matlab::MatlabWorkspace::find_index(
 //{
 //  using namespace std;
 //  // If I don't know the type then I can't save it
-//  cerr<<"^MatlabWorkspace::save Error: Unknown data type. "<<
-//    name<<" not saved."<<endl;
+//  std::cerr<<"^MatlabWorkspace::save Error: Unknown data type. "<<
+//    name<<" not saved."<<std::endl;
 //  return false;
 //}
 

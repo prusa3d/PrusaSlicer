@@ -34,7 +34,6 @@ IGL_INLINE void igl::nchoosek(
   const int k,
   Eigen::PlainObjectBase<DerivedU> & U)
 {
-  using namespace Eigen;
   if(V.size() == 0)
   {
     U.resize(0,k);
@@ -44,7 +43,7 @@ IGL_INLINE void igl::nchoosek(
   U.resize(nchoosek(V.size(),k),k);
   int running_i  = 0;
   int running_j = 0;
-  Matrix<typename DerivedU::Scalar,1,Dynamic> running(1,k);
+  Eigen::Matrix<typename DerivedU::Scalar,1 ,Eigen::Dynamic> running(1,k);
   int N = V.size();
   const std::function<void(int,int)> doCombs =
     [&running,&N,&doCombs,&running_i,&running_j,&U,&V](int offset, int k)

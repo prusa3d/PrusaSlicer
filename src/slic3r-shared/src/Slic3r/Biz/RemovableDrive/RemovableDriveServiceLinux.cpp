@@ -4,7 +4,11 @@
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Assert.hpp"
 #include <fmt/format.h>
-#include <boost/process.hpp>
+#define BOOST_PROCESS_VERSION 1
+#include <boost/process/v1/child.hpp>
+#include <boost/process/v1/io.hpp>
+#include <boost/process/v1/pipe.hpp>
+#include <boost/process/v1/search_path.hpp>
 
 namespace Slic3r::Biz::RemovableDrive {
 

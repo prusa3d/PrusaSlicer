@@ -6,7 +6,6 @@
 // v. 2.0. If a copy of the MPL was not distributed with this file, You can 
 // obtain one at http://mozilla.org/MPL/2.0/.
 #include "projected_delaunay.h"
-#include "../../REDRUM.h"
 #include <iostream>
 #include <cassert>
 
@@ -26,7 +25,6 @@ IGL_INLINE void igl::copyleft::cgal::projected_delaunay(
         CGAL::Constrained_triangulation_face_base_2<Kernel> >,
       CGAL::Exact_intersections_tag> > & cdt)
 {
-  using namespace std;
   // 3D Primitives
   typedef CGAL::Point_3<Kernel>    Point_3;
   typedef CGAL::Segment_3<Kernel>  Segment_3; 
@@ -82,7 +80,6 @@ IGL_INLINE void igl::copyleft::cgal::projected_delaunay(
     } else if(const std::vector<Point_3 > *polyp = 
         CGAL::object_cast< std::vector<Point_3 > >(&obj))
     {
-      //cerr<<REDRUM("Poly...")<<endl;
       const std::vector<Point_3 > & poly = *polyp;
       const Index m = poly.size();
       assert(m>=2);
@@ -93,8 +90,7 @@ IGL_INLINE void igl::copyleft::cgal::projected_delaunay(
       }
     }else
     {
-      cerr<<REDRUM("What is this object?!")<<endl;
-      assert(false);
+      assert(false && "What is this object?!");
     }
   }
 }
