@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Slic3r/App/AccountServiceSwitcher.hpp"
 #include "Slic3r/Domain/Workbench.hpp"
 
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
@@ -36,6 +37,10 @@ class ProjectSaver;
 
 namespace WX {
 class MacOSNativeMenuBar;
+
+namespace WebView {
+class AbstractWebViewPanel;
+} // namespace WebView
 } // namespace WX
 } // namespace Slic3r::App
 
@@ -53,6 +58,7 @@ class MainFrame :
     public wxFrame,
     public ILanguageChangedListener,
     public IAppConfigChangedListener,
+    public IAccountServiceListener,
     public Biz::IProjectsChangedListener,
     public Biz::UserAccount::IUserAccountListener,
     public Biz::PhysicalPrinter::IPhysicalPrinterChangedListener,
@@ -108,6 +114,12 @@ private:
     void remove_left_bar_page(LeftBarTabs page_id);
     void ensure_slicing_page_selected();
     void update_printables_left_bar(bool printables_enabled);
+    void on_account_service_applied(const AccountServiceChange& change) override;
+    void choose_account_state(TabsBarMenus::AccountState state);
+    void show_connect_server_setup();
+    void update_printers_left_bar();
+    void remove_printers_page();
+    void recreate_printers_page();
 
     void on_language_changed() override;
     void on_app_config_changed(const std::string& key) override;
@@ -160,6 +172,7 @@ private:
 
     bool m_printables_page_added {false};
     bool m_printers_page_added {false};
+    WX::WebView::AbstractWebViewPanel* m_printers_panel{nullptr};
     bool m_physical_printer_page_added {false};
 
 #ifdef USE_NATIVE_MENU

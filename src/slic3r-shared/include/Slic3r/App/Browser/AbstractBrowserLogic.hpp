@@ -1,7 +1,9 @@
 #pragma once
 
 #include "Slic3r/App/Browser/BrowserLogicCommand.hpp"
+#include "Slic3r/Biz/UserAccount/IUserAccountActionCallbacks.hpp"
 
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -48,6 +50,56 @@ public:
     virtual std::vector<BrowserLogicCommand> on_user_account_will_refresh() {return {};}
     virtual std::vector<BrowserLogicCommand> on_printables_secret_token(const std::string& body) {return {};}
 
+    /**
+     * @brief A page failed to load. Commands returned replace the error page of the hosting view,
+     * no commands keep it.
+     * @param certificate_error The server certificate was refused.
+     */
+    virtual std::vector<BrowserLogicCommand>
+    on_load_error(const std::string& url, bool certificate_error)
+    {
+        return {};
+    }
+
+    /**
+     * @brief The hosting dialog is being closed by the person (close button, Esc), not by the
+     * logic. The commands run before the dialog ends; the web view still exists.
+     */
+    virtual std::vector<BrowserLogicCommand> on_dialog_closing()
+    {
+        return {};
+    }
+
+    /**
+     * @brief Called when the hosting view is hidden (on_show_webview_event is only called on show).
+     */
+    virtual void on_hide_webview_event() {}
+
+    /**
+     * @brief Called whenever the hosting view becomes visible, also on the first show, when the
+     * web view is only being created and on_show_webview_event is not called.
+     */
+    virtual void on_visible_webview_event() {}
+
+    /**
+     * @brief Lets the logic send commands on its own, outside of a webview event (e.g. results of
+     * a background task). Set by the hosting view; commands must be pushed on the main thread.
+     */
+    void set_command_sink(std::function<void(std::vector<BrowserLogicCommand>)> sink)
+    {
+        m_command_sink = std::move(sink);
+    }
+
+    /**
+     * @brief Sends commands to the hosting view outside of a webview event, see set_command_sink().
+     */
+    void push_commands(std::vector<BrowserLogicCommand> commands)
+    {
+        if (m_command_sink && !commands.empty()) {
+            m_command_sink(std::move(commands));
+        }
+    }
+
     void set_next_show_url(std::string url) {m_next_show_url = url;}
     void set_title(const std::string& title) { m_component_title = title; }
 
@@ -60,5 +112,6 @@ protected:
 private:
     std::string m_component_title;
     std::vector<std::string> m_script_message_handler_names;
+    std::function<void(std::vector<BrowserLogicCommand>)> m_command_sink;
 };
 } // namespace Slic3r::App::Browser 

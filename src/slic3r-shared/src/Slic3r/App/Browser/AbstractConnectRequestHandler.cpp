@@ -4,6 +4,8 @@
 #include <Slic3r/App/AppConfig.hpp>
 #include <Slic3r/App/Theme.hpp>
 #include "Slic3r/Biz/ProjectInteractor.hpp"
+#include "Slic3r/Biz/Network/ServiceConfig.hpp"
+#include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/LegacyFormat.hpp"
@@ -11,12 +13,27 @@
 
 #include <nlohmann/json.hpp>
 
+#include <optional>
+#include <utility>
+
 namespace Slic3r::App::Browser {
-AbstractConnectRequestHandler::AbstractConnectRequestHandler(Biz::ProjectInteractor& project_interactor)
-    : m_project_interactor(project_interactor)
+AbstractConnectRequestHandler::AbstractConnectRequestHandler(
+    Biz::ProjectInteractor& project_interactor,
+    std::unique_ptr<IConnectPageAuth> page_auth,
+    PushCommandsFn push_commands,
+    std::string error_page
+) :
+    m_project_interactor(project_interactor),
+    m_page_auth(std::move(page_auth)),
+    m_push_commands(std::move(push_commands)),
+    m_error_page(std::move(error_page))
 {
     m_actions["REQUEST_LOGIN"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_request_login, this, std::placeholders::_1);
-    m_actions["REQUEST_CONFIG"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_request_config, this, std::placeholders::_1);
+    m_actions["REQUEST_CONFIG"] = std::bind(
+        &AbstractConnectRequestHandler::on_connect_action_request_config_message,
+        this,
+        std::placeholders::_1
+    );
     m_actions["WEBAPP_READY"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_webapp_ready,this, std::placeholders::_1);
     m_actions["SELECT_PRINTER"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_select_printer, this, std::placeholders::_1);
     m_actions["PRINT"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_print, this, std::placeholders::_1);
@@ -33,7 +50,9 @@ AbstractConnectRequestHandler::AbstractConnectRequestHandler(Biz::ProjectInterac
 std::string AbstractConnectRequestHandler::get_engine_check_script() const
 {
     return R"(
-        if (location.protocol === 'https:' && window._prusaSlicer) {
+        if ()"
+        + m_page_auth->page_js_condition()
+        + R"( && window._prusaSlicer) {
             try {
                 new Function('class _{static{}}');
                 new RegExp('(?<=a)b');
@@ -117,6 +136,49 @@ std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_actio
     return {};
 }
 
+std::vector<BrowserLogicCommand>
+AbstractConnectRequestHandler::on_connect_action_request_config_message(
+    const std::string& message_data
+)
+{
+    if (m_page_auth->pages_get_token()) {
+        return on_connect_action_request_config(message_data);
+    }
+    if (m_project_interactor.user_account_interactor().access_token().empty()) {
+        return signed_out_commands();
+    }
+    const bool refused = std::exchange(m_page_configured, true);
+    with_page_session(
+        on_connect_action_request_config(message_data),
+        refused ? OnSessionFailure::ShowError : OnSessionFailure::Then,
+        refused
+    );
+    return {};
+}
+
+std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::signed_out_commands()
+{
+    return {};
+}
+
+std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::page_session_failed_commands()
+{
+    return {{BrowserLogicCommandType::LoadResourcesPage, m_error_page}};
+}
+
+void AbstractConnectRequestHandler::with_page_session(
+    std::vector<BrowserLogicCommand> then,
+    OnSessionFailure on_failure,
+    bool fresh
+)
+{
+    IConnectPageAuth::FallbackFn fallback;
+    if (on_failure == OnSessionFailure::ShowError) {
+        fallback = [this]() { return page_session_failed_commands(); };
+    }
+    m_page_auth->prepare_page(std::move(then), std::move(fallback), fresh, m_push_commands);
+}
+
 std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_action_request_config(const std::string& message_data)
 {
     /*
@@ -142,14 +204,16 @@ std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_actio
     std::string lang_app_conf =
         AppServices::instance().app_config().get<std::string>("translation_language");
 
-    const std::string init_options = format(
-        "{\"accessToken\": \"%4%\",\"clientVersion\": \"%1%\", \"colorMode\": \"%2%\", \"language\": \"%3%\"}",
-        SLIC3R_VERSION,
-        theme,
-        lang_app_conf,
+    nlohmann::json init_options = {
+        {"clientVersion", SLIC3R_VERSION},
+        {"colorMode", theme},
+        {"language", lang_app_conf},
+    };
+    m_page_auth->add_credentials(
+        init_options,
         m_project_interactor.user_account_interactor().access_token()
     );
-    std::string script = format("window._prusaConnect_v2.init(%1%)", init_options);
+    std::string script = format("window._prusaConnect_v2.init(%1%)", init_options.dump());
     return {{BrowserLogicCommandType::RunScript, script}};
 }
 std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_action_request_open_in_browser(const std::string& message_data) 

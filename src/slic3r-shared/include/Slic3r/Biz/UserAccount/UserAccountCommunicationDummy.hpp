@@ -7,6 +7,10 @@ namespace Slic3r::Biz::UserAccount {
 
 class UserAccountCommunicationDummy final : public IUserAccountCommunication {
 public:
+    bool is_prusa_account() const override { return false; }
+    IPairingCommunication* pairing() override { return nullptr; }
+    void on_unauthorized(const std::string& access_token) override {}
+    void on_user_id_unusable() override {}
     void init() override {}
     bool is_active() const override { return false; }
     std::string wait_for_access_token(std::chrono::milliseconds timeout, JThread::StopToken stop_token) override { return {}; }

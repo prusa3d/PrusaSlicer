@@ -56,6 +56,7 @@ struct PrintHostProgressNotificationData
     bool is_storage_resolve{false};
     std::string additional_msg;
     std::function<void(const boost::filesystem::path&)> eject_fn{nullptr};
+    std::function<void()> show_printer_page_fn{nullptr};
 };
 
 struct EjectNotificationData

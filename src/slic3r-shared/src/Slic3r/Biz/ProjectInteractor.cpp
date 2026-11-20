@@ -1,5 +1,6 @@
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 
+#include <chrono>
 #include <Slic3r/Assert.hpp>
 #include <Slic3r/Domain/Workbench.hpp>
 #include <Slic3r/Domain/Project.hpp>
@@ -1164,16 +1165,31 @@ void ProjectInteractor::do_result_upload(
     do_result_export_inner(id, std::move(config), std::move(data));
 }
 
+namespace {
+constexpr std::chrono::seconds CONNECT_UPLOAD_TOKEN_WAIT{10};
+} // namespace
+
 void ProjectInteractor::do_result_upload_connect(
     const Domain::SlicingId id,
     const std::string& connect_msg,
     const std::string& filename_override /* = std::string()*/
 )
 {
+    const Network::ServiceConfig& service_config = Network::ServiceConfig::instance();
     PhysicalPrinter::PhysicalPrinterConfig config;
-    config.host = Network::ServiceConfig::instance().connect_api_url();
     PhysicalPrinter::ConnectUpload auth;
+    config.host = service_config.connect_api_url();
+    if (config.host.empty()) {
+        config.host = service_config.connect_url();
+        auth.api    = PhysicalPrinter::ConnectUploadApi::Legacy;
+    }
     auth.access_token = m_user_account_interactor.access_token();
+    auth.on_unauthorized = [this](const std::string& access_token)
+    {
+        Platform::PlatformServices::instance().main_thread_dispatcher().dispatch_on_main_thread(
+            [this, access_token]() { m_user_account_interactor.on_unauthorized(access_token); }
+        );
+    };
     config.payload = std::move(auth);
 
     std::string filename;
@@ -1184,8 +1200,8 @@ void ProjectInteractor::do_result_upload_connect(
         return;
     }
 
-    const PhysicalPrinter::ConnectUpload& upload = std::get<PhysicalPrinter::ConnectUpload>(config.payload);
-    if (upload.organization_id.empty()) {
+    PhysicalPrinter::ConnectUpload& upload = std::get<PhysicalPrinter::ConnectUpload>(config.payload);
+    if (upload.api == PhysicalPrinter::ConnectUploadApi::SlicerRest && upload.organization_id.empty()) {
         SPDLOG_ERROR(
             "Upload to Connect has failed - the Connect message has no organization for printer {}.",
             upload.printer_uuid
@@ -1195,7 +1211,27 @@ void ProjectInteractor::do_result_upload_connect(
         );
         return;
     }
-    SPDLOG_INFO("Upload to Connect: printer {}, organization {}.", upload.printer_uuid, upload.organization_id);
+    if (upload.api == PhysicalPrinter::ConnectUploadApi::Legacy && upload.team_id.empty()) {
+        SPDLOG_ERROR(
+            "Upload to Connect has failed - the Connect message has no team for printer {}.",
+            upload.printer_uuid
+        );
+        report_connect_upload_error(
+            Biz::_u8L("Prusa Connect did not provide the team of the selected printer.")
+        );
+        return;
+    }
+    upload.files_url        = service_config.connect_organization_files_url(upload.organization_id);
+    upload.queue_url        = service_config.connect_printer_queue_url(upload.printer_uuid);
+    upload.printer_page_url = service_config.connect_printer_page_url(upload.printer_uuid);
+    upload.current_access_token = [this]()
+    { return m_user_account_interactor.wait_for_access_token(CONNECT_UPLOAD_TOKEN_WAIT); };
+    SPDLOG_INFO(
+        "Upload to Connect: printer {}, organization {}, team {}.",
+        upload.printer_uuid,
+        upload.organization_id,
+        upload.team_id
+    );
 
     if (!filename_override.empty()) {
         filename = filename_override;

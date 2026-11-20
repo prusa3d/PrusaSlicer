@@ -1,5 +1,6 @@
 #include "Slic3r/App/WelcomeDialog.hpp"
 #include <ranges>
+#include "Slic3r/App/AccountServiceSwitcher.hpp"
 #include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/Browser/BrowserLogicLogInRedirect.hpp"
@@ -18,6 +19,7 @@
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
+#include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Biz/Preset/HwConfigEvaluator.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/HwConfigMatchers.hpp"
@@ -431,6 +433,13 @@ ItemPtr create_offline_button_content()
     local_row->set_align_items(YGAlignCenter);
     emplace_dot(local_row, green);
     local_row->emplace_back<Text>(Biz::_u8L("Local network printing enabled"));
+
+    auto connect_local_row{result->emplace_back<Item>()};
+    connect_local_row->set_flex_shrink(0);
+    connect_local_row->set_gap(gap);
+    connect_local_row->set_align_items(YGAlignCenter);
+    emplace_dot(connect_local_row, green);
+    connect_local_row->emplace_back<Text>(Biz::_u8L("Prusa Connect on-premise enabled"));
 
     return result;
 }
@@ -1259,13 +1268,15 @@ public:
 
     ItemPtr logged_out_layout()
     {
-        auto login{[this]()
-                   {
-                       AppServices::instance().dialog_manager().show_webview_dialog(
-                           std::make_unique<Browser::BrowserLogicLogInRedirect>(
-                               m_project_interactor.user_account_interactor()),
-                           &m_project_interactor);
-                   }};
+        auto login{
+            [this]()
+            {
+                AppServices::instance().dialog_manager().show_webview_dialog(
+                    Browser::make_log_in_logic(m_project_interactor.user_account_interactor()),
+                    &m_project_interactor
+                );
+            }
+        };
 
         const NavigationSetup navigation_setup{
             .left_button_text     = Biz::_u8L("Back"),
@@ -1404,7 +1415,7 @@ WelcomeDialog::WelcomeDialog(Biz::ProjectInteractor& project_interactor, Navigat
             } else {
                 ASSERT(button == m_offline_button);
                 m_online = false;
-                m_project_interactor.user_account_interactor().do_log_out();
+                m_project_interactor.user_account_interactor().log_out_locally();
                 m_login_screen->reload_layout();
                 m_printer_screen->disable_printer_sync();
                 go_to_screen(ASSERT_VAL(m_printer_screen));
@@ -1587,7 +1598,9 @@ void WelcomeDialog::sync_config() const
     auto& app_config_interactor{AppServices::instance().app_config_interactor()};
     if (app_config.is_webkit_available()) {
         app_config_interactor.set_item_value("enable_printables", Domain::ConfigValue{m_online});
-        app_config_interactor.set_item_value("enable_prusa_account", Domain::ConfigValue{m_online});
+        AppServices::instance()
+            .account_service_switcher()
+            .enable_services(m_online, true, AccountService::PrusaAccount);
     }
 
     if (app_config.is_sentry_available()) {

@@ -6,6 +6,8 @@
 
 namespace Slic3r::App {
 
+enum class AccountService;
+
 /**
  * Manipulates config box associated with application configuration
  */
@@ -27,6 +29,12 @@ public:
         const std::string& item_name,
         const Domain::ConfigValue& value
     );
+
+    /**
+     * @brief Makes a service the active one ("account_service"), if it is not. It takes effect
+     * when both services are enabled. Listeners switch the account and the Connect tab live.
+     */
+    void set_account_service(AccountService service);
 
     void toggle_favorite_param(const std::string& param);
     void toggle_favorite_preset_printer(const std::string& id, const std::string& hw_config_id);

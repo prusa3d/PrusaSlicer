@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Slic3r/App/AccountServiceSwitcher.hpp"
 #include "Slic3r/App/Platform/WX/WXRenderCanvas.hpp"
 #include <memory>
 
@@ -80,6 +81,7 @@ private:
 
     std::unique_ptr<wxGLContext> m_gl_context; // do NOT change order of this attribute
     std::unique_ptr<Biz::ProjectInteractor> m_project_interactor;
+    std::unique_ptr<AccountServiceSwitcher> m_account_service_switcher;
 
     MainFrame* m_main_frame{nullptr};
     std::unique_ptr<LoadingRenderModule> m_loading_module;

@@ -1,5 +1,9 @@
 #include "Slic3r/App/Browser/BrowserLogicLogInRedirect.hpp"
 
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/Browser/BrowserLogicConnectLocalLogIn.hpp"
+#include "Slic3r/App/IDialogManager.hpp"
+#include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 #include "Slic3r/Log.hpp"
@@ -81,6 +85,27 @@ BrowserLogicLogInRedirect::on_navigation_request_webview_event(const std::string
         };
     }
     return {};
+}
+
+std::unique_ptr<AbstractBrowserLogic>
+make_log_in_logic(Biz::UserAccount::UserAccountInteractor& user_account)
+{
+    if (user_account.is_connect_local_account()) {
+        return std::make_unique<BrowserLogicConnectLocalLogIn>(user_account);
+    }
+    return std::make_unique<BrowserLogicLogInRedirect>(user_account);
+}
+
+void show_log_in_dialog(Biz::ProjectInteractor& project_interactor)
+{
+    Biz::UserAccount::UserAccountInteractor& user_account = project_interactor.user_account_interactor();
+    AppServices::instance().dialog_manager().show_webview_dialog(
+        make_log_in_logic(user_account),
+        &project_interactor
+    );
+    if (project_interactor.raise_app_fn() && !user_account.is_connect_local_account()) {
+        project_interactor.raise_app_fn()();
+    }
 }
 
 } // namespace Slic3r::App::Browser

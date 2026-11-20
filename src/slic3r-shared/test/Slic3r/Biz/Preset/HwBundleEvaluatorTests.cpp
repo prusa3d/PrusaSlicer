@@ -2,6 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <boost/filesystem/path.hpp>
+#include <nlohmann/json.hpp>
 
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
@@ -14,6 +15,7 @@
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Biz/Preset/HwBundleEvaluator.hpp"
 
+#include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterConfig.hpp"
 #include "Slic3r/Biz/Preset/IO/HwConfigConnectJson.hpp"
 #include "Slic3r/TestUtils/ScopedThreadDispatcher.hpp"
 
@@ -88,4 +90,34 @@ TEST_CASE_METHOD(HwBundleEvaluatorFixture, "Evaluate Connect HW Config Tests", "
             REQUIRE(t.features == exp.features);
         }
     }
+}
+
+TEST_CASE_METHOD(
+    HwBundleEvaluatorFixture,
+    "Evaluate the Connect Local printer list",
+    "[preset][connect-local]"
+)
+{
+    Biz::Preset::HwBundleEvaluator hw_bundle_evaluator{workbench.preset_bundle()};
+
+    const nlohmann::json list = nlohmann::json::parse(read_json("connect_local_printers.json"));
+    REQUIRE(list.contains("printers"));
+
+    std::size_t evaluated = 0;
+    for (const nlohmann::json& printer : list["printers"]) {
+        if (!printer.contains("model")) {
+            continue;
+        }
+        INFO("Printer: " << printer.value("name", std::string()));
+        const std::optional<Domain::Preset::HwPrinterConfig> hw_config =
+            Biz::PhysicalPrinter::hw_config_from_connect_json(printer.dump());
+        REQUIRE(hw_config.has_value());
+        CHECK(hw_config->model.model == printer["model"].get<std::string>());
+
+        const tl::expected<Domain::Preset::HwPrinterConfig, std::string> evaluated_config =
+            hw_bundle_evaluator.evaluate_config(hw_config.value());
+        REQUIRE(evaluated_config.has_value());
+        ++evaluated;
+    }
+    CHECK(evaluated == 3);
 }

@@ -45,7 +45,16 @@ public:
         browser_logic()->set_next_show_url(url);
     }
 
+    void reload_default_page() override
+    {
+        load_default_url();
+    }
+
+    void destroy_when_safe() override;
+
 private:
+    void destroy_if_requested();
+
     std::unique_ptr<App::Browser::AbstractBrowserLogic> m_logic;
     WebViewHost m_host;
 
@@ -54,7 +63,20 @@ private:
 
     bool m_busy_cursor_set {false};
     bool m_load_error_page{false};
+    /**
+     * @brief Set by the logic for a failed load (AbstractBrowserLogic::on_load_error), run instead
+     * of the error page.
+     */
+    std::vector<App::Browser::BrowserLogicCommand> m_error_commands;
     bool m_shown{false};
+    bool m_destroy_requested{false};
+    bool m_destroy_scheduled{false};
+    /**
+     * @brief Scripts started with RunScriptAsync() whose result has not arrived. wxWidgets on GTK
+     * completes such a script through a plain pointer to the web view, so the panel must not be
+     * destroyed while one is pending.
+     */
+    int m_pending_scripts{0};
     bool m_load_default_url_on_next_error{false};
 
     void late_create();
@@ -67,6 +89,7 @@ private:
     // and load default page
     void on_show(wxShowEvent& evt);
     void on_script_message(wxWebViewEvent& evt);
+    void on_script_result(wxWebViewEvent& evt);
     void on_navigation_request(wxWebViewEvent& evt);
     void on_loaded(wxWebViewEvent& evt);
     void on_page_will_load();
@@ -121,6 +144,11 @@ protected:
     bool handle_logic_command_EndModalCancel(const std::string& data) override;
     bool handle_logic_command_DeleteCookies(const std::string& data) override;
     bool handle_logic_command_DeleteCookiesWithCounter(const std::string& data) override;
+    bool handle_logic_command_DeleteCookie(const std::string& data) override;
+    bool handle_logic_command_SetCookie(
+        const std::string& data,
+        std::vector<App::Browser::BrowserLogicCommand> then
+    ) override;
     bool handle_logic_command_Veto(const std::string& data) override;
     bool handle_logic_command_DoReload(const std::string& data) override;
     bool handle_logic_command_AddUserScript(const std::string& data) override;

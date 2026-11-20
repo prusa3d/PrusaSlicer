@@ -10,18 +10,54 @@
 #include "Slic3r/Assert.hpp"
 #include <nlohmann/json.hpp>
 
+#include <utility>
+
 namespace Slic3r::App::Browser {
 
-BrowserLogicConnectSelect::BrowserLogicConnectSelect(Biz::ProjectInteractor& project_interactor) :
+BrowserLogicConnectSelect::BrowserLogicConnectSelect(
+    Biz::ProjectInteractor& project_interactor,
+    std::unique_ptr<IConnectPageAuth> page_auth
+) :
     AbstractUploadBrowserLogic(
-        Biz::Network::ServiceConfig::instance().connect_select_printer_url(),
+        page_auth->pages_get_token() ?
+            Biz::Network::ServiceConfig::instance().connect_select_printer_url() :
+            std::string(),
         {"_prusaSlicer"},
         "connect_loading",
         "connect_error",
         "Select printer"
     ),
-    AbstractConnectRequestHandler(project_interactor)
+    AbstractConnectRequestHandler(
+        project_interactor,
+        std::move(page_auth),
+        [this](std::vector<BrowserLogicCommand> commands) { push_commands(std::move(commands)); },
+        "connect_error"
+    ),
+    m_select_url(Biz::Network::ServiceConfig::instance().connect_select_printer_url())
 {}
+
+std::vector<BrowserLogicCommand>
+BrowserLogicConnectSelect::on_loaded_webview_event(const std::string& url)
+{
+    if (!page_auth().pages_get_token()
+        && !m_select_page_requested
+        && url.find("/web/" + m_loading_html) != std::string::npos)
+    {
+        m_select_page_requested = true;
+        with_page_session(
+            {{BrowserLogicCommandType::LoadURL, m_select_url}},
+            OnSessionFailure::Then
+        );
+    }
+    return {};
+}
+
+std::vector<BrowserLogicCommand> BrowserLogicConnectSelect::
+    on_navigation_request_webview_event(const std::string& new_url, const std::string& current_url)
+{
+    on_page_navigation();
+    return {};
+}
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectSelect::on_script_message_webview_event(const std::string& message) 
 {
@@ -285,7 +321,7 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectSelect::request_compatible_p
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectSelect::on_webview_reload_event(const std::string& message_data)
 {
-    return {{BrowserLogicCommandType::LoadURL, m_url}};
+    return {{BrowserLogicCommandType::LoadURL, m_select_url}};
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectSelect::on_connect_action_close_dialog(const std::string& message_data)

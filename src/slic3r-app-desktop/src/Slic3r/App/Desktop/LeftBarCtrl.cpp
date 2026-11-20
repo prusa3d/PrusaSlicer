@@ -32,13 +32,14 @@ LeftBarCtrl::LeftBarCtrl(wxWindow* parent, int orient, TabsBarMenus* menus)
     
     m_account_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
         m_account_btn->set_selected(true);
-        m_menus->Popup(this, &m_menus->account, m_account_btn->get_popup_pos());
+        m_menus->UpdateAccountMenu();
+        m_menus->Popup(this, m_menus->AccountMenu(), m_account_btn->get_popup_pos());
     });
 
     m_account_btn->set_compact_mode(compact_mode(), m_login_icon_sz);
     m_preferences_btn->set_compact_mode(compact_mode(), m_action_btn_sz, false);
 
-    ShowUserAccount(AppServices::instance().app_config().is_prusa_account_enabled());
+    ShowUserAccount(AppServices::instance().app_config().is_account_service_enabled());
 }
 
 void LeftBarCtrl::OnColorsChanged()
@@ -57,7 +58,10 @@ void LeftBarCtrl::UpdateAccountButton(bool avatar/* = false*/)
         return;
 
     TabsBarMenus::UserAccountInfo  user_account = m_menus->get_user_account_info();
-    const wxString user_name = user_account.is_logged ? from_u8(user_account.user_name) : _L("Sign in");
+    const wxString user_name = user_account.is_logged ? from_u8(user_account.user_name) :
+        user_account.connect_local && !user_account.server_set ?
+                                                        _L("Prusa Connect on-premise: no server set") :
+                                                        _L("Sign in");
     m_account_btn->SetToolTip(user_name);
     if (avatar) {
         if (user_account.is_logged) {

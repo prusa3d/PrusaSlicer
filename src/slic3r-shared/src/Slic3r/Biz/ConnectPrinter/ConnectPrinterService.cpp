@@ -1,53 +1,15 @@
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp"
 
-#include "Slic3r/Biz/Network/MqttSubscriber.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 
 #include "Slic3r/Log.hpp"
 
 #include <algorithm>
-#include <string_view>
 #include <thread>
+#include <utility>
 
 namespace Slic3r::Biz::ConnectPrinter {
-
-namespace {
-constexpr std::string_view STATE_TOPIC_PREFIX = "v1/devices/printers/";
-constexpr std::string_view STATE_TOPIC_SUFFIX = "/data/state";
-
-std::string state_topic(const std::string& uuid)
-{
-    return std::string(STATE_TOPIC_PREFIX) + uuid + std::string(STATE_TOPIC_SUFFIX);
-}
-
-std::string uuid_from_state_topic(std::string_view topic)
-{
-    if (!topic.starts_with(STATE_TOPIC_PREFIX)
-        || !topic.ends_with(STATE_TOPIC_SUFFIX)
-        || topic.size() <= STATE_TOPIC_PREFIX.size() + STATE_TOPIC_SUFFIX.size())
-    {
-        return {};
-    }
-    return std::string(topic.substr(
-        STATE_TOPIC_PREFIX.size(),
-        topic.size() - STATE_TOPIC_PREFIX.size() - STATE_TOPIC_SUFFIX.size()
-    ));
-}
-
-constexpr std::string_view MPI_CHANGED_TOPIC_SUFFIX = "/data/tools/+/mpi/changed";
-constexpr std::string_view MPI_CHANGED_TOPIC_END    = "/mpi/changed";
-
-std::string mpi_changed_topic(const std::string& uuid)
-{
-    return std::string(STATE_TOPIC_PREFIX) + uuid + std::string(MPI_CHANGED_TOPIC_SUFFIX);
-}
-
-bool is_mpi_changed_topic(std::string_view topic)
-{
-    return topic.starts_with(STATE_TOPIC_PREFIX) && topic.ends_with(MPI_CHANGED_TOPIC_END);
-}
-} // namespace
 
 ConnectPrinterService::ConnectPrinterService(
     Platform::IMainThreadDispatcher& dispatcher,
@@ -145,13 +107,27 @@ void ConnectPrinterService::fetch_printer_list(
             );
 
             http->on_error(
-                [fail_fn = std::move(fail_fn)](std::string body, std::string error, unsigned status)
+                [this,
+                 generation,
+                 access_token,
+                 fail_fn = std::move(fail_fn)](std::string body, std::string error, unsigned status)
                 {
                     SPDLOG_ERROR(
                         "Connect HTTP request failed. Status: {}, Error: {}",
                         status,
                         error
                     );
+                    if (status == 401) {
+                        m_dispatcher.dispatch_on_main_thread(
+                            [this, generation, access_token]()
+                            {
+                                if (generation == m_session_generation) {
+                                    m_list_refused = true;
+                                    m_user_account_interactor.on_unauthorized(access_token);
+                                }
+                            }
+                        );
+                    }
                     if (fail_fn) {
                         fail_fn("Connect HTTP request failed: " + error);
                     }
@@ -174,15 +150,20 @@ void ConnectPrinterService::fetch_printer_list(
 
 void ConnectPrinterService::on_user_account_id_success(bool is_refresh, const std::string& username)
 {
-    if (!m_mqtt_subscriber) {
-        start_mqtt();
-    } else if (m_user_account_interactor.access_token() != m_mqtt_access_token) {
-        update_mqtt_access_token();
+    const std::string access_token = m_user_account_interactor.access_token();
+    if (!m_updates) {
+        start_updates();
+    } else if (access_token != m_updates_access_token) {
+        m_updates->set_credentials(m_user_account_interactor.user_id(), access_token);
+        m_updates_access_token = access_token;
     }
 
     if (!is_refresh) {
+        m_list_refused = false;
         fetch_printer_list({}, {});
         m_favorite_material_service.request_refresh();
+    } else if (std::exchange(m_list_refused, false)) {
+        fetch_printer_list({}, {});
     }
 }
 
@@ -191,8 +172,8 @@ void ConnectPrinterService::on_user_account_logged_out()
     ++m_session_generation;
     m_refresh_in_flight = false;
     m_refresh_pending   = false;
-    m_mqtt_subscriber.reset();
-    m_mqtt_access_token.clear();
+    m_list_refused      = false;
+    stop_updates();
     m_favorite_material_service.on_logged_out();
 
     if (!m_printers.empty()) {
@@ -204,57 +185,58 @@ void ConnectPrinterService::on_user_account_logged_out()
     }
 }
 
-void ConnectPrinterService::start_mqtt()
+std::unique_ptr<IConnectPrinterUpdates> ConnectPrinterService::create_updates()
 {
-    const std::string access_token = m_user_account_interactor.access_token();
-    m_mqtt_subscriber = std::make_unique<Network::Mqtt::Subscriber>(
-        Network::ServiceConfig::instance().connect_mqtt_url(),
-        m_user_account_interactor.user_id(),
-        access_token,
-        [this,
-         generation =
-             m_session_generation](const std::string& topic, const std::string& payload)
-        { on_mqtt_message(generation, topic, payload); },
-        [this, generation = m_session_generation]()
-        {
-            m_dispatcher.dispatch_on_main_thread(
-                [this, generation]()
-                {
-                    if (generation == m_session_generation) {
-                        request_printer_list_refresh();
-                    }
+    const size_t generation = m_session_generation;
+    IConnectPrinterUpdates::Sink sink;
+    sink.on_list_changed = [this, generation]()
+    {
+        m_dispatcher.dispatch_on_main_thread(
+            [this, generation]()
+            {
+                if (generation == m_session_generation && m_user_account_interactor.is_logged_in()) {
+                    request_printer_list_refresh();
                 }
-            );
-        }
+            }
+        );
+    };
+    sink.on_state = [this, generation](const std::string& uuid, ConnectPrinterState state)
+    {
+        m_dispatcher.dispatch_on_main_thread(
+            [this, generation, uuid, state]()
+            {
+                if (generation == m_session_generation) {
+                    apply_state(uuid, state);
+                }
+            }
+        );
+    };
+
+    const std::string mqtt_url = Network::ServiceConfig::instance().connect_mqtt_url();
+    if (mqtt_url.empty()) {
+        return std::make_unique<PollingConnectPrinterUpdates>(POLL_INTERVAL, std::move(sink));
+    }
+    return std::make_unique<MqttConnectPrinterUpdates>(
+        mqtt_url,
+        m_user_account_interactor.user_id(),
+        m_updates_access_token,
+        std::move(sink)
     );
-    m_mqtt_access_token = access_token;
+}
 
+void ConnectPrinterService::start_updates()
+{
+    m_updates_access_token = m_user_account_interactor.access_token();
+    m_updates              = create_updates();
     for (ConnectPrinter& printer : m_printers) {
-        subscribe(printer.uuid);
+        m_updates->watch(printer.uuid);
     }
 }
 
-void ConnectPrinterService::update_mqtt_access_token()
+void ConnectPrinterService::stop_updates()
 {
-    const std::string access_token = m_user_account_interactor.access_token();
-    m_mqtt_subscriber->update_credentials(m_user_account_interactor.user_id(), access_token);
-    m_mqtt_access_token = access_token;
-}
-
-void ConnectPrinterService::subscribe(const std::string& uuid)
-{
-    if (m_mqtt_subscriber) {
-        m_mqtt_subscriber->subscribe(state_topic(uuid));
-        m_mqtt_subscriber->subscribe(mpi_changed_topic(uuid));
-    }
-}
-
-void ConnectPrinterService::unsubscribe(const std::string& uuid)
-{
-    if (m_mqtt_subscriber) {
-        m_mqtt_subscriber->unsubscribe(state_topic(uuid));
-        m_mqtt_subscriber->unsubscribe(mpi_changed_topic(uuid));
-    }
+    m_updates.reset();
+    m_updates_access_token.clear();
 }
 
 void ConnectPrinterService::request_printer_list_refresh()
@@ -284,46 +266,9 @@ void ConnectPrinterService::request_printer_list_refresh()
     fetch_printer_list(done, done);
 }
 
-void ConnectPrinterService::on_mqtt_message(
-    size_t generation,
-    const std::string& topic,
-    const std::string& payload
-)
-{
-    SPDLOG_DEBUG("MQTT: {} - {}", topic, payload);
-    if (is_mpi_changed_topic(topic)) {
-        m_dispatcher.dispatch_on_main_thread(
-            [this, generation]()
-            {
-                if (generation == m_session_generation) {
-                    request_printer_list_refresh();
-                }
-            }
-        );
-        return;
-    }
-    std::string uuid = uuid_from_state_topic(topic);
-    if (uuid.empty()) {
-        SPDLOG_ERROR("Failed to extract uuid from mqtt topic {}", topic);
-        return;
-    }
-    std::optional<ConnectPrinterState> state = parse_connect_printer_state(payload);
-    if (!state) {
-        SPDLOG_ERROR("Unknown Connect printer state '{}' for printer {}", payload, uuid);
-        return;
-    }
-    m_dispatcher.dispatch_on_main_thread(
-        [this, generation, uuid = std::move(uuid), state = *state]()
-        {
-            if (generation == m_session_generation) {
-                apply_state(uuid, state);
-            }
-        }
-    );
-}
-
 void ConnectPrinterService::apply_printer_list(std::vector<ConnectPrinter> new_printers)
 {
+    const bool states_pushed = m_updates && m_updates->pushes_states();
     for (size_t i = m_printers.size(); i-- > 0;) {
         const std::string uuid = m_printers.at(i).uuid;
         if (std::ranges::none_of(
@@ -331,7 +276,9 @@ void ConnectPrinterService::apply_printer_list(std::vector<ConnectPrinter> new_p
                 [&uuid](const ConnectPrinter& p) { return p.uuid == uuid; }
             ))
         {
-            unsubscribe(uuid);
+            if (m_updates) {
+                m_updates->unwatch(uuid);
+            }
             IndexRange index{i};
             invoke_listeners<IListObserver<ConnectPrinter>>([&](IListObserver<ConnectPrinter>* l)
                                                             { l->on_will_be_removed(index); });
@@ -344,8 +291,9 @@ void ConnectPrinterService::apply_printer_list(std::vector<ConnectPrinter> new_p
     for (ConnectPrinter& printer : new_printers) {
         if (std::optional<size_t> index = find_index(printer.uuid)) {
             ConnectPrinter& current = m_printers.at(*index);
-            // Keep the state received over MQTT, the list is only the initial one.
-            printer.state = current.state;
+            if (states_pushed) {
+                printer.state = current.state;
+            }
             if (printer != current) {
                 current = std::move(printer);
                 invoke_listeners<IListObserver<ConnectPrinter>>(
@@ -355,7 +303,9 @@ void ConnectPrinterService::apply_printer_list(std::vector<ConnectPrinter> new_p
         } else {
             const std::string uuid = printer.uuid;
             m_printers.insert(m_printers.end(), std::move(printer));
-            subscribe(uuid);
+            if (m_updates) {
+                m_updates->watch(uuid);
+            }
             invoke_listeners<IListObserver<ConnectPrinter>>(
                 [&](IListObserver<ConnectPrinter>* l)
                 { l->on_inserted(m_printers.back(), m_printers.size() - 1); }

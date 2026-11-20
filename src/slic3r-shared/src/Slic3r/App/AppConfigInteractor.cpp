@@ -1,5 +1,7 @@
 #include "Slic3r/App/AppConfigInteractor.hpp"
 
+#include "Slic3r/App/AppConfig.hpp"
+
 namespace Slic3r::App {
 
 AppConfigInteractor::AppConfigInteractor(Domain::ConfigBox* app_config_box) :
@@ -37,6 +39,16 @@ void AppConfigInteractor::set_item_value(
 
     invoke_listeners<IAppConfigChangedListener>([&](auto* l)
                                                 { l->on_app_config_changed(item_name); });
+}
+
+void AppConfigInteractor::set_account_service(AccountService service)
+{
+    Domain::ConfigValue value = *m_app_config_cbi.find("account_service");
+    if (service == AccountService::None || value.get<AccountService>() == service) {
+        return;
+    }
+    value.set(service);
+    set_item_value("account_service", value);
 }
 
 void AppConfigInteractor::toggle_favorite_param(const std::string& param)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
 namespace Slic3r::App::Browser {
 
@@ -25,8 +26,27 @@ enum class BrowserLogicCommandType
     SetLoadDefaultURLOnErrorFalse,
     SwitchToSlicing,
     ClearBasicAuth,
-    SetBasicAuth
+    SetBasicAuth,
+    /** @brief Deletes one cookie, data is cookie_command_data(). */
+    DeleteCookie,
+    /** @brief Sets one cookie, data is cookie_set_command_data() (BrowserCookie.hpp). */
+    SetCookie
 };
+
+/** @brief Data of BrowserLogicCommandType::DeleteCookie: the cookie name and the server URL. */
+inline std::string cookie_command_data(const std::string& name, const std::string& url)
+{
+    return name + "\n" + url;
+}
+
+inline std::pair<std::string, std::string> parse_cookie_command_data(const std::string& data)
+{
+    const size_t pos = data.find('\n');
+    if (pos == std::string::npos) {
+        return {};
+    }
+    return {data.substr(0, pos), data.substr(pos + 1)};
+}
 
 struct BrowserLogicCommand
 {

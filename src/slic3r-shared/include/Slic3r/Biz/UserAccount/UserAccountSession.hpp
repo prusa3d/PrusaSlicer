@@ -54,6 +54,11 @@ public:
      */
     void on_log_in_code_response(const std::string& code, const std::string& code_verifier);
     void enqueue_action(ActionQueueData&& action);
+    /**
+     * @brief Enqueues an action that runs even without a token (e.g. starting an app pairing,
+     * testing a token), before the regular queue.
+     */
+    void enqueue_priority_action(ActionQueueData&& action);
     void enqueue_test_with_refresh();
     void enqueue_refresh(const std::string& body);
     void enqueue_refresh_race(const std::string& refresh_token_from_store);
@@ -127,6 +132,11 @@ private:
      *  sets to true by on_log_in_code_response or enqueue_action call
      */
     bool m_processing_enabled{false};
+    /**
+     * @brief m_global_cancel was set by a logout: it cancels only the request in flight then, the
+     * next action picked from the (emptied) queue was enqueued after the logout.
+     */
+    bool m_cancel_ends_at_next_action{false};
 
     void enqueue_action_inner(ActionQueueData&& action);
 

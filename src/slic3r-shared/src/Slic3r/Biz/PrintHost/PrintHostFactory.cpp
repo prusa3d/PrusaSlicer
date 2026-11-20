@@ -5,6 +5,7 @@
 #include "Slic3r/Biz/PrintHost/PrintHostPrusaLink.hpp"
 #include "Slic3r/Biz/PrintHost/PrintHostPrusaLinkStorage.hpp"
 #include "Slic3r/Biz/PrintHost/PrintHostPrusaConnect.hpp"
+#include "Slic3r/Biz/PrintHost/PrintHostPrusaConnectLocal.hpp"
 #include "Slic3r/Biz/PrintHost/PrintHostSL1Host.hpp"
 #include "Slic3r/Biz/PrintHost/PrintHostMoonraker.hpp"
 #include "Slic3r/Biz/PrintHost/PrintHostDuet.hpp"
@@ -51,7 +52,14 @@ create_print_host(PhysicalPrinter::PhysicalPrinterConfig config, PrintHostJobDat
                 return nullptr;
             }
         } else if constexpr (std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::ConnectUpload>) {
-            return std::make_unique<PrintHostPrusaConnect>(std::move(config), std::move(data));
+            switch (arg.api) {
+            case PhysicalPrinter::ConnectUploadApi::SlicerRest:
+                return std::make_unique<PrintHostPrusaConnect>(std::move(config), std::move(data));
+            case PhysicalPrinter::ConnectUploadApi::Legacy:
+                return std::make_unique<PrintHostPrusaConnectLocal>(std::move(config), std::move(data));
+            }
+            ASSERT(false);
+            return nullptr;
         } else if constexpr (std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::FileSystemExport>) {
             return std::make_unique<PrintHostLocal>(std::move(config), std::move(data));
         }

@@ -1,0 +1,219 @@
+{
+    "printers": [
+        {
+            "base_model": "MK4",
+            "connect_state": "ATTENTION",
+            "legacy_printer_model": "MK4SMMU3",
+            "model": "MK4S",
+            "name": "MK4S DEMO-02",
+            "tool_count": 1,
+            "tools": {
+                "0": {
+                    "class": "FFF",
+                    "features": {
+                        "nozzle_diameter": 0.4,
+                        "nozzle_hardened": false,
+                        "nozzle_high_flow": false
+                    },
+                    "feeder": {
+                        "base_model": "MMU3",
+                        "model": "MMU3",
+                        "num_slots": 5,
+                        "type": "MMU"
+                    },
+                    "type": "PRINT_HEAD"
+                },
+                "0.0": {
+                    "class": "FFF",
+                    "material_package_instance": {
+                        "package": {
+                            "material": {
+                                "abbreviation": "PLA",
+                                "type": "PLA"
+                            }
+                        }
+                    },
+                    "type": "FEEDER_SLOT"
+                },
+                "0.1": {
+                    "class": "FFF",
+                    "material_package_instance": {
+                        "package": {
+                            "material": {
+                                "abbreviation": "PETG",
+                                "type": "PETG"
+                            }
+                        }
+                    },
+                    "type": "FEEDER_SLOT"
+                },
+                "0.2": {
+                    "class": "FFF",
+                    "material_package_instance": {
+                        "package": {
+                            "material": {
+                                "abbreviation": "PLA",
+                                "type": "PLA"
+                            }
+                        }
+                    },
+                    "type": "FEEDER_SLOT"
+                },
+                "0.3": {
+                    "class": "FFF",
+                    "material_package_instance": {
+                        "package": {
+                            "material": {
+                                "abbreviation": "ASA",
+                                "type": "ASA"
+                            }
+                        }
+                    },
+                    "type": "FEEDER_SLOT"
+                },
+                "0.4": {
+                    "class": "FFF",
+                    "material_package_instance": null,
+                    "type": "FEEDER_SLOT"
+                }
+            },
+            "uuid": "18a4bd04-bd17-48e4-a7e5-324f400683a4"
+        },
+        {
+            "base_model": "XL",
+            "connect_state": "IDLE",
+            "legacy_printer_model": "XL5IS",
+            "model": "XL",
+            "name": "XL DEMO-03",
+            "tool_count": 5,
+            "tools": {
+                "0": {
+                    "class": "FFF",
+                    "features": {
+                        "nozzle_diameter": 0.4,
+                        "nozzle_hardened": false,
+                        "nozzle_high_flow": false
+                    },
+                    "material_package_instance": {
+                        "package": {
+                            "material": {
+                                "abbreviation": "PLA",
+                                "type": "PLA"
+                            }
+                        }
+                    },
+                    "type": "PRINT_HEAD"
+                },
+                "1": {
+                    "class": "FFF",
+                    "features": {
+                        "nozzle_diameter": 0.4,
+                        "nozzle_hardened": true,
+                        "nozzle_high_flow": true
+                    },
+                    "material_package_instance": {
+                        "package": {
+                            "material": {
+                                "abbreviation": "PETG",
+                                "type": "PETG"
+                            }
+                        }
+                    },
+                    "type": "PRINT_HEAD"
+                },
+                "2": {
+                    "class": "FFF",
+                    "features": {
+                        "nozzle_diameter": 0.4,
+                        "nozzle_hardened": false,
+                        "nozzle_high_flow": false
+                    },
+                    "material_package_instance": {
+                        "package": {
+                            "material": {
+                                "abbreviation": "ASA",
+                                "type": "ASA"
+                            }
+                        }
+                    },
+                    "type": "PRINT_HEAD"
+                },
+                "3": {
+                    "class": "FFF",
+                    "features": {
+                        "nozzle_diameter": 0.4,
+                        "nozzle_hardened": false,
+                        "nozzle_high_flow": false
+                    },
+                    "material_package_instance": {
+                        "package": {
+                            "material": {
+                                "abbreviation": "PLA",
+                                "type": "PLA"
+                            }
+                        }
+                    },
+                    "type": "PRINT_HEAD"
+                },
+                "4": {
+                    "class": "FFF",
+                    "features": {
+                        "nozzle_diameter": 0.4,
+                        "nozzle_hardened": false,
+                        "nozzle_high_flow": false
+                    },
+                    "material_package_instance": {
+                        "package": {
+                            "material": {
+                                "abbreviation": "PVA",
+                                "type": "PVA"
+                            }
+                        }
+                    },
+                    "type": "PRINT_HEAD"
+                }
+            },
+            "uuid": "12221345-a441-4b8d-8bdd-ac5bca4f6680"
+        },
+        {
+            "connect_state": "IDLE",
+            "legacy_printer_model": "KLIPPER",
+            "name": "Klipper DEMO-06",
+            "tools": {
+                "0": {
+                    "class": "FFF",
+                    "type": "PRINT_HEAD"
+                }
+            },
+            "uuid": "47c1454f-d5b6-4fe9-bfab-2e025fd1dc9a"
+        },
+        {
+            "base_model": "COREONE",
+            "connect_state": "PRINTING",
+            "legacy_printer_model": "COREONE",
+            "model": "COREONE",
+            "name": "CoreOne DEMO-01",
+            "tool_count": 1,
+            "tools": {
+                "0": {
+                    "class": "FFF",
+                    "features": {
+                        "nozzle_diameter": 0.4,
+                        "nozzle_hardened": false,
+                        "nozzle_high_flow": false
+                    },
+                    "material_package_instance": {
+                        "package": {
+                            "material": {
+                                "abbreviation": "PLA",
+                                "type": "PLA"
+                            }
+                        }
+                    },
+                    "type": "PRINT_HEAD"
+                }
+            },
+            "uuid": "6f6d580b-7ce5-48fc-ad72-a4c91c96b4b9"
+        }
+    ]
+}

@@ -7,6 +7,13 @@
 
 namespace Slic3r::Biz::UserAccount {
 
+namespace {
+Network::HttpRetryOpt retry_opt(const ActionQueueData& data)
+{
+    return data.retry ? Network::HttpRetryOpt::default_retry() : Network::HttpRetryOpt::no_retry();
+}
+} // namespace
+
 void UserAccountActionPost::perform(
     IUserAccountActionCallbacks* callbacks,
     /*UNUSED*/ const std::string& access_token,
@@ -53,7 +60,7 @@ void UserAccountActionPost::perform(
             http->header(key, value);
         }
     }
-    if (!content_type_added) {
+    if (!content_type_added && shared_data->retry) {
         http->header("Content-Type", "application/x-www-form-urlencoded");
     }
 
@@ -68,7 +75,7 @@ void UserAccountActionPost::perform(
                     return;
                 }
                 if (shared_data->fail_callback) {
-                    shared_data->fail_callback({});
+                    shared_data->fail_callback({}, 0);
                 }
             }
         )
@@ -77,7 +84,7 @@ void UserAccountActionPost::perform(
             {
                 // SPDLOG_INFO("UserActionPost::perform on_error");
                 if (shared_data->fail_callback)
-                    shared_data->fail_callback(body);
+                    shared_data->fail_callback(body, status);
             }
         )
         .on_complete(
@@ -88,7 +95,7 @@ void UserAccountActionPost::perform(
                     shared_data->success_callback(body);
             }
         )
-        .perform_sync(Network::HttpRetryOpt::default_retry());
+        .perform_sync(retry_opt(*shared_data));
 }
 
 void UserAccountActionGetWithEvent::perform(
@@ -147,7 +154,7 @@ void UserAccountActionGetWithEvent::perform(
             {
                 // SPDLOG_INFO("UserActionGetWithEvent::perform on_error");
                 if (shared_data->fail_callback)
-                    shared_data->fail_callback(body);
+                    shared_data->fail_callback(body, status);
                 std::string message = fmt::format("{} action failed ({}): {}", *action_name, std::to_string(status), body);
                 if (fail_type != ActionFailType::None) {
                     callbacks->on_action_fail(fail_type, std::move(message));
@@ -165,7 +172,7 @@ void UserAccountActionGetWithEvent::perform(
                     return;
                 }
                 if (shared_data->fail_callback) {
-                    shared_data->fail_callback({});
+                    shared_data->fail_callback({}, 0);
                 }
                 std::string message = fmt::format("{} action canceled", *action_name);
                 if (fail_type != ActionFailType::None) {
@@ -184,7 +191,7 @@ void UserAccountActionGetWithEvent::perform(
                 }
             }
         )
-        .perform_sync(Network::HttpRetryOpt::default_retry());
+        .perform_sync(retry_opt(*shared_data));
 }
 
 } // namespace Slic3r::Biz::UserAccount

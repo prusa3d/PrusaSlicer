@@ -2,14 +2,10 @@
 #include "Slic3r/Biz/UserAccount/UserAccountCodeChallengeGenerator.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Biz/Network/IHttp.hpp"
-#include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Log.hpp"
-#include "Slic3r/Directories.hpp"
 
 #include "fmt/format.h"
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/nowide/cstdio.hpp>
 #include <nlohmann/json.hpp>
 
 namespace Slic3r::Biz::UserAccount {
@@ -94,60 +90,6 @@ void UserAccountCommunication::on_log_in_code_response(const std::string& url_me
     wakeup_session_thread();
 }
 
-bool UserAccountCommunication::is_logged_in() const
-{
-    return !username().empty();
-}
-
-std::string UserAccountCommunication::access_token() const
-{
-    return m_session.get_access_token();
-}
-
-boost::filesystem::path UserAccountCommunication::avatar() const
-{
-    if (is_logged_in()) {
-        const std::string filename = "slic3r3-avatar-"
-            + std::to_string(Platform::PlatformServices::instance().app_hash())
-            + m_avatar_extension;
-        return Slic3r::temp_dir() / filename;
-    } else {
-        return boost::filesystem::path(resources_dir()) / "icons" / "user.svg";
-    }
-}
-
-std::string UserAccountCommunication::email() const {
-    return m_email;
-}
-
-void UserAccountCommunication::on_avatar_url(const std::string& data)
-{
-    const boost::filesystem::path server_file(data);
-    m_avatar_extension = server_file.extension().string();
-    ASSERT(m_session.is_initialized());
-    m_session.enqueue_action({UserAccountActionID::Avatar, nullptr, nullptr, data, {}});
-    wakeup_session_thread();
-}
-
-void UserAccountCommunication::on_avatar_success(std::string&& data) const
-{
-    ASSERT(is_logged_in());
-    boost::filesystem::path path = avatar();
-    FILE* file;
-    file = boost::nowide::fopen(path.generic_string().c_str(), "wb");
-    if (file == NULL) {
-        SPDLOG_ERROR("Failed to create file to store avatar picture at: {}", path.string());
-        return;
-    }
-    fwrite(data.c_str(), 1, data.size(), file);
-    fclose(file);
-}
-
-void UserAccountCommunication::on_email(const std::string& data)
-{
-    m_email = data;
-}
-
 void UserAccountCommunication::request_printables_secret_token()
 {
     ASSERT(m_session.is_initialized());
@@ -155,7 +97,7 @@ void UserAccountCommunication::request_printables_secret_token()
     { 
         m_session.dispatch_printables_secret_token(body); 
     };
-    auto fail_fn = [this](const std::string& body)
+    auto fail_fn = [this](const std::string& body, unsigned)
     {
         SPDLOG_ERROR("Failed to retrieve Printables secret token. Response: {} bytes.", body.size());
         m_session.dispatch_printables_secret_token({});
@@ -184,6 +126,23 @@ void UserAccountCommunication::enqueue_connect_printers_data_action(std::functio
     };
     m_session.enqueue_action(std::move(action));
     wakeup_session_thread();
+}
+
+void UserAccountCommunication::on_unauthorized(const std::string& access_token)
+{
+    if (access_token.empty() || access_token != this->access_token()) {
+        return;
+    }
+    if (validate_and_refresh()) {
+        SPDLOG_INFO("UserAccountCommunication: the refused access token has expired, refreshing.");
+    } else {
+        SPDLOG_WARN("UserAccountCommunication: the server refused an access token that is valid.");
+    }
+}
+
+void UserAccountCommunication::on_user_id_unusable()
+{
+    SPDLOG_ERROR("UserAccountCommunication: the account reply has no usable username.");
 }
 
 } // namespace Slic3r::Biz::UserAccount

@@ -97,8 +97,13 @@ void UserAccountSession::do_clear(bool notify_owner)
     // Invalidate any request that was already in flight or queued when we logged out, so a
     // refresh/code-exchange that completes afterwards cannot write tokens or log us back in.
     ++m_session_epoch;
-    m_global_cancel = true;
-    cancel_queue();
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        m_global_cancel              = true;
+        m_cancel_ends_at_next_action = true;
+        m_priority_action_queue.clear();
+        m_action_queue = {};
+    }
     {
         std::lock_guard<std::mutex> lock(m_credentials_mutex);
         m_access_token.clear();
@@ -153,6 +158,9 @@ void UserAccountSession::process_action_queue_inner()
     ActionQueueData selected_data;
     {
         std::lock_guard<std::mutex> lock(m_session_mutex);
+        if (std::exchange(m_cancel_ends_at_next_action, false)) {
+            m_global_cancel = false;
+        }
 
         // priority queue works even when tokens are empty or broken
         if (!m_priority_action_queue.empty()) {
@@ -198,7 +206,8 @@ void UserAccountSession::on_log_in_code_response(const std::string& code, const 
         m_priority_action_queue.push_back(
             {UserAccountActionID::CodeForToken,
              [this, epoch](const std::string& body) { token_success_callback(body, epoch); },
-             [this, epoch](const std::string& body) { code_exchange_fail_callback(body, epoch); },
+             [this, epoch](const std::string& body, unsigned)
+             { code_exchange_fail_callback(body, epoch); },
              post_fields}
         );
     }
@@ -213,6 +222,16 @@ void UserAccountSession::enqueue_action(ActionQueueData&& action)
         std::lock_guard<std::mutex> lock(m_session_mutex);
         enqueue_action_inner(std::move(action));
     }
+}
+
+void UserAccountSession::enqueue_priority_action(ActionQueueData&& action)
+{
+    if (m_shutting_down) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(m_session_mutex);
+    m_processing_enabled = true;
+    m_priority_action_queue.push_back(std::move(action));
 }
 
 void UserAccountSession::enqueue_test_with_refresh()
@@ -259,7 +278,8 @@ void UserAccountSession::enqueue_refresh(const std::string& body)
         m_priority_action_queue.push_back(
             {UserAccountActionID::RefreshToken,
              [this, epoch](const std::string& body) { token_success_callback(body, epoch); },
-             [this, epoch](const std::string& body) { refresh_fail_callback(body, epoch); },
+             [this, epoch](const std::string& body, unsigned)
+             { refresh_fail_callback(body, epoch); },
              post_fields}
         );
     }
@@ -294,7 +314,8 @@ void UserAccountSession::enqueue_refresh_race(const std::string& refresh_token_f
         m_priority_action_queue.push_back(
             {UserAccountActionID::RefreshToken,
              [this, epoch](const std::string& body) { token_success_callback(body, epoch); },
-             [this, epoch](const std::string& body) { refresh_fail_soft_callback(body, epoch); },
+             [this, epoch](const std::string& body, unsigned)
+             { refresh_fail_soft_callback(body, epoch); },
              post_fields}
         );
     }

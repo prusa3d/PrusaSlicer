@@ -101,7 +101,12 @@ constexpr int DEFAULT_TIMEOUT_CONNECT = 10;
 constexpr int DEFAULT_TIMEOUT_MAX     = 0;
 constexpr int DEFAULT_SIZE_LIMIT      = 5 * 1'024 * 1'024;
 
-HttpCurl::HttpCurl(RequestMethod request_method, std::string&& url, RetryFn fn) :
+HttpCurl::HttpCurl(
+    RequestMethod request_method,
+    std::string&& url,
+    RetryFn fn,
+    const std::optional<ServerTrust>& server_trust
+) :
     IHttp(request_method, std::move(url), std::move(fn)),
     m_curl(curl_easy_init()),
     m_error_buffer(CURL_ERROR_SIZE + 1, '\0')
@@ -123,6 +128,10 @@ HttpCurl::HttpCurl(RequestMethod request_method, std::string&& url, RetryFn fn) 
     ::curl_easy_setopt(m_curl.get(), CURLOPT_ERRORBUFFER, &m_error_buffer.front());
     ::curl_easy_setopt(m_curl.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
 
+    if (server_trust) {
+        apply_server_trust(m_curl.get(), *server_trust);
+    }
+
     switch (m_request_method) {
     case IHttp::RequestMethod::Post:
         curl_easy_setopt(m_curl.get(), CURLOPT_POST, 1L);
@@ -133,6 +142,9 @@ HttpCurl::HttpCurl(RequestMethod request_method, std::string&& url, RetryFn fn) 
     case IHttp::RequestMethod::Patch:
         curl_easy_setopt(m_curl.get(), CURLOPT_CUSTOMREQUEST, "PATCH");
         break;
+    case IHttp::RequestMethod::Delete:
+        curl_easy_setopt(m_curl.get(), CURLOPT_CUSTOMREQUEST, "DELETE");
+        break;
     case IHttp::RequestMethod::Get:
     default:
         break;
@@ -141,6 +153,49 @@ HttpCurl::HttpCurl(RequestMethod request_method, std::string&& url, RetryFn fn) 
 
 HttpCurl::~HttpCurl() 
 {
+}
+
+void HttpCurl::apply_server_trust(CURL* curl, const ServerTrust& trust)
+{
+    switch (trust.kind) {
+    case ServerTrustKind::PinnedKey:
+        // The pinned key is the check: curl compares it with the key of the presented
+        // certificate after the handshake and fails with CURLE_SSL_PINNEDPUBKEYNOTMATCH on
+        // any other key (all TLS backends: OpenSSL, Secure Transport, Schannel), regardless of
+        // the chain and host name checks. Those two are off because the certificate is
+        // typically self-signed and reached through an IP address or a .local name.
+        ::curl_easy_setopt(curl, CURLOPT_PINNEDPUBLICKEY, trust.pin.c_str());
+        ::curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        ::curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        break;
+    case ServerTrustKind::Certificate:
+        // Normal verification, host name included, against the loaded certificate(s) only.
+        // Unlike ca_file(), set on every backend: Secure Transport (the system curl of macOS)
+        // and Schannel (curl 7.60 and newer, PEM only) take CURLOPT_CAINFO as the only trust
+        // anchors too. ca_file_supported() is kept as it is for the print host settings.
+        ::curl_easy_setopt(curl, CURLOPT_CAINFO, trust.pem_path.c_str());
+        ::curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+        ::curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+#ifdef _WIN32
+        // A private CA has no revocation list; Schannel would fail with "revocation status unknown".
+        ::curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_REVOKE_BEST_EFFORT);
+#endif
+        break;
+    case ServerTrustKind::System:
+    default:
+        break;
+    }
+}
+
+std::function<std::unique_ptr<IHttp>(IHttp::RequestMethod, std::string, IHttp::RetryFn)>
+HttpCurl::creator(ServerTrustLookup lookup)
+{
+    return [lookup = std::move(lookup)](RequestMethod request_method, std::string url, RetryFn fn)
+               -> std::unique_ptr<IHttp>
+    {
+        const std::optional<ServerTrust> trust = lookup ? lookup(url) : std::nullopt;
+        return std::make_unique<HttpCurl>(request_method, std::move(url), std::move(fn), trust);
+    };
 }
 
 bool HttpCurl::ca_file_supported_inner(::CURL* curl)
@@ -344,9 +399,16 @@ void HttpCurl::perform_sync(const HttpRetryOpt& retry_opts)
         ::curl_easy_setopt(m_curl.get(), CURLOPT_HTTPPOST, m_form.get());
     }
 
+    const bool has_body =
+        !m_post_fields.empty() || m_form || !m_mime_data.empty() || !m_upload_data.empty();
     if (!m_post_fields.empty()) {
         ::curl_easy_setopt(m_curl.get(), CURLOPT_POSTFIELDS, m_post_fields.c_str());
         ::curl_easy_setopt(m_curl.get(), CURLOPT_POSTFIELDSIZE_LARGE, m_post_fields.size());
+    } else if (m_request_method == IHttp::RequestMethod::Post && !has_body) {
+        // A POST without any body: without POSTFIELDS curl would read the body through the read
+        // callback from the default READDATA (stdin). Send an empty body, Content-Length: 0.
+        ::curl_easy_setopt(m_curl.get(), CURLOPT_POSTFIELDS, "");
+        ::curl_easy_setopt(m_curl.get(), CURLOPT_POSTFIELDSIZE_LARGE, curl_off_t{0});
     }
 
     if (!m_mime_data.empty()) {

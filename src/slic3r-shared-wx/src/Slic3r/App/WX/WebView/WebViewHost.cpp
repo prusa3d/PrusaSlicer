@@ -3,6 +3,10 @@
 #include "WebViewPlatformUtils.hpp"
 
 #include "Slic3r/App/WX/WebView/WebView.hpp"
+#include "Slic3r/App/Browser/BrowserCookie.hpp"
+#include "Slic3r/App/Browser/BrowserLogicCommand.hpp"
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/Biz/Network/ServerTrustStore.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 
 #include "Slic3r/Assert.hpp"
@@ -11,6 +15,9 @@
 #include <wx/webview.h>
 #include <wx/sizer.h>
 #include <wx/window.h>
+
+#include <utility>
+#include <vector>
 
 namespace Slic3r::App::WX::WebView {
 
@@ -22,7 +29,15 @@ WebViewHost::WebViewHost()
 
 WebViewHost::~WebViewHost()
 {
+    AppServices::instance().server_trust_store().remove_listener(this);
     m_watchdog.Stop();
+}
+
+void WebViewHost::on_server_trust_applied()
+{
+    if (wxWebView* web_view = get()) {
+        webview_server_trust_changed(web_view);
+    }
 }
 
 bool WebViewHost::create(
@@ -53,6 +68,8 @@ bool WebViewHost::create(
     }
 
     m_state = State::Creating;
+    set_up_server_trust();
+    AppServices::instance().server_trust_store().add_listener(this);
 
     if (Biz::Network::ServiceConfig::instance().webdev_enabled()) {
         setup_webview_devtools(m_web_view);
@@ -63,6 +80,15 @@ bool WebViewHost::create(
     return true;
 }
 
+void WebViewHost::set_up_server_trust()
+{
+    if (m_server_trust_set_up || m_web_view->GetNativeBackend() == nullptr) {
+        return;
+    }
+    m_server_trust_set_up = true;
+    setup_webview_server_trust(m_web_view);
+}
+
 void WebViewHost::notify_created()
 {
     m_watchdog.Stop();
@@ -70,6 +96,58 @@ void WebViewHost::notify_created()
         return;
     }
     m_state = State::Ready;
+    set_up_server_trust();
+    for (const std::function<void()>& fn : std::exchange(m_when_ready, {})) {
+        fn();
+    }
+}
+
+void WebViewHost::run_when_ready(std::function<void()> fn)
+{
+    if (m_state == State::Ready) {
+        fn();
+    } else if (m_state != State::Failed) {
+        m_when_ready.push_back(std::move(fn));
+    }
+}
+
+void WebViewHost::set_cookie(const std::string& command_data, std::function<void()> done)
+{
+    run_when_ready(
+        [this, command_data, done = std::move(done)]()
+        {
+            const std::optional<App::Browser::BrowserCookie> cookie =
+                App::Browser::parse_cookie_set_command_data(command_data);
+            if (!cookie) {
+                SPDLOG_ERROR("Invalid SetCookie command.");
+                done();
+                return;
+            }
+            WebView::set_cookie(
+                m_web_view,
+                *cookie,
+                [alive = m_lifetime.token(), done]()
+                {
+                    if (alive.lock()) {
+                        done();
+                    }
+                }
+            );
+        }
+    );
+}
+
+void WebViewHost::delete_cookie(const std::string& command_data)
+{
+    run_when_ready(
+        [this, command_data]()
+        {
+            const auto [name, url] = App::Browser::parse_cookie_command_data(command_data);
+            if (!name.empty() && !url.empty()) {
+                WebView::delete_cookie(m_web_view, url, name);
+            }
+        }
+    );
 }
 
 bool WebViewHost::notify_error()
@@ -102,6 +180,7 @@ void WebViewHost::fail()
     }
     m_state = State::Failed;
     m_watchdog.Stop();
+    m_when_ready.clear();
     web_view_show_unavailable_message(m_parent, m_sizer, m_web_view);
 }
 

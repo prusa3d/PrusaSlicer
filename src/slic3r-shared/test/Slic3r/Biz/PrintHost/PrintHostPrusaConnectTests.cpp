@@ -159,15 +159,21 @@ struct Fixture
         return create_reply;
     }
 
+    std::function<std::string()> current_access_token;
+
     bool run()
     {
         PhysicalPrinter::PhysicalPrinterConfig config;
         config.host = "connect";
         PhysicalPrinter::ConnectUpload upload;
-        upload.organization_id = organization_id;
-        upload.printer_uuid    = PRINTER_UUID;
-        upload.access_token    = TOKEN;
-        config.payload         = std::move(upload);
+        upload.organization_id      = organization_id;
+        upload.printer_uuid         = PRINTER_UUID;
+        upload.access_token         = TOKEN;
+        upload.current_access_token = current_access_token;
+        const Network::ServiceConfig& urls = Network::ServiceConfig::instance();
+        upload.files_url = urls.connect_organization_files_url(organization_id);
+        upload.queue_url = urls.connect_printer_queue_url(PRINTER_UUID);
+        config.payload   = std::move(upload);
 
         PrintHost::PrintHostJobData data{std::monostate{}, fs::path("print.bgcode")};
         data.source_path       = source_path;
@@ -421,4 +427,28 @@ TEST_CASE("PrusaConnect API URLs", "[PrintHost][PrusaConnect]")
     CHECK(urls.connect_organization_files_url("42") == api + "/file/slicer/v1/organizations/42/files");
     CHECK(urls.connect_organization_file_url("42", "7") == api + "/file/slicer/v1/organizations/42/files/7");
     CHECK(urls.connect_printer_queue_url("u-1") == api + "/printer/slicer/v1/printers/u-1/queue");
+}
+
+TEST_CASE_METHOD(Fixture, "PrusaConnect upload: each request carries the account's current token", "[PrintHost][PrusaConnect]")
+{
+    int asked            = 0;
+    current_access_token = [&asked]()
+    { return ++asked < 2 ? std::string(TOKEN) : std::string("refreshed-token"); };
+
+    REQUIRE(run());
+
+    REQUIRE(seen.size() == 4);
+    CHECK(seen[0].headers.at("Authorization") == "Bearer " + std::string(TOKEN));
+    CHECK(seen[2].headers.at("Authorization") == "Bearer refreshed-token");
+    CHECK(seen[3].headers.at("Authorization") == "Bearer refreshed-token");
+}
+
+TEST_CASE_METHOD(Fixture, "PrusaConnect upload: without a current token the starting one is used", "[PrintHost][PrusaConnect]")
+{
+    current_access_token = []() { return std::string(); };
+
+    REQUIRE(run());
+
+    REQUIRE(seen.size() == 4);
+    CHECK(seen[3].headers.at("Authorization") == "Bearer " + std::string(TOKEN));
 }

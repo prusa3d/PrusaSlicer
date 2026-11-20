@@ -1,0 +1,390 @@
+/* Shared style of the slicer's own Connect tab pages (connect_logged_out, connect_local_setup,
+   connect_local_logged_out) and their _dark twins; the colour variables are set by each page. */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  margin: 0;
+  min-height: 100vh;
+  padding: clamp(16px, 8vh, 72px) 16px 32px 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+/* Must win over the display of any component class below. */
+.hidden { display: none !important; }
+
+/* ---- Prusa Connect | Prusa Connect on-premise ---- */
+.modes {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin: 0 0 16px 0;
+  border-radius: 10px;
+  background-color: var(--color-track);
+  border: 1px solid var(--color-border);
+}
+.modes button {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
+  cursor: pointer;
+  text-align: center;
+}
+.modes button:hover { color: var(--color-text); }
+.modes button[aria-current='page'] {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 1px 2px var(--color-shadow), 0 0 0 1px var(--color-border);
+  cursor: default;
+}
+.modes button[aria-current='page'] svg { color: var(--color-accent); }
+.modes button:disabled:not([aria-current='page']) { cursor: progress; }
+.modes svg { flex: none; width: 18px; height: 18px; }
+
+/* ---- Card ---- */
+.card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px var(--color-shadow), 0 8px 24px var(--color-shadow);
+  padding: 32px;
+}
+@media (max-width: 520px) {
+  .card { padding: 24px 20px; }
+}
+
+/* The PRUSA CONNECT wordmark and the filament spool of the slicer's other Connect pages
+   (connect_loading, connect_error). */
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.wordmark {
+  display: block;
+  width: 250px;
+  max-width: 100%;
+  height: auto;
+  fill: var(--color-text);
+  fill-rule: evenodd;
+}
+.tag {
+  padding: 1px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+.spool-art {
+  display: block;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 24px auto;
+}
+.spool { stroke: var(--color-spool); fill: none; }
+.filament { stroke: var(--color-accent); }
+.filament line { stroke-linecap: round; }
+
+h1 {
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: normal;
+  margin: 0 0 8px 0;
+}
+.card > h1, .card > .lead { text-align: center; }
+.card > .lead { margin-left: auto; margin-right: auto; }
+h2 {
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: bold;
+  margin: 0;
+}
+p { margin: 0; }
+.lead { color: var(--color-muted); max-width: 60ch; }
+.muted { color: var(--color-muted); }
+.small { font-size: 13px; }
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 20px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.btn-primary {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.btn-primary:hover { background-color: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.btn-secondary {
+  background-color: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+.btn-secondary:hover { border-color: var(--color-muted); }
+.btn-small { padding: 5px 12px; font-size: 13px; line-height: 18px; }
+.btn-block { width: 100%; }
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.link {
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  cursor: pointer;
+  text-decoration: none;
+}
+.link:hover { text-decoration: underline; }
+
+button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-focus);
+}
+.modes button:focus-visible { box-shadow: 0 0 0 3px var(--color-focus); }
+
+/* ---- Form ---- */
+.address { margin-top: 24px; }
+label {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  margin: 0 0 6px 0;
+}
+.field-row {
+  display: flex;
+  gap: 8px;
+}
+input[type=text] {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background-color: var(--color-input);
+  color: var(--color-text);
+}
+input[type=text]::placeholder { color: var(--color-placeholder); }
+input[type=text]:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-focus);
+}
+input[type=text].invalid { border-color: var(--color-error); }
+input[type=text].invalid:focus { box-shadow: 0 0 0 3px var(--color-error-soft); }
+@media (max-width: 400px) {
+  .field-row { flex-direction: column; }
+}
+
+.error {
+  color: var(--color-error);
+  font-size: 13px;
+  margin-top: 8px;
+}
+.error:empty { display: none; }
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-muted);
+  font-size: 13px;
+  margin-top: 10px;
+}
+.spinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+}
+
+/* ---- Certificate step of the setup page ---- */
+.cert {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--color-warn-border);
+  border-radius: 10px;
+  background-color: var(--color-warn-soft);
+}
+.cert-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.cert-head svg { flex: none; width: 20px; height: 20px; margin-top: 1px; color: var(--color-warn); }
+.cert-server {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+  margin-top: 2px;
+}
+.cert .error { margin-top: 10px; }
+.cert-intro { color: var(--color-muted); font-size: 13px; margin-top: 10px; }
+.cert dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 14px;
+  font-size: 12.5px;
+  margin: 12px 0 0 0;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+.cert dt { color: var(--color-muted); }
+.cert dd { margin: 0; overflow-wrap: anywhere; }
+.cert .fingerprint { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+.cert .warning { color: var(--color-error); }
+@media (max-width: 400px) {
+  .cert dl { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .cert dd { margin-bottom: 6px; }
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-top: 14px;
+}
+
+/* ---- Discovery section of the setup page ---- */
+.section {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section .lead { margin-top: 4px; font-size: 13px; }
+.section .start { margin-top: 14px; }
+.servers {
+  list-style: none;
+  margin: 12px 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.servers li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-sunken);
+}
+.servers .glyph {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+}
+.servers .glyph svg { width: 18px; height: 18px; }
+.servers .info { flex: 1; min-width: 0; }
+.server-name { font-weight: 600; overflow-wrap: anywhere; }
+.server-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12.5px;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+.version {
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 11.5px;
+  line-height: 18px;
+}
+
+/* ---- Server strip of the signed-out page ---- */
+.cta { margin-top: 24px; text-align: center; }
+.facts {
+  margin-top: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-sunken);
+}
+.fact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.fact + .fact { border-top: 1px solid var(--color-border); }
+.fact-text { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.fact .link { flex: none; }
+@media (max-width: 440px) {
+  .fact { flex-wrap: wrap; }
+}
+.fact-text svg { flex: none; width: 16px; height: 16px; color: var(--color-muted); }
+
+.footer {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 24px;
+  font-size: 13px;
+}

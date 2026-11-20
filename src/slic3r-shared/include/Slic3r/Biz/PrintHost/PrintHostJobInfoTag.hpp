@@ -10,8 +10,8 @@ enum class PrintHostJobInfoTag
     Resolve,
     OperationType,
     Storage,
+    ConnectPrinterAddress,
     // Tags used int PS2 implementation (might have to be implemented when Physical printer presets are implemented)
-    //ConnectPrinterAddress,
     //complete_with_warning
     //complete
     //set_complete_off

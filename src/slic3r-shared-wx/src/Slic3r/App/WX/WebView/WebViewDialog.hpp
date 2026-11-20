@@ -77,6 +77,11 @@ private:
 
     std::string m_loading_html;
     bool m_load_error_page{false};
+    /**
+     * @brief Set by the logic for a failed load (AbstractBrowserLogic::on_load_error), run instead
+     * of the error page.
+     */
+    std::vector<App::Browser::BrowserLogicCommand> m_error_commands;
 
     wxString m_response_js;
     wxString m_default_url;
@@ -85,6 +90,11 @@ private:
     std::atomic<size_t> m_atomic_counter{0};
     size_t m_counter_to_match{0};
     bool m_force_close{false};
+    /**
+     * @brief The logic ends the dialog itself, on_dialog_closing() is not needed. Reset by
+     * EndModal().
+     */
+    bool m_ended_by_logic{false};
     bool m_busy_cursor_set {false};
 
 protected:
@@ -95,6 +105,11 @@ protected:
     bool handle_logic_command_EndModalCancel(const std::string& data) override;
     bool handle_logic_command_DeleteCookies(const std::string& data) override;
     bool handle_logic_command_DeleteCookiesWithCounter(const std::string& data) override;
+    bool handle_logic_command_DeleteCookie(const std::string& data) override;
+    bool handle_logic_command_SetCookie(
+        const std::string& data,
+        std::vector<App::Browser::BrowserLogicCommand> then
+    ) override;
     bool handle_logic_command_Veto(const std::string& data) override;
     bool handle_logic_command_DoReload(const std::string& data) override;
     bool handle_logic_command_AddUserScript(const std::string& data) override;

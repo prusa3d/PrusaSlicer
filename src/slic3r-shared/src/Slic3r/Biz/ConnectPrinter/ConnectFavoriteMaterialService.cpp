@@ -42,7 +42,9 @@ void ConnectFavoriteMaterialService::on_logged_out()
 
 void ConnectFavoriteMaterialService::request_refresh()
 {
-    if (m_user_account_interactor.access_token().empty()) {
+    if (m_user_account_interactor.access_token().empty()
+        || Network::ServiceConfig::instance().connect_graphql_url().empty())
+    {
         return;
     }
     if (m_refresh_in_flight) {

@@ -9,6 +9,9 @@
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/Theme.hpp"
 #include "Slic3r/App/Mouse3D/Mouse3DController.hpp"
+#include "Slic3r/Biz/Network/ServerTrustStore.hpp"
+
+#include <utility>
 
 namespace Slic3r::App {
 
@@ -18,7 +21,27 @@ AppServices& AppServices::instance()
     return instance;
 }
 
+AppServices::AppServices() :
+    m_server_trust_store(std::make_unique<Biz::Network::ServerTrustStore>())
+{}
+
 AppServices::~AppServices() = default;
+
+Biz::Network::ServerTrustStore& AppServices::server_trust_store() const
+{
+    return *m_server_trust_store;
+}
+
+void AppServices::set_account_service_switcher(AccountServiceSwitcher* switcher)
+{
+    m_account_service_switcher = switcher;
+}
+
+AccountServiceSwitcher& AppServices::account_service_switcher() const
+{
+    ASSERT(m_account_service_switcher != nullptr);
+    return *m_account_service_switcher;
+}
 
 void AppServices::set_pop_notification_center(
     std::unique_ptr<PopNotification::PopNotificationCenter>&& ptr

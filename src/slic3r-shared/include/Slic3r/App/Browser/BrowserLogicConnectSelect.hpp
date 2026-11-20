@@ -11,11 +11,19 @@ namespace Slic3r::App::Browser {
 class BrowserLogicConnectSelect final : public AbstractUploadBrowserLogic, public AbstractConnectRequestHandler
 {
 public:
-    BrowserLogicConnectSelect(Biz::ProjectInteractor& project_interactor);
+    BrowserLogicConnectSelect(
+        Biz::ProjectInteractor& project_interactor,
+        std::unique_ptr<IConnectPageAuth> page_auth
+    );
     
     // AbstractBrowserLogic
     std::vector<BrowserLogicCommand> on_script_message_webview_event(const std::string& message) override;
     std::vector<BrowserLogicCommand> on_show_webview_event(bool show) override;
+    std::vector<BrowserLogicCommand> on_loaded_webview_event(const std::string& url) override;
+    std::vector<BrowserLogicCommand> on_navigation_request_webview_event(
+        const std::string& new_url,
+        const std::string& current_url
+    ) override;
     std::pair<int,int> size(int em_unit) const override {return std::pair<int,int>(200*em_unit, 100*em_unit); }
     std::pair<int,int> min_size(int em_unit) const override { return {100 * em_unit, 50 * em_unit}; }
 protected:
@@ -28,5 +36,13 @@ protected:
     std::vector<BrowserLogicCommand> on_webview_reload_event(const std::string& message_data) override;
     std::vector<BrowserLogicCommand> on_connect_action_close_dialog(const std::string& message_data) override;
     std::vector<BrowserLogicCommand> on_connect_action_log_in_in_browser(const std::string& data) override;
+
+private:
+    /**
+     * @brief The select-printer page. Without a token for the page it loads only after
+     * IConnectPageAuth::prepare_page().
+     */
+    std::string m_select_url;
+    bool m_select_page_requested{false};
 };
 } // namespace Slic3r::App::Browser 

@@ -37,7 +37,8 @@ enum class PopNotificationType
     PluginBundleDownloaded,
     GeometryOnlyImport,
     ArchiveFilesSkipped,
-    ArchiveOpenPostponed
+    ArchiveOpenPostponed,
+    UserAccountCredentialExpiry
 };
 
 /*

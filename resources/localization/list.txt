@@ -26,8 +26,15 @@ src/slic3r-domain/src/Slic3r/Domain/ConfigDefsSLA.cpp
 src/slic3r-platform/src/Slic3r/App/Platform/KeyCode.cpp
 src/slic3r-shared/include/Slic3r/App/Plater/ArrangeDialog.hpp
 src/slic3r-shared/include/Slic3r/App/Plater/MMPaintingColorDropdowns.hpp
+src/slic3r-shared/src/Slic3r/App/AccountServiceSwitcher.cpp
 src/slic3r-shared/src/Slic3r/App/AddPrinterPanel.cpp
 src/slic3r-shared/src/Slic3r/App/AppConfig.cpp
+src/slic3r-shared/src/Slic3r/App/Browser/BrowserLogicConnectLocalLogIn.cpp
+src/slic3r-shared/src/Slic3r/App/Browser/BrowserLogicConnectLocalPage.cpp
+src/slic3r-shared/src/Slic3r/App/Browser/BrowserLogicConnectPage.cpp
+src/slic3r-shared/src/Slic3r/App/Browser/BrowserLogicPrintables.cpp
+src/slic3r-shared/src/Slic3r/App/Browser/ConnectLocalSetupLogic.cpp
+src/slic3r-shared/src/Slic3r/App/Browser/ConnectServiceSwitch.cpp
 src/slic3r-shared/src/Slic3r/App/ColorDropdown.cpp
 src/slic3r-shared/src/Slic3r/App/ColorMix/ColorMixDialog.cpp
 src/slic3r-shared/src/Slic3r/App/ColorMix/ColorMixRecipeRow.cpp
@@ -54,6 +61,8 @@ src/slic3r-shared/src/Slic3r/App/Config/PrintToolRowItem.cpp
 src/slic3r-shared/src/Slic3r/App/Config/ToolRowControl.cpp
 src/slic3r-shared/src/Slic3r/App/Config/ToolToFeatureDialog.cpp
 src/slic3r-shared/src/Slic3r/App/Config/ToolToFeatureDialogHeader.cpp
+src/slic3r-shared/src/Slic3r/App/ConnectLocalTrust.cpp
+src/slic3r-shared/src/Slic3r/App/ConnectServiceName.cpp
 src/slic3r-shared/src/Slic3r/App/CrashedProjectsDialog.cpp
 src/slic3r-shared/src/Slic3r/App/DisplayStrings.cpp
 src/slic3r-shared/src/Slic3r/App/EffectiveValuesDialog.cpp
@@ -194,6 +203,7 @@ src/slic3r-shared/src/Slic3r/Biz/PrintHost/PrintHostLocal.cpp
 src/slic3r-shared/src/Slic3r/Biz/PrintHost/PrintHostMKS.cpp
 src/slic3r-shared/src/Slic3r/Biz/PrintHost/PrintHostOctoPrint.cpp
 src/slic3r-shared/src/Slic3r/Biz/PrintHost/PrintHostPrusaConnect.cpp
+src/slic3r-shared/src/Slic3r/Biz/PrintHost/PrintHostPrusaConnectLocal.cpp
 src/slic3r-shared/src/Slic3r/Biz/PrintHost/PrintHostPrusaLink.cpp
 src/slic3r-shared/src/Slic3r/Biz/PrintHost/PrintHostPrusaLinkStorage.cpp
 src/slic3r-shared/src/Slic3r/Biz/PrintHost/PrintHostRepetier.cpp

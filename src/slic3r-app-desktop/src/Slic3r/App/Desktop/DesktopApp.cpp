@@ -364,8 +364,8 @@ bool DesktopApp::OnInit()
 
     platform_services.set_secret_store(SecretStoreFactory::create_secret_store());
     // Reset Token store if Account not allowed in app_config
-    if (!app_services.app_config().is_prusa_account_enabled()) {
-        Biz::UserAccount::TokenStore::reset();
+    if (!app_services.app_config().is_account_service_enabled()) {
+        Biz::UserAccount::TokenStore::reset_all_modes();
     }
     platform_services.set_job_manager(
         std::make_unique<JobManager>(platform_services.main_thread_dispatcher())
@@ -386,6 +386,13 @@ bool DesktopApp::OnInit()
         platform_services.main_thread_dispatcher(),
         *m_thumbnail_image_generator
     );
+
+    m_account_service_switcher = std::make_unique<AccountServiceSwitcher>(
+        app_services.app_config(),
+        app_services.app_config_interactor(),
+        make_account_service_backend(m_project_interactor->user_account_interactor())
+    );
+    app_services.set_account_service_switcher(m_account_service_switcher.get());
 
     auto undo_store_ptr{std::make_unique<Undo::Store>(*m_project_interactor)};
     m_undo_store = undo_store_ptr.get();
@@ -690,7 +697,7 @@ void DesktopApp::finish_init()
     m_project_interactor->user_account_interactor()
         .add_listener<Biz::UserAccount::IUserAccountListener>(m_main_frame);
 
-    m_project_interactor->user_account_interactor().init(app_services.app_config().is_prusa_account_enabled());
+    m_project_interactor->user_account_interactor().init(app_services.app_config().is_account_usable());
 
     m_prusalink_storage_listener =
         std::make_unique<PrintHost::PrusaLinkStorageListener>(*m_project_interactor.get());

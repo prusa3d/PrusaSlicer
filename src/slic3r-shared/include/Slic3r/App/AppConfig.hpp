@@ -3,10 +3,26 @@
 #include "Slic3r/Domain/Config.hpp"
 #include "Slic3r/App/AppSettingsAdvanced.hpp"
 
+#include <optional>
 #include <string>
 #include "tl/expected.hpp"
 
+namespace Slic3r::Biz::Network {
+enum class ServiceMode;
+struct ServerTrust;
+} // namespace Slic3r::Biz::Network
+
 namespace Slic3r::App {
+
+/**
+ * @brief Which account the app signs in to and whose printers the Connect tab shows.
+ */
+enum class AccountService
+{
+    None,
+    PrusaAccount,
+    ConnectLocal
+};
 
 enum class GraphicsQuality
 {
@@ -67,7 +83,72 @@ public:
 
     bool is_webkit_available() const;
     bool is_printables_enabled() const;
-    bool is_prusa_account_enabled() const;
+    /**
+     * @brief Updates app_config item values to current version
+     *
+     * This is the place where to put all handling of outdated
+     * AppConfig values. If you need to update new default
+     * value without user, this is the place to put it.
+     */
+    static void handle_legacy_config(AppConfig& app_config);
+
+    /**
+     * @brief The active account service: none when neither "enable_prusa_account" nor
+     * "enable_connect_local" is on, the enabled one when only one is, and the
+     * "account_service" setting when both are.
+     */
+    AccountService account_service() const;
+
+    bool are_both_account_services_enabled() const;
+
+    /**
+     * @brief An account service is enabled (and WebKit is available), whatever its server. The
+     * Connect tab and the account button exist exactly then; on-premise without a valid server
+     * the tab shows its setup page.
+     */
+    bool is_account_service_enabled() const;
+
+    /**
+     * @brief is_account_service_enabled() and the account has somewhere to sign in: online, or a
+     * valid Connect Local server. Only then the account communication runs.
+     */
+    bool is_account_usable() const;
+
+    /**
+     * @brief Connect Local (a Prusa Connect on-premise server) when account_service() is ConnectLocal,
+     * else Online.
+     */
+    Biz::Network::ServiceMode service_mode() const;
+
+    /**
+     * @brief Connect Local server URL as entered by the user, the "connect_local_url" setting.
+     */
+    std::string connect_local_url() const;
+
+    /**
+     * @brief The configured Prusa Connect on-premise server, normalized, whatever service is
+     * active. nullopt when "connect_local_url" is empty or not a usable URL.
+     */
+    std::optional<std::string> connect_local_server() const;
+
+    /**
+     * @brief Pushes the service mode settings, Connect Local certificate trust included, to
+     * Biz::Network::ServiceConfig.
+     * The user account must be logged out (disabled) when the mode changes at runtime.
+     */
+    void apply_service_mode() const;
+
+    /**
+     * @brief Trust of the Connect Local server certificate (connect_local_trust*), System when none
+     * is stored. Applies to its server_url only, see Biz::Network::ServerTrustStore::apply().
+     */
+    Biz::Network::ServerTrust connect_local_trust() const;
+
+    /**
+     * @brief The PEM file of connect_local_trust() in the data directory.
+     */
+    static std::string connect_local_trust_pem_path();
+
     bool is_sentry_enabled() const;
     bool is_sentry_available() const;
 
@@ -112,15 +193,6 @@ private:
     static tl::expected<std::unique_ptr<AppConfig>, std::string> load_appconfig(
         const std::string& filename
     );
-
-    /**
-     * @brief Updates app_config item values to current version
-     *
-     * This is the place where to put all handling of outdated
-     * AppConfig values. If you need to update new default
-     * value without user, this is the place to put it.
-     */
-    static void handle_legacy_config(AppConfig& app_config);
 };
 
 } // namespace Slic3r::App

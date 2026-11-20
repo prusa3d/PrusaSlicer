@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8' />
+  <meta content='width=device-width, initial-scale=1.0' name='viewport' />
+  <title>Prusa Connect on-premise sign in</title>
+  <style>
+    :root {
+      --color-background: #f6f6f6;
+      --color-panel: #ffffff;
+      --color-text: #333333;
+      --color-muted: #666666;
+      --color-border: #cccccc;
+      --color-accent: #FA6831;
+      --color-error: #e5484d;
+    }
+  </style>
+  <link href='connect_local_login.css' rel='stylesheet' />
+</head>
+<body>
+<!-- Login dialog in offline mode (Prusa Connect Local), which signs in by app pairing: shown while
+     the pairing starts, while it waits for approval in a browser, and when it fails. The approval
+     page of the server opens in this dialog too. Texts are filled by PrusaSlicer (connectLocalLogin). -->
+<div class='content'>
+  <div id='opening'>
+    <div class='spinner'></div>
+    <p id='opening-text'>Connecting to your Prusa Connect on-premise server…</p>
+  </div>
+  <div class='hidden' id='waiting'>
+    <h1 id='waiting-title'>Approve PrusaSlicer on your Prusa Connect on-premise server</h1>
+    <p class='muted' id='waiting-hint'>Sign in on the server and approve this code:</p>
+    <div class='code' id='user-code'></div>
+    <p class='muted' id='waiting-note'></p>
+    <p class='status'><span class='spinner small'></span><span id='waiting-status'>Waiting for approval…</span></p>
+    <button id='open-in-browser' type='button'>Open in browser</button>
+    <button class='secondary' id='cancel' type='button'>Cancel</button>
+  </div>
+  <div class='hidden' id='failed'>
+    <h1 id='failed-title'>Signing in did not succeed</h1>
+    <p class='error' id='failed-reason'></p>
+    <p class='muted' id='failed-hint'></p>
+    <button class='hidden' id='retry' type='button'>Try again</button>
+    <button class='secondary' id='close' type='button'>Close</button>
+  </div>
+</div>
+<script src='connect_local_login.js'></script>
+</body>
+</html>

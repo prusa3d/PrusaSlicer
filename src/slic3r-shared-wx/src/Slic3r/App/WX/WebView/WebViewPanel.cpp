@@ -12,10 +12,14 @@
 #include <Slic3r/Assert.hpp>
 #include <Slic3r/Directories.hpp>
 
+#include <wx/app.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textdlg.h>
 #include <wx/uri.h>
+#include <wx/weakref.h>
+
+#include <utility>
 
 #include "nlohmann/json.hpp"
 
@@ -25,6 +29,14 @@ WebViewPanel::WebViewPanel(wxWindow* parent,  int id, std::unique_ptr<App::Brows
     AbstractWebViewPanel(parent, id),
     m_logic(std::move(logic))
 {
+    m_logic->set_command_sink(
+        [this](std::vector<App::Browser::BrowserLogicCommand> commands)
+        {
+            m_host.run_when_ready(
+                [this, commands]() mutable { process_logic_command_vector(std::move(commands)); }
+            );
+        }
+    );
     topsizer    = new wxBoxSizer(wxVERTICAL);
     m_sizer_top = new wxBoxSizer(wxHORIZONTAL);
     topsizer->Add(m_sizer_top, 0, wxEXPAND, 0);
@@ -139,6 +151,7 @@ void WebViewPanel::late_create()
     Bind(wxEVT_WEBVIEW_NAVIGATING, &WebViewPanel::on_navigation_request, this, web_view->GetId());
     Bind(wxEVT_WEBVIEW_LOADED, &WebViewPanel::on_loaded, this, web_view->GetId());
     Bind(wxEVT_WEBVIEW_CREATED, &WebViewPanel::on_created, this, web_view->GetId());
+    Bind(wxEVT_WEBVIEW_SCRIPT_RESULT, &WebViewPanel::on_script_result, this, web_view->GetId());
 
     Layout();
 
@@ -226,7 +239,17 @@ void WebViewPanel::run_script(const wxString& javascript)
     if (!web_view || !m_shown)
         return;
     // SPDLOG_DEBUG("RunScript: {}", into_u8(javascript));
+    ++m_pending_scripts;
     web_view->RunScriptAsync(javascript);
+}
+
+void WebViewPanel::on_script_result(wxWebViewEvent& evt)
+{
+    evt.Skip();
+    if (m_pending_scripts > 0) {
+        --m_pending_scripts;
+    }
+    destroy_if_requested();
 }
 
 void WebViewPanel::do_reload()
@@ -249,13 +272,48 @@ void WebViewPanel::do_reload()
     load_default_url();
 }
 
+void WebViewPanel::destroy_when_safe()
+{
+    m_destroy_requested = true;
+    Hide();
+    destroy_if_requested();
+}
+
+void WebViewPanel::destroy_if_requested()
+{
+    if (!m_destroy_requested
+        || m_destroy_scheduled
+        || m_host.is_creating()
+        || m_pending_scripts > 0)
+    {
+        return;
+    }
+    m_destroy_scheduled = true;
+    wxTheApp->CallAfter(
+        [panel = wxWeakRef<WebViewPanel>(this)]()
+        {
+            if (panel) {
+                panel->Destroy();
+            }
+        }
+    );
+}
+
 void WebViewPanel::on_show(wxShowEvent& evt)
 {
+    if (IsBeingDeleted() || m_destroy_scheduled) {
+        return;
+    }
     m_shown = evt.IsShown();
     if (!m_shown) {
         wxSetCursor(wxNullCursor);
+        m_logic->on_hide_webview_event();
         return;
     }
+    if (m_destroy_requested) {
+        return;
+    }
+    m_logic->on_visible_webview_event();
     if (m_host.is_pending()) {
         late_create();
         return;
@@ -315,6 +373,10 @@ void WebViewPanel::on_page_will_load()
 void WebViewPanel::on_created(wxWebViewEvent& evt)
 {
     m_host.notify_created();
+    if (m_destroy_requested) {
+        destroy_if_requested();
+        return;
+    }
     [[maybe_unused]] bool b = process_logic_command_vector(m_logic->on_webview_created());
     DEBUG_ASSERT(b, "False return value signals Veto which cannot be done here.");
 }
@@ -344,11 +406,19 @@ case type: \
         return;
     }
 
+    m_error_commands = m_logic->on_load_error(
+        into_u8(evt.GetURL()),
+        evt.GetInt() == wxWEBVIEW_NAV_ERR_CERTIFICATE
+    );
     load_error_page();
 }
 
 void WebViewPanel::on_idle(wxIdleEvent& evt)
 {
+    if (m_destroy_requested) {
+        destroy_if_requested();
+        return;
+    }
     wxWebView* web_view = m_host.get();
     if (!web_view)
         return;
@@ -374,7 +444,9 @@ void WebViewPanel::on_idle(wxIdleEvent& evt)
 
     if (m_shown && m_load_error_page && !is_busy) {
         m_load_error_page = false;
-        if (m_load_default_url_on_next_error) {
+        if (!m_error_commands.empty()) {
+            process_logic_command_vector(std::exchange(m_error_commands, {}));
+        } else if (m_load_default_url_on_next_error) {
             m_load_default_url_on_next_error = false;
             load_default_url();
         } else {
@@ -609,6 +681,24 @@ bool WebViewPanel::handle_logic_command_DeleteCookies(const std::string& data)
 bool WebViewPanel::handle_logic_command_DeleteCookiesWithCounter(const std::string& data)
 {
     DEBUG_ASSERT(false, "DeleteCookiesWithCounter not supported for WebViewTab.");
+    return true;
+}
+
+bool WebViewPanel::handle_logic_command_DeleteCookie(const std::string& data)
+{
+    m_host.delete_cookie(data);
+    return true;
+}
+
+bool WebViewPanel::handle_logic_command_SetCookie(
+    const std::string& data,
+    std::vector<App::Browser::BrowserLogicCommand> then
+)
+{
+    m_host.set_cookie(
+        data,
+        [this, then]() mutable { process_logic_command_vector(std::move(then)); }
+    );
     return true;
 }
 

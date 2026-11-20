@@ -32,7 +32,8 @@ public:
         Post,
         Put,
         /** @brief Body is attached with set_post_body(); always send a non-empty body. */
-        Patch
+        Patch,
+        Delete
     };
 
     struct Progress

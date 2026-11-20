@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8' />
+  <meta content='width=device-width, initial-scale=1.0' name='viewport' />
+  <title>Prusa Connect on-premise server</title>
+  <style>
+    :root {
+      --color-background: #eceef1;
+      --color-surface: #ffffff;
+      --color-sunken: #f6f7f9;
+      --color-track: #e1e4e8;
+      --color-input: #ffffff;
+      --color-text: #1d2127;
+      --color-muted: #5b636e;
+      --color-placeholder: #8d949e;
+      --color-border: #dde1e6;
+      --color-border-strong: #c3c9d1;
+      --color-accent: #FA6831;
+      --color-accent-hover: #ea5a24;
+      --color-accent-text: #c4461a;
+      --color-accent-soft: #fff0e9;
+      --color-on-accent: #ffffff;
+      --color-focus: rgba(250, 104, 49, 0.35);
+      --color-error: #c9302c;
+      --color-error-soft: rgba(201, 48, 44, 0.2);
+      --color-warn: #b45c0a;
+      --color-warn-border: #f2c79a;
+      --color-warn-soft: #fff7ee;
+      --color-shadow: rgba(23, 32, 46, 0.06);
+      --color-spool: #231F20;
+    }
+  </style>
+  <link href='connect_pages.css' rel='stylesheet' />
+</head>
+<body>
+<!-- Shown in the Connect tab in offline mode to choose the Prusa Connect Local server: the address,
+     the certificate of an https server that is not trusted, and an optional search of the network.
+     PrusaSlicer fills in the translated texts through connectLocalSetup.init(). -->
+<div class='page'>
+  <nav aria-label='Connect service' class='modes' id='modes'>
+    <button data-action='SET_ACCOUNT_SERVICE_PRUSA_ACCOUNT' type='button'>
+      <svg aria-hidden='true' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' viewBox='0 0 24 24'><path d='M7 18.5h10.5a4 4 0 0 0 .6-7.95 6 6 0 0 0-11.5-1.4A4.7 4.7 0 0 0 7 18.5z' /></svg>
+      <span id='mode-cloud'>Prusa Connect</span>
+    </button>
+    <button aria-current='page' data-action='SET_ACCOUNT_SERVICE_CONNECT_LOCAL' type='button'>
+      <svg aria-hidden='true' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' viewBox='0 0 24 24'><rect height='7' rx='2' width='18' x='3' y='3.5' /><rect height='7' rx='2' width='18' x='3' y='13.5' /><path d='M7 7h.01M7 17h.01M11 7h2M11 17h2' /></svg>
+      <span id='mode-local'>Prusa Connect on-premise</span>
+    </button>
+  </nav>
+
+  <main class='card'>
+    <div class='brand'>
+      <svg aria-label='Prusa Connect' class='wordmark' role='img' viewBox='0 0 10584 1835' xmlns='http://www.w3.org/2000/svg'><path d='M 10485.267,532.67639 4431.78,535.92 v 1298.52 h 6058.92 l -5.433,-1301.76361 z M 0,535.92 H 4257.14 V 1834.44 H 0 Z m 427.69,409.16 h 142.58 c 65.02,0 114.07,29.65 114.07,107.22 0,74.14 -46.76,101.52 -114.07,101.52 H 427.69 Z m -212.17,644.48 h 212.17 v -271.48 h 174.52 c 179.09,0 294.3,-78.71 294.3,-280.61 0,-192.77 -142.59,-262.36 -294.3,-262.36 H 215.52 Z m 957.61,-644.48 h 168.82 c 59.32,0 107.22,27.37 107.22,87.83 0,62.74 -34.22,95.82 -98.09,95.82 h -177.95 z m -212.17,644.48 h 212.17 v -296.58 h 160.84 c 100.38,0 112.92,84.41 118.63,166.54 3.42,23.96 5.7,101.52 23.95,130.04 h 209.89 c -28.52,-31.94 -30.8,-148.29 -34.22,-183.65 -5.71,-77.57 -33.08,-173.38 -118.64,-195.06 v -2.28 c 86.7,-33.08 127.76,-116.35 127.76,-204.18 0,-164.26 -142.58,-229.28 -285.17,-229.28 H 960.96 Z M 2452.4,775.11 h -212.16 v 490.5 c 0,104.94 -37.65,158.55 -142.59,158.55 -104.94,0 -142.58,-53.61 -142.58,-158.55 V 775.11 H 1742.9 v 477.95 c 0,236.12 108.36,353.61 354.75,353.61 246.39,0 354.75,-117.49 354.75,-353.61 z m 58.75,540.69 c 0,208.74 167.68,290.87 353.61,290.87 179.08,0 354.75,-66.16 354.75,-272.62 0,-147.15 -118.63,-201.9 -236.12,-234.98 -118.63,-33.08 -236.12,-43.35 -236.12,-107.23 0,-53.61 57.03,-69.58 102.66,-69.58 63.88,0 134.6,25.1 131.18,98.1 h 212.16 c 0,-182.51 -165.4,-262.36 -326.23,-262.36 -152.85,0 -331.94,69.59 -331.94,247.53 0,150.57 123.19,201.9 238.4,234.98 117.49,33.08 233.84,45.63 233.84,118.63 0,60.46 -66.16,83.27 -130.04,83.27 -91.25,0 -149.43,-30.8 -153.99,-126.61 z m 688.39,273.76 h 217.87 l 51.33,-146.01 h 284.03 l 50.19,146.01 h 221.3 L 3719.69,775.11 h -215.58 z m 410.65,-588.59 h 2.28 l 90.11,285.17 h -184.79 z m 1840.23,65.02 C 5444.72,869.79 5255.37,758 5078.56,758 c -247.53,0 -406.08,188.22 -406.08,424.34 0,236.12 158.55,424.33 406.08,424.33 206.46,0 359.31,-122.05 371.86,-333.08 h -212.16 c -7.99,94.68 -63.88,150.57 -164.26,150.57 -136.88,0 -189.35,-119.77 -189.35,-241.82 0,-122.06 52.47,-241.83 189.35,-241.83 90.11,0 151.71,43.35 164.26,125.48 z m 258.37,116.35 c 0,-122.06 52.47,-241.83 189.35,-241.83 136.89,0 189.36,119.77 189.36,241.83 0,122.05 -52.47,241.82 -189.36,241.82 -136.88,0 -189.35,-119.77 -189.35,-241.82 z m -212.16,0 c 0,236.12 146,424.33 401.51,424.33 255.52,0 401.52,-188.21 401.52,-424.33 0,-236.12 -146,-424.34 -401.52,-424.34 -255.51,0 -401.51,188.22 -401.51,424.34 z m 880.03,407.22 h 199.62 v -507.6 h 2.28 l 282.89,507.6 h 217.87 V 775.11 H 6879.7 v 501.9 h -2.28 l -282.89,-501.9 h -217.87 z m 809.31,0 h 199.62 v -507.6 h 2.28 l 282.89,507.6 h 217.87 V 775.11 h -199.62 v 501.9 h -2.28 l -282.89,-501.9 h -217.87 z m 811.59,0 h 660.46 v -182.51 h -448.29 v -155.13 h 399.24 V 1087.66 H 8209.73 V 945.08 h 436.88 V 775.11 H 7997.56 Z M 9495.85,1065.99 C 9490.15,869.79 9300.8,758 9123.99,758 c -247.53,0 -406.08,188.22 -406.08,424.34 0,236.12 158.55,424.33 406.08,424.33 206.46,0 359.31,-122.05 371.86,-333.08 h -212.16 c -7.99,94.68 -63.88,150.57 -164.26,150.57 -136.88,0 -189.35,-119.77 -189.35,-241.82 0,-122.06 52.47,-241.83 189.35,-241.83 90.11,0 151.71,43.35 164.26,125.48 z m 722.65,-290.88 h -698.12 v 182.51 h 242.97 v 631.94 h 212.16 V 957.62 h 242.99 z' /></svg>
+      <span class='tag' id='mode-tag'>on-premise</span>
+    </div>
+    <h1 id='title'>Prusa Connect on-premise server</h1>
+    <p class='lead' id='intro'>Enter the address of the Prusa Connect on-premise server that manages your printers.</p>
+
+    <form class='address' id='form'>
+      <label for='url' id='url-label'>Server address</label>
+      <div class='field-row'>
+        <input aria-describedby='error' autocomplete='off' id='url' placeholder='http://192.168.1.10:8080' spellcheck='false' type='text' />
+        <button class='btn btn-primary' id='connect' type='submit'>Connect</button>
+      </div>
+      <div aria-live='polite' class='error' id='error' role='alert'></div>
+      <div class='progress hidden' id='checking'>
+        <div class='spinner'></div>
+        <span id='checking-text'>Connecting to the server…</span>
+      </div>
+    </form>
+
+    <!-- Certificate of an https server that is not trusted, filled by connectLocalSetup.showCertificate(). -->
+    <section aria-labelledby='cert-title' class='cert hidden' id='step-certificate'>
+      <div class='cert-head'>
+        <svg aria-hidden='true' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' viewBox='0 0 24 24'><path d='M12 3.5 2.5 20h19z' /><path d='M12 10v4.5M12 17.3h.01' /></svg>
+        <div>
+          <h2 id='cert-title'>The server certificate is not trusted</h2>
+          <div class='cert-server' id='cert-server'></div>
+        </div>
+      </div>
+      <div aria-live='polite' class='error' id='cert-error' role='alert'></div>
+      <p class='cert-intro' id='cert-intro'>This system does not trust the certificate of the server, which is common for a server with a self-signed certificate. Compare the fingerprint with the one of your Prusa Connect on-premise server before you trust it, or load the certificate of the authority that issued it.</p>
+      <dl>
+        <dt id='cert-fingerprint-label'>SHA-256 fingerprint</dt><dd class='fingerprint' id='cert-fingerprint'></dd>
+        <dt id='cert-subject-label'>Issued to</dt><dd id='cert-subject'></dd>
+        <dt id='cert-names-label'>Names</dt><dd id='cert-names'></dd>
+        <dt id='cert-issuer-label'>Issued by</dt><dd id='cert-issuer'></dd>
+        <dt id='cert-validity-label'>Valid</dt><dd id='cert-validity'></dd>
+      </dl>
+      <div class='progress hidden' id='cert-checking'>
+        <div class='spinner'></div>
+        <span id='cert-checking-text'>Connecting to the server…</span>
+      </div>
+      <div class='actions'>
+        <button class='btn btn-primary' id='cert-trust' type='button'>Trust this certificate</button>
+        <button class='link' id='cert-load' type='button'>Load certificate…</button>
+        <button class='link' id='cert-back' type='button'>Cancel</button>
+      </div>
+    </section>
+
+    <section aria-labelledby='discovery-title' class='section'>
+      <div class='section-head'>
+        <h2 id='discovery-title'>Find a server on the network</h2>
+        <button class='btn btn-secondary btn-small hidden' id='toggle' type='button'>Stop</button>
+      </div>
+      <p class='lead' id='discovery-intro'>PrusaSlicer can look for Prusa Connect on-premise servers running on your local network.</p>
+      <div aria-live='polite' class='progress hidden' id='discovery-status'>
+        <div class='spinner' id='spinner'></div>
+        <span id='status'>Searching the network…</span>
+      </div>
+      <ul class='servers' id='list'></ul>
+      <button class='btn btn-secondary start' id='start' type='button'>
+        <svg aria-hidden='true' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24'><circle cx='11' cy='11' r='6.5' /><path d='m16 16 4.5 4.5' /></svg>
+        <span id='start-text'>Find servers on the network</span>
+      </button>
+    </section>
+
+    <div class='footer hidden' id='cancel-row'>
+      <button class='link' id='cancel' type='button'>Cancel</button>
+    </div>
+  </main>
+</div>
+<script src='connect_pages.js'></script>
+<script src='connect_local_setup.js'></script>
+</body>
+</html>

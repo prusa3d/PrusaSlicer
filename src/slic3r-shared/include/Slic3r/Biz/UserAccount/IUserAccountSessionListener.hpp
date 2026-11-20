@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Slic3r/Biz/UserAccount/IUserAccountActionCallbacks.hpp"
+
 #include <string>
 
 namespace Slic3r::Biz::UserAccount {

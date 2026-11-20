@@ -12,6 +12,8 @@
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Directories.hpp"
 
+#include <utility>
+
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textdlg.h>
@@ -31,6 +33,14 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
     m_logic(std::move(logic))
 {
     ASSERT(m_logic);
+    m_logic->set_command_sink(
+        [this](std::vector<App::Browser::BrowserLogicCommand> commands)
+        {
+            m_host.run_when_ready(
+                [this, commands]() mutable { process_logic_command_vector(std::move(commands)); }
+            );
+        }
+    );
     topsizer = new wxBoxSizer(wxVERTICAL);
 #ifdef DEBUG_URL_PANEL
     // Create the button
@@ -198,7 +208,10 @@ void WebViewDialog::on_idle(wxIdleEvent& WXUNUSED(evt))
     }
 
     if (!is_busy) {
-        if (web_view && m_load_error_page) {
+        if (web_view && m_load_error_page && !m_error_commands.empty()) {
+            m_load_error_page = false;
+            process_logic_command_vector(std::exchange(m_error_commands, {}));
+        } else if (web_view && m_load_error_page) {
             m_load_error_page = false;
             web_view->LoadURL(format_wxstr(
                 "file://%1%/web/error_no_reload%2%.html",
@@ -207,9 +220,11 @@ void WebViewDialog::on_idle(wxIdleEvent& WXUNUSED(evt))
             ));
         }
         if (m_waiting_for_counters && m_atomic_counter == m_counter_to_match) {
+            m_ended_by_logic = true;
             EndModal(wxID_OK);
         }
         if (m_force_close) {
+            m_ended_by_logic = true;
             EndModal(wxID_OK);
         }
     }
@@ -448,6 +463,10 @@ case type: \
         return;
     }
 
+    m_error_commands = m_logic->on_load_error(
+        into_u8(evt.GetURL()),
+        evt.GetInt() == wxWEBVIEW_NAV_ERR_CERTIFICATE
+    );
     load_error_page();
 }
 
@@ -477,6 +496,9 @@ void WebViewDialog::run_script(const wxString& javascript)
 
 void WebViewDialog::EndModal(int retCode)
 {
+    if (!std::exchange(m_ended_by_logic, false)) {
+        process_logic_command_vector(m_logic->on_dialog_closing());
+    }
     if (wxWebView* web_view = m_host.get_unguarded()) {
         for (const std::string& handler : m_logic->script_message_handler_names()) {
             web_view->RemoveScriptMessageHandler(from_u8(handler));
@@ -563,12 +585,14 @@ bool WebViewDialog::handle_logic_command_RunScript(const std::string& data)
 
 bool WebViewDialog::handle_logic_command_EndModalOK(const std::string& data)
 {
+    m_ended_by_logic = true;
     EndModal(wxID_OK);
     return true;
 }
 
 bool WebViewDialog::handle_logic_command_EndModalCancel(const std::string& data)
 {
+    m_ended_by_logic = true;
     EndModal(wxID_CANCEL);
     return true;
 }
@@ -594,6 +618,24 @@ bool WebViewDialog::handle_logic_command_DeleteCookiesWithCounter(const std::str
     m_atomic_counter       = 0;
     m_counter_to_match++;
     delete_cookies_with_counter(web_view, data, m_atomic_counter);
+    return true;
+}
+
+bool WebViewDialog::handle_logic_command_DeleteCookie(const std::string& data)
+{
+    m_host.delete_cookie(data);
+    return true;
+}
+
+bool WebViewDialog::handle_logic_command_SetCookie(
+    const std::string& data,
+    std::vector<App::Browser::BrowserLogicCommand> then
+)
+{
+    m_host.set_cookie(
+        data,
+        [this, then]() mutable { process_logic_command_vector(std::move(then)); }
+    );
     return true;
 }
 

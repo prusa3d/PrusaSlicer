@@ -43,6 +43,14 @@ bool config_from_json(const std::string& json, PhysicalPrinter::PhysicalPrinterC
         } else {
             SPDLOG_WARN("Could not find organization_id in Connect message.");
         }
+
+        if (j.contains("team_id") && j["team_id"].is_string()) {
+            auth->team_id = j["team_id"].get<std::string>();
+        } else if (j.contains("team_id") && j["team_id"].is_number_integer()) {
+            auth->team_id = std::to_string(j["team_id"].get<long long>());
+        } else {
+            SPDLOG_WARN("Could not find team_id in Connect message.");
+        }
     } catch (const nlohmann::json::exception& e) {
         SPDLOG_ERROR("Could not parse Connect message: {}", e.what());
         return false;

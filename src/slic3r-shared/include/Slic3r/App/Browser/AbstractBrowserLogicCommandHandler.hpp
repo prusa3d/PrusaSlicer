@@ -5,6 +5,7 @@
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Log.hpp"
 
+#include <iterator>
 #include <vector>
 #include <string>
 
@@ -24,6 +25,14 @@ protected:
     virtual bool handle_logic_command_EndModalCancel(const std::string& data) = 0;
     virtual bool handle_logic_command_DeleteCookies(const std::string& data) = 0;
     virtual bool handle_logic_command_DeleteCookiesWithCounter(const std::string& data) = 0;
+    virtual bool handle_logic_command_DeleteCookie(const std::string& data) = 0;
+    /**
+     * @brief Sets the cookie, then runs `then` (the commands after it), also when it fails.
+     */
+    virtual bool handle_logic_command_SetCookie(
+        const std::string& data,
+        std::vector<BrowserLogicCommand> then
+    ) = 0;
     virtual bool handle_logic_command_Veto(const std::string& data) = 0;
     virtual bool handle_logic_command_DoReload(const std::string& data) = 0;
     virtual bool handle_logic_command_AddUserScript(const std::string& data) = 0;
@@ -38,8 +47,14 @@ protected:
     bool process_logic_command_vector(std::vector<BrowserLogicCommand>&& command)
     {
         bool ret_val = true;
-        for (const BrowserLogicCommand& cmd : command) {        
-            ret_val &= handle_logic_command(cmd);          
+        for (auto it = command.begin(); it != command.end(); ++it) {
+            if (it->type == BrowserLogicCommandType::SetCookie) {
+                std::vector<BrowserLogicCommand>
+                    then(std::make_move_iterator(it + 1), std::make_move_iterator(command.end()));
+                ret_val &= handle_logic_command_SetCookie(it->data, std::move(then));
+                return ret_val;
+            }
+            ret_val &= handle_logic_command(*it);
         }
         return ret_val;
     }
@@ -72,6 +87,8 @@ protected:
         case BrowserLogicCommandType::SwitchToSlicing:               return handle_logic_command_SwitchToSlicing(command.data);
         case BrowserLogicCommandType::SetBasicAuth:                  return handle_logic_command_SetBasicAuth(command.data);
         case BrowserLogicCommandType::ClearBasicAuth:                return handle_logic_command_ClearBasicAuth(command.data);
+        case BrowserLogicCommandType::DeleteCookie:                  return handle_logic_command_DeleteCookie(command.data);
+        case BrowserLogicCommandType::SetCookie:                     return handle_logic_command_SetCookie(command.data, {});
         }
         DEBUG_ASSERT(false, "Missing BrowserLogicCommand handling");
         return true;

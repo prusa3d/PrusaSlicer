@@ -11,7 +11,6 @@
 
 namespace Slic3r::Biz::Network::Jwt {
 
-namespace {
 boost::optional<double> get_exp(const std::string& token)
 {
     size_t payload_start = token.find('.');
@@ -52,7 +51,6 @@ boost::optional<double> get_exp(const std::string& token)
         return boost::none;
     }
     return boost::none;
-}
 }
 
 int get_exp_seconds(const std::string& token)
