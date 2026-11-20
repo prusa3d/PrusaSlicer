@@ -8,6 +8,8 @@
 
 #include "TreeSupport.hpp"
 
+#include "libslic3r/Model.hpp"
+
 #include <Slic3r/Log.hpp>
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
@@ -3662,14 +3664,30 @@ void fff_tree_support_generate(PrintObject &print_object, std::function<void()> 
             break;
         ++idx;
     }
-    // The plate is a real collision volume for the generator, so pass the configured bed instead of
-    // the historical hardcoded square. A degenerate bed shape keeps the old unconstrained behaviour
-    // (calculateMachineBorderCollision() then returns an empty border).
+    // The tree generator works in object local coordinates; the instance shift is applied later by
+    // the G-code writer. Map the plate into that frame, otherwise only the overlap between the two
+    // frames counts as printable and support appears on one side of the part only.
     const PrintConfigView &print_config = print_object.print()->config();
-    BuildVolume build_volume(print_config.get<std::vector<Vec2d>>("bed_shape"),
-                             print_config.get<double>("max_print_height"));
+    std::vector<Vec2d> bed_shape = print_config.get<std::vector<Vec2d>>("bed_shape");
+    const PrintInstances &instances = print_object.instances();
+    const bool            single_instance = instances.size() == 1;
+    if (single_instance) {
+        const Point  shift = instances.front().shift();
+        const Vec2d  shift_mm(unscaled<double>(shift.x()), unscaled<double>(shift.y()));
+        for (Vec2d &p : bed_shape)
+            p -= shift_mm;
+    } else {
+        // Supports are generated once per object and reused by every instance, so one shared geometry
+        // cannot satisfy a plate that differs per instance. Keep the old unconstrained square there.
+        // shortcut: multi-instance prints stay unconstrained, upgrade by generating per instance.
+        bed_shape = { { -300., -300. }, { 300., -300. }, { 300., 300. }, { -300., 300. } };
+    }
+    BuildVolume build_volume(bed_shape, print_config.get<double>("max_print_height"));
     FFFTreeSupport::generate_support_areas(*print_object.print(), build_volume, { idx },
         throw_on_cancel);
+
+    if (! single_instance)
+        return;
 
     // Safety net: the growth constraint above keeps branches on the plate, but layer 0 pads are
     // widened after placement, so clip whatever still pokes past the plate edge. Off-plate support

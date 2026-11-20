@@ -588,7 +588,11 @@ Old Perl tests, which were disabled by Vojtech at the time of first Support Gene
 // The generator used to run with an empty machine-border collision volume, so branches (and their
 // layer 0 pads) were free to leave the plate whenever the model reached the plate edge.
 // ---------------------------------------------------------------------------
-static Polygons bed_polygon(const Slic3r::Print &print)
+// Tree / organic supports must keep their footprint on the build plate.
+// Support geometry is generated in object local coordinates and shifted per instance when the
+// G-code is written, so both sides of these tests are compared in world coordinates.
+// ---------------------------------------------------------------------------
+static Polygons world_bed(const Slic3r::Print &print)
 {
     const std::vector<Vec2d> bed_shape = print.config().get<std::vector<Vec2d>>("bed_shape");
     Polygons bed;
@@ -598,24 +602,20 @@ static Polygons bed_polygon(const Slic3r::Print &print)
     return bed;
 }
 
-static Polygons support_contours(const Slic3r::Print &print)
+static Polygons support_world(const Slic3r::Print &print)
 {
-    Polygons out;
-    for (const SupportLayer *layer : print.objects().front()->support_layers())
-        for (const ExPolygon &island : layer->support_islands)
-            out.emplace_back(island.contour); // Outer contour only: containment is a superset test.
+    const PrintObject *object = print.objects().front();
+    const Point        shift  = object->instances().front().shift();
+    Polygons           out;
+    for (const SupportLayer *layer : object->support_layers())
+        for (const ExPolygon &island : layer->support_islands) {
+            out.emplace_back(island.contour); // Outer contour: containment is a superset test.
+            out.back().translate(shift.x(), shift.y());
+        }
     return out;
 }
 
-// A 110 x 110 plate: the 43 x 50 mm test part fits while arranging, but init_and_process_print then
-// re-centres every instance on (100, 100), so the part ends up hanging over the plate edge and part
-// of its overhang has no legal support area at all.
-static void set_small_bed(TestConfig &config)
-{
-    config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} });
-}
-
-static TestConfig organic_config()
+static TestConfig organic_tree_config()
 {
     TestConfig config;
     config.print.items.opt("support_material").set(SupportMode::Everywhere);
@@ -625,16 +625,18 @@ static TestConfig organic_config()
 
 TEST_CASE("TreeSupport: supports stay on the build plate", "[SupportMaterial][TreeSupport]")
 {
-    Slic3r::Print print;
-    TestConfig    config = organic_config();
-    set_small_bed(config);
+    // A plate small enough that the part, re-centred on (100, 100) afterwards, hangs over the edge:
+    // part of its overhang then has no legal support area at all.
+    TestConfig config = organic_tree_config();
+    config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} });
 
+    Slic3r::Print print;
     Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
 
-    const Polygons bed = bed_polygon(print);
+    const Polygons bed = world_bed(print);
     REQUIRE(! bed.empty());
 
-    const Polygons support = support_contours(print);
+    const Polygons support = support_world(print);
     REQUIRE(! support.empty());
 
     // 10 um of slack for Clipper rounding at the plate boundary.
@@ -644,14 +646,12 @@ TEST_CASE("TreeSupport: supports stay on the build plate", "[SupportMaterial][Tr
 TEST_CASE("TreeSupport: a part inside the plate keeps its supports", "[SupportMaterial][TreeSupport]")
 {
     Slic3r::Print print;
-    TestConfig    config = organic_config();
+    Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, organic_tree_config());
 
-    Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
-
-    const Polygons bed = bed_polygon(print);
+    const Polygons bed = world_bed(print);
     REQUIRE(! bed.empty());
 
-    const Polygons support = support_contours(print);
+    const Polygons support = support_world(print);
     REQUIRE(! support.empty());
     CHECK(diff(support, offset(bed, 0.01f)).empty());
 }
