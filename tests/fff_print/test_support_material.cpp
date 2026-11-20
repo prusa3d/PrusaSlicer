@@ -668,3 +668,29 @@ TEST_CASE("TreeSupport: the plate constraint is off by default", "[SupportMateri
     CHECK((toolpath.min_x < 0. - slack || toolpath.min_y < 0. - slack ||
            toolpath.max_x > 110. + slack || toolpath.max_y > 110. + slack));
 }
+
+TEST_CASE(
+    "TreeSupport: the raft's first-layer column bases stay on the plate",
+    "[SupportMaterial][TreeSupport]"
+)
+{
+    // With a raft, the first layer fills first_layer_support_polygons on its own once its density
+    // differs from the raft's. That member used to escape the plate trim, so the column bases were
+    // printed beside the part even with the constraint on.
+    TestConfig config = organic_tree_config();
+    config.print.items.opt("support_material_constrain_to_build_volume").set(true);
+    config.printer.items.opt("bed_shape")
+        .set(std::vector<Vec2d>{{0., 0.}, {110., 0.}, {110., 110.}, {0., 110.}});
+    config.print.items.opt("raft_layers").set(2);
+    config.print.items.opt("raft_first_layer_density").set(Percentage{80.});
+    config.print.items.opt("support_material_first_layer_density").set(Percentage{30.});
+
+    const ToolpathExtents toolpath = support_gcode_extents(slice({TestMesh::overhang}, config));
+    REQUIRE(toolpath.defined);
+
+    const double slack = 0.01; // Clipper rounding at the plate boundary
+    CHECK(toolpath.min_x >= 0. - slack);
+    CHECK(toolpath.min_y >= 0. - slack);
+    CHECK(toolpath.max_x <= 110. + slack);
+    CHECK(toolpath.max_y <= 110. + slack);
+}

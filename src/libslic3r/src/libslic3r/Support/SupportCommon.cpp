@@ -1574,8 +1574,15 @@ void generate_support_toolpaths(
     if (! plate.empty() && plate.front().points.size() >= 3)
         for (const SupportGeneratorLayersPtr *layers : { &raft_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers })
             for (SupportGeneratorLayer *layer : *layers)
-                if (layer != nullptr)
+                if (layer != nullptr) {
                     layer->polygons = intersection(layer->polygons, plate);
+                    // The first raft layer fills this member separately when its density differs
+                    // from the raft's, so it needs the same trim or the column bases print
+                    // off-plate.
+                    if (layer->first_layer_support_polygons)
+                        *layer->first_layer_support_polygons =
+                            intersection(*layer->first_layer_support_polygons, plate);
+                }
 
     // loop_interface_processor with a given circle radius.
     LoopInterfaceProcessor loop_interface_processor(1.5 * support_params.support_material_interface_flow.scaled_width());
