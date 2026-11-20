@@ -1573,9 +1573,9 @@ void generate_support_toolpaths(
     // degenerate plate means "no constraint", so a caller can pass the configured plate as it is.
     if (! plate.empty() && plate.front().points.size() >= 3)
         for (const SupportGeneratorLayersPtr *layers : { &raft_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers })
-            for (const SupportGeneratorLayer *layer : *layers)
+            for (SupportGeneratorLayer *layer : *layers)
                 if (layer != nullptr)
-                    const_cast<SupportGeneratorLayer*>(layer)->polygons = intersection(layer->polygons, plate);
+                    layer->polygons = intersection(layer->polygons, plate);
 
     // loop_interface_processor with a given circle radius.
     LoopInterfaceProcessor loop_interface_processor(1.5 * support_params.support_material_interface_flow.scaled_width());

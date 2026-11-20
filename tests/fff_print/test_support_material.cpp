@@ -4,7 +4,6 @@
 #include "libslic3r/Layer.hpp"
 
 #include "test_data.hpp" // get access to init_print, etc
-#include "libslic3r/ClipperUtils.hpp"
 
 using namespace Slic3r::Test;
 using namespace Slic3r;
@@ -588,16 +587,6 @@ Old Perl tests, which were disabled by Vojtech at the time of first Support Gene
 // Support geometry is generated in object local coordinates and shifted per instance when the
 // G-code is written, so both sides of these tests are compared in world coordinates.
 // ---------------------------------------------------------------------------
-static Polygons world_bed(const Slic3r::Print &print)
-{
-    const std::vector<Vec2d> bed_shape = print.config().get<std::vector<Vec2d>>("bed_shape");
-    Polygons bed;
-    bed.emplace_back();
-    for (const Vec2d &p : bed_shape)
-        bed.back().points.emplace_back(Point(scaled<coord_t>(p.x()), scaled<coord_t>(p.y())));
-    return bed;
-}
-
 // Extents of the support toolpaths that will actually be printed, read from the G-code in world
 // coordinates. support_islands is bookkeeping only, so what a change does to the print has to be
 // measured here.
@@ -636,18 +625,12 @@ static ToolpathExtents support_gcode_extents(const std::string &gcode)
     return out;
 }
 
-static BoundingBox bed_extents(const Slic3r::Print &print)
-{
-    const Polygons bed = world_bed(print);
-    return get_extents(bed);
-}
-
 static TestConfig organic_tree_config()
 {
     TestConfig config;
     config.print.items.opt("support_material").set(SupportMode::Everywhere);
     config.print.items.opt("support_material_style").set(Domain::SupportMaterialStyle::smsOrganic);
-    config.print.items.opt("support_material_keep_on_bed").set(false); // opt-in, off by default
+    config.print.items.opt("support_material_constrain_to_build_volume").set(false); // opt-in, off by default
     return config;
 }
 
@@ -656,7 +639,7 @@ TEST_CASE("TreeSupport: the constraint keeps the printed support on the plate", 
     // The re-centred part hangs over this plate, so without the constraint the pads are printed beside
     // it. Same fixture as the default-off case below, which proves the spill is real.
     TestConfig config = organic_tree_config();
-    config.print.items.opt("support_material_keep_on_bed").set(true);
+    config.print.items.opt("support_material_constrain_to_build_volume").set(true);
     config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} });
 
     const ToolpathExtents toolpath = support_gcode_extents(slice({ TestMesh::overhang }, config));
@@ -671,6 +654,10 @@ TEST_CASE("TreeSupport: the constraint keeps the printed support on the plate", 
 
 TEST_CASE("TreeSupport: the plate constraint is off by default", "[SupportMaterial][TreeSupport]")
 {
+    // At its default the option must leave the tree generator unconstrained: the printed support
+    // spills past the plate, as it did before the constraint existed. This asserts "not clipped to
+    // the plate" rather than a specific unconstrained extent (the fixture spills well inside the
+    // reach of the historical 300 mm square, so it cannot by itself catch that clip).
     TestConfig config = organic_tree_config();
     config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} });
 

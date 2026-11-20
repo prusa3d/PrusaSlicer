@@ -52,7 +52,12 @@ static Polygons calculateMachineBorderCollision(const Polygon &machine_border)
         return {};
 
     const BoundingBox bbox   = get_extents(machine_border);
-    const coord_t     margin = std::max(bbox.max.x() - bbox.min.x(), bbox.max.y() - bbox.min.y());
+    // Clamp so min - margin / max + margin stay inside 32-bit coordinates. A margin of
+    // coord_t_max/3 keeps the enclosing rectangle in range for any plate within +-(2/3)coord_t_max
+    // (about +-1.4 m), which covers every real bed; the old fixed 1 m offset overflowed far sooner.
+    const coord_t     margin = std::min(
+        std::max(bbox.max.x() - bbox.min.x(), bbox.max.y() - bbox.min.y()),
+        std::numeric_limits<coord_t>::max() / 3);
 
     Polygons out;
     out.emplace_back(Polygon{ { Point(bbox.min.x() - margin, bbox.min.y() - margin),

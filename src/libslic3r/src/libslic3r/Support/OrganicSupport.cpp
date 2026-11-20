@@ -1439,7 +1439,6 @@ void organic_draw_branches(
             throw_on_cancel();
         }
     }, tbb::simple_partitioner());
-
 }
 
 } // namespace FFFTreeSupport

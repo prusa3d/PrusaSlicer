@@ -4077,10 +4077,11 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->tooltip = L("Only create support if it lies on a build plate. Don't create support on a print.");
     def->init_fn = init_with(false);
 
-    def = defs.add("support_material_keep_on_bed", typeid(bool));
+    def = defs.add("support_material_constrain_to_build_volume", typeid(bool));
     def->location = Print;
+    // Not tool-overridable: the plate is shared by all extruders, so a per-tool value is meaningless.
     def->overrides_in = Locations{ Object, MacroOverrides };
-    def->label = L("Keep supports on build plate");
+    def->label = L("Constrain organic supports to build volume");
     def->option_group = ConfigItemDef::OptionGroup::Print_Supports_OrganicSupports;
     def->category = ConfigItemDef::Category::Print_Supports;
     def->order = 8;
