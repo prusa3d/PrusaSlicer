@@ -47,9 +47,6 @@ class TreeModelVolumes
 {
 public:
     TreeModelVolumes() = default;
-    // The plate in the frame the tree polygons are generated in.
-    const Polygons &bed_polygon() const { return m_bed_polygon; }
-
     explicit TreeModelVolumes(const PrintObject &print_object, const BuildVolume &build_volume,
         coord_t max_move, coord_t max_move_slow, size_t current_mesh_idx, 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS

@@ -3616,7 +3616,8 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
             generate_support_layers(print_object, raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
         // Don't fill in the tree supports, make them hollow with just a single sheath line.
         generate_support_toolpaths(print_object.support_layers(), print_object.config(), support_params, print_object.slicing_parameters(),
-            raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
+            raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers,
+            { build_volume.polygon() });
 
  #if 0
 //#ifdef SLIC3R_DEBUG

@@ -1400,11 +1400,8 @@ void organic_draw_branches(
                 }
         }
 
-    // The plate, to keep the base pads of the first layer on it. Off-plate support cannot be printed.
-    const Polygons plate = volumes.bed_polygon();
-
     tbb::parallel_for(tbb::blocked_range<size_t>(0, std::min(move_bounds.size(), slices.size()), 1),
-        [&print_object, &config, &slices, &bottom_contacts, &top_contacts, &intermediate_layers, &layer_storage, &throw_on_cancel, &plate](const tbb::blocked_range<size_t> &range) {
+        [&print_object, &config, &slices, &bottom_contacts, &top_contacts, &intermediate_layers, &layer_storage, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
             Slice &slice = slices[layer_idx];
             assert(intermediate_layers[layer_idx] == nullptr);
@@ -1417,9 +1414,6 @@ void organic_draw_branches(
                 //smooth_outward(closing(std::move(bottom), closing_distance + minimum_island_radius, closing_distance, SUPPORT_SURFACES_OFFSET_PARAMETERS), smoothing_distance) :
                 // simplify a bit, to ensure the output does not contain outrageous amounts of vertices. Should not be necessary, just a precaution.
                 base_layer_polygons = polygons_simplify(base_layer_polygons, std::min(scaled<double>(0.03), double(config.resolution)), polygons_strictly_simple);
-                // smooth_outward() widens the pads past the plate edge; nothing off the plate can be printed.
-                if (! plate.empty())
-                    base_layer_polygons = intersection(base_layer_polygons, plate);
             }
 
             // Subtract top contact layer polygons from support base.
@@ -1430,8 +1424,6 @@ void organic_draw_branches(
                     //FIXME it may be better to clip bottom contacts with top contacts first after they are propagated to produce interface layers.
                     bottom_contact_polygons = diff(bottom_contact_polygons, top_contact_layer->polygons);
             }
-            if (! plate.empty() && ! bottom_contact_polygons.empty())
-                bottom_contact_polygons = intersection(bottom_contact_polygons, plate);
             if (! bottom_contact_polygons.empty()) {
                 base_layer_polygons = diff(base_layer_polygons, bottom_contact_polygons);
                 SupportGeneratorLayer *bottom_contact_layer = bottom_contacts[layer_idx] = &layer_allocate(
