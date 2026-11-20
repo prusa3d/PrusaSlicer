@@ -670,6 +670,31 @@ TEST_CASE("TreeSupport: the plate constraint is off by default", "[SupportMateri
 }
 
 TEST_CASE(
+    "TreeSupport: a clockwise bed_shape still constrains to the plate",
+    "[SupportMaterial][TreeSupport]"
+)
+{
+    // Printer profiles store bed_shape in whatever winding the vendor chose. The plate is cut out of
+    // the off-plate collision volume by winding alone, so a clockwise plate that is not normalised
+    // first turns the cut-out into a filled contour: the collision volume then encloses the whole bed
+    // and the generator emits no support at all. Same 110 mm square as the other cases, listed
+    // clockwise.
+    TestConfig config = organic_tree_config();
+    config.print.items.opt("support_material_constrain_to_build_volume").set(true);
+    config.printer.items.opt("bed_shape")
+        .set(std::vector<Vec2d>{{0., 0.}, {0., 110.}, {110., 110.}, {110., 0.}});
+
+    const ToolpathExtents toolpath = support_gcode_extents(slice({TestMesh::overhang}, config));
+    REQUIRE(toolpath.defined); // the winding guard must not cost the print its support
+
+    const double slack = 0.01; // Clipper rounding at the plate boundary
+    CHECK(toolpath.min_x >= 0. - slack);
+    CHECK(toolpath.min_y >= 0. - slack);
+    CHECK(toolpath.max_x <= 110. + slack);
+    CHECK(toolpath.max_y <= 110. + slack);
+}
+
+TEST_CASE(
     "TreeSupport: the raft's first-layer column bases stay on the plate",
     "[SupportMaterial][TreeSupport]"
 )

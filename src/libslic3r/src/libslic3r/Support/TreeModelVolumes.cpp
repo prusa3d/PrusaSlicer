@@ -9,6 +9,7 @@
 #include "TreeModelVolumes.hpp"
 
 #include <Slic3r/Log.hpp>
+#include <Slic3r/Biz/Algorithms/Polygon.hpp>
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/task_arena.h>
@@ -65,6 +66,9 @@ static Polygons calculateMachineBorderCollision(const Polygon &machine_border)
                                 Point(bbox.max.x() + margin, bbox.max.y() + margin),
                                 Point(bbox.min.x() - margin, bbox.max.y() + margin) } });
     Polygon hole = machine_border;
+    // bed_shape arrives as configured, so a clockwise bed would negate the hole instead of cutting
+    // it. Normalise first, then invert.
+    Algorithms::Polygon::make_counter_clockwise(hole);
     hole.reverse(); // Negative winding: the plate is subtracted from the rectangle.
     out.emplace_back(std::move(hole));
     return out;
