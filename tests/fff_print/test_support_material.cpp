@@ -620,6 +620,7 @@ static TestConfig organic_tree_config()
     TestConfig config;
     config.print.items.opt("support_material").set(SupportMode::Everywhere);
     config.print.items.opt("support_material_style").set(Domain::SupportMaterialStyle::smsOrganic);
+    config.print.items.opt("support_material_keep_on_bed").set(false); // opt-in, off by default
     return config;
 }
 
@@ -628,6 +629,7 @@ TEST_CASE("TreeSupport: supports stay on the build plate", "[SupportMaterial][Tr
     // A plate small enough that the part, re-centred on (100, 100) afterwards, hangs over the edge:
     // part of its overhang then has no legal support area at all.
     TestConfig config = organic_tree_config();
+    config.print.items.opt("support_material_keep_on_bed").set(true);
     config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} });
 
     Slic3r::Print print;
@@ -645,8 +647,11 @@ TEST_CASE("TreeSupport: supports stay on the build plate", "[SupportMaterial][Tr
 
 TEST_CASE("TreeSupport: a part inside the plate keeps its supports", "[SupportMaterial][TreeSupport]")
 {
+    TestConfig config = organic_tree_config();
+    config.print.items.opt("support_material_keep_on_bed").set(true);
+
     Slic3r::Print print;
-    Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, organic_tree_config());
+    Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
 
     const Polygons bed = world_bed(print);
     REQUIRE(! bed.empty());
@@ -654,4 +659,20 @@ TEST_CASE("TreeSupport: a part inside the plate keeps its supports", "[SupportMa
     const Polygons support = support_world(print);
     REQUIRE(! support.empty());
     CHECK(diff(support, offset(bed, 0.01f)).empty());
+}
+
+TEST_CASE("TreeSupport: the plate constraint is off by default", "[SupportMaterial][TreeSupport]")
+{
+    // Same small plate as above, option left at its default. Placement stays unconstrained, which is
+    // the historical behaviour this option exists to fix.
+    TestConfig config = organic_tree_config();
+    config.printer.items.opt("bed_shape").set(std::vector<Vec2d>{ {0., 0.}, {110., 0.}, {110., 110.}, {0., 110.} });
+
+    Slic3r::Print print;
+    Slic3r::Test::init_and_process_print({ TestMesh::overhang }, print, config);
+
+    const Polygons bed     = world_bed(print);
+    const Polygons support = support_world(print);
+    REQUIRE(! support.empty());
+    CHECK(! diff(support, offset(bed, 0.01f)).empty());
 }

@@ -3670,7 +3670,9 @@ void fff_tree_support_generate(PrintObject &print_object, std::function<void()> 
     const PrintConfigView &print_config = print_object.print()->config();
     std::vector<Vec2d> bed_shape = print_config.get<std::vector<Vec2d>>("bed_shape");
     const PrintInstances &instances = print_object.instances();
-    const bool            single_instance = instances.size() == 1;
+    // Opt-in: the constraint changes where supports are allowed to grow, so it stays off unless asked for.
+    const bool            keep_on_bed = print_config.get<bool>("support_material_keep_on_bed");
+    const bool            single_instance = keep_on_bed && instances.size() == 1;
     if (single_instance) {
         const Point  shift = instances.front().shift();
         const Vec2d  shift_mm(unscaled<double>(shift.x()), unscaled<double>(shift.y()));

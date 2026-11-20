@@ -122,7 +122,7 @@ namespace {
                 "support_material_enforce_layers", "support_material_extruder", "support_material_extrusion_width",
                 "support_material_interface_contact_loops", "support_material_interface_extruder",
                 "support_material_interface_layers", "support_material_interface_pattern", "support_material_interface_spacing",
-                "support_material_interface_speed", "support_material_pattern", "support_material_spacing", "support_material_speed",
+                "support_material_interface_speed", "support_material_keep_on_bed", "support_material_pattern", "support_material_spacing", "support_material_speed",
                 "support_material_style", "support_material_synchronize_layers", "support_material_threshold",
                 "support_material_with_sheath", "support_material_xy_spacing", "support_tree_angle", "support_tree_angle_slow",
                 "support_tree_branch_diameter", "support_tree_branch_diameter_angle", "support_tree_branch_diameter_double_wall",

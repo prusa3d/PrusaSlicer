@@ -4077,6 +4077,18 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->tooltip = L("Only create support if it lies on a build plate. Don't create support on a print.");
     def->init_fn = init_with(false);
 
+    def = defs.add("support_material_keep_on_bed", typeid(bool));
+    def->location = Print;
+    def->overrides_in = Locations{ Object, MacroOverrides };
+    def->label = L("Keep supports on build plate");
+    def->option_group = ConfigItemDef::OptionGroup::Print_Supports_Generation;
+    def->category = ConfigItemDef::Category::Print_Supports;
+    def->order = 6;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Constrain organic supports to the build volume: no branch and no base pad is generated outside it, at any height. "
+                     "Enable this if an object that fits inside the build volume gets supports that start or wander outside it.");
+    def->init_fn = init_with(false);
+
     def = defs.add("support_material_contact_distance", typeid(double));
     def->location = Print;
     def->compatibility_rule = CompatibilityRule::Average;

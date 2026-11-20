@@ -504,6 +504,7 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"support_material_first_layer_density", steps({propagate(posSupportMaterial)})},
     {"support_material_first_layer_expansion", steps({propagate(posSupportMaterial)})},
     {"support_material_interface_contact_loops", steps({propagate(posSupportMaterial)})},
+    {"support_material_keep_on_bed", steps({propagate(posSupportMaterial)})},
     {"support_material_interface_extruder", steps({propagate(posSupportMaterial)})},
     {"support_material_interface_layers", steps({propagate(posSupportMaterial)})},
     {"support_material_interface_pattern", steps({propagate(posSupportMaterial)})},
