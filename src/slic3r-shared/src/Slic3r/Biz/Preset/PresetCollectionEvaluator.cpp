@@ -33,16 +33,31 @@ using namespace Domain::Preset;
 thread_local std::stack<SourceLocation> last_location;
 
 [[noreturn]]
-void throw_eval_exception(const std::string& message)
+void throw_bare_eval_exception(const std::string& message)
 {
     throw PresetEvalException(message);
+}
+
+std::string error_message_prefix()
+{
+    return "["
+        + (last_location.empty() ? SourceLocation{} : last_location.top()).to_string()
+        + "] ";
+}
+
+template <typename ... Args>
+[[noreturn]]
+void throw_eval_exception(const fmt::format_string<Args...>& message, Args&&... args)
+{
+    auto prefix = error_message_prefix();
+    throw PresetEvalException(prefix + fmt::format(message, std::forward<Args>(args)...));
 }
 
 [[noreturn]]
 void preset_eval_assert_handler(const libassert::assertion_info& info)
 {
-    std::string prefix = "[" + (last_location.empty() ? SourceLocation{} : last_location.top()).to_string() +  "]";
-    handle_assert(info, prefix, throw_eval_exception);
+    std::string prefix = error_message_prefix();
+    handle_assert(info, prefix, throw_bare_eval_exception);
 };
 
 
@@ -278,7 +293,9 @@ PresetEvaluator::EvalPresetContexts PresetCollectionEvaluator::eval_preset(
     if (!node.inherits.empty()) {
         for (const auto& inh : node.inherits) {
             const auto& node_path = named_preset(inh);
-            ASSERT(node_path.size() == 1);
+            if (node_path.size() != 1) {
+                throw_eval_exception("Only IDs of top-level nodes can be used in `inherits`");
+            }
 
             // if this node has condition, it overrides the superclass condition
             // (and hence we want to skip its evaluation)
@@ -376,14 +393,18 @@ PresetEvaluator::EvalPresetContexts PresetCollectionEvaluator::eval_preset(
     );
 
     // make sure that the match_mode is same for contexts
-    ASSERT(
+    if (!(
         first_match_only
         || std::ranges::none_of(
             ret,
             [](const auto& ctx)
             { return *ctx.match_mode == Domain::Preset::ConditionMatchMode::FirstMatch; }
         )
-    );
+    )) {
+        throw_eval_exception(
+            "Mixing condition match modes between parent and child or via inherits or unconditional_inherits is forbidden"
+        );
+    }
 
     PresetEvaluator::StringPtrs conditions, negative_conditions;
     bool any_variant_visited = false;
@@ -394,7 +415,11 @@ PresetEvaluator::EvalPresetContexts PresetCollectionEvaluator::eval_preset(
         (conditional ? conditional_variants : unconditional_variants)++;
         if (conditional) {
             // There no unconditional variants allowed prior condition
-            ASSERT(unconditional_variants == 0);
+            if (unconditional_variants != 0) {
+                throw_eval_exception(
+                    "Node with condition comes AFTER node without condition. This node won't be evaluated"
+                );
+            }
 
             // Condition is not met, continue with next variant
             if (!eval_condition(overrides, expr_combine, var.condition.value().expr)) {
@@ -407,7 +432,11 @@ PresetEvaluator::EvalPresetContexts PresetCollectionEvaluator::eval_preset(
         } else if (conditional_variants > 0) {
             // if there was at least one condition case met before
             // only one unconditional variant is valid
-            ASSERT(unconditional_variants == 1);
+            if (unconditional_variants != 1) {
+                throw_eval_exception(
+                    "Only one node without condition is allowed if mixing variants with and without conditions. "
+                );
+            }
         }
 
         any_variant_visited = true;
@@ -578,7 +607,9 @@ bool PresetCollectionEvaluator::eval_condition(
 const PresetEvaluator::PresetNodePath& PresetCollectionEvaluator::named_preset(const std::string& id) const
 {
     auto it = m_named_presets.find(id);
-    ASSERT(it != m_named_presets.end());
+    if (it == m_named_presets.end()) {
+        throw_eval_exception("Preset with id '{}' not found", id);
+    }
     return it->second;
 }
 
