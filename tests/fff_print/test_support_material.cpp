@@ -582,7 +582,9 @@ Old Perl tests, which were disabled by Vojtech at the time of first Support Gene
         'no support material layer is as thin as object layers';
 }
 
-*/// ---------------------------------------------------------------------------
+*/
+
+// ---------------------------------------------------------------------------
 // Tree / organic supports must keep their footprint on the build plate.
 // Support geometry is generated in object local coordinates and shifted per instance when the
 // G-code is written, so both sides of these tests are compared in world coordinates.
@@ -593,10 +595,11 @@ Old Perl tests, which were disabled by Vojtech at the time of first Support Gene
 struct ToolpathExtents
 {
     double min_x{ 0 }, min_y{ 0 }, max_x{ 0 }, max_y{ 0 };
+    double max_radius{ 0 }; // from an optional centre, for beds that are not rectangular
     bool   defined{ false };
 };
 
-static ToolpathExtents support_gcode_extents(const std::string &gcode)
+static ToolpathExtents support_gcode_extents(const std::string &gcode, const double centre_x = 0., const double centre_y = 0.)
 {
     ToolpathExtents out;
     bool            in_support = false;
@@ -613,14 +616,16 @@ static ToolpathExtents support_gcode_extents(const std::string &gcode)
         if (! in_support || ! std::regex_search(line, match, xy))
             continue;
         const double x = std::stod(match[1]), y = std::stod(match[2]);
+        const double radius = std::hypot(x - centre_x, y - centre_y);
         if (! out.defined) {
-            out = { x, y, x, y, true };
+            out = { x, y, x, y, radius, true };
             continue;
         }
         out.min_x = std::min(out.min_x, x);
         out.min_y = std::min(out.min_y, y);
         out.max_x = std::max(out.max_x, x);
         out.max_y = std::max(out.max_y, y);
+        out.max_radius = std::max(out.max_radius, radius);
     }
     return out;
 }
@@ -718,4 +723,69 @@ TEST_CASE(
     CHECK(toolpath.min_y >= 0. - slack);
     CHECK(toolpath.max_x <= 110. + slack);
     CHECK(toolpath.max_y <= 110. + slack);
+}
+
+TEST_CASE("TreeSupport: a circular bed clips support along the arc", "[SupportMaterial][TreeSupport]")
+{
+    // No delta printer ships in this tree, so a circular bed can only be checked synthetically: a
+    // 64-gon standing in for the arc. The radius sits between the fixture's corners (33.0 mm from
+    // its centre) and its support (37.7 mm), the only band where a circle cuts support but not part.
+    constexpr double   two_pi = 6.283185307179586;
+    const double       radius = 35.;
+    std::vector<Vec2d> bed;
+    for (int i = 0; i < 64; ++i) {
+        const double angle = two_pi * double(i) / 64.;
+        bed.push_back(Vec2d{100. + radius * std::cos(angle), 100. + radius * std::sin(angle)});
+    }
+
+    const double slack = 0.01; // Clipper rounding at the plate boundary
+    for (const bool constrained : {false, true}) {
+        TestConfig config = organic_tree_config();
+        config.print.items.opt("support_material_constrain_to_build_volume").set(constrained);
+        config.printer.items.opt("bed_shape").set(bed);
+
+        const ToolpathExtents toolpath =
+            support_gcode_extents(slice({TestMesh::overhang}, config), 100., 100.);
+        REQUIRE(toolpath.defined);
+        if (constrained)
+            CHECK(toolpath.max_radius <= radius + slack);
+        else
+            CHECK(toolpath.max_radius > radius + slack); // the arc has to cut something, or this proves nothing
+    }
+}
+
+TEST_CASE(
+    "TreeSupport: the constraint holds for every instance of an object",
+    "[SupportMaterial][TreeSupport]"
+)
+{
+    // Support geometry is generated once and printed at every instance, so constraining it to the
+    // plate around one instance would leave the others printing support beside the bed. The plate is
+    // therefore intersected over all instances. Two instances on the fixture bed are far enough apart
+    // for the unconstrained spill to show, which makes the pair below a real test rather than a
+    // tautology.
+    const double slack = 0.01; // Clipper rounding at the plate boundary
+    for (const bool constrained : {false, true}) {
+        TestConfig config = organic_tree_config();
+        config.print.items.opt("support_material_constrain_to_build_volume").set(constrained);
+        config.printer.items.opt("bed_shape")
+            .set(std::vector<Vec2d>{{0., 0.}, {110., 0.}, {110., 110.}, {0., 110.}});
+
+        Print         print;
+        Domain::Model model;
+        init_print({TestMesh::overhang}, print, model, config, 2, true);
+        REQUIRE(print.objects().front()->instances().size() == 2); // else this proves nothing
+
+        const ToolpathExtents toolpath = support_gcode_extents(gcode(print));
+        REQUIRE(toolpath.defined);
+        if (constrained) {
+            CHECK(toolpath.min_x >= 0. - slack);
+            CHECK(toolpath.min_y >= 0. - slack);
+            CHECK(toolpath.max_x <= 110. + slack);
+            CHECK(toolpath.max_y <= 110. + slack);
+        } else {
+            CHECK((toolpath.min_x < 0. - slack || toolpath.min_y < 0. - slack ||
+                   toolpath.max_x > 110. + slack || toolpath.max_y > 110. + slack));
+        }
+    }
 }
