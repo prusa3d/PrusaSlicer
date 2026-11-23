@@ -215,6 +215,52 @@ std::string slice_stacked_cubes(const TestConfig &config, const VolumeSettings &
     return slice_model(model, config);
 }
 
+TEST_CASE("Carry the next layer's first tool across the boundary", "[Multi]")
+{
+    Domain::Model model;
+    auto *object = model.add_object();
+    for (int tool = 0; tool < 3; ++tool) {
+        auto *volume = add_volume(object, Biz::Algorithms::TriangleMesh::make_cube(5., 5., tool == 0 ? 0.6 : 0.4));
+        translate(*volume, 6. * tool, 0., 0.);
+        volume->volume_settings.overrides.set("extruder", tool + 1);
+    }
+    object->add_instance();
+    ensure_on_bed(*object);
+    TestConfig config{3};
+    config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.2});
+    config.print.items.opt("layer_height").set(0.2);
+    config.print.items.opt("skirts").set(0);
+    config.print.items.opt("wipe_tower").set(false);
+    for (const char *key : {"toolchange_gcode", "start_gcode", "before_layer_gcode", "layer_gcode", "end_gcode"})
+        config.printer.items.opt(key).set(std::string{});
+
+    std::vector<int> middle{1, 0}, top;
+    SECTION("Unconstrained reloads") {}
+    SECTION("Pair-dependent custom purge") {
+        config.printer.items.opt("toolchange_gcode").set(
+            "T[next_extruder]\n{if previous_extruder == 1 && next_extruder == 0}G1 E3{endif}");
+        middle = {0, 1};
+        top = {0};
+    }
+    SECTION("Cyclic ordering") {
+        config.print.items.opt("toolchange_ordering").set(Domain::ToolChangeOrderingType::Cyclic);
+        middle = {0, 1, 2};
+        top = {0};
+    }
+    std::vector<std::vector<int>> selections;
+    const std::string gcode = slice_model(model, config);
+    std::istringstream stream{gcode};
+    for (std::string line; std::getline(stream, line);) {
+        if (line == ";LAYER_CHANGE")
+            selections.emplace_back();
+        else if (!selections.empty() && line.size() > 1 && line.front() == 'T' && line[1] >= '0' && line[1] <= '9')
+            selections.back().push_back(std::stoi(line.substr(1)));
+    }
+    REQUIRE(selections.size() == 3);
+    CHECK(selections[1] == middle);
+    CHECK(selections[2] == top);
+}
+
 TEST_CASE("Stacked cubes", "[Multi]")
 {
     VolumeSettings lower_config;

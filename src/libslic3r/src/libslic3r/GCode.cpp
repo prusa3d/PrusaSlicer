@@ -38,6 +38,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/find.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/crc.hpp>
 #include <Slic3r/Log.hpp>
 
 #include <boost/nowide/iostream.hpp>
@@ -976,6 +977,58 @@ static inline std::optional<std::string> find_M84(const std::string &gcode) {
     return std::nullopt;
 }
 
+static void join_layer_tool_runs(const Print &print, ToolOrdering &ordering)
+{
+    const auto &config = print.config();
+    if (ordering.all_extruders().size() < 3 || config.get<bool>("wipe_tower") ||
+        config.get<bool>("single_extruder_multi_material") ||
+        config.get<Domain::ToolChangeOrderingType>("toolchange_ordering") != Domain::ToolChangeOrderingType::Optimized ||
+        (print.custom_gcode() && !print.custom_gcode()->get().gcodes.empty()) ||
+        !config.get<std::vector<std::string>>("gcode_substitutions").empty())
+        return;
+
+    // Unknown scripts may purge based on the outgoing/incoming pair or the
+    // current tool at a layer change. The stock INDX reload purges by incoming
+    // tool alone; moving a run can only remove one reload of that same tool.
+    const bool indx = config.hw_config().model.model == "COREONE_INDX";
+    for (const auto &[key, stock_crc] : {
+        std::pair{"toolchange_gcode", 0x6bcf48c4u}, {"start_gcode", 0x00aab6beu},
+        {"before_layer_gcode", 0x4ecdeaa3u}, {"layer_gcode", 0x4aded607u}, {"end_gcode", 0x33ddf090u}
+    }) {
+        const auto &script = config.get<std::string>(key);
+        if (!script.empty()) {
+            boost::crc_32_type crc;
+            crc.process_bytes(script.data(), script.size());
+            if (!indx || crc.checksum() != stock_crc)
+                return;
+        }
+    }
+    for (const char *key : {"start_filament_gcode", "end_filament_gcode"}) {
+        for (const auto &script : config.get<std::vector<std::string>>(key)) {
+            std::istringstream lines{script};
+            for (std::string line; std::getline(lines, line);) {
+                const size_t pos = line.find_first_not_of(" \t\r");
+                if (pos != std::string::npos && (line[pos] != ';' || line.find_first_of("{[") != std::string::npos))
+                    return;
+            }
+        }
+    }
+
+    auto &layers = ordering.layer_tools();
+    for (size_t i = 1; i + 1 < layers.size(); ++i) {
+        auto &tools = layers[i].extruders;
+        const auto &next = layers[i + 1];
+        if (layers[i].has_support || next.has_support || tools.size() < 3 || next.extruders.empty())
+            continue;
+        // Keep the incoming tool, the first layer (priming) and the entire
+        // following layer intact. Only move a strictly interior run.
+        auto last = tools.end() - 1;
+        auto it = std::find(tools.begin() + 1, last, next.extruders.front());
+        if (it != last)
+            std::rotate(it, it + 1, tools.end());
+    }
+}
+
 Domain::ExtraPrintStatistics GCodeGenerator::_do_export(
     Print& print,
     GCodeOutputStream& file,
@@ -1148,6 +1201,7 @@ Domain::ExtraPrintStatistics GCodeGenerator::_do_export(
         // Find tool ordering for all the objects at once, and the initial extruder ID.
         // If the tool ordering has been pre-calculated by Print class for wipe tower already, reuse it.
         tool_ordering = print.tool_ordering();
+        join_layer_tool_runs(print, tool_ordering);
         tool_ordering.assign_custom_gcodes(print);
         if (tool_ordering.all_extruders().empty()) {
             // No object to print was found, cancel the G-code export.
