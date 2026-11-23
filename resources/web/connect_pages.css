@@ -23,7 +23,7 @@ body {
 /* Must win over the display of any component class below. */
 .hidden { display: none !important; }
 
-/* ---- Prusa Connect | Prusa Connect on-premise ---- */
+/* ---- Prusa Connect (cloud) | Prusa Connect (local) ---- */
 .modes {
   display: flex;
   gap: 4px;
@@ -75,8 +75,7 @@ body {
   .card { padding: 24px 20px; }
 }
 
-/* The PRUSA CONNECT wordmark and the filament spool of the slicer's other Connect pages
-   (connect_loading, connect_error). */
+/* The PRUSA CONNECT wordmark. */
 .brand {
   display: flex;
   flex-direction: column;
@@ -100,15 +99,6 @@ body {
   font-size: 12px;
   line-height: 18px;
 }
-.spool-art {
-  display: block;
-  width: 80px;
-  height: 80px;
-  margin: 0 auto 24px auto;
-}
-.spool { stroke: var(--color-spool); fill: none; }
-.filament { stroke: var(--color-accent); }
-.filament line { stroke-linecap: round; }
 
 h1 {
   font-size: 22px;

@@ -375,9 +375,9 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def           = defs.add("enable_connect_local", typeid(bool));
     def->location = Domain::AppConfigLocation{};
     def->gui_type = GUIType::checkbox;
-    def->label    = L("Prusa Connect on-premise");
+    def->label    = L("Prusa Connect (local)");
     def->tooltip  = L(
-        "Enables signing in to your own Prusa Connect on-premise server, the Connect tab with its printers and uploading files to it. The server is set up in the Connect tab."
+        "Enables signing into your own local Prusa Connect server, the Connect tab with its printers and uploading files to it. The server is set up in the Connect tab."
     );
     def->category     = Domain::ConfigItemDef::Category::AppConfig_Services;
     def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup;
@@ -460,7 +460,7 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def = defs.add("enable_printables", typeid(bool));
     def->location = Domain::AppConfigLocation{};
     def->gui_type = GUIType::checkbox;
-    def->label = L("Enable Printables");
+    def->label = L("Printables");
     def->tooltip = L("Enable Printables tab.");
     def->category = Domain::ConfigItemDef::Category::AppConfig_Services;
     def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_ServicesSetup;

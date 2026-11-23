@@ -1250,12 +1250,12 @@ void PopNotificationCenter::on_user_account_credential_expires_soon(std::time_t 
     const long long days_left = (seconds_left + 24 * 60 * 60 - 1) / (24 * 60 * 60);
     const std::string text    = days_left <= 1 ?
         // TRN Connect Local notification: the sign-in of the app ends within a day and cannot be renewed.
-        _u8L("Your sign-in to Prusa Connect on-premise ends within a day. Sign in again after that.") :
+        _u8L("Your sign-in to Prusa Connect (local) ends within a day. Sign in again after that.") :
         fmt::format(
             fmt::runtime(_L_PLURAL_u8(
                 // TRN Connect Local notification: the sign-in of the app ends soon and cannot be renewed. {} is a number of days.
-                "Your sign-in to Prusa Connect on-premise ends in {} day. Sign in again after that.",
-                "Your sign-in to Prusa Connect on-premise ends in {} days. Sign in again after that.",
+                "Your sign-in to Prusa Connect (local) ends in {} day. Sign in again after that.",
+                "Your sign-in to Prusa Connect (local) ends in {} days. Sign in again after that.",
                 static_cast<int>(days_left)
             )),
             days_left
@@ -1266,7 +1266,7 @@ void PopNotificationCenter::on_user_account_credential_expires_soon(std::time_t 
             PopNotificationLevel::Warning,
             0s,
             // TRN Header of the Connect Local sign-in expiration notification.
-            PopNotificationLayoutHeaderText{_u8L("Prusa Connect on-premise"), text}
+            PopNotificationLayoutHeaderText{_u8L("Prusa Connect (local)"), text}
         },
         always_equal_matcher
     );

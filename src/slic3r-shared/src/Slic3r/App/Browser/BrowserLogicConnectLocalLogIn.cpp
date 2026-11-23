@@ -99,8 +99,8 @@ void BrowserLogicConnectLocalLogIn::PairingEvents::on_user_account_pairing_appro
 std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::page_init_commands() const
 {
     const nlohmann::json texts = {
-        {"opening", Biz::_u8L("Connecting to your Prusa Connect on-premise server…")},
-        {"waitingTitle", Biz::_u8L("Approve PrusaSlicer on your Prusa Connect on-premise server")},
+        {"opening", Biz::_u8L("Connecting to your local Prusa Connect server…")},
+        {"waitingTitle", Biz::_u8L("Approve PrusaSlicer on your local Prusa Connect server")},
         {"waitingHint", Biz::_u8L("Sign in on the server and approve this code:")},
         {"waitingStatus", Biz::_u8L("Waiting for approval…")},
         {"openInBrowser", Biz::_u8L("Open in browser")},
@@ -267,7 +267,7 @@ void BrowserLogicConnectLocalLogIn::start_sign_in()
     m_state                  = State::Starting;
     const std::string server = Biz::Network::ServiceConfig::instance().connect_local_server_url();
     if (server.empty()) {
-        push_commands(show_error(Biz::_u8L("No Prusa Connect on-premise server is set."), false));
+        push_commands(show_error(Biz::_u8L("No local Prusa Connect server is set."), false));
         return;
     }
     if (!server.starts_with("https://")) {

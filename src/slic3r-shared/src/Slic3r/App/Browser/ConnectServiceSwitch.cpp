@@ -10,13 +10,16 @@
 
 namespace Slic3r::App::Browser {
 
-void ConnectServiceSwitch::add_texts(nlohmann::json& texts)
+void ConnectServiceSwitch::add_texts(nlohmann::json& texts, AccountService service)
 {
-    texts["modeCloud"] = Biz::_u8L("Prusa Connect");
-    texts["modeLocal"] = Biz::_u8L("Prusa Connect on-premise");
-    // TRN Small label under the PRUSA CONNECT logo on the Prusa Connect on-premise pages.
-    texts["modeTag"] = Biz::_u8L("on-premise");
-    // TRN Accessible name of the switch between Prusa Connect and Prusa Connect on-premise.
+    texts["modeCloud"] = Biz::_u8L("Prusa Connect (cloud)");
+    texts["modeLocal"] = Biz::_u8L("Prusa Connect (local)");
+    texts["modeTag"]   = service == AccountService::ConnectLocal ?
+        // TRN Small label under the PRUSA CONNECT logo on the Prusa Connect (local) pages.
+        Biz::_u8L("local") :
+        // TRN Small label under the PRUSA CONNECT logo on the Prusa Connect (cloud) page.
+        Biz::_u8L("cloud");
+    // TRN Accessible name of the switch between Prusa Connect (cloud) and Prusa Connect (local).
     texts["modeSwitch"] = Biz::_u8L("Connect service");
 }
 

@@ -16,7 +16,7 @@ enum class AccountService;
 namespace Slic3r::App::Browser {
 
 /**
- * @brief The switch between Prusa Connect and Prusa Connect on-premise at the top of the app's
+ * @brief The switch between Prusa Connect (cloud) and Prusa Connect (local) at the top of the app's
  * own signed-out Connect tab pages (resources/web/connect_pages.js), shown while both services
  * are enabled. It makes the chosen service the active one; the Connect tab is then created
  * again for it. Only the app's own pages may switch, a page of a server cannot.
@@ -27,7 +27,7 @@ public:
     using Actions =
         std::map<std::string, std::function<std::vector<BrowserLogicCommand>(const std::string&)>>;
 
-    static void add_texts(nlohmann::json& texts);
+    static void add_texts(nlohmann::json& texts, AccountService service);
 
     /** @brief Whether the pages show the switch: both services are enabled. */
     static bool shown();

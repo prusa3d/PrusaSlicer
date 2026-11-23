@@ -177,9 +177,9 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectLocalPage::signed_out_comman
 std::string BrowserLogicConnectLocalPage::unsupported_page_script() const
 {
     const nlohmann::json texts = {
-        Biz::_u8L("Prusa Connect on-premise can't be displayed here."),
+        Biz::_u8L("Prusa Connect (local) can't be displayed here."),
         Biz::_u8L(
-            "Your system's built-in web browser is too old to run Prusa Connect on-premise. Please install the latest updates for your operating system, then restart PrusaSlicer."
+            "Your system's built-in web browser is too old to run Prusa Connect (local). Please install the latest updates for your operating system, then restart PrusaSlicer."
         ),
     };
     return std::string(R"(

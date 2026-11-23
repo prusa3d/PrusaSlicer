@@ -249,11 +249,11 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_pri
     DEBUG_ASSERT(!download_url.empty() && !model_url.empty(), "Faulty printables message.");
 
     if (Biz::Network::ServiceConfig::instance().connect_printables_print_url().empty()) {
-        SPDLOG_WARN("Printing from Printables to Connect is not available with Prusa Connect on-premise.");
+        SPDLOG_WARN("Printing from Printables to Connect is not available with Prusa Connect (local).");
         AppServices::instance().dialog_manager().show_info_dialog(
             // TRN Shown when printing a Printables model while PrusaSlicer uses the self-hosted
             Biz::_u8L(
-                "Printing from Printables to Prusa Connect is not available with Prusa Connect on-premise. Download the model and slice it instead."
+                "Printing from Printables to Prusa Connect is not available with Prusa Connect (local). Download the model and slice it instead."
             ),
             Biz::_u8L("Print to Prusa Connect")
         );

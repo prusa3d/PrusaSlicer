@@ -48,7 +48,7 @@ void TabsBarMenus::CreateAccountMenu()
         choose(AccountState::SignedOut), nullptr);
     m_prusa_account_item = append_menu_radio_item(&account_states, wxID_ANY, _L("Prusa Account"), {},
         choose(AccountState::PrusaAccount), nullptr);
-    m_connect_local_item = append_menu_radio_item(&account_states, wxID_ANY, _L("Prusa Connect on-premise"), {},
+    m_connect_local_item = append_menu_radio_item(&account_states, wxID_ANY, _L("Prusa Connect (local)"), {},
         choose(AccountState::ConnectLocal), nullptr);
 }
 

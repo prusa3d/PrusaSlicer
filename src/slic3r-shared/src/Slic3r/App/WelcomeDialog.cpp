@@ -439,7 +439,7 @@ ItemPtr create_offline_button_content()
     connect_local_row->set_gap(gap);
     connect_local_row->set_align_items(YGAlignCenter);
     emplace_dot(connect_local_row, green);
-    connect_local_row->emplace_back<Text>(Biz::_u8L("Prusa Connect on-premise enabled"));
+    connect_local_row->emplace_back<Text>(Biz::_u8L("Prusa Connect (local) enabled"));
 
     return result;
 }

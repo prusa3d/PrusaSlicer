@@ -198,18 +198,18 @@ std::string ConnectLocalSetupLogic::setup_page_init_script() const
         url = AppServices::instance().app_config().connect_local_url();
     }
     nlohmann::json texts = {
-        {"title", Biz::_u8L("Prusa Connect on-premise server")},
+        {"title", Biz::_u8L("Prusa Connect server")},
         {"intro",
          Biz::_u8L(
-             "Enter the address of the Prusa Connect on-premise server that manages your printers."
+             "Enter the address of the local Prusa Connect server that manages your printers."
          )},
         {"address", Biz::_u8L("Server address")},
         {"discoveryTitle", Biz::_u8L("Find a server on the network")},
         {"discoveryIntro",
          Biz::_u8L(
-             "PrusaSlicer can look for Prusa Connect on-premise servers running on your local network."
+             "PrusaSlicer can look for local Prusa Connect servers running on your network."
          )},
-        // TRN Button that starts the search for Prusa Connect on-premise servers.
+        // TRN Button that starts the search for local Prusa Connect servers.
         {"discoveryStart", Biz::_u8L("Find servers on the network")},
         {"searching", Biz::_u8L("Searching the network…")},
         {"nothing", Biz::_u8L("No server found yet. Still searching…")},
@@ -225,7 +225,7 @@ std::string ConnectLocalSetupLogic::setup_page_init_script() const
         {"certTitle", Biz::_u8L("The server certificate is not trusted")},
         {"certIntro",
          Biz::_u8L(
-             "This system does not trust the certificate of the server, which is common for a server with a self-signed certificate. Compare the fingerprint with the one of your Prusa Connect on-premise server before you trust it, or load the certificate of the authority that issued it."
+             "This system does not trust the certificate of the server, which is common for a server with a self-signed certificate. Compare the fingerprint with the one of your local Prusa Connect server before you trust it, or load the certificate of the authority that issued it."
          )},
         {"fingerprint", Biz::_u8L("SHA-256 fingerprint")},
         {"subject", Biz::_u8L("Issued to")},
@@ -238,7 +238,7 @@ std::string ConnectLocalSetupLogic::setup_page_init_script() const
         {"trust", Biz::_u8L("Trust this certificate")},
         {"load", Biz::_u8L("Load certificate…")},
     };
-    ConnectServiceSwitch::add_texts(texts);
+    ConnectServiceSwitch::add_texts(texts, AccountService::ConnectLocal);
     const nlohmann::json init = {
         {"texts", texts},
         {"url", url},
@@ -251,7 +251,7 @@ std::string ConnectLocalSetupLogic::setup_page_init_script() const
 std::string ConnectLocalSetupLogic::logged_out_page_init_script() const
 {
     nlohmann::json texts = {
-        {"title", Biz::_u8L("Sign in to Prusa Connect on-premise")},
+        {"title", Biz::_u8L("Sign in to Prusa Connect")},
         {"intro",
          Biz::_u8L(
              "PrusaSlicer will open the sign-in page of your server in a PrusaSlicer window."
@@ -260,7 +260,7 @@ std::string ConnectLocalSetupLogic::logged_out_page_init_script() const
         {"change", Biz::_u8L("Change server")},
         {"forget", Biz::_u8L("Forget certificate")},
     };
-    ConnectServiceSwitch::add_texts(texts);
+    ConnectServiceSwitch::add_texts(texts, AccountService::ConnectLocal);
     const std::string server = Biz::Network::ServiceConfig::instance().connect_local_server_url();
     const Biz::Network::ServerTrust trust = ConnectLocalTrust::stored_trust_for(server);
     const nlohmann::json init             = {

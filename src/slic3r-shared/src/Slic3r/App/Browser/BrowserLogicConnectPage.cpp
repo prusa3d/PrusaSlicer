@@ -1,5 +1,6 @@
 #include "Slic3r/App/Browser/BrowserLogicConnectPage.hpp"
 
+#include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/JsonForScript.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
@@ -89,7 +90,7 @@ std::string BrowserLogicConnectPage::logged_out_page_init_script() const
          )},
         {"login", Biz::_u8L("Sign in")},
     };
-    ConnectServiceSwitch::add_texts(texts);
+    ConnectServiceSwitch::add_texts(texts, AccountService::PrusaAccount);
     const nlohmann::json init = {{"texts", texts}, {"showSwitch", ConnectServiceSwitch::shown()}};
     return "window.connectLoggedOut && window.connectLoggedOut.init("
         + Biz::json_for_script(init)

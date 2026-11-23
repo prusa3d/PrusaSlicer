@@ -6,12 +6,8 @@
 #include "Slic3r/Biz/ExportDestination/IExportDestinationChangedListener.hpp"
 #include "Slic3r/Biz/Platform/ListenerScope.hpp"
 
-#include <utility>
-#include <vector>
-
 namespace Slic3r::App::Yoga {
 class Menu;
-class MenuItem;
 } // namespace Slic3r::App::Yoga
 
 namespace Slic3r::App {
@@ -37,7 +33,6 @@ private:
 
     Biz::ExportDestination::ExportDestinationInteractor& m_interactor;
     Yoga::Menu* m_menu{nullptr};
-    std::vector<std::pair<Biz::ExportDestination::ExportDestination, Yoga::MenuItem*>> m_menu_items;
 };
 
 } // namespace Slic3r::App

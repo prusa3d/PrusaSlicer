@@ -9,7 +9,7 @@ std::string connect_service_name()
 {
     if (Biz::Network::ServiceConfig::instance().is_connect_local()) {
         // TRN The self-hosted Prusa Connect Local server, wherever the Connect service is named.
-        return Biz::_u8L("Prusa Connect on-premise");
+        return Biz::_u8L("Prusa Connect (local)");
     }
     return Biz::_u8L("Prusa Connect");
 }
