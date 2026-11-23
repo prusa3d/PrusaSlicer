@@ -13,6 +13,7 @@ add_executable(${_TEST_NAME}_tests
 	test_flow.cpp
 	test_gaps.cpp
 	test_gcode.cpp
+	test_extrusion_order.cpp
 	test_gcode_travels.cpp
     test_infill_above_bridges.cpp
     test_seam_perimeters.cpp

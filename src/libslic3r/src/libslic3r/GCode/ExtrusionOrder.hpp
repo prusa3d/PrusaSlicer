@@ -146,6 +146,10 @@ static constexpr const double min_gcode_segment_length = 0.002;
 
 bool is_empty(const std::vector<SliceExtrusions> &extrusions);
 
+std::vector<std::reference_wrapper<const LayerIsland>> get_ordered_islands(
+    const LayerSlice &lslice, const std::optional<Point> &previous_position, const Point &instance_offset
+);
+
 std::vector<ExtruderExtrusions> get_extrusions(
     const Print &print,
     const GCode::WipeTowerIntegration *wipe_tower,
