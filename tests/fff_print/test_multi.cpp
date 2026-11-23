@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <numeric>
 #include <sstream>
 
@@ -9,6 +10,7 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
+#include "libslic3r/GCode/WipeTower.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/libslic3r.h"
 #include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
@@ -31,6 +33,30 @@ using Biz::Algorithms::ModelObject::ensure_on_bed;
 using Biz::Algorithms::ModelVolume::translate;
 using Biz::Slicing::SerializedConfig;
 using Domain::Preset::HwPrinterConfig;
+
+TEST_CASE("Wipe tower tool changes starting at an inherited feedrate have finite duration", "[Multi]")
+{
+    TestConfig config{2};
+    config.printer.items.opt("single_extruder_multi_material").set(true);
+    const auto view = config.get_view();
+    const std::vector<unsigned> tools{0, 1};
+    WipeTower tower({0, 0}, 0., view, {{0, 100}, {120, 0}}, 0, tools);
+    for (unsigned tool : tools)
+        tower.set_extruder(tool, view);
+    tower.plan_toolchange(0.2f, 0.2f, 0, 1, 100.f);
+    tower.plan_toolchange(0.4f, 0.2f, 1, 0, 120.f);
+
+    std::vector<std::vector<WipeTower::ToolChangeResult>> layers;
+    tower.generate(layers);
+    REQUIRE(layers.size() == 2);
+    for (const auto &layer : layers) {
+        REQUIRE_FALSE(layer.empty());
+        for (const auto &change : layer) {
+            CHECK(std::isfinite(change.elapsed_time));
+            CHECK(change.elapsed_time > 0.f);
+        }
+    }
+}
 
 SCENARIO("Basic tests", "[Multi]")
 {
