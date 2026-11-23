@@ -1,5 +1,5 @@
 add_cmake_project(pugixml
-    URL https://github.com/zeux/pugixml/releases/download/v1.15/pugixml-1.15.zip
-    URL_HASH SHA256=4e1aa9a5b5654b63b2ae5c4cd10b88ac295e91c86b1f563e5f8ce5a444b52311
+    URL https://github.com/zeux/pugixml/releases/download/v1.16/pugixml-1.16.zip
+    URL_HASH SHA256=42e324b50d53aff0cf259a7f26cd04d00f90a1d436b356dd52b0f4d4dcf3b769
     #CMAKE_ARGS
 )
