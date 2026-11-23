@@ -344,6 +344,7 @@ public:
         const std::string& id,
         std::optional<Domain::MacroOverridesLayerFDM> layer
     );
+    void set_macro_overrides(Domain::MacroOverridesMap layers);
 
     template <typename T>
     using ConstRefBoolPair = std::pair<std::reference_wrapper<const T>, bool>;
@@ -961,6 +962,8 @@ private:
      */
     void refresh_original_config_boxes(Domain::Preset::SelectedPreset& selected_preset);
 
+    void clear_printer_goals(Domain::PrinterTechnology technology, ListenerInvokeLaterBag& bag);
+    void notify_macro_overrides_changed();
     void fill_config_container_with_selected_preset(
         Domain::ConfigContainer& cc,
         const std::string& printer_hw_config_id,

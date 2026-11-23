@@ -429,3 +429,49 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Switching to an SLA printer cl
     CHECK(preset_interactor.sheet_items().items().size() == 0);
     CHECK(preset_interactor.sheet_items().selected_index() == Slic3r::Domain::INVALID_ID);
 }
+
+TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Switching FFF printers clears tool-specific print goals", "[PresetInteractor][preset]")
+{
+    using namespace Slic3r::Domain;
+    project_interactor.new_project();
+    auto& presets = project_interactor.preset_interactor();
+    const auto& selected = presets.selected_printer_preset();
+    REQUIRE(selected.technology() == PrinterTechnology::FFF);
+
+    std::string next_printer_config_id;
+    const auto& items = presets.printer_configs().items();
+    for (size_t i = 0; i < items.size(); ++i) {
+        const auto& item = items.at(i);
+        const auto& hw = workbench.preset_bundle().printer_configs.at(item.hw_printer_config_id);
+        if (hw.technology == PrinterTechnology::FFF && hw.id != selected.hw_config.id) {
+            next_printer_config_id = hw.id;
+            break;
+        }
+    }
+    REQUIRE_FALSE(next_printer_config_id.empty());
+    MacroOverridesLayerFDM layer;
+    layer.overrides.overrides.set("support_material_interface_extruder", 1);
+    presets.set_macro_overrides("breakaway", layer);
+    REQUIRE_FALSE(std::get<MacroOverridesMapFDM>(selected.macro_overrides).empty());
+
+    presets.select_printer_preset(selected.hw_config.id, selected.printer.id);
+    REQUIRE(std::get<MacroOverridesMapFDM>(selected.macro_overrides).at("breakaway") == layer);
+
+    const auto project = project_interactor.selected_project_id();
+    project_interactor.new_project();
+    project_interactor.select_project(project);
+    REQUIRE(std::get<MacroOverridesMapFDM>(presets.selected_printer_preset().macro_overrides)
+                .at("breakaway") == layer);
+
+    struct SlicingListener : Slic3r::Biz::ISlicingInputChangedListener {
+        void on_slicing_input_changed(const BedRef&) override { changed = true; }
+        void on_slicing_input_removed(const BedRef&) override {}
+        bool changed = false;
+    } slicing_listener;
+    presets.add_listener<Slic3r::Biz::ISlicingInputChangedListener>(&slicing_listener);
+    presets.select_printer_config(next_printer_config_id);
+    presets.remove_listener<Slic3r::Biz::ISlicingInputChangedListener>(&slicing_listener);
+    CHECK(slicing_listener.changed);
+    CHECK(presets.selected_printer_preset().hw_config.id == next_printer_config_id);
+    CHECK(std::get<MacroOverridesMapFDM>(presets.selected_printer_preset().macro_overrides).empty());
+}

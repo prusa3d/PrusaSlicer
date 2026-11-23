@@ -15,8 +15,10 @@
 #include "Slic3r/Domain/Preset/Bundle.hpp"
 
 #include <cstdlib>
+#include <fstream>
 
 #include <boost/filesystem.hpp>
+#include <nlohmann/json.hpp>
 
 using Slic3r::Domain::BoundingBox3d;
 using Slic3r::Domain::FloatOrPercentage;
@@ -31,6 +33,61 @@ using namespace Slic3r::Biz;
 using namespace Slic3r::App::CLI::Test;
 
 namespace fs = boost::filesystem;
+
+TEST_CASE("CLI preserves a print goal across project and config round trips", "[cli]")
+{
+    const ScopedTempDir temp;
+    const fs::path config = temp.path() / "settings.json";
+    const fs::path model = write_cube_stl(temp.path(), "part.stl", 10.);
+    const fs::path project = temp.path() / "part.3mf";
+    InitParams save = make_params(resolved_profile_sets().front());
+    save.action.configuration_save = true;
+    save.misc.output = config.string();
+    REQUIRE(CLI::run(save) == EXIT_SUCCESS);
+
+    auto settings = nlohmann::json::parse(std::ifstream{config.string()});
+    const size_t slots = settings.at("preset").at("materials").size();
+    REQUIRE(slots > 0);
+    const nlohmann::json layer = {
+        {"name", "Breakaway interface supports"},
+        {"params", {{"model_extruder", {{"label", "Model extruder"}, {"value", 1}}}}},
+        {"overrides", {{"support_material", "everywhere"}}},
+        {"slot_overrides", {{"support_material_contact_distance", std::vector<double>(slots, 0.)}}}
+    };
+    const std::string id = "com.prusa3d.slicer.printmodes.breakaway_interface_supports";
+    settings["configuration"]["macro_overrides"][id] = layer;
+    std::ofstream{config.string()} << settings;
+
+    InitParams export_project;
+    export_project.input.config_file = config.string();
+    export_project.input.input_files.push_back(model.string());
+    export_project.action.export_3mf = true;
+    export_project.misc.output = project.string();
+    REQUIRE(CLI::run(export_project) == EXIT_SUCCESS);
+
+    InitParams reopen;
+    reopen.input.input_files.push_back(project.string());
+    reopen.action.configuration_save = true;
+    reopen.misc.output = (temp.path() / "reopened.json").string();
+    const auto save_configuration = [&reopen] {
+        REQUIRE(CLI::run(reopen) == EXIT_SUCCESS);
+        return nlohmann::json::parse(std::ifstream{*reopen.misc.output}).at("configuration");
+    };
+    const auto restored = save_configuration();
+    CHECK_FALSE(restored.contains("macro_slot_overrides"));
+    CHECK(restored.at("macro_overrides").at(id) == layer);
+
+    auto replacement = layer;
+    replacement["slot_overrides"]["support_material_contact_distance"][0] = 0.15;
+    settings["configuration"]["macro_overrides"][id] = replacement;
+    std::ofstream{config.string()} << settings;
+    reopen.input.config_file = config.string();
+    CHECK(save_configuration().at("macro_overrides").at(id) == replacement);
+
+    settings["configuration"].erase("macro_overrides");
+    std::ofstream{config.string()} << settings;
+    CHECK_FALSE(save_configuration().contains("macro_overrides"));
+}
 
 TEST_CASE("CLI slices a single-tool 3MF project", "[cli][timeout]")
 {

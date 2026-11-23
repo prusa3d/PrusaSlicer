@@ -684,15 +684,8 @@ static bool perform_configuration_save(CLIRuntime& runtime, const MiscParams& mi
         nlohmann::ordered_json(config_container.selected_preset().metadata());
 
     const ConfigPack config_pack{config_container.build_print_config()};
-    if (std::holds_alternative<ConfigPackFDM>(config_pack)) {
-        config_json[CONFIGURATION] =
-            nlohmann::ordered_json(Domain::as_boxes(std::get<ConfigPackFDM>(config_pack)));
-    } else if (std::holds_alternative<ConfigPackSLA>(config_pack)) {
-        config_json[CONFIGURATION] =
-            nlohmann::ordered_json(Domain::as_boxes(std::get<ConfigPackSLA>(config_pack)));
-    } else {
-        PANIC("Unexpected config type!");
-    }
+    config_json[CONFIGURATION] =
+        std::visit([](const auto& pack) { return Biz::Config::to_json(pack); }, config_pack);
 
     boost::nowide::ofstream config_file;
     config_file.open(config_save_path, std::ios::out | std::ios::trunc);

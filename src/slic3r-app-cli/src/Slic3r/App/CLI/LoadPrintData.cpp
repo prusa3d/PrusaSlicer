@@ -207,6 +207,7 @@ static bool apply_preset_and_config(CLIRuntime& runtime, const PresetAndConfig& 
         preset_and_config.config_pack
     );
 
+    preset_interactor.set_macro_overrides(std::move(preset_to_select.macro_overrides));
     return true;
 }
 
