@@ -1,6 +1,6 @@
 add_cmake_project(spdlog
-    URL "https://github.com/gabime/spdlog/archive/refs/tags/v1.15.3.zip"
-    URL_HASH SHA256=b74274c32c8be5dba70b7006c1d41b7d3e5ff0dff8390c8b6390c1189424e094
+    URL "https://github.com/gabime/spdlog/archive/refs/tags/v1.17.0.zip"
+    URL_HASH SHA256=b11912a82d149792fef33fabd0503b13d54aeac25c1464755461d4108ea71fc2
     CMAKE_ARGS
         -DSPDLOG_FMT_EXTERNAL=ON
         # This is only relevant for windows, because no one else in the whole world would find useful to use utf16 for filenames
