@@ -69,7 +69,7 @@ public:
      * @brief Path under the Connect Local server where the PrusaSlicer module API is mounted.
      */
     static constexpr std::string_view CONNECT_LOCAL_MODULE_PATH =
-        "/api/v1/modules/com.github.aux.prusa3d.prusaslicer3-compat";
+        "/api/v1/modules/com.github.aux.prusa3d.prusaslicer3-connector";
 
 
     /**
