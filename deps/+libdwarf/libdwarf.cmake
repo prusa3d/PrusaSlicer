@@ -4,8 +4,8 @@ if (MSVC)
 endif()
 
 add_cmake_project(libdwarf
-    URL "https://github.com/davea42/libdwarf-code/releases/download/v0.11.1/libdwarf-0.11.1.tar.xz"
-    URL_HASH SHA256=b5be211b1bd0c1ee41b871b543c73cbff5822f76994f6b160fc70d01d1b5a1bf
+    URL "https://github.com/davea42/libdwarf-code/releases/download/v2.3.3/libdwarf-2.3.3.tar.xz"
+    URL_HASH SHA256=bde13d1c49be6f2467326a6e0b3919247471455d16eefc3c6be26c7d4baca36a
     PATCH_COMMAND ${PATCH_CMD} ${CMAKE_CURRENT_LIST_DIR}/libdwarf.patch
     CMAKE_ARGS
         -DBUILD_DWARFDUMP=FALSE
