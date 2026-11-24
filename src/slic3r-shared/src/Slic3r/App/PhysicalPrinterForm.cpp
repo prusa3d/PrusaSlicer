@@ -26,6 +26,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <memory>
 #include <variant>
 #include <vector>
@@ -405,9 +406,23 @@ void PhysicalPrinterForm::build_form()
         _u8L(
             "PrusaSlicer can upload G-code files to a printer host.\n"
             "This field should contain the API key or the password\n"
-            "required for authentication."
+            "required for authentication.\n"
+            "It may not contain line breaks."
         )
     );
+    // API Keys are put directly into the HTTP header, so they may not contain any line breaks (RFC 9110 Section 5.5)
+    // So we color the input field red when the user does enter a line break.
+    m_api_key->callbacks().text_changed = [this]()
+    {
+        const std::string_view text = m_api_key->text();
+        const auto line_break_iterator =
+            std::ranges::find_if(text, [](const char c) { return (c == '\n') || (c == '\r'); });
+        if (line_break_iterator != text.end()) {
+            m_api_key->set_color(std::optional(Platform::Color::Error));
+        } else {
+            m_api_key->set_color(std::nullopt);
+        }
+    };
     m_user     = add_input(m_connection_box, m_user_group, _u8L("User"));
     m_password = add_input(m_connection_box, m_password_group, _u8L("Password"));
     m_password->set_input_flags(ImGuiInputTextFlags_Password);
