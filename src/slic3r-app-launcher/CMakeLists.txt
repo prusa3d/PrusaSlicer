@@ -78,3 +78,28 @@ if (WIN32)
 endif ()
 
 install(TARGETS slic3r-app-launcher RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+if (SLIC3R_BUILD_TESTS)
+    # The command line parsing is compiled into the tests directly, the launcher is an executable.
+    add_executable(slic3r-app-launcher-tests
+            src/Slic3r/App/Launcher/ReadCLI.cpp
+            src/Slic3r/App/Launcher/ReadCLI.hpp
+            test/Slic3r/App/Launcher/ReadCLITests.cpp
+    )
+
+    target_include_directories(slic3r-app-launcher-tests PRIVATE src)
+    target_link_libraries(slic3r-app-launcher-tests PRIVATE
+            slic3r-app-cli
+            CLI11::CLI11
+            Catch2::Catch2WithMain
+    )
+
+    add_test(NAME slic3r-app-launcher-tests
+            COMMAND slic3r-app-launcher-tests ${CATCH_ALL_ARGS}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    if (WIN32)
+        prusaslicer_copy_dlls(slic3r-app-launcher-tests)
+    endif ()
+endif ()
