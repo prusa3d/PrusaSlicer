@@ -21,6 +21,7 @@ add_cmake_project(Boost
     URL_HASH SHA256=a66084ec52c9dfa838b3b225a29f29869b2d11e201b3f9e4b989431d95b671c2
     #EMSCRIPTEN_PORT boost_headers
     LIST_SEPARATOR |
+    PATCH_COMMAND ${PATCH_CMD} ${CMAKE_CURRENT_LIST_DIR}/locale.patch
     CMAKE_ARGS
         -DBOOST_EXCLUDE_LIBRARIES:STRING=${_excluded_libs}
         -DBOOST_LOCALE_ENABLE_ICU:BOOL=OFF # do not link to libicu, breaks compatibility between distros
