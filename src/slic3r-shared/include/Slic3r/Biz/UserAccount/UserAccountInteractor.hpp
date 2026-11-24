@@ -44,9 +44,9 @@ public:
 
     /**
      * @brief Logs out and drops the current communication (if any), calls between(), then starts a
-     * new communication if enabled. Used when the Account server changes: the new session picks up
-     * the service URLs and token store applied in between. The enabled state is reported only if it
-     * ends up different from the start.
+     * new communication if enabled. Used when the Account server changes: the account of the
+     * previous one is logged out for good and the new session picks up the service URLs applied
+     * in between. The enabled state is reported only if it ends up different from the start.
      */
     void restart(bool app_config_enabled, const std::function<void()>& between);
 
@@ -59,12 +59,6 @@ public:
      * @brief Logs out of User Account, tokens are thrown out, all other running apps gets message to log out.
      */
     void do_log_out();
-
-    /**
-     * @brief Ends the session without revoking anything on a Connect Local server and keeps its
-     * credential stored, e.g. when the person chooses to work without an account.
-     */
-    void log_out_locally();
 
     /**
      * @brief Returns url to be displayed in browser for logging in.

@@ -65,7 +65,7 @@ void UserAccountInteractor::start_communication()
 void UserAccountInteractor::stop_communication()
 {
     bool was_logged = is_logged_in();
-    m_communication->log_out_locally(was_logged);
+    m_communication->do_log_out(was_logged);
     replace_communication(std::make_unique<UserAccountCommunicationDummy>());
     m_communication->add_session_listener(this);
 
@@ -112,11 +112,6 @@ UserAccountInteractor::~UserAccountInteractor()
 void UserAccountInteractor::do_log_out()
 {
     m_communication->do_log_out(is_logged_in());
-}
-
-void UserAccountInteractor::log_out_locally()
-{
-    m_communication->log_out_locally(is_logged_in());
 }
 
 std::string

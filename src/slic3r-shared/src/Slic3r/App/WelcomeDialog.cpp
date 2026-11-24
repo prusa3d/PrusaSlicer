@@ -1415,7 +1415,7 @@ WelcomeDialog::WelcomeDialog(Biz::ProjectInteractor& project_interactor, Navigat
             } else {
                 ASSERT(button == m_offline_button);
                 m_online = false;
-                m_project_interactor.user_account_interactor().log_out_locally();
+                m_project_interactor.user_account_interactor().do_log_out();
                 m_login_screen->reload_layout();
                 m_printer_screen->disable_printer_sync();
                 go_to_screen(ASSERT_VAL(m_printer_screen));

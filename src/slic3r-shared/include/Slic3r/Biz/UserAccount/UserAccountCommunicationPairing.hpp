@@ -26,7 +26,8 @@ class BackgroundWorker;
  * credential (an access_token valid for 90 days, without refresh). The credential is the bearer
  * of every request and is kept in the Connect Local token store together with the server it belongs to.
  * When the server refuses it (401) or it expires, the app switches to another valid credential
- * in the store or logs out; a logout the person asks for revokes it on the server.
+ * in the store or logs out. Every other logout (the person asks for it, another service or
+ * server is chosen, the account is turned off) revokes it on the server and empties the store.
  *
  * UserAccountSession serves only as the request queue and the holder of the token; none of its
  * OAuth refresh or code exchange paths is used here.
@@ -82,10 +83,10 @@ public:
     bool validate_and_refresh() override;
 
     /**
-     * @brief Revokes the credential on the server (best effort) and empties the store.
+     * @brief Revokes the credential on the server (best effort) and empties the store, whatever
+     * it holds.
      */
     void do_log_out(bool notify_owner) override;
-    void log_out_locally(bool notify_owner) override;
     /**
      * @brief Printables would not accept a Connect Local token: answers with none.
      */
@@ -160,7 +161,11 @@ private:
     void on_credential(const Pairing::Credential& credential);
     void notify_pairing_failed(PairingFailure failure);
 
-    /** @brief Revokes a credential on the server, in the background, ignoring the result. */
+    /**
+     * @brief Revokes a credential on the server, in the background, ignoring the result. The
+     * request is created here, with the server address and certificate trust in effect now, so
+     * that it still reaches the server when the account service is switched right after.
+     */
     void revoke(const std::string& credential_id, const std::string& token);
     /**
      * @brief Logs out locally (session, timers, user data).

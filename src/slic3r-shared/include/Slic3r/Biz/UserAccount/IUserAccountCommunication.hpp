@@ -51,19 +51,11 @@ public:
 
     // From UserAccountCommunication
     /**
-     * @brief Logout the person asked for. With Connect Local the credential is also revoked on the server.
+     * @brief Logs out: when the person asks for it and before the communication is replaced
+     * (another service or server is chosen, the account is turned off). Nothing of the account
+     * stays stored. With Connect Local the credential is also revoked on the server.
      */
     virtual void do_log_out(bool notify_owner) = 0;
-
-    /**
-     * @brief Ends the session because the communication is being replaced (service mode or server
-     * changed, account turned off). With Connect Local nothing is revoked and the credential stays stored:
-     * it may serve again when the same server is chosen.
-     */
-    virtual void log_out_locally(bool notify_owner)
-    {
-        do_log_out(notify_owner);
-    }
 
     virtual std::string on_log_in_request(
         const std::string& lang_code,

@@ -294,6 +294,7 @@ struct Request
     Network::IHttp::RequestMethod method;
     std::string url;
     std::map<std::string, std::string> headers;
+    std::thread::id created_on;
 };
 
 using Responder = std::function<void(const Request&, Network::MockHttp&)>;
@@ -381,7 +382,7 @@ struct PairingFixture
                 {
                     std::lock_guard lock(mutex);
                     index = requests.size();
-                    requests.push_back({method, url, {}});
+                    requests.push_back({method, url, {}, std::this_thread::get_id()});
                 }
                 http->allowances.push_back(
                     NAMED_ALLOW_CALL(*http, header_mock(trompeloeil::_, trompeloeil::_))
@@ -1099,23 +1100,55 @@ TEST_CASE_METHOD(
 
 TEST_CASE_METHOD(
     PairingFixture,
-    "Replacing the communication neither revokes nor clears the store",
+    "Logging out empties a store that holds a credential not in use",
     "[user_account][pairing]"
 )
 {
     if (!store_available) {
         SKIP("Token store is not compiled in this build.");
     }
-    const std::string token = make_jwt(std::time(nullptr) + 3600);
-    store(token);
+    store(make_jwt(std::time(nullptr) + 3600), "http://other-server:8080");
     create();
     communication->init();
+    REQUIRE(communication->access_token().empty());
+    REQUIRE(stored());
 
-    communication->log_out_locally(true);
-    CHECK(communication->access_token().empty());
-    communication.reset();
-    CHECK(count(DELETE, credential_url("cred-1")) == 0);
-    CHECK(stored()->token == token);
+    communication->do_log_out(false);
+
+    CHECK_FALSE(stored());
+    CHECK(all_requests().empty());
+}
+
+TEST_CASE_METHOD(
+    PairingFixture,
+    "A logout builds its revocation before the account service is switched",
+    "[user_account][pairing]"
+)
+{
+    if (!store_available) {
+        SKIP("Token store is not compiled in this build.");
+    }
+    store(make_jwt(std::time(nullptr) + 3600));
+    set_respond(all(unreachable));
+    create();
+    communication->init();
+    REQUIRE(answered(1));
+
+    set_respond(all([](Network::MockHttp& http) { http.invoke_complete("", 204); }));
+    communication->do_log_out(true);
+    Network::ServiceConfig::instance().set_mode(Network::ServiceMode::Cloud);
+
+    REQUIRE(answered(2));
+    CHECK_FALSE(stored());
+    size_t revocations = 0;
+    for (const Request& request : all_requests()) {
+        if (request.method == DELETE) {
+            ++revocations;
+            CHECK(request.url == credential_url("cred-1"));
+            CHECK(request.created_on == std::this_thread::get_id());
+        }
+    }
+    CHECK(revocations == 1);
 }
 
 TEST_CASE_METHOD(

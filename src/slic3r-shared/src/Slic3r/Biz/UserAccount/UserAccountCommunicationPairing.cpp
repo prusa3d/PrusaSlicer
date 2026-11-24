@@ -406,12 +406,8 @@ bool UserAccountCommunicationPairing::check_expiration()
 
 void UserAccountCommunicationPairing::do_log_out(bool notify_owner)
 {
-    log_out(notify_owner, true, true);
-}
-
-void UserAccountCommunicationPairing::log_out_locally(bool notify_owner)
-{
-    log_out(notify_owner, false, false);
+    TokenStore::clear_connect_local_credential();
+    log_out(notify_owner, true, false);
 }
 
 void
@@ -423,43 +419,40 @@ UserAccountCommunicationPairing::revoke(const std::string& credential_id, const 
         return;
     }
     SPDLOG_INFO("Connect Local: revoking credential {}", credential_id);
+    const std::shared_ptr<Network::IHttp> request = Network::IHttp::create(
+        Network::IHttp::RequestMethod::Delete,
+        url,
+        [](Network::IHttp::Retry, bool& cancel) { cancel = false; }
+    );
+    request->timeout_connection(REVOKE_CONNECT_TIMEOUT_SECONDS)
+        .timeout_total(REVOKE_TOTAL_TIMEOUT_SECONDS)
+        .header("Authorization", "Bearer " + token)
+        .on_complete(
+            [credential_id](std::string, unsigned status)
+            {
+                SPDLOG_INFO(
+                    "Connect Local: credential {} revoked (HTTP {}).",
+                    credential_id,
+                    status
+                );
+            }
+        )
+        .on_error(
+            [credential_id](std::string, std::string error, unsigned status)
+            {
+                SPDLOG_WARN(
+                    "Connect Local: revoking credential {} failed (HTTP {}): {}",
+                    credential_id,
+                    status,
+                    error
+                );
+            }
+        );
     if (!m_revocation_worker) {
         m_revocation_worker = std::make_unique<BackgroundWorker>();
     }
     m_revocation_worker->add(
-        [url, token, credential_id]()
-        {
-            std::unique_ptr<Network::IHttp> http = Network::IHttp::create(
-                Network::IHttp::RequestMethod::Delete,
-                url,
-                [](Network::IHttp::Retry, bool& cancel) { cancel = false; }
-            );
-            http->timeout_connection(REVOKE_CONNECT_TIMEOUT_SECONDS)
-                .timeout_total(REVOKE_TOTAL_TIMEOUT_SECONDS)
-                .header("Authorization", "Bearer " + token)
-                .on_complete(
-                    [credential_id](std::string, unsigned status)
-                    {
-                        SPDLOG_INFO(
-                            "Connect Local: credential {} revoked (HTTP {}).",
-                            credential_id,
-                            status
-                        );
-                    }
-                )
-                .on_error(
-                    [credential_id](std::string, std::string error, unsigned status)
-                    {
-                        SPDLOG_WARN(
-                            "Connect Local: revoking credential {} failed (HTTP {}): {}",
-                            credential_id,
-                            status,
-                            error
-                        );
-                    }
-                )
-                .perform_sync(Network::HttpRetryOpt::no_retry());
-        }
+        [request]() { request->perform_sync(Network::HttpRetryOpt::no_retry()); }
     );
 }
 
