@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <chrono>
+#include <optional>
 
 #include <GL/glew.h>
 #include <wx/glcanvas.h>
@@ -69,6 +70,9 @@ private:
     bool m_initialized{false};
     bool m_in_render{false};
     bool m_pending_frame{false};
+    bool m_presented_once{false};
+    bool m_surface_ready{false};
+    std::optional<std::chrono::steady_clock::time_point> m_first_present_deadline;
 
     static constexpr size_t MAX_INFLIGHT_FRAMES{1};
     GLsync m_frame_fence[MAX_INFLIGHT_FRAMES] = {nullptr};
