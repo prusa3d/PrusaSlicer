@@ -1,5 +1,6 @@
 [Desktop Entry]
 Name=Prusa GCode viewer
+Comment=View and inspect G-code files for 3D printing
 Exec=prusa-slicer --gcodeviewer %F
 Icon=PrusaSlicer-gcodeviewer
 Terminal=false
