@@ -73,6 +73,17 @@ TEST_CASE("Enum vector values can be updated", "[ConfigValue]") {
     CHECK(value.get<std::vector<TestEnum>>() == std::vector{TestEnum::Two});
 }
 
+TEST_CASE("Enum vector values can be set from strings", "[ConfigValue]")
+{
+    ConfigValue value{EnumVectorWrapper{std::vector{TestEnum::One}, &enum_def}};
+
+    value.set(std::vector<std::string>{"two", "one", "two"});
+    CHECK(
+        value.get<std::vector<TestEnum>>()
+        == std::vector{TestEnum::Two, TestEnum::One, TestEnum::Two}
+    );
+}
+
 TEST_CASE("ConfigValue can be re-assigned", "[ConfigValue]") {
     ConfigValue value{10};
     value = ConfigValue{20};
