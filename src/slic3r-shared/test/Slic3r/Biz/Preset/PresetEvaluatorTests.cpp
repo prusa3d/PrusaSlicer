@@ -223,3 +223,62 @@ TEST_CASE("Preset Eval feature propagation", "[preset]")
         }
     }
 }
+
+TEST_CASE("Preset with an unknown enum value", "[preset]")
+{
+    using namespace Slic3r::Domain::Preset;
+    using namespace Slic3r::Biz::Preset;
+    using namespace Slic3r::Biz::Preset::IO;
+    using Slic3r::Domain::EnumWrapper;
+    using Slic3r::Domain::PrintSettings;
+
+    PresetLoader loader;
+    loader.load_dir(Tests::get_datadir().string() + "/presets/prusa-research-fff/PrusaResearch");
+    // A user preset saved by a version which knows more support modes.
+    loader.load_from_string(
+        R"(
+kind: print
+id: user-print
+variants:
+  - condition: tool.nozzle_high_flow and tool.nozzle_diameter == 0.4
+    id: user-print-0.20mm
+    name: 0.20mm - Copy
+    unconditional_inherits:
+      - 2o62eWpTRAOgfhTt4UNtUg
+    values:
+      support_material: some_future_mode
+      fill_pattern: gyroid
+)",
+        PresetOrigin::User
+    );
+
+    VendorInfo vendor_info;
+    PresetEvaluator eval(loader.presets(), vendor_info);
+
+    HwPrinterConfig hw_config = {
+        .technology = Slic3r::Domain::PrinterTechnology::FFF,
+        .model      = {.model = "COREONE", .base_model = "COREONE"},
+        .tool_count = 1,
+        .features   = {},
+        .tools =
+            {{.features = {
+                  std::make_pair("nozzle_diameter", FeatureValue{0.4}),
+                  std::make_pair("nozzle_high_flow", FeatureValue{true}),
+              }}}
+    };
+
+    const auto printer_presets = eval.evaluate(hw_config);
+    REQUIRE(printer_presets.empty() == false);
+    const EvaluatedPrintPreset* print_preset =
+        printer_presets[0].find_print_preset_by_id("user-print-0.20mm");
+    REQUIRE(print_preset != nullptr);
+
+    // The unknown value is ignored, the other values are loaded.
+    const auto& values = std::get<PrintSettings>(print_preset->preset.values);
+    CHECK(
+        values.find("support_material").item->value()
+        == PrintSettings{}.find("support_material").item->value()
+    );
+    CHECK(values.find("fill_pattern").item->get<EnumWrapper>().get_string() == "gyroid");
+    CHECK(values.find("layer_height").item->value().get<double>() == 0.20);
+}
