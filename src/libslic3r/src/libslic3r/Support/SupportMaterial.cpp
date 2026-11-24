@@ -1895,9 +1895,15 @@ static inline std::pair<Polygons, Polygons> project_support_to_grid(const Layer 
 #endif /* SLIC3R_DEBUG */
 )
 {
-    // Remove the areas that touched from the projection that will continue on next, lower, top surfaces.
-//            Polygons trimming = union_(to_polygons(layer.slices), touching, true);
-    Polygons trimming = layer_buildplate_covered ? std::move(*layer_buildplate_covered) : offset(layer.lslices, float(SCALED_EPSILON));
+    // Grid expansion must respect both the current object slice and, for
+    // build-plate-only supports, the accumulated footprint of lower layers.
+    Polygons trimming = offset(layer.lslices, float(SCALED_EPSILON));
+    if (layer_buildplate_covered) {
+        trimming = union_(trimming, *layer_buildplate_covered);
+        // Release this consumed footprint while other layers are processed
+        // to limit peak memory use.
+        *layer_buildplate_covered = Polygons{};
+    }
     Polygons overhangs_projection = diff(overhangs, trimming);
 
 #ifdef SLIC3R_DEBUG
