@@ -1,0 +1,32 @@
+--- a/gmp-6.2.1/configure
++++ b/gmp-6.2.1/configure
+@@ -16756,3 +16756,4 @@
+       exclude_expsyms='[_]+GLOBAL_OFFSET_TABLE_|[_]+GLOBAL__[FID]_.*|[_]+head_[A-Za-z0-9_]+_dll|[A-Za-z0-9_]+_dll_iname'
++      file_list_spec='@'
+ 
+       if $LD --help 2>&1 | $GREP 'auto-import' > /dev/null; then
+--- a/gmp-6.2.1/ltmain.sh
++++ b/gmp-6.2.1/ltmain.sh
+@@ -9825,5 +9825,5 @@
+ 	  k=1
+ 
+-	  if test -n "$save_libobjs" && test : != "$skipped_export" && test yes = "$with_gnu_ld"; then
++	  if test -n "$save_libobjs" && test : != "$skipped_export" && test yes = "$with_gnu_ld" && test -z "$file_list_spec"; then
+ 	    output=$output_objdir/$output_la.lnkscript
+ 	    func_verbose "creating GNU ld script: $output"
+--- a/mpfr-4.2.1/configure
++++ b/mpfr-4.2.1/configure
+@@ -11330,3 +11330,4 @@
+       exclude_expsyms='[_]+GLOBAL_OFFSET_TABLE_|[_]+GLOBAL__[FID]_.*|[_]+head_[A-Za-z0-9_]+_dll|[A-Za-z0-9_]+_dll_iname'
++      file_list_spec='@'
+ 
+       if $LD --help 2>&1 | $GREP 'auto-import' > /dev/null; then
+--- a/mpfr-4.2.1/ltmain.sh
++++ b/mpfr-4.2.1/ltmain.sh
+@@ -10111,5 +10111,5 @@
+ 	  k=1
+ 
+-	  if test -n "$save_libobjs" && test : != "$skipped_export" && test yes = "$with_gnu_ld"; then
++	  if test -n "$save_libobjs" && test : != "$skipped_export" && test yes = "$with_gnu_ld" && test -z "$file_list_spec"; then
+ 	    output=$output_objdir/$output_la.lnkscript
+ 	    func_verbose "creating GNU ld script: $output"

@@ -1,0 +1,54 @@
+name: Windows GMP and MPFR
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    name: Native ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: windows-11-vs2026-arm
+          - arch: x64
+            runner: windows-2025
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+        with:
+          persist-credentials: false
+      - name: Build, test, and package matched dependencies
+        id: build
+        env:
+          WINDOWS_MATH_RUNNER_LABEL: ${{ matrix.runner }}
+        run: |
+          .\deps\windows-math\build.ps1 -Architecture '${{ matrix.arch }}' -WorkRoot "$env:RUNNER_TEMP\windows-math"
+      - name: Upload verified package and corresponding source
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1, Node 24
+        with:
+          name: ${{ steps.build.outputs.artifact }}
+          path: ${{ runner.temp }}\windows-math\artifacts\*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload diagnostics even when a gate fails
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1, Node 24
+        with:
+          name: windows-math-${{ matrix.arch }}-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}\windows-math\logs
+            ${{ runner.temp }}\windows-math\build-gmp\config.log
+            ${{ runner.temp }}\windows-math\build-mpfr\config.log
+            ${{ runner.temp }}\windows-math\build-mpfr\tests\test-suite.log
+          if-no-files-found: warn
+          retention-days: 14
