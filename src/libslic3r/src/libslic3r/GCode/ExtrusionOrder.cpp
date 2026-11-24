@@ -210,14 +210,16 @@ std::vector<InfillRange> extract_infill_ranges(
 // Returns LayerIslands ordered by the shortest distance.
 std::vector<std::reference_wrapper<const LayerIsland>> get_ordered_islands(
     const LayerSlice &lslice,
-    const std::optional<Point> &previous_position
+    const std::optional<Point> &previous_position,
+    const Point &instance_offset
 ) {
     std::vector<std::reference_wrapper<const LayerIsland>> islands_to_order;
     for (const LayerIsland &island : lslice.islands) {
         islands_to_order.emplace_back(island);
     }
 
-    chain_and_reorder_layer_islands(islands_to_order, previous_position.has_value() ? std::addressof(*previous_position) : nullptr);
+    const auto local_position = get_instance_point(previous_position, instance_offset);
+    chain_and_reorder_layer_islands(islands_to_order, local_position ? &local_position->local_point : nullptr);
     return islands_to_order;
 }
 
@@ -235,7 +237,7 @@ std::vector<IslandExtrusions> extract_island_extrusions(
         return should_pick_extrusion(eec, region) && eec.role() != ExtrusionRole::Ironing;
     };
 
-    std::vector<std::reference_wrapper<const LayerIsland>> ordered_islands = get_ordered_islands(lslice, previous_position);
+    std::vector<std::reference_wrapper<const LayerIsland>> ordered_islands = get_ordered_islands(lslice, previous_position, offset);
 
     std::vector<IslandExtrusions> result;
     for (const LayerIsland &island : ordered_islands) {
@@ -280,7 +282,7 @@ std::vector<InfillRange> extract_ironing_extrusions(
         return should_pick_extrusion(eec, region) && eec.role() == ExtrusionRole::Ironing;
     };
 
-    std::vector<std::reference_wrapper<const LayerIsland>> ordered_islands = get_ordered_islands(lslice, previous_position);
+    std::vector<std::reference_wrapper<const LayerIsland>> ordered_islands = get_ordered_islands(lslice, previous_position, offset);
 
     std::vector<InfillRange> result;
     for (const LayerIsland &island : ordered_islands) {
