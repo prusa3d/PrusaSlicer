@@ -164,28 +164,6 @@ bool PrintModeInteractor::remove_incompatible_modes()
     return !incompatible.empty();
 }
 
-bool PrintModeInteractor::drop_modes()
-{
-    if (m_project_interactor.selected_config_container_id() == Domain::INVALID_ID) {
-        return false;
-    }
-    Preset::PresetInteractor& preset_interactor{m_project_interactor.preset_interactor()};
-    const Domain::MacroOverridesMapFDM* applied{std::get_if<Domain::MacroOverridesMapFDM>(
-        &preset_interactor.selected_printer_preset().macro_overrides)};
-    if (!applied || applied->empty()) {
-        return false;
-    }
-    std::vector<std::string> ids;
-    for (const auto& [id, layer] : *applied) {
-        ids.push_back(id);
-    }
-    for (const std::string& id : ids) {
-        SPDLOG_INFO("Printer selected, dropping print mode '{}'", id);
-        preset_interactor.set_macro_overrides(id, std::nullopt);
-    }
-    return true;
-}
-
 void PrintModeInteractor::apply_evaluated()
 {
     if (m_project_interactor.selected_config_container_id() == Domain::INVALID_ID) {
@@ -290,7 +268,7 @@ bool PrintModeInteractor::reload_orphaned_modes()
     return false;
 }
 
-void PrintModeInteractor::reload_all(const bool modes_dropped)
+void PrintModeInteractor::reload_all()
 {
     bool removed_incompatible{false};
     if (m_project_interactor.selected_config_container_id() != Domain::INVALID_ID) {
@@ -299,7 +277,7 @@ void PrintModeInteractor::reload_all(const bool modes_dropped)
     const bool reloaded_config_values{reload_config_values()};
     const bool reloaded_mode_params{reload_mode_params()};
     const bool reloaded_orphaned_modes{reload_orphaned_modes()};
-    if (modes_dropped || removed_incompatible || reloaded_config_values
+    if (removed_incompatible || reloaded_config_values
         || reloaded_mode_params || reloaded_orphaned_modes) {
         reevaluate();
         invoke_listeners<IPrintModesChangedListener>(
@@ -318,8 +296,7 @@ void PrintModeInteractor::on_preset_selection_changed(
 {
     // The printer decides which modes are available and the orphans.
     if (type == Preset::PresetItemType::PrinterPreset) {
-        const bool dropped{drop_modes()};
-        reload_all(dropped);
+        reload_all();
     }
 }
 

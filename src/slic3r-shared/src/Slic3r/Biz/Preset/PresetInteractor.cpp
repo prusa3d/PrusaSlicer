@@ -1630,12 +1630,11 @@ void PresetInteractor::fill_config_container_with_selected_preset(
 
         const auto& printer_preset =
             get_printer_preset(printer_hw_config_id, printer_preset_id).first.get();
+        if (selected_preset.hw_config.id != hw_config.id || selected_preset.printer.id != printer_preset.id) {
+            clear_printer_goals(hw_config.technology, bag);
+        }
         selected_preset.hw_config = hw_config;
         selected_preset.printer   = printer_preset;
-        if (selected_preset.macro_overrides.index()
-            != empty_macro_overrides(hw_config.technology).index()) {
-            selected_preset.macro_overrides = empty_macro_overrides(hw_config.technology);
-        }
 
         resize_tool_dependant_presets(hw_config, selected_preset.tools);
         resize_tool_dependant_presets(hw_config, selected_preset.materials);
@@ -2508,6 +2507,9 @@ void PresetInteractor::select_printer_config_internal(
 {
     auto& selected_preset = mutable_selected_printer_preset();
     auto [hw_cfg, runtime] = get_printer_config(m_selected_project_id, printer_hw_config_id);
+    if (!no_data_update && selected_preset.hw_config.id != hw_cfg.get().id) {
+        clear_printer_goals(hw_cfg.get().technology, bag);
+    }
     selected_preset.hw_config = hw_cfg.get();
 
     const bool found_and_selected = m_printer_configs.set_selected(
@@ -3337,16 +3339,33 @@ void PresetInteractor::set_macro_overrides(
     std::optional<Domain::MacroOverridesLayerFDM> layer
 )
 {
-    Domain::Preset::SelectedPreset& selected_preset{mutable_selected_printer_preset()};
-    auto* fdm_overrides{std::get_if<Domain::MacroOverridesMapFDM>(&selected_preset.macro_overrides)};
-    ASSERT(fdm_overrides != nullptr);
-
+    Domain::MacroOverridesMapFDM layers;
     if (layer.has_value()) {
-        *fdm_overrides ={std::pair{id, *layer}};
-    } else {
-        *fdm_overrides = {};
+        layers.emplace(id, std::move(*layer));
     }
+    set_macro_overrides(std::move(layers));
+}
 
+void PresetInteractor::set_macro_overrides(Domain::MacroOverridesMap layers)
+{
+    auto& overrides = mutable_selected_printer_preset().macro_overrides;
+    ASSERT(overrides.index() == layers.index());
+    overrides = std::move(layers);
+    notify_macro_overrides_changed();
+}
+
+void PresetInteractor::clear_printer_goals(Domain::PrinterTechnology technology, ListenerInvokeLaterBag& bag)
+{
+    auto& overrides = mutable_selected_printer_preset().macro_overrides;
+    const bool had_goals = std::visit([](const auto& layers) { return !layers.empty(); }, overrides);
+    overrides = empty_macro_overrides(technology);
+    if (had_goals) {
+        bag.add([this] { notify_macro_overrides_changed(); });
+    }
+}
+
+void PresetInteractor::notify_macro_overrides_changed()
+{
     m_backup_store.invalidate_backup(m_selected_project_id);
     invoke_listeners<IMacroOverridesChangedListener>(
         [](auto* listener) { listener->on_macro_overrides_changed(); }
