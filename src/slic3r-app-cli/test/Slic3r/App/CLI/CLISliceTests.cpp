@@ -59,6 +59,23 @@ TEST_CASE("CLI slices a single-tool 3MF project", "[cli][timeout]")
     }
 }
 
+TEST_CASE("CLI merges multiple STL inputs into a single G-code", "[cli][timeout]")
+{
+    const ScopedTempDir temp_dir;
+    const fs::path first_cube_stl_path  = write_cube_stl(temp_dir.path(), "cube_a.stl", 20.);
+    const fs::path second_cube_stl_path = write_cube_stl(temp_dir.path(), "cube_b.stl", 20.);
+
+    App::InitParams slice_params = make_params(resolved_profile_sets().front());
+    slice_params.input.input_files.push_back(first_cube_stl_path.string());
+    slice_params.input.input_files.push_back(second_cube_stl_path.string());
+    slice_params.transform.merge     = true;
+    slice_params.action.export_gcode = true;
+    slice_params.misc.output         = temp_dir.path().string();
+
+    REQUIRE(App::CLI::run(slice_params) == EXIT_SUCCESS);
+    REQUIRE(count_gcode_files(temp_dir.path()) == 1);
+}
+
 TEST_CASE("CLI slices multiple STL inputs into separate G-codes", "[cli][timeout]")
 {
     const ScopedTempDir temp_dir;
