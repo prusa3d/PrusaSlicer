@@ -51,10 +51,11 @@ static float length_to_volume(float length, float line_width, float layer_height
 class WipeTowerWriter
 {
 public:
-	WipeTowerWriter(float layer_height, float line_width, GCodeFlavor flavor, const std::vector<WipeTower::FilamentParameters>& filament_parameters) :
+	WipeTowerWriter(float layer_height, float line_width, GCodeFlavor flavor, const std::vector<WipeTower::FilamentParameters>& filament_parameters, float travel_speed) :
 		m_current_pos(std::numeric_limits<float>::max(), std::numeric_limits<float>::max()),
 		m_current_z(0.f),
 		m_current_feedrate(0.f),
+		m_travel_feedrate(travel_speed * 60.f),
 		m_layer_height(layer_height),
 		m_extrusion_flow(0.f),
 		m_preview_suppressed(false),
@@ -208,8 +209,9 @@ public:
         m_current_pos.x() = x;
         m_current_pos.y() = y;
 
-		// Update the elapsed time with a rough estimate.
-        m_elapsed_time += ((len == 0.f) ? std::abs(e) : len) / m_current_feedrate * 60.f;
+        // Until the first explicit F, estimate the inherited feedrate using the configured travel speed.
+        const float feedrate = m_current_feedrate == 0.f ? m_travel_feedrate : m_current_feedrate;
+        m_elapsed_time += ((len == 0.f) ? std::abs(e) : len) / feedrate * 60.f;
 		return *this;
 	}
 
@@ -492,6 +494,7 @@ private:
     std::vector<Vec2f>  m_wipe_path;
 	float    	  m_current_z;
 	float 	  	  m_current_feedrate;
+	const float   m_travel_feedrate;
     size_t        m_current_tool;
 	float 		  m_layer_height;
 	float 	  	  m_extrusion_flow;
@@ -809,7 +812,7 @@ std::vector<WipeTower::ToolChangeResult> WipeTower::prime(
     for (size_t idx_tool = 0; idx_tool < tools.size(); ++ idx_tool) {
         size_t old_tool = m_current_tool;
 
-        WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar);
+        WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar, m_travel_speed);
         writer.set_extrusion_flow(m_extrusion_flow)
               .set_z(m_z_pos)
               .set_initial_tool(m_current_tool);
@@ -904,7 +907,7 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool)
         (tool != (unsigned int)(-1) ? wipe_area+m_depth_traversed-0.5f*m_perimeter_width
                                     : m_wipe_tower_depth-m_perimeter_width));
 
-	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar);
+	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar, m_travel_speed);
 	writer.set_extrusion_flow(m_extrusion_flow)
 		.set_z(m_z_pos)
 		.set_initial_tool(m_current_tool)
@@ -1398,7 +1401,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
 
     size_t old_tool = m_current_tool;
 
-	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar);
+	WipeTowerWriter writer(m_layer_height, m_perimeter_width, m_gcode_flavor, m_filpar, m_travel_speed);
 	writer.set_extrusion_flow(m_extrusion_flow)
 		.set_z(m_z_pos)
 		.set_initial_tool(m_current_tool)
