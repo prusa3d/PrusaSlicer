@@ -11,6 +11,7 @@
 #include "Slic3r/Log.hpp"
 
 #include <iomanip>
+#include <catch2/interfaces/catch_interfaces_capture.hpp>
 
 using namespace Slic3r::Biz;
 using Algorithms::SVG::SVG;
