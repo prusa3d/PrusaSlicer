@@ -4,69 +4,74 @@
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Directories.hpp"
 
-#include "Slic3r/Utils.hpp" // ScopeGuard
-
-#include <boost/filesystem.hpp> 
+#include <boost/filesystem.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/algorithm/string.hpp>
 #include <fmt/format.h>
 #include <fcntl.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
 
 namespace Slic3r::Biz::Platform {
 
 namespace {
-bool concurrent_write_file(const std::string& secret_to_store, const boost::filesystem::path& filename)
+bool write_all(int fd, const std::string& data)
 {
-    // Open the file
-    int fd = open(filename.string().c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-    if (fd == -1) {
-        SPDLOG_ERROR("Unable to open store file {}: {}", filename.string() , strerror(errno));
-        return false;
-    }
-    // Close the file when the guard dies
-    Slic3r::ScopeGuard sg_fd([fd]() { 
-        close(fd); 
-    });
-
-    // Configure the lock
-    struct flock lock;
-    memset(&lock, 0, sizeof(lock));
-    lock.l_type = F_WRLCK;  // Write lock
-    lock.l_whence = SEEK_SET;  // Lock from the start of the file
-    lock.l_start = 0;
-    lock.l_len = 0;  // 0 means lock the entire file
-
-    // Try to acquire the lock
-    SPDLOG_INFO("Waiting to acquire lock on file: {}", filename.string());
-    if (fcntl(fd, F_SETLKW, &lock) == -1) {
-        SPDLOG_ERROR("Unable to acquire lock: {}", strerror(errno));
-        return false;
-    }
-    SPDLOG_INFO("Lock acquired on file: {}", filename.string());
-    
-    Slic3r::ScopeGuard sg_lock([&lock, fd, filename]() {
-        // Release the lock when guard dies.
-        lock.l_type = F_UNLCK;  // Unlock the file
-       if (fcntl(fd, F_SETLK, &lock) == -1) {
-            SPDLOG_ERROR("Unable to release lock ({}): ", filename.string(), strerror(errno));
-        } else {
-            SPDLOG_INFO("Lock released on file: {}", filename.string());
+    size_t written = 0;
+    while (written < data.size()) {
+        const ssize_t result = write(fd, data.data() + written, data.size() - written);
+        if (result == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return false;
         }
-    });
-
-    // Write content to the file
-    if (write(fd, secret_to_store.c_str(), strlen(secret_to_store.c_str())) == -1) {
-        SPDLOG_ERROR("Unable to write to file: {}", strerror(errno));
-        return false;
+        written += static_cast<size_t>(result);
     }
     return true;
 }
-} // namespace 
+
+bool replace_file(const std::string& content, const boost::filesystem::path& filename)
+{
+    const std::string temporary = fmt::format("{}.{}.tmp", filename.string(), getpid());
+    const int fd = open(
+        temporary.c_str(),
+        O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC,
+        S_IRUSR | S_IWUSR
+    );
+    if (fd == -1) {
+        SPDLOG_ERROR("Unable to open store file {}: {}", temporary, strerror(errno));
+        return false;
+    }
+
+    bool replaced = write_all(fd, content);
+    if (!replaced) {
+        SPDLOG_ERROR("Unable to write to file {}: {}", temporary, strerror(errno));
+    } else if (fsync(fd) == -1) {
+        SPDLOG_WARN("Unable to flush {}: {}", temporary, strerror(errno));
+    }
+    if (close(fd) == -1 && replaced) {
+        SPDLOG_ERROR("Unable to close {}: {}", temporary, strerror(errno));
+        replaced = false;
+    }
+    if (replaced && rename(temporary.c_str(), filename.string().c_str()) == -1) {
+        SPDLOG_ERROR("Unable to replace {}: {}", filename.string(), strerror(errno));
+        replaced = false;
+    }
+    if (!replaced) {
+        unlink(temporary.c_str());
+    }
+    return replaced;
+}
+} // namespace
 
 bool SecretStoreLinux::save_secret(const std::string& opt, const std::string& usr, const std::string& psswd)
 {
     boost::filesystem::path target(boost::filesystem::path(Slic3r::data_dir()) / "shared_runtime" / (opt + ".dat"));
-	ASSERT(usr.find('\n') == std::string::npos);    
+	ASSERT(usr.find('\n') == std::string::npos);
     std::string data = fmt::format("usr: {}\npsswd: {}", usr, psswd);
 
     static const auto perms = boost::filesystem::owner_read | boost::filesystem::owner_write;   // aka 600
@@ -76,12 +81,12 @@ bool SecretStoreLinux::save_secret(const std::string& opt, const std::string& us
     if (ec)
         SPDLOG_INFO("UserAccount: boost::filesystem::permissions before write error message (this could be irrelevant message based on file system): {}", ec.message());
     ec.clear();
-    
-    if (!concurrent_write_file(data, target)) {
+
+    if (!replace_file(data, target)) {
         SPDLOG_ERROR("Failed to store secret.");
         return false;
     }
-    
+
     boost::filesystem::permissions(target, perms, ec);
     if (ec)
         SPDLOG_INFO("UserAccount: boost::filesystem::permissions after write error message (this could be irrelevant message based on file system): {}", ec.message());
@@ -104,7 +109,7 @@ bool SecretStoreLinux::load_secret(const std::string& opt, std::string& usr, std
         return false;
     }
     std::string label;
-    std::getline(stream, label, ' '); 
+    std::getline(stream, label, ' ');
     std::getline(stream, usr);
     std::getline(stream, label, ' ');
     std::getline(stream, psswd, '\0');

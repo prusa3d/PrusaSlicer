@@ -71,10 +71,16 @@ add_target_to_doxygen(slic3r-platform)
 slic3r_add_tracy(slic3r-platform)
 
 if(SLIC3R_BUILD_TESTS)
-    add_executable(slic3r-platform-tests
+    set(SLIC3R_PLATFORM_TEST_FILES
         test/Slic3r/Biz/Platform/JobManager/JobManagerTests.cpp
         test/Slic3r/Biz/Platform/ListenerListTests.cpp
     )
+    if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        list(APPEND SLIC3R_PLATFORM_TEST_FILES
+            test/Slic3r/Biz/Platform/SecretStoreLinuxTests.cpp
+        )
+    endif ()
+    add_executable(slic3r-platform-tests ${SLIC3R_PLATFORM_TEST_FILES})
     target_include_directories(slic3r-platform-tests PRIVATE test src)
     target_link_libraries(slic3r-platform-tests PRIVATE slic3r-platform Catch2::Catch2WithMain)
 
