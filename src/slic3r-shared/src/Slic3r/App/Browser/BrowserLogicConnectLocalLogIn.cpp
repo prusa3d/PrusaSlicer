@@ -22,6 +22,7 @@ namespace {
 const std::string LOGIN_PAGE = "connect_local_login";
 /** @brief The server's approval page has this long to show up, else the code is shown locally. */
 constexpr std::chrono::seconds APPROVAL_PAGE_TIMEOUT{15};
+const std::string EMBED_QUERY = "&embed=1";
 
 std::string failure_reason(Biz::UserAccount::PairingFailure failure)
 {
@@ -245,7 +246,7 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::
         },
         false
     );
-    return {{BrowserLogicCommandType::LoadURL, m_pairing_url}};
+    return {{BrowserLogicCommandType::LoadURL, m_pairing_url + EMBED_QUERY}};
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectLocalLogIn::on_pairing_failed(
