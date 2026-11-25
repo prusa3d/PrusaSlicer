@@ -59,13 +59,18 @@ add_cmake_project(wxWidgets
 
     set(DEP_wxWidgets_DEPENDS ZLIB PNG EXPAT JPEG NanoSVG)
 
-
     if (MSVC)
+        if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+            set(_webview_lib_folder vc_arm64_lib)
+        else()
+            set(_webview_lib_folder vc_x64_lib)
+        endif()  
+
         # After the build, copy the WebView2Loader.dll into the installation directory.
         # This should probably be done better.
         add_custom_command(TARGET dep_wxWidgets POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy
-                "${CMAKE_CURRENT_BINARY_DIR}/builds/wxWidgets/lib/vc_x64_lib/WebView2Loader.dll"
+                "${CMAKE_CURRENT_BINARY_DIR}/builds/wxWidgets/lib/${_webview_lib_folder}/WebView2Loader.dll"
                 "${${PROJECT_NAME}_DEP_INSTALL_PREFIX}/bin/WebView2Loader.dll")
     endif()
 

@@ -1,0 +1,23 @@
+On ARM64, MSVC has no inline intrinsics for the full-barrier _Interlocked*
+operations (only the _acq/_rel/_nf variants exist in intrin.h), so it emits
+calls to the helper functions in the CRT's atomics.obj instead. Linking the
+SDL2 DLL with /NODEFAULTLIB therefore leaves _InterlockedCompareExchange,
+_InterlockedExchange_acq and friends unresolved. On x86/x64 the same code
+links because those intrinsics are expanded inline.
+
+SDL already exempts ARM32 from /NODEFAULTLIB for this exact reason (see the
+"missing symbols for ARM" FIXME a few lines above); extend that exemption to
+ARM64. Only atomics.obj gets pulled in, so the DLL keeps its CRT-free
+dependency list.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -3473,7 +3473,7 @@
+       OUTPUT_NAME "SDL2")
+   endif()
+   # Note: The clang toolset for Visual Studio does not support /NODEFAULTLIB.
+-  if(MSVC AND NOT SDL_LIBC AND NOT MSVC_CLANG AND NOT SDL_CPU_ARM32)
++  if(MSVC AND NOT SDL_LIBC AND NOT MSVC_CLANG AND NOT SDL_CPU_ARM32 AND NOT SDL_CPU_ARM64)
+     # Don't try to link with the default set of libraries.
+     if(NOT WINDOWS_STORE)
+       set_property(TARGET SDL2 APPEND_STRING PROPERTY LINK_FLAGS " /NODEFAULTLIB")

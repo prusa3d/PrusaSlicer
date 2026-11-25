@@ -60,10 +60,15 @@ function(slic3r_remap_configs targets from_Cfg to_Cfg)
 endfunction()
 
 function(prusaslicer_copy_dlls target)
-    if ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
-        set(_bits 64)
+    if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+        set(_gmp_dll winarm64/gmp-10.dll)
+        set(_mpfr_dll winarm64/mpfr-6.dll)
+    elseif ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+        set(_gmp_dll win64/libgmp-10.dll)
+        set(_mpfr_dll win64/libmpfr-4.dll)
     elseif ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-        set(_bits 32)
+        set(_gmp_dll win32/libgmp-10.dll)
+        set(_mpfr_dll win32/libmpfr-4.dll)
     endif ()
 
     get_property(_is_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
@@ -79,12 +84,12 @@ function(prusaslicer_copy_dlls target)
 
     # This has to be a separate target due to the windows command line lenght limits
     add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/deps/+GMP/gmp/lib/win${_bits}/libgmp-10.dll ${_out_dir}
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/deps/+GMP/gmp/lib/${_gmp_dll} ${_out_dir}
         COMMENT "Copy gmp runtime to build tree"
         VERBATIM)
 
     add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/deps/+MPFR/mpfr/lib/win${_bits}/libmpfr-4.dll ${_out_dir}
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/deps/+MPFR/mpfr/lib/${_mpfr_dll} ${_out_dir}
         COMMENT "Copy mpfr runtime to build tree"
         VERBATIM)
 
