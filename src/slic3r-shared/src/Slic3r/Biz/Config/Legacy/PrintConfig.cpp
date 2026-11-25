@@ -3356,6 +3356,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("support_material_constrain_to_build_volume", coBool);
+    def->label = L("Constrain organic supports to build volume");
+    def->category = L("Support material");
+    def->tooltip = L("Constrain organic supports to the build volume: no branch and no base pad is generated outside it, at any height. "
+                     "Enable this if an object that fits inside the build volume gets supports that start or wander outside it.");
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("support_material_contact_distance", coFloat);
     def->label = L("Top contact Z distance");
     def->category = L("Support material");

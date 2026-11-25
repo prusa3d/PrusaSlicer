@@ -497,6 +497,7 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"support_material_bottom_interface_layers", steps({propagate(posSupportMaterial)})},
     {"support_material_buildplate_only", steps({propagate(posSupportMaterial)})},
     {"support_material_closing_radius", steps({propagate(posSupportMaterial)})},
+    {"support_material_constrain_to_build_volume", steps({propagate(posSupportMaterial)})},
     {"support_material_contact_distance", steps({propagate(posSlice)})},
     {"support_material_enforce_layers", steps({propagate(posSupportMaterial)})},
     {"support_material_extruder", steps({propagate(posSupportMaterial)})},

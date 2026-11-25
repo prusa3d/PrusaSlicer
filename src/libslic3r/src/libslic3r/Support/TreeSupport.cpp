@@ -8,6 +8,8 @@
 
 #include "TreeSupport.hpp"
 
+#include "libslic3r/Model.hpp"
+
 #include <Slic3r/Log.hpp>
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
@@ -3613,8 +3615,13 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
 #endif // SLIC3R_DEBUG
             generate_support_layers(print_object, raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
         // Don't fill in the tree supports, make them hollow with just a single sheath line.
+        // Constrain the filled regions to the plate when one is configured. An empty plate polygon must be
+        // passed as an empty plate (no trim), not as a plate holding a null polygon, which would clip every
+        // layer away.
+        const Polygon &plate = build_volume.polygon();
         generate_support_toolpaths(print_object.support_layers(), print_object.config(), support_params, print_object.slicing_parameters(),
-            raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers);
+            raft_layers, bottom_contacts, top_contacts, intermediate_layers, interface_layers, base_interface_layers,
+            Polygons{ plate });
 
  #if 0
 //#ifdef SLIC3R_DEBUG
@@ -3662,8 +3669,58 @@ void fff_tree_support_generate(PrintObject &print_object, std::function<void()> 
             break;
         ++idx;
     }
-    FFFTreeSupport::generate_support_areas(*print_object.print(), 
-        BuildVolume(Pointfs{ Vec2d{ -300., -300. }, Vec2d{ -300., +300. }, Vec2d{ +300., +300. }, Vec2d{ +300., -300. } }, 0.), { idx }, 
+    const PrintConfigView &print_config = print_object.print()->config();
+    const PrintInstances &instances = print_object.instances();
+    // Opt-in: the constraint changes where supports are allowed to grow, so it stays off unless asked for.
+    // Read from the object's config: the setting is per-object overridable and the print-wide view hides that.
+    const bool            constrain_to_build_volume = print_object.config().get<bool>("support_material_constrain_to_build_volume");
+
+    // The tree generator works in object local coordinates; the instance shift is applied later by the
+    // G-code writer. Map the plate into that frame, otherwise only the overlap between the two frames
+    // counts as printable and support appears on one side of the part only.
+    // One support geometry is printed at every instance, so it has to be legal at every instance at
+    // once: intersect the plate seen from each instance and keep that. Widely spaced instances leave a
+    // narrower valid area, which is the physical truth rather than a limitation of the generator.
+    std::vector<Vec2d> bed_shape;
+    if (constrain_to_build_volume) {
+        const std::vector<Vec2d> bed = print_config.get<std::vector<Vec2d>>("bed_shape");
+        Polygons                 allowed;
+        for (const PrintInstance &instance : instances) {
+            const Point shift   = instance.shift();
+            const Vec2d shift_mm(unscaled<double>(shift.x()), unscaled<double>(shift.y()));
+            Polygons    plate;
+            Polygon    &contour = plate.emplace_back();
+            for (const Vec2d &p : bed) {
+                const Vec2d local = p - shift_mm;
+                contour.points.emplace_back(coord_t(scaled<double>(local.x())), coord_t(scaled<double>(local.y())));
+            }
+            allowed = allowed.empty() ? plate : intersection(allowed, plate);
+            if (allowed.empty())
+                break;
+        }
+        // BuildVolume takes one outline, so keep the largest contour of the intersection.
+        auto largest = std::max_element(allowed.begin(), allowed.end(),
+            [](const Polygon &a, const Polygon &b) { return std::abs(a.area()) < std::abs(b.area()); });
+        if (largest != allowed.end() && largest->points.size() >= 3) {
+            for (const Point &p : largest->points)
+                bed_shape.emplace_back(unscaled<double>(p.x()), unscaled<double>(p.y()));
+        } else if (instances.size() > 1) {
+            // No area is on the plate for every instance, so nothing can be shared: warn rather than
+            // silently printing support that misses the plate at some instances.
+            print_object.print()->append_warning_callback(Biz::Slicing::Warning{
+                Biz::Slicing::WarningCode::OrganicSupportConstraintImpossible,
+                {},                                // item_keys
+                print_object.model_object()->id(), // model_object_id
+                {},                                // payload
+                Biz::Slicing::WarningSeverity::LOW
+            });
+        }
+    }
+    // Option off: leave the plate empty. An empty polygon makes the machine-border collision, the
+    // layer-0 placeable area and the toolpath trim all inert, which is the historical unconstrained
+    // behaviour.
+    BuildVolume build_volume(bed_shape, print_config.get<double>("max_print_height"));
+    FFFTreeSupport::generate_support_areas(*print_object.print(), build_volume, { idx },
         throw_on_cancel);
 }
 

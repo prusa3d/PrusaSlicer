@@ -146,7 +146,8 @@ enum class WarningCode
     GCodeConflict,
     XYSizeCompensationIgnoredMultiMaterialPainting,
     XYSizeCompensationIgnoredFuzzySkinPainting,
-    VirtualExtruderMixesFilamentTypes
+    VirtualExtruderMixesFilamentTypes,
+    OrganicSupportConstraintImpossible
 };
 
 struct StabilityWarningPayload {

@@ -9,6 +9,7 @@
 #include "TreeModelVolumes.hpp"
 
 #include <Slic3r/Log.hpp>
+#include <Slic3r/Biz/Algorithms/Polygon.hpp>
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/task_arena.h>
@@ -40,20 +41,37 @@ namespace Slic3r::FFFTreeSupport
 
 using namespace std::literals;
 
-//FIXME Machine border is currently ignored.
-static Polygons calculateMachineBorderCollision(Polygon machine_border)
+// Collision volume standing for "everything off the build plate": a rectangle enclosing the plate
+// with the plate itself as a negative hole, so unioning this into the collision volumes keeps every
+// branch footprint on the plate.
+// The rectangle only has to enclose the area the generator can reach, hence it is derived from the
+// plate instead of the historical 1 m offset, which overflowed 32bit coordinates on large beds.
+static Polygons calculateMachineBorderCollision(const Polygon &machine_border)
 {
-    // Put a border of 1m around the print volume so that we don't collide.
-#if 1
-    //FIXME just returning no border will let tree support legs collide with print bed boundary
-    return {};
-#else
-    //FIXME offsetting by 1000mm easily overflows int32_tr coordinate.
-    Polygons out = offset(machine_border, scaled<float>(1000.), jtMiter, 1.2);
-    machine_border.reverse(); // Makes the polygon negative so that we subtract the actual volume from the collision area.
-    out.emplace_back(std::move(machine_border));
+    if (machine_border.points.size() < 3)
+        // No plate configured (or a degenerate one): keep the unconstrained behaviour.
+        return {};
+
+    const BoundingBox bbox   = get_extents(machine_border);
+    // Clamp so min - margin / max + margin stay inside 32-bit coordinates. A margin of
+    // coord_t_max/3 keeps the enclosing rectangle in range for any plate within +-(2/3)coord_t_max
+    // (about +-1.4 m), which covers every real bed; the old fixed 1 m offset overflowed far sooner.
+    const coord_t     margin = std::min(
+        std::max(bbox.max.x() - bbox.min.x(), bbox.max.y() - bbox.min.y()),
+        std::numeric_limits<coord_t>::max() / 3);
+
+    Polygons out;
+    out.emplace_back(Polygon{ { Point(bbox.min.x() - margin, bbox.min.y() - margin),
+                                Point(bbox.max.x() + margin, bbox.min.y() - margin),
+                                Point(bbox.max.x() + margin, bbox.max.y() + margin),
+                                Point(bbox.min.x() - margin, bbox.max.y() + margin) } });
+    Polygon hole = machine_border;
+    // bed_shape arrives as configured, so a clockwise bed would negate the hole instead of cutting
+    // it. Normalise first, then invert.
+    Algorithms::Polygon::make_counter_clockwise(hole);
+    hole.reverse(); // Negative winding: the plate is subtracted from the rectangle.
+    out.emplace_back(std::move(hole));
     return out;
-#endif
 }
 
 TreeModelVolumes::TreeModelVolumes(
@@ -69,6 +87,7 @@ TreeModelVolumes::TreeModelVolumes(
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     m_progress_multiplier{ progress_multiplier }, m_progress_offset{ progress_offset },
 #endif // SLIC3R_TREESUPPORTS_PROGRESS
+    m_bed_polygon{ build_volume.polygon() },
     m_machine_border{ calculateMachineBorderCollision(build_volume.polygon()) }
 {
 #if 0
@@ -730,7 +749,9 @@ void TreeModelVolumes::calculatePlaceables(const coord_t radius, const LayerInde
     std::vector<Polygons> data(max_required_layer + 1 - start_layer, Polygons{});
 
     if (start_layer == 0)
-        data[0] = diff(m_machine_border, getCollision(radius, 0, true));
+        // Where a branch of this radius may rest on the first layer: the plate minus collisions.
+        // (m_machine_border is the complement of the plate, i.e. the wrong polarity for this query.)
+        data[0] = diff(m_bed_polygon, getCollision(radius, 0, true));
 
     tbb::parallel_for(tbb::blocked_range<LayerIndex>(std::max(1, start_layer), max_required_layer + 1),
         [this, &data, radius, start_layer, &throw_on_cancel](const tbb::blocked_range<LayerIndex>& range) {

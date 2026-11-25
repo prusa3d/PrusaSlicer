@@ -118,7 +118,7 @@ namespace {
                 "solid_infill_extrusion_width", "solid_infill_speed", "spiral_vase", "staggered_inner_seams",
                 "standby_temperature_delta", "start_filament_gcode", "start_gcode", "support_material", "support_material_angle",
                 "support_material_bottom_contact_distance", "support_material_bottom_interface_layers",
-                "support_material_buildplate_only", "support_material_closing_radius", "support_material_contact_distance",
+                "support_material_buildplate_only", "support_material_closing_radius", "support_material_constrain_to_build_volume", "support_material_contact_distance",
                 "support_material_enforce_layers", "support_material_extruder", "support_material_extrusion_width",
                 "support_material_interface_contact_loops", "support_material_interface_extruder",
                 "support_material_interface_layers", "support_material_interface_pattern", "support_material_interface_spacing",

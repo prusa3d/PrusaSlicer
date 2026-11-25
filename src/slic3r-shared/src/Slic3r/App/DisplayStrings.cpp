@@ -386,6 +386,14 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
         );
         break;
 
+    case WarningCode::OrganicSupportConstraintImpossible:
+        message = _u8L(
+            "No part of the build plate is shared by every instance of this object, so its organic supports "
+            "cannot be constrained and may extend past the plate. Move the instances closer together, "
+            "or turn off Constrain organic supports to build volume for this object."
+        );
+        break;
+
     case WarningCode::None:
         message = _u8L("Warning: unspecified issue detected.");
         break;

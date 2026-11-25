@@ -1566,8 +1566,24 @@ void generate_support_toolpaths(
     const SupportGeneratorLayersPtr     &top_contacts,
     const SupportGeneratorLayersPtr     &intermediate_layers,
     const SupportGeneratorLayersPtr     &interface_layers,
-    const SupportGeneratorLayersPtr     &base_interface_layers)
+    const SupportGeneratorLayersPtr     &base_interface_layers,
+    const Polygons                      &plate)
 {
+    // Off-plate support cannot be printed: trim the regions before they are filled. An empty or
+    // degenerate plate means "no constraint", so a caller can pass the configured plate as it is.
+    if (! plate.empty() && plate.front().points.size() >= 3)
+        for (const SupportGeneratorLayersPtr *layers : { &raft_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers })
+            for (SupportGeneratorLayer *layer : *layers)
+                if (layer != nullptr) {
+                    layer->polygons = intersection(layer->polygons, plate);
+                    // The first raft layer fills this member separately when its density differs
+                    // from the raft's, so it needs the same trim or the column bases print
+                    // off-plate.
+                    if (layer->first_layer_support_polygons)
+                        *layer->first_layer_support_polygons =
+                            intersection(*layer->first_layer_support_polygons, plate);
+                }
+
     // loop_interface_processor with a given circle radius.
     LoopInterfaceProcessor loop_interface_processor(1.5 * support_params.support_material_interface_flow.scaled_width());
     loop_interface_processor.n_contact_loops = config.get<bool>("support_material_interface_contact_loops") ? 1 : 0;
