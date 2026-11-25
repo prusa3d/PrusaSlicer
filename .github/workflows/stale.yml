@@ -1,0 +1,59 @@
+name: Handle Stale Issues and PRs
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # Run daily at 1 AM UTC
+  workflow_dispatch: # Allow manual triggering
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          # Stale timing
+          days-before-stale: 90         # 3 months before marking stale
+          days-before-close: 15         # 15 days to respond after stale
+          
+          # Friendly messages
+          stale-issue-message: >
+            Hello! 👋 This issue has been automatically marked as stale because it hasn't had any activity in the last 90 days.
+            
+            To keep this issue active, simply add a comment with any updates or confirm if this is still relevant.
+            If no activity occurs within 15 days, this issue will be automatically closed.
+            
+            Thank you for contributing to PrusaSlicer! 🙂
+
+          stale-pr-message: >
+            Hello! 👋 This pull request has been automatically marked as stale because it hasn't had any activity in the last 90 days.
+            
+            We appreciate your contribution to PrusaSlicer! To keep this PR active, please update it or add a comment if you're still working on it.
+            If no activity occurs within 15 days, this PR will be automatically closed.
+            
+            Thank you! 🙂
+
+          close-issue-message: >
+            As there hasn't been any activity here for 15 days since being marked as stale, we're going to close this issue.
+            
+            If this is still relevant, please feel free to reopen it or create a new issue with updated information.
+            Thank you for your understanding! 🙂
+
+          close-pr-message: >
+            As there hasn't been any activity here for 15 days since being marked as stale, we're going to close this PR.
+            
+            If you'd like to continue working on this, feel free to reopen it or create a new PR.
+            Thank you for your contribution to PrusaSlicer! 🙂
+
+          # Labels
+          stale-issue-label: "stale"
+          stale-pr-label: "stale"
+          
+          # Additional settings
+          operations-per-run: 100
+          enable-statistics: true
+          remove-stale-when-updated: true
+          ascending: true  # Process older items first
