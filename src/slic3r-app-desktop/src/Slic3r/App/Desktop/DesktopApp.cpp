@@ -48,6 +48,7 @@
 #include <Slic3r/Biz/AppInstance/AppInstanceMessageHandlerFactory.hpp>
 #include <Slic3r/Biz/AppInstance/AppInstanceUtils.hpp>
 #include <Slic3r/Biz/FileOpen/FileOpeningInteractor.hpp>
+#include <Slic3r/Biz/FileLoadingLogic.hpp>
 #include "Slic3r/Biz/WX/FontManager.hpp"
 
 #include "Slic3r/Biz/Scene/BedGeometry.hpp"
@@ -60,6 +61,7 @@
 
 #include <cstdint>
 #include <span>
+#include <utility>
 
 #ifdef WIN32
 #include <dbt.h>
@@ -757,6 +759,12 @@ void DesktopApp::finish_init()
 
     // Last: the application is up, so the check can report what it finds without being in the way.
     app_services.preset_updater_controller().start_background_check();
+
+#ifdef __APPLE__
+    // Files opened from Finder on a cold launch arrive right after OnInit(), long before this point.
+    m_ready_for_files = true;
+    open_pending_files();
+#endif /* __APPLE__ */
 }
 
 DesktopApp::~DesktopApp()
@@ -929,6 +937,56 @@ void DesktopApp::MacOpenURL(const wxString& url)
         m_project_interactor->on_download_models({std::move(narrow_url)});
     } else {
         SPDLOG_ERROR("MacOpenURL recieved improper URL: {}", Biz::AppInstance::redact_app_urls(narrow_url));
+    }
+}
+
+// Files opened from Finder or dropped on the Dock icon (#15985). On a cold launch wxWidgets calls
+// this right after OnInit(), while the presets may still be checked, so the files only get queued.
+void DesktopApp::MacOpenFiles(const wxArrayString& file_names)
+{
+    for (const wxString& file_name : file_names) {
+        m_pending_files.emplace_back(WX::into_u8(file_name));
+    }
+    if (m_ready_for_files) {
+        // Called from the Cocoa open event: load once it is handled, not from within it.
+        CallAfter([this]() { open_pending_files(); });
+    }
+}
+
+void DesktopApp::open_pending_files()
+{
+    if (!m_ready_for_files) {
+        return;
+    }
+
+    std::vector<fs::path> paths = std::exchange(m_pending_files, {});
+    // Same filtering and semantics as MainFrameDropTarget::OnDropFiles().
+    std::erase_if(
+        paths,
+        [](const fs::path& path)
+        {
+            return !Biz::FileLoadingLogic::is_supported_file(path.string())
+                && !Biz::FileLoadingLogic::is_archive_file(path.string());
+        }
+    );
+    if (paths.empty()) {
+        return;
+    }
+
+    // Unlike a drop, opening from Finder is not refused outside the Slicing tab.
+    m_main_frame->switch_left_tab(LeftBarTabs::Slicing, std::string());
+    // macOS activates the application, but leaves a minimized window in the Dock.
+    if (m_main_frame->IsIconized()) {
+        m_main_frame->Restore();
+    }
+
+    const bool single_project =
+        paths.size() == 1 && Biz::FileLoadingLogic::is_project_file(paths.front().string());
+    m_project_interactor->file_opening_interactor().open(std::move(paths));
+    if (!single_project) {
+        AppServices::instance().navigator().navigate_to_module_type(
+            App::Render::ModuleType::Plater
+        );
     }
 }
 #endif /* __APPLE__ */
