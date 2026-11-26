@@ -2,6 +2,7 @@
 
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 #include "Slic3r/Biz/Preset/PresetSelectionCheck.hpp"
+#include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
@@ -65,6 +66,7 @@ PhysicalPrinterInteractor::PhysicalPrinterInteractor(
     UserAccount::UserAccountInteractor& user_account_interactor
 ) :
     m_workbench(workbench),
+    m_project_interactor(project_interactor),
     m_project_contexts(std::make_unique<ProjectContexts>(project_interactor)),
     m_dispatcher(dispatcher),
     m_preset_interactor(preset_interactor),
@@ -150,8 +152,16 @@ bool PhysicalPrinterInteractor::apply_selection(const std::string& uuid, bool ap
 
     // Hw config can be missing for Connect printers with incomplete data
     if (apply_hw_config && physical_printer.hw_config.has_value()) {
+        const std::vector<Preset::ConnectMaterial> materials = connect_materials(physical_printer);
         const Preset::PreferredMaterialTypes material_types =
-            connect_material_types(physical_printer);
+            Preset::PrinterPresetSelector::material_types(materials);
+        std::vector<std::string> previous_matdb_uuids;
+        if (!materials.empty()) {
+            const auto& selected = m_preset_interactor.selected_printer_preset();
+            for (size_t slot = 0; slot < selected.materials.size(); ++slot) {
+                previous_matdb_uuids.emplace_back(selected.material_matdb_uuid(slot));
+            }
+        }
         if (physical_printer.is_runtime) {
             m_preset_interactor.select_printer_config(
                 physical_printer.hw_config->id,
@@ -173,7 +183,7 @@ bool PhysicalPrinterInteractor::apply_selection(const std::string& uuid, bool ap
             return false;
         }
 
-        m_printer_preset_selector.warn_material_mismatches(material_types);
+        complete_connect_materials(materials, previous_matdb_uuids);
     }
 
     m_selected_uuid = uuid;
@@ -190,8 +200,8 @@ bool PhysicalPrinterInteractor::apply_selection(const std::string& uuid, bool ap
     return true;
 }
 
-Preset::PreferredMaterialTypes
-PhysicalPrinterInteractor::connect_material_types(const PhysicalPrinterConfig& printer) const
+std::vector<Preset::ConnectMaterial>
+PhysicalPrinterInteractor::connect_materials(const PhysicalPrinterConfig& printer) const
 {
     const auto* upload = std::get_if<ConnectUpload>(&printer.payload);
     if (upload == nullptr || !printer.hw_config.has_value()) {
@@ -202,15 +212,84 @@ PhysicalPrinterInteractor::connect_material_types(const PhysicalPrinterConfig& p
     if (connect_printer == nullptr) {
         return {};
     }
+    std::vector<Preset::ConnectMaterial> materials;
     try {
-        return Preset::PrinterPresetSelector::connect_material_types(
-            nlohmann::json::parse(connect_printer->json),
-            printer.hw_config->material_slot_count()
-        );
+        materials = Preset::PrinterPresetSelector::
+            connect_materials(nlohmann::json::parse(connect_printer->json), *printer.hw_config);
     } catch (const nlohmann::json::exception& e) {
         SPDLOG_ERROR("Failed to parse Connect printer json: {}", e.what());
+        return {};
     }
-    return {};
+    for (Preset::ConnectMaterial& material : materials) {
+        if (material.matdb_uuid.empty()) {
+            continue;
+        }
+        try {
+            material.matdb_material =
+                m_project_interactor.matdb_interactor().get_material_by_uuid(material.matdb_uuid);
+        } catch (const std::exception& e) {
+            // A damaged database is handled as one that does not know the material.
+            SPDLOG_ERROR(
+                "Cannot read material {} from the material database: {}",
+                material.matdb_uuid,
+                e.what()
+            );
+        }
+    }
+    return materials;
+}
+
+void PhysicalPrinterInteractor::complete_connect_materials(
+    const std::vector<Preset::ConnectMaterial>& materials,
+    const std::vector<std::string>& previous_matdb_uuids
+)
+{
+    std::vector<Preset::ConnectSlotColor> slot_colors =
+        m_printer_preset_selector.complete_connect_materials(
+            materials,
+            previous_matdb_uuids,
+            [this](size_t slot_index, const Domain::MatDb::Material& material)
+            {
+                // The presets the material selection offers for the material are those whose
+                // MDB match rule matches it.
+                const auto& selected         = m_preset_interactor.selected_printer_preset();
+                const std::string& preset_id = selected.materials.at(slot_index).id;
+                const Preset::MaterialPresetProjectView view =
+                    m_preset_interactor.get_material_presets_view(
+                        m_current_project_id,
+                        selected.hw_config.id,
+                        selected.printer.id,
+                        selected.print.id,
+                        slot_index
+                    );
+                for (const auto& [preset, rule] : view.match_rules()) {
+                    if (preset.id == preset_id && rule.match(material) > 0) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        );
+
+    ProjectSettingsInteractor& settings = m_project_interactor.project_settings_interactor();
+    std::vector<std::string> colors(slot_colors.size());
+    for (size_t slot = 0; slot < slot_colors.size(); ++slot) {
+        if (slot_colors[slot].reset_to_auto) {
+            settings.reset_color_to_auto(
+                m_current_project_id,
+                m_current_container_id,
+                static_cast<int>(slot)
+            );
+        }
+        colors[slot] = std::move(slot_colors[slot].color);
+    }
+    if (std::ranges::any_of(colors, [](const std::string& color) { return !color.empty(); })) {
+        settings.set_colors_from_connect(
+            m_current_project_id,
+            m_current_container_id,
+            std::move(colors)
+        );
+    }
 }
 
 void PhysicalPrinterInteractor::clear_selection()
@@ -230,7 +309,8 @@ bool PhysicalPrinterInteractor::can_apply_hw_config(const PhysicalPrinterConfig&
     if (!printer.hw_config.has_value()) {
         return true;
     }
-    const Preset::PreferredMaterialTypes material_types = connect_material_types(printer);
+    const Preset::PreferredMaterialTypes material_types =
+        Preset::PrinterPresetSelector::material_types(connect_materials(printer));
     if (printer.is_runtime) {
         return Preset::PresetSelectionCheck::can_select_printer_config(
             m_preset_interactor,

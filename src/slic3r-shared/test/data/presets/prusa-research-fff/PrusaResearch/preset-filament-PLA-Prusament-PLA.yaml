@@ -1,6 +1,9 @@
 kind: filament
 id: Prusament PLA
 name: Prusament PLA
+features:
+  $.type: PLA
+  $.brand.slug: prusament
 values:
   bed_temperature: '60'
   bridge_fan_speed: '100'
@@ -803,3 +806,15 @@ variants:
       filament_max_volumetric_speed: '13'
       slowdown_below_layer_time: '20'
       start_filament_gcode: M900 K200 ; Filament gcode
+---
+# Prusament PLA Azure Blue of the test material database (matdb-mini.zip) ranks this preset
+# above Prusament PLA, which is the one preferred by the material type.
+inherits:
+- Prusament PLA
+kind: filament
+id: Prusament PLA Azure Blue
+name: Prusament PLA Azure Blue
+features:
+  $.type: PLA
+  $.brand.slug: prusament
+  $.uuid: f7bf0baf-0419-51ee-89ec-f6fc6020f7b6

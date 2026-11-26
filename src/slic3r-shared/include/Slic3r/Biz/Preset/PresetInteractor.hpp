@@ -176,7 +176,8 @@ public:
      * are refilled: keep the old one (by id, or by name and origin), otherwise the default one
      * from the parent preset, otherwise the first one.
      * @param print_id  Explicitly selected print preset; chosen by the rule above when empty.
-     * @param material_types  Material types preferred over the rule above.
+     * @param material_types  Materials preferred over the rule above, see
+     *                        PreferredMaterialTypes.
      */
     SelectedPresetIds get_preset_ids_after_selection(
         const std::string& hw_config_id,
@@ -273,7 +274,10 @@ public:
         return m_object_settings_interactor;
     }
 
-    /** @param material_types  Material types preferred when material presets are selected. */
+    /**
+     * @param material_types  Materials preferred when material presets are selected, see
+     *                        PreferredMaterialTypes.
+     */
     void select_printer_config(
         const std::string& printer_hw_config_id,
         const PreferredMaterialTypes& material_types = {}
@@ -355,7 +359,8 @@ public:
     /**
      * @brief Find or create appropriate full hw config for given external one and select it
      * @param printer External hw config
-     * @param material_types  Material types preferred when material presets are selected.
+     * @param material_types  Materials preferred when material presets are selected, see
+     *                        PreferredMaterialTypes.
      * @return void or error message why full hw config creation failed.
      */
     tl::expected<void, std::string> select_external_printer_config(

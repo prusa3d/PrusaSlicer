@@ -176,9 +176,16 @@ private:
      * @return False if the user canceled the switch.
      */
     bool can_apply_hw_config(const PhysicalPrinterConfig& printer);
-    /// Types of the materials loaded in the Connect printer, empty for other printers.
-    Preset::PreferredMaterialTypes
-    connect_material_types(const PhysicalPrinterConfig& printer) const;
+    /// Filaments loaded in the Connect printer, with their materials from the material database
+    /// (MDB), one per material slot; empty for other printers.
+    std::vector<Preset::ConnectMaterial>
+    connect_materials(const PhysicalPrinterConfig& printer) const;
+    /// Checks the filaments selected by the printer switch and applies their colors.
+    /// @param previous_matdb_uuids  MDB uuids of the material slots before the switch.
+    void complete_connect_materials(
+        const std::vector<Preset::ConnectMaterial>& materials,
+        const std::vector<std::string>& previous_matdb_uuids
+    );
     void clear_selection();
     void set_last_used(const std::string& uuid);
 
@@ -221,6 +228,7 @@ private:
     using ProjectContexts = Biz::ProjectScoped<ProjectContext>;
 
     Domain::Workbench& m_workbench;
+    ProjectInteractor& m_project_interactor;
     std::unique_ptr<ProjectContexts> m_project_contexts;
     Platform::IMainThreadDispatcher& m_dispatcher;
     Preset::PresetInteractor& m_preset_interactor;
