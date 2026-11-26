@@ -37,6 +37,12 @@ using Address = std::vector<uint8_t>;
 tl::expected<Address, std::string> to_address(const std::string& input);
 
 /**
+ * @brief Formats an Address to its dot separated textual form (e.g. "2.0"), the inverse of
+ *        to_address().
+ */
+std::string to_string(const Address& address);
+
+/**
  * @brief Model information of a hardware component (like printer or feeder).
  */
 struct HwModel

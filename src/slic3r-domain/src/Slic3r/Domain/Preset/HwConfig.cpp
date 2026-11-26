@@ -3,6 +3,8 @@
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Log.hpp"
 
+#include <fmt/ranges.h>
+
 #include <charconv>
 #include <ranges>
 
@@ -26,6 +28,13 @@ tl::expected<Address, std::string> to_address(const std::string& input)
     }
 
     return address;
+}
+
+std::string to_string(const Address& v)
+{
+    return fmt::to_string(
+        fmt::join(v | std::views::transform([](auto slot) { return int(slot); }), ".")
+    );
 }
 
 FeatureValueMap build_features(const FeatureDefs& feature_defs)

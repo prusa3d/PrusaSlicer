@@ -1901,6 +1901,59 @@ std::string find_material_id_by_type(const MaterialPresetProjectView& view, cons
 }
 
 /**
+ * @brief Returns id of the material preset from @p view whose MDB match rule ranks @p material
+ * highest, the first one of those ranked the same. It is the preset the material selection
+ * offers first for the material. Empty if no preset matches.
+ */
+std::string find_material_id_by_matdb_material(
+    const MaterialPresetProjectView& view,
+    const Domain::MatDb::Material& material
+)
+{
+    std::string best_id;
+    size_t best_rank = 0;
+    for (const auto& [preset, rule] : view.match_rules()) {
+        if (const size_t rank = rule.match(material); rank > best_rank) {
+            best_rank = rank;
+            best_id   = preset.id;
+        }
+    }
+    return best_id;
+}
+
+/** @brief Material preset preferred in a slot, see preferred_material_preset(). */
+struct PreferredMaterialPreset
+{
+    /// Id of the preset, empty if there is no preference or no matching preset.
+    std::string id;
+    /// MDB uuid to be stored with the preset, see PreferredMaterial::matdb_uuid.
+    std::string matdb_uuid;
+};
+
+/**
+ * @brief Returns the material preset from @p view preferred by @p material_types for
+ * @p slot_index: the one matching its MDB material, otherwise one of its type.
+ */
+PreferredMaterialPreset preferred_material_preset(
+    const MaterialPresetProjectView& view,
+    const PreferredMaterialTypes& material_types,
+    size_t slot_index
+)
+{
+    if (slot_index >= material_types.size())
+        return {};
+    const PreferredMaterial& preferred = material_types[slot_index];
+    if (preferred.matdb_material.has_value()) {
+        if (std::string id = find_material_id_by_matdb_material(view, *preferred.matdb_material);
+            !id.empty())
+            return {std::move(id), preferred.matdb_uuid};
+    }
+    if (preferred.type.empty())
+        return {};
+    return {find_material_id_by_type(view, preferred.type), preferred.matdb_uuid};
+}
+
+/**
  * @brief Returns id of the material preset from @p view preferred by @p material_types
  * for @p slot_index. Empty if there is no preference or no matching preset.
  */
@@ -1910,9 +1963,7 @@ std::string preferred_material_id(
     size_t slot_index
 )
 {
-    if (slot_index >= material_types.size() || material_types[slot_index].empty())
-        return {};
-    return find_material_id_by_type(view, material_types[slot_index]);
+    return preferred_material_preset(view, material_types, slot_index).id;
 }
 
 } // namespace
@@ -2313,6 +2364,9 @@ void PresetInteractor::fill_materials_presets(
 
     std::vector<PresetItemObservableList> materials;
     std::vector<std::optional<size_t>> changed_selected_indices;
+    // MDB uuids stored with the preferred presets, so that they are in place when the slots
+    // are notified about their presets.
+    std::vector<std::optional<std::string>> matdb_uuids;
     const auto& p          = get_or_fail_project_context(m_selected_project_id);
     const auto& hw_config  = selected_preset.hw_config;
     bool hw_config_runtime = !m_workbench.preset_bundle().printer_configs.contains(hw_config.id);
@@ -2335,20 +2389,23 @@ void PresetInteractor::fill_materials_presets(
             selected_preset.materials[slot_index],
             get_string(selected_preset.print, "default_material")
         );
-        if (const std::string preferred_id =
-                preferred_material_id(view, material_types, slot_index);
-            !preferred_id.empty())
+        std::optional<std::string> matdb_uuid;
+        if (PreferredMaterialPreset preferred =
+                preferred_material_preset(view, material_types, slot_index);
+            !preferred.id.empty())
         {
             const auto& list_items = items.items();
             for (size_t index = 0; index < list_items.size(); ++index) {
-                if (list_items.at(index).id == preferred_id) {
+                if (list_items.at(index).id == preferred.id) {
                     changed_selected_index = index;
                     items.set_selected_index(index);
+                    matdb_uuid = std::move(preferred.matdb_uuid);
                     break;
                 }
             }
         }
         changed_selected_indices.emplace_back(changed_selected_index);
+        matdb_uuids.emplace_back(std::move(matdb_uuid));
         materials.emplace_back(std::move(items));
     }
     m_material_presets.set_items(std::move(materials));
@@ -2359,7 +2416,13 @@ void PresetInteractor::fill_materials_presets(
         const auto& item             = material_presets.items().at(
             changed_selected_index.value_or(material_presets.selected_index())
         );
-        select_material_preset_internal(slot_index, item.id, no_data_update, std::nullopt, bag);
+        select_material_preset_internal(
+            slot_index,
+            item.id,
+            no_data_update,
+            matdb_uuids.at(slot_index),
+            bag
+        );
     }
 }
 
