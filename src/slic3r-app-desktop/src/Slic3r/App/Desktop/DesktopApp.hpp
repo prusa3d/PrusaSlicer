@@ -3,7 +3,9 @@
 #include "Slic3r/App/AccountServiceSwitcher.hpp"
 #include "Slic3r/App/Platform/WX/WXRenderCanvas.hpp"
 #include <memory>
+#include <vector>
 
+#include <boost/filesystem/path.hpp>
 #include <wx/wx.h>
 
 #include <Slic3r/Domain/Workbench.hpp>
@@ -63,9 +65,18 @@ public:
 
 #ifdef __APPLE__
     void MacOpenURL(const wxString& url) override;
+    void MacOpenFiles(const wxArrayString& file_names) override;
 #endif /* __APPLE */
 
 private:
+#ifdef __APPLE__
+    /**
+     * @brief Opens the files received by MacOpenFiles() since the last call, like a drop on the
+     * main frame would. Does nothing until finish_init() is done.
+     */
+    void open_pending_files();
+#endif /* __APPLE__ */
+
     void init_translations();
     void handle_previous_crash_recovery(AppConfig& app_config);
 
@@ -104,6 +115,11 @@ private:
     Biz::Preset::IO::BundlePaths m_bundle_paths;
     wxWeakRef<SplashScreen> m_splash_screen;
     bool m_init_completed{false};
+#ifdef __APPLE__
+    // Set at the very end of finish_init(), unlike m_init_completed, which is set at its start.
+    bool m_ready_for_files{false};
+    std::vector<boost::filesystem::path> m_pending_files;
+#endif /* __APPLE__ */
 };
 
 } // namespace Slic3r::App::Desktop
