@@ -19,6 +19,8 @@ struct AppSettingsAdvanced : public Yoga::IDialogGeometryStore
     using MaterialFavoritePresets = std::set<std::string>;
     using RecentProjects          = std::vector<std::string>;
     using PinnedDialogs           = std::map<std::string, Yoga::DialogGeometry>;
+    using PrinterMaterialSelections = std::map<std::string, std::vector<std::string>>;
+    using PrinterMaterialColors = std::map<std::string, std::vector<std::string>>;
 
     void toggle_printer_favorite_preset(const std::string& id, const std::string& hw_config_id);
     void toggle_material_favorite_preset(const std::string& id);
@@ -36,6 +38,10 @@ struct AppSettingsAdvanced : public Yoga::IDialogGeometryStore
     MaterialFavoritePresets material_favorite_presets;
     RecentProjects recent_projects;
     PinnedDialogs pinned_dialogs;
+    PrinterMaterialSelections printer_material_selections;
+    PrinterMaterialColors printer_material_colors;
+    // Stable preset ID; hardware-config IDs are regenerated between launches.
+    std::string last_printer_preset_id;
 };
 
 void to_json(
