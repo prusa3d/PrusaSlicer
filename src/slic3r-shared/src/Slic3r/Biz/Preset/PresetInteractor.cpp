@@ -2547,6 +2547,8 @@ void PresetInteractor::select_printer_config_internal(
 )
 {
     auto& selected_preset = mutable_selected_printer_preset();
+    // Remember the outgoing printer's materials before its hw_config is replaced below.
+    cache_selected_materials(selected_preset);
     auto [hw_cfg, runtime] = get_printer_config(m_selected_project_id, printer_hw_config_id);
     selected_preset.hw_config = hw_cfg.get();
 
