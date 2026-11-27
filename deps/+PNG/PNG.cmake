@@ -7,8 +7,8 @@ if (MSVC OR APPLE OR EMSCRIPTEN)
     endif ()
 
     add_cmake_project(PNG
-        URL https://github.com/pnggroup/libpng/archive/refs/tags/v1.6.58.zip
-        URL_HASH SHA256=ad8fc23d75a76f352989bbec9e905bdfe8f2d2e77b32e4f2070a4bb1849802ee
+        URL https://github.com/pnggroup/libpng/archive/refs/tags/v1.6.59.zip
+        URL_HASH SHA256=6fd97a1e5e2ac55cec0a538a9800a351eb3844086736291844ebd12db72ba433
         EMSCRIPTEN_PORT libpng
 #    EMSCRIPTEN_CMAKE_ARGS
 #        -DCMAKE_CXX_FLAGS=-pthread
