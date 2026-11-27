@@ -7,38 +7,57 @@
 // obtain one at http://mozilla.org/MPL/2.0/.
 #include "qslim.h"
 
-#include "collapse_edge.h"
 #include "connect_boundary_to_infinity.h"
 #include "decimate.h"
 #include "edge_flaps.h"
+#include "find.h"
 #include "is_edge_manifold.h"
 #include "max_faces_stopping_condition.h"
 #include "per_vertex_point_to_plane_quadrics.h"
 #include "qslim_optimal_collapse_edge_callbacks.h"
+#include "placeholders.h"
 #include "quadric_binary_plus_operator.h"
 #include "remove_unreferenced.h"
-#include "slice.h"
-#include "slice_mask.h"
+#include "block_self_intersections.h"
+#include "PlainMatrix.h"
 
 IGL_INLINE bool igl::qslim(
   const Eigen::MatrixXd & V,
   const Eigen::MatrixXi & F,
-  const size_t max_m,
+  const int max_m,
+  const bool block_intersections,
+  Eigen::MatrixXd & U,
+  Eigen::MatrixXi & G,
+  Eigen::VectorXi & J,
+  Eigen::VectorXi & I)
+{
+  std::vector<decimate_pre_post_collapse_callbacks_decorator> decorators;
+  if(block_intersections)
+  {
+    decorators.push_back(igl::block_self_intersections());
+  }
+  return qslim(V,F,max_m,decorators,U,G,J,I);
+}
+
+IGL_INLINE bool igl::qslim(
+  const Eigen::MatrixXd & V,
+  const Eigen::MatrixXi & F,
+  const int max_m,
+  const std::vector<decimate_pre_post_collapse_callbacks_decorator> & decorators,
   Eigen::MatrixXd & U,
   Eigen::MatrixXi & G,
   Eigen::VectorXi & J,
   Eigen::VectorXi & I)
 {
   using namespace igl;
-
   // Original number of faces
   const int orig_m = F.rows();
   // Tracking number of faces
   int m = F.rows();
   typedef Eigen::MatrixXd DerivedV;
   typedef Eigen::MatrixXi DerivedF;
-  DerivedV VO;
-  DerivedF FO;
+  PlainMatrix<DerivedV,Eigen::Dynamic> VO;
+  PlainMatrix<DerivedF,Eigen::Dynamic> FO;
   igl::connect_boundary_to_infinity(V,F,VO,FO);
   // decimate will not work correctly on non-edge-manifold meshes. By extension
   // this includes meshes with non-manifold vertices on the boundary since these
@@ -47,6 +66,7 @@ IGL_INLINE bool igl::qslim(
   {
     return false;
   }
+  // These will unfortunately be immediately recomputed in decimate.
   Eigen::VectorXi EMAP;
   Eigen::MatrixXi E,EF,EI;
   edge_flaps(FO,E,EMAP,EF,EI);
@@ -58,47 +78,16 @@ IGL_INLINE bool igl::qslim(
   int v1 = -1;
   int v2 = -1;
   // Callbacks for computing and updating metric
-  std::function<void(
-    const int e,
-    const Eigen::MatrixXd &,
-    const Eigen::MatrixXi &,
-    const Eigen::MatrixXi &,
-    const Eigen::VectorXi &,
-    const Eigen::MatrixXi &,
-    const Eigen::MatrixXi &,
-    double &,
-    Eigen::RowVectorXd &)> cost_and_placement;
-  std::function<bool(
-    const Eigen::MatrixXd &                                         ,/*V*/
-    const Eigen::MatrixXi &                                         ,/*F*/
-    const Eigen::MatrixXi &                                         ,/*E*/
-    const Eigen::VectorXi &                                         ,/*EMAP*/
-    const Eigen::MatrixXi &                                         ,/*EF*/
-    const Eigen::MatrixXi &                                         ,/*EI*/
-    const std::set<std::pair<double,int> > &                        ,/*Q*/
-    const std::vector<std::set<std::pair<double,int> >::iterator > &,/*Qit*/
-    const Eigen::MatrixXd &                                         ,/*C*/
-    const int                                                        /*e*/
-    )> pre_collapse;
-  std::function<void(
-    const Eigen::MatrixXd &                                         ,   /*V*/
-    const Eigen::MatrixXi &                                         ,   /*F*/
-    const Eigen::MatrixXi &                                         ,   /*E*/
-    const Eigen::VectorXi &                                         ,/*EMAP*/
-    const Eigen::MatrixXi &                                         ,  /*EF*/
-    const Eigen::MatrixXi &                                         ,  /*EI*/
-    const std::set<std::pair<double,int> > &                        ,   /*Q*/
-    const std::vector<std::set<std::pair<double,int> >::iterator > &, /*Qit*/
-    const Eigen::MatrixXd &                                         ,   /*C*/
-    const int                                                       ,   /*e*/
-    const int                                                       ,  /*e1*/
-    const int                                                       ,  /*e2*/
-    const int                                                       ,  /*f1*/
-    const int                                                       ,  /*f2*/
-    const bool                                                  /*collapsed*/
-    )> post_collapse;
+  decimate_cost_and_placement_callback cost_and_placement;
+  decimate_pre_collapse_callback       pre_collapse;
+  decimate_post_collapse_callback      post_collapse;
   qslim_optimal_collapse_edge_callbacks(
     E,quadrics,v1,v2, cost_and_placement, pre_collapse,post_collapse);
+  // Cascade the decorators: each wraps the result of the previous.
+  for(const auto & decorator : decorators)
+  {
+    decorator(VO,FO,orig_m,pre_collapse,post_collapse);
+  }
   // Call to greedy decimator
   bool ret = decimate(
     VO, FO,
@@ -106,15 +95,15 @@ IGL_INLINE bool igl::qslim(
     max_faces_stopping_condition(m,orig_m,max_m),
     pre_collapse,
     post_collapse,
-    E, EMAP, EF, EI,
     U, G, J, I);
   // Remove phony boundary faces and clean up
   const Eigen::Array<bool,Eigen::Dynamic,1> keep = (J.array()<orig_m);
-  igl::slice_mask(Eigen::MatrixXi(G),keep,1,G);
-  igl::slice_mask(Eigen::VectorXi(J),keep,1,J);
+  const auto keep_i = igl::find(keep);
+  G = G(keep_i,igl::placeholders::all).eval();
+  J = J(keep_i).eval();
   Eigen::VectorXi _1,I2;
   igl::remove_unreferenced(Eigen::MatrixXd(U),Eigen::MatrixXi(G),U,G,_1,I2);
-  igl::slice(Eigen::VectorXi(I),I2,1,I);
+  I = I(I2).eval();
 
   return ret;
 }

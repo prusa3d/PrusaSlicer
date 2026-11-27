@@ -1,3 +1,5 @@
+#include <cassert>
+
 #include "SampleConfigFactory.hpp"
 
 #include "Slic3r/Domain/Constants.hpp"

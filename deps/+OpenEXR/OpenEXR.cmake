@@ -1,6 +1,6 @@
 add_cmake_project(OpenEXR
-    URL https://github.com/AcademySoftwareFoundation/openexr/releases/download/v3.2.10/openexr-3.2.10.tar.gz
-    URL_HASH SHA256=9a61920ae2056b6f0f44e73e7001fa3fac45f266b65c29401cc9d33dd9d41050
+    URL https://github.com/AcademySoftwareFoundation/openexr/releases/download/v3.5.5/openexr-3.5.5.tar.gz
+    URL_HASH SHA256=66699e84a31fb787461f0fdbeff7507479ae4096119d3a12670f9baedb8288eb
     CMAKE_ARGS
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DBUILD_TESTING=OFF

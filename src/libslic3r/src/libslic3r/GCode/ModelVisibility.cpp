@@ -129,7 +129,7 @@ std::vector<float> raycast_visibility(
             [&triangles, &precomputed_sample_directions, model_contains_negative_parts, negative_volumes_start_index,
                     &raycasting_tree, &result, &samples, &params](tbb::blocked_range<size_t> r) {
                 // Maintaining hits memory outside of the loop, so it does not have to be reallocated for each query.
-                std::vector<igl::Hit> hits;
+                std::vector<igl::Hit<float>> hits;
                 for (size_t s_idx = r.begin(); s_idx < r.end(); ++s_idx) {
                     result[s_idx] = 1.0f;
                     const float decrease_step = 1.0f
@@ -144,7 +144,7 @@ std::vector<float> raycast_visibility(
                     for (const auto &dir : precomputed_sample_directions) {
                         Vec3f final_ray_dir = (f.to_world(dir));
                         if (!model_contains_negative_parts) {
-                            igl::Hit hitpoint;
+                            igl::Hit<float> hitpoint;
                             // FIXME: This AABBTTreeIndirect query will not compile for float ray origin and
                             // direction.
                             Vec3d final_ray_dir_d = final_ray_dir.cast<double>();

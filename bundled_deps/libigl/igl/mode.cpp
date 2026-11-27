@@ -8,6 +8,7 @@
 #include "mode.h"
 
 // Implementation 
+#include <cassert>
 #include <vector>
 
 template <typename T>
@@ -17,13 +18,12 @@ IGL_INLINE void igl::mode(
   Eigen::Matrix<T,Eigen::Dynamic,1> & M)
 {
   assert(d==1 || d==2);
-  using namespace std;
   int m = X.rows();
   int n = X.cols();
   M.resize((d==1)?n:m,1);
   for(int i = 0;i<((d==2)?m:n);i++)
   {
-    vector<int> counts(((d==2)?n:m),0);
+    std::vector<int> counts(((d==2)?n:m),0);
     for(int j = 0;j<((d==2)?n:m);j++)
     {
       T v = (d==2)?X(i,j):X(j,i);
@@ -40,7 +40,7 @@ IGL_INLINE void igl::mode(
     int max_count = -1;
     int max_count_j = -1;
     int j =0;
-    for(vector<int>::iterator it = counts.begin();it<counts.end();it++)
+    for(std::vector<int>::iterator it = counts.begin();it<counts.end();it++)
     {
       if(max_count < *it)
       {

@@ -13,8 +13,6 @@ IGL_INLINE bool igl::line_segment_in_rectangle(
   const Eigen::Vector2d & A,
   const Eigen::Vector2d & B)
 {
-  using namespace std;
-  using namespace Eigen;
   // http://stackoverflow.com/a/100165/148668
   const auto SegmentIntersectRectangle = [](double a_rectangleMinX,
                                  double a_rectangleMinY,

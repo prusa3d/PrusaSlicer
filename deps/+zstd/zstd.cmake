@@ -1,6 +1,6 @@
 add_cmake_project(zstd
-    URL "https://github.com/facebook/zstd/releases/download/v1.5.6/zstd-1.5.6.tar.gz"
-    URL_HASH SHA256=8c29e06cf42aacc1eafc4077ae2ec6c6fcb96a626157e0593d5e82a34fd403c1
+    URL "https://github.com/facebook/zstd/releases/download/v1.6.0/zstd-1.6.0.tar.gz"
+    URL_HASH SHA256=2ba599ae2a257976278e7e71e998433a387bfd18aa7b78678229fd5d84f5e9b8
     CONFIGURE_COMMAND ${CMAKE_COMMAND}
         ${DEP_CMAKE_OPTS}
         -DCMAKE_INSTALL_PREFIX:PATH=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}

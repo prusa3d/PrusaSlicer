@@ -7,6 +7,8 @@
 // obtain one at http://mozilla.org/MPL/2.0/.
 #include "group_sum_matrix.h"
 
+#include <cassert>
+
 template <typename T>
 IGL_INLINE void igl::group_sum_matrix(
   const Eigen::Matrix<int,Eigen::Dynamic,1> & G,

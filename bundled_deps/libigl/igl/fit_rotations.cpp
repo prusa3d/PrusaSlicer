@@ -12,15 +12,15 @@
 #include "polar_dec.h"
 #include "polar_svd.h"
 #include "C_STR.h"
+#include <cassert>
 #include <iostream>
 
 template <typename DerivedS, typename DerivedD>
 IGL_INLINE void igl::fit_rotations(
-  const Eigen::PlainObjectBase<DerivedS> & S,
+  const Eigen::MatrixBase<DerivedS> & S,
   const bool single_precision,
   Eigen::PlainObjectBase<DerivedD> & R)
 {
-  using namespace std;
   const int dim = S.cols();
   const int nr = S.rows()/dim;
   assert(nr * dim == S.rows());
@@ -64,10 +64,9 @@ IGL_INLINE void igl::fit_rotations(
 
 template <typename DerivedS, typename DerivedD>
 IGL_INLINE void igl::fit_rotations_planar(
-  const Eigen::PlainObjectBase<DerivedS> & S,
+  const Eigen::MatrixBase<DerivedS> & S,
         Eigen::PlainObjectBase<DerivedD> & R)
 { 
-  using namespace std;
   const int dim = S.cols();
   const int nr = S.rows()/dim;
   //assert(dim == 2 && "_planar input should be 2D");
@@ -218,8 +217,9 @@ IGL_INLINE void igl::fit_rotations_AVX(
 
 #ifdef IGL_STATIC_LIBRARY
 // Explicit template instantiation
-template void igl::fit_rotations<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<double, -1, -1, 0, -1, -1> >(Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, bool, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> >&);
-template void igl::fit_rotations_planar<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<double, -1, -1, 0, -1, -1> >(Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> >&);
-template void igl::fit_rotations_planar<Eigen::Matrix<float, -1, -1, 0, -1, -1>, Eigen::Matrix<float, -1, -1, 0, -1, -1> >(Eigen::PlainObjectBase<Eigen::Matrix<float, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<float, -1, -1, 0, -1, -1> >&);
-template void igl::fit_rotations<Eigen::Matrix<float,-1,-1,0,-1,-1>,Eigen::Matrix<float,-1,-1,0,-1,-1> >(Eigen::PlainObjectBase<Eigen::Matrix<float,-1,-1,0,-1,-1> > const &,bool,Eigen::PlainObjectBase<Eigen::Matrix<float,-1,-1,0,-1,-1> > &);
+template void igl::fit_rotations<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<double, -1, -1, 0, -1, -1> >(Eigen::MatrixBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, bool, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> >&);
+template void igl::fit_rotations_planar<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<double, -1, -1, 0, -1, -1> >(Eigen::MatrixBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> >&);
+template void igl::fit_rotations_planar<Eigen::Matrix<float, -1, -1, 0, -1, -1>, Eigen::Matrix<float, -1, -1, 0, -1, -1> >(Eigen::MatrixBase<Eigen::Matrix<float, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<float, -1, -1, 0, -1, -1> >&);
+template void igl::fit_rotations<Eigen::Matrix<float,-1,-1,0,-1,-1>,Eigen::Matrix<float,-1,-1,0,-1,-1> >(Eigen::MatrixBase<Eigen::Matrix<float,-1,-1,0,-1,-1> > const &,bool,Eigen::PlainObjectBase<Eigen::Matrix<float,-1,-1,0,-1,-1> > &);
+template void igl::fit_rotations_planar<Eigen::Matrix<double, 2, 2, 0, 2, 2>, Eigen::Matrix<double, -1, -1, 0, -1, -1> >(Eigen::MatrixBase<Eigen::Matrix<double, 2, 2, 0, 2, 2> > const&, Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> >&);
 #endif

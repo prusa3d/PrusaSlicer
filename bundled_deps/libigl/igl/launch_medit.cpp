@@ -18,14 +18,13 @@
 
 template <typename DerivedV, typename DerivedT, typename DerivedF>
 IGL_INLINE int igl::launch_medit(
-  const Eigen::PlainObjectBase<DerivedV> & V, 
-  const Eigen::PlainObjectBase<DerivedT> & T,
-  const Eigen::PlainObjectBase<DerivedF> & F,
+  const Eigen::MatrixBase<DerivedV> & V, 
+  const Eigen::MatrixBase<DerivedT> & T,
+  const Eigen::MatrixBase<DerivedF> & F,
   const bool wait)
 {
-  using namespace std;
   // Build medit command, end with & so command returns without waiting
-  stringstream command; 
+  std::stringstream command;
   command<<MEDIT_PATH<<" "<<TEMP_MESH_FILE<<" "<<TEMP_MEDIT_FILE;
   if(!wait)
   {
@@ -37,7 +36,7 @@ IGL_INLINE int igl::launch_medit(
     return -1;
   }
   // Write default medit options
-  const string default_medit_file_contents = 
+  const std::string default_medit_file_contents =
     "BackgroundColor 1 1 1\n"
     "LineColor 0 0 0\n"
     "WindowSize 1024 800\n"
@@ -45,7 +44,7 @@ IGL_INLINE int igl::launch_medit(
   FILE * fp = fopen(TEMP_MEDIT_FILE,"w");
   if(fp == NULL)
   {
-    cerr<<"^"<<__FUNCTION__<<": Could not write to "<<TEMP_MEDIT_FILE<<endl;
+    std::cerr<<"^"<<__FUNCTION__<<": Could not write to "<<TEMP_MEDIT_FILE<<std::endl;
     return -1;
   }
   fprintf(fp,"%s",default_medit_file_contents.c_str());
@@ -56,7 +55,8 @@ IGL_INLINE int igl::launch_medit(
     return system(command.str().c_str());
   }catch(int e)
   {
-    cerr<<"^"<<__FUNCTION__<<": Calling to medit crashed..."<<endl;
+    (void)e;
+    std::cerr<<"^"<<__FUNCTION__<<": Calling to medit crashed..."<<std::endl;
     return -1;
   }
   // Could clean up and delete these files but not really worth it
@@ -64,6 +64,6 @@ IGL_INLINE int igl::launch_medit(
 
 #ifdef IGL_STATIC_LIBRARY
 // Explicit template instantiation
-template int igl::launch_medit<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1> >(Eigen::PlainObjectBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, bool);
+template int igl::launch_medit<Eigen::Matrix<double, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1> >(Eigen::MatrixBase<Eigen::Matrix<double, -1, -1, 0, -1, -1> > const&, Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, bool);
 #endif
 

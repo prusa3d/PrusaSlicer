@@ -7,11 +7,10 @@ IGL_INLINE bool igl::copyleft::cgal::string_to_mesh_boolean_type(
   const std::string & s,
   MeshBooleanType & type)
 {
-  using namespace std;
-  string eff_s = s;
-  transform(eff_s.begin(), eff_s.end(), eff_s.begin(), ::tolower);
+  std::string eff_s = s;
+  std::transform(eff_s.begin(), eff_s.end(), eff_s.begin(), ::tolower);
   const auto & find_any = 
-    [](const vector<string> & haystack, const string & needle)->bool
+    [](const std::vector<std::string> & haystack, const std::string & needle)->bool
   {
     return find(haystack.begin(), haystack.end(), needle) != haystack.end();
   };

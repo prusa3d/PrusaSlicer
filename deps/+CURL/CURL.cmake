@@ -70,8 +70,8 @@ if (UNIX AND NOT APPLE)
 endif ()
 
 add_cmake_project(CURL
-  URL                 https://github.com/curl/curl/releases/download/curl-8_21_0/curl-8.21.0.zip
-  URL_HASH            SHA256=a99651d2b9ee0bf858c590078b1b0f989c187b07009e88bf94c0ec614be1bc7d
+  URL                 https://github.com/curl/curl/releases/download/curl-8_23_0/curl-8.23.0.zip
+  URL_HASH            SHA256=85477fe11408471285f38a601e7c6f53470d13be9a5a316919b071ad02e68213
   PATCH_COMMAND       "${_patch_command}"
   EMSCRIPTEN_EXCLUDED TRUE
   CMAKE_ARGS

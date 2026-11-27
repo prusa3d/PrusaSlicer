@@ -33,8 +33,8 @@ if(APPLE)
 endif()
 
 add_cmake_project(Blosc
-        URL https://github.com/Blosc/c-blosc/archive/refs/tags/v1.21.6.zip
-        URL_HASH SHA256=1919c97d55023c04aa8771ea8235b63e9da3c22e3d2a68340b33710d19c2a2eb
+        URL https://github.com/Blosc/c-blosc/archive/refs/tags/v1.21.7.zip
+        URL_HASH SHA256=6f4432f5b577ccdf9da27f673b9483ec75bebd6562db1306582a15ba5589ed35
         EMSCRIPTEN_EXCLUDED OFF
         CMAKE_ARGS
         ${_blosc_cmake_args}

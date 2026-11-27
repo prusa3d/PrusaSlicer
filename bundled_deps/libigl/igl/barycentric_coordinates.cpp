@@ -8,6 +8,8 @@
 #include "barycentric_coordinates.h"
 #include "volume.h"
 
+#include <cassert>
+
 template <
   typename DerivedP,
   typename DerivedA,
@@ -23,7 +25,6 @@ IGL_INLINE void igl::barycentric_coordinates(
   const Eigen::MatrixBase<DerivedD> & D,
   Eigen::PlainObjectBase<DerivedL> & L)
 {
-  using namespace Eigen;
   assert(P.cols() == 3 && "query must be in 3d");
   assert(A.cols() == 3 && "corners must be in 3d");
   assert(B.cols() == 3 && "corners must be in 3d");
@@ -33,7 +34,7 @@ IGL_INLINE void igl::barycentric_coordinates(
   assert(A.rows() == B.rows() && "Corners must be same size");
   assert(A.rows() == C.rows() && "Corners must be same size");
   assert(A.rows() == D.rows() && "Corners must be same size");
-  typedef Matrix<typename DerivedL::Scalar,DerivedL::RowsAtCompileTime,1> 
+  typedef Eigen::Matrix<typename DerivedL::Scalar,DerivedL::RowsAtCompileTime,1>
     VectorXS;
   // Total volume
   VectorXS vol,LA,LB,LC,LD;
@@ -60,7 +61,6 @@ IGL_INLINE void igl::barycentric_coordinates(
   const Eigen::MatrixBase<DerivedC> & C,
   Eigen::PlainObjectBase<DerivedL> & L)
 {
-  using namespace Eigen;
 #ifndef NDEBUG
   const int DIM = P.cols();
   assert(A.cols() == DIM && "corners must be in same dimension as query");

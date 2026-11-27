@@ -2,6 +2,7 @@
 #include "Slic3r/Domain/Constants.hpp"
 #include "Slic3r/Math.hpp"
 #include "Slic3r/Utils.hpp"
+#include <cassert>
 
 namespace Slic3r::Domain {
 

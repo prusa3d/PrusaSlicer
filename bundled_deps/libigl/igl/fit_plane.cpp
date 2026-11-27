@@ -7,6 +7,7 @@
 // obtain one at http://mozilla.org/MPL/2.0/.
 
 #include "fit_plane.h"
+#include <cassert>
 #include <iostream>
 
 IGL_INLINE void igl::fit_plane(

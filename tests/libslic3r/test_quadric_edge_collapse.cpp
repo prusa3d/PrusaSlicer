@@ -271,7 +271,7 @@ TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[its]")
     Eigen::MatrixXd U;
     Eigen::MatrixXi G;
     Eigen::VectorXi J, I;
-    CHECK(igl::qslim(V, F, max_m, U, G, J, I));
+    CHECK(igl::qslim(V, F, max_m, false, U, G, J, I));
 
     // convert to its
     indexed_triangle_set its_out;

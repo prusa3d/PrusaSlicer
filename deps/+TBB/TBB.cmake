@@ -7,8 +7,8 @@ endif()
 
 add_cmake_project(
     TBB
-    URL "https://github.com/oneapi-src/oneTBB/archive/refs/tags/v2021.12.0.zip"
-    URL_HASH SHA256=fe6ca052b5bdd2c6e0616b360c9b0dcbcc46e01bbd0aa8fd0517c17fc58931db
+    URL "https://github.com/oneapi-src/oneTBB/archive/refs/tags/v2023.2.0.zip"
+    URL_HASH SHA256=6a7cf5f1873afd6efb82af3de40ae08f4898cd4fe7de5d7bf96cd24a6546cc9b
     CMAKE_ARGS
         -DTBB_BUILD_SHARED=${BUILD_SHARED_LIBS}
         -DTBB_TEST=OFF

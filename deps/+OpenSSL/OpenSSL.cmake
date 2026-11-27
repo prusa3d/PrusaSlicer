@@ -84,8 +84,8 @@ endif ()
 
 ExternalProject_Add(dep_OpenSSL
     EXCLUDE_FROM_ALL ${_exclude_from_all}
-    URL "https://github.com/openssl/openssl/releases/download/openssl-4.0.1/openssl-4.0.1.tar.gz"
-    URL_HASH SHA256=2db3f3a0d6ea4b59e1f094ace2c8cd536dffb87cdc39084c5afa1e6f7f37dd09
+    URL "https://github.com/openssl/openssl/releases/download/openssl-4.1.0/openssl-4.1.0.tar.gz"
+    URL_HASH SHA256=50c17baf54cb008f6ce42d50deb4b28050a1aad711636cabd4b241c7e90cc2fd
     DOWNLOAD_DIR ${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}/OpenSSL
     BUILD_IN_SOURCE ON
     CONFIGURE_COMMAND ${_conf_cmd} ${_cross_arch}

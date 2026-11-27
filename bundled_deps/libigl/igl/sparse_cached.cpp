@@ -7,6 +7,7 @@
 // obtain one at http://mozilla.org/MPL/2.0/.
 #include "sparse_cached.h"
 
+#include <cassert>
 #include <iostream>
 #include <vector>
 #include <array>

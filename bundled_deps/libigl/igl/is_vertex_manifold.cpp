@@ -17,28 +17,25 @@
 
 template <typename DerivedF,typename DerivedB>
 IGL_INLINE bool igl::is_vertex_manifold(
-  const Eigen::PlainObjectBase<DerivedF>& F,
+  const Eigen::MatrixBase<DerivedF>& F,
   Eigen::PlainObjectBase<DerivedB>& B)
 {
-  using namespace std;
-  using namespace Eigen;
   assert(F.cols() == 3 && "F must contain triangles");
   typedef typename DerivedF::Scalar Index;
-  typedef typename DerivedF::Index FIndex;
-  const FIndex m = F.rows();
+  using FIndex = int;
   const Index n = F.maxCoeff()+1;
-  vector<vector<vector<FIndex > > > TT;
-  vector<vector<vector<FIndex > > > TTi;
+  std::vector<std::vector<std::vector<FIndex > > > TT;
+  std::vector<std::vector<std::vector<FIndex > > > TTi;
   triangle_triangle_adjacency(F,TT,TTi);
 
-  vector<vector<FIndex > > V2F,_1;
+  std::vector<std::vector<FIndex > > V2F,_1;
   vertex_triangle_adjacency(n,F,V2F,_1);
 
   const auto & check_vertex = [&](const Index v)->bool
   {
-    vector<FIndex> uV2Fv;
+    std::vector<FIndex> uV2Fv;
     {
-      vector<size_t> _1,_2;
+      std::vector<size_t> _1,_2;
       unique(V2F[v],uV2Fv,_1,_2);
     }
     const FIndex one_ring_size = uV2Fv.size();
@@ -47,9 +44,9 @@ IGL_INLINE bool igl::is_vertex_manifold(
       return false;
     }
     const FIndex g = uV2Fv[0];
-    queue<Index> Q;
+    std::queue<Index> Q;
     Q.push(g);
-    map<FIndex,bool> seen;
+    std::map<FIndex,bool> seen;
     while(!Q.empty())
     {
       const FIndex f = Q.front();
@@ -95,7 +92,16 @@ IGL_INLINE bool igl::is_vertex_manifold(
   return all;
 }
 
+template <typename DerivedF>
+IGL_INLINE bool igl::is_vertex_manifold(
+  const Eigen::MatrixBase<DerivedF>& F)
+{
+  Eigen::Array<bool,Eigen::Dynamic,1> B;
+  return is_vertex_manifold(F,B);
+}
+
 #ifdef IGL_STATIC_LIBRARY
-template bool igl::is_vertex_manifold<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, 1, 0, -1, 1> >(Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> >&);
-template bool igl::is_vertex_manifold<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1> >(Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&);
+template bool igl::is_vertex_manifold<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, 1, 0, -1, 1> >(  Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, 1, 0, -1, 1> >&);
+template bool igl::is_vertex_manifold<Eigen::Matrix<int, -1, -1, 0, -1, -1>, Eigen::Matrix<int, -1, -1, 0, -1, -1> >(Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> > const&, Eigen::PlainObjectBase<Eigen::Matrix<int, -1, -1, 0, -1, -1> >&);
+template bool igl::is_vertex_manifold<Eigen::Matrix<int, -1, -1, 0, -1, -1>>(Eigen::MatrixBase<Eigen::Matrix<int, -1, -1, 0, -1, -1>> const&);
 #endif

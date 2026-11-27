@@ -15,8 +15,8 @@ endif ()
 
 add_cmake_project(OpenVDB
     # 11.0.0 patched
-    URL https://github.com/AcademySoftwareFoundation/openvdb/archive/refs/tags/v11.0.0.zip
-    URL_HASH SHA256=db7e1aacd0a634195574b2e6a43d268d063830628501fd0a94a99bf252d01fb6
+    URL https://github.com/AcademySoftwareFoundation/openvdb/archive/refs/tags/v13.0.0.zip
+    URL_HASH SHA256=37b31e0e67cd071b4aafbf924b4ac7dce9b15c439c0e25b4b35aa47f3939a5fc
     PATCH_COMMAND ${PATCH_CMD} ${CMAKE_CURRENT_LIST_DIR}/openvdb.patch
     CMAKE_ARGS
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
@@ -29,7 +29,7 @@ add_cmake_project(OpenVDB
         -DTBB_STATIC=${_build_static}
         -DOPENVDB_BUILD_VDB_PRINT=${_openvdb_vdbprint}
         -DUSE_CCACHE=OFF
-        -DOPENVDB_ABI_VERSION_NUMBER=11
+        -DOPENVDB_ABI_VERSION_NUMBER=13
         -DOPENVDB_INSTALL_CMAKE_MODULES=OFF
         -DUSE_EXPLICIT_INSTANTIATION=OFF # https://github.com/AcademySoftwareFoundation/openvdb/issues/1624
         -DOPENVDB_BUILD_VDB_PRINT=OFF

@@ -17,13 +17,12 @@ bool igl::next_filename(
   const std::string & suffix,
   std::string & next)
 {
-  using namespace std;
   // O(n), for huge lists could at least find bounds with exponential search
   // and then narrow with binary search O(log(n))
   int i = 0;
   while(true)
   {
-    next = STR(prefix << setfill('0') << setw(zeros)<<i<<suffix);
+    next = STR(prefix << std::setfill('0') << std::setw(zeros)<<i<<suffix);
     if(!file_exists(next))
     {
       return true;

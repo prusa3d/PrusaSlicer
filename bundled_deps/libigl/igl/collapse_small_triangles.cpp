@@ -13,24 +13,27 @@
 #include "colon.h"
 #include "faces_first.h"
 
+#include <cassert>
+
 #include <limits>
 
 #include <iostream>
 
+template <
+  typename DerivedV,
+  typename DerivedF,
+  typename DerivedFF>
 void igl::collapse_small_triangles(
-  const Eigen::MatrixXd & V,
-  const Eigen::MatrixXi & F,
+  const Eigen::MatrixBase<DerivedV> & V,
+  const Eigen::MatrixBase<DerivedF> & F,
   const double eps,
-  Eigen::MatrixXi & FF)
+  Eigen::PlainObjectBase<DerivedFF> & FF)
 {
-  using namespace Eigen;
-  using namespace std;
-
   // Compute bounding box diagonal length
   double bbd = bounding_box_diagonal(V);
-  MatrixXd l;
+  Eigen::MatrixXd l;
   edge_lengths(V,F,l);
-  VectorXd dblA;
+  Eigen::VectorXd dblA;
   doublearea(l,0.,dblA);
 
   // Minimum area tolerance
@@ -81,7 +84,7 @@ void igl::collapse_small_triangles(
   }
 
   // Reindex faces
-  MatrixXi rF = F;
+  Eigen::MatrixXi rF = F;
   // Loop over triangles
   for(int f = 0;f<rF.rows();f++)
   {
@@ -92,7 +95,9 @@ void igl::collapse_small_triangles(
   }
 
   FF.resizeLike(rF);
+#ifndef NDEBUG
   int num_face_collapses=0;
+#endif
   // Only keep uncollapsed faces
   {
     int ff = 0;
@@ -108,7 +113,9 @@ void igl::collapse_small_triangles(
           if(rF(f,i)==rF(f,j))
           {
             collapsed = true;
+#ifndef NDEBUG
             num_face_collapses++;
+#endif
             break;
           }
         }
@@ -134,6 +141,11 @@ void igl::collapse_small_triangles(
   //// force base case
   //return;
 
-  MatrixXi recFF = FF;
+  Eigen::MatrixXi recFF = FF;
   return collapse_small_triangles(V,recFF,eps,FF);
 }
+
+#ifdef IGL_STATIC_LIBRARY
+// Explicit template instantiation
+template void igl::collapse_small_triangles<Eigen::MatrixXd, Eigen::MatrixXi, Eigen::MatrixXi> ( const Eigen::MatrixBase<Eigen::MatrixXd> &, const Eigen::MatrixBase<Eigen::MatrixXi> &, const double , Eigen::PlainObjectBase<Eigen::MatrixXi> & );
+#endif

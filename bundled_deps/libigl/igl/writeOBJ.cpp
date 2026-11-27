@@ -103,18 +103,47 @@ IGL_INLINE bool igl::writeOBJ(
   const Eigen::MatrixBase<DerivedV>& V,
   const Eigen::MatrixBase<DerivedF>& F)
 {
-  using namespace std;
-  using namespace Eigen;
   assert(V.cols() == 3 && "V should have 3 columns");
-  ofstream s(str);
+  std::ofstream s(str);
   if(!s.is_open())
   {
     fprintf(stderr,"IOError: writeOBJ() could not open %s\n",str.c_str());
     return false;
   }
   s<<
-    V.format(IOFormat(FullPrecision,DontAlignCols," ","\n","v ","","","\n"))<<
-    (F.array()+1).format(IOFormat(FullPrecision,DontAlignCols," ","\n","f ","","","\n"));
+    V.format(Eigen::IOFormat(Eigen::FullPrecision,Eigen::DontAlignCols," ","\n","v ","","","\n"))<<
+    (F.array()+1).format(Eigen::IOFormat(Eigen::FullPrecision,Eigen::DontAlignCols," ","\n","f ","","","\n"));
+  return true;
+}
+
+template <typename DerivedV, typename T>
+IGL_INLINE bool igl::writeOBJ(
+  const std::string &str,
+  const Eigen::MatrixBase<DerivedV>& V,
+  const std::vector<std::vector<T> >& F)
+{
+  assert(V.cols() == 3 && "V should have 3 columns");
+  std::ofstream s(str);
+  if(!s.is_open())
+  {
+    fprintf(stderr,"IOError: writeOBJ() could not open %s\n",str.c_str());
+    return false;
+  }
+  s<<V.format(Eigen::IOFormat(Eigen::FullPrecision,Eigen::DontAlignCols," ","\n","v ","","","\n"));
+  
+  for(const auto& face : F)
+  {
+    int face_size = face.size();
+    assert(face_size != 0);
+
+    s << (face_size == 2 ? "l" : "f");
+
+    for(const auto& vi : face)
+    {
+      s<<" "<<(vi+1); 
+    }
+    s<<"\n";
+  }
   return true;
 }
 

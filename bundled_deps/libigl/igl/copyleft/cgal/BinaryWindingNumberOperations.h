@@ -13,6 +13,7 @@
 #include "../../igl_inline.h"
 #include "../../MeshBooleanType.h"
 #include <Eigen/Core>
+#include <cassert>
 
 // TODO: This is not written according to libigl style. These should be
 // function handles.
@@ -26,23 +27,24 @@ namespace igl
   {
     namespace cgal
     {
+      /// Binary winding number operations
       template <igl::MeshBooleanType Op>
       class BinaryWindingNumberOperations {
         public:
           template<typename DerivedW>
             typename DerivedW::Scalar operator()(
-                const Eigen::PlainObjectBase<DerivedW>& /*win_nums*/) const {
+                const Eigen::MatrixBase<DerivedW>& /*win_nums*/) const {
               throw (std::runtime_error("not implemented!"));
             }
       };
 
-      // A ∪ B ∪ ... ∪ Z
+      /// A ∪ B ∪ ... ∪ Z
       template <>
       class BinaryWindingNumberOperations<MESH_BOOLEAN_TYPE_UNION> {
         public:
           template<typename DerivedW>
           typename DerivedW::Scalar operator()(
-              const Eigen::PlainObjectBase<DerivedW>& win_nums) const 
+              const Eigen::MatrixBase<DerivedW>& win_nums) const 
           {
             for(int i = 0;i<win_nums.size();i++)
             {
@@ -52,13 +54,13 @@ namespace igl
           }
       };
 
-      // A ∩ B ∩ ... ∩ Z
+      /// A ∩ B ∩ ... ∩ Z
       template <>
       class BinaryWindingNumberOperations<MESH_BOOLEAN_TYPE_INTERSECT> {
         public:
           template<typename DerivedW>
           typename DerivedW::Scalar operator()(
-              const Eigen::PlainObjectBase<DerivedW>& win_nums) const 
+              const Eigen::MatrixBase<DerivedW>& win_nums) const 
           {
             for(int i = 0;i<win_nums.size();i++)
             {
@@ -68,13 +70,13 @@ namespace igl
           }
       };
 
-      // A \ B \ ... \ Z = A \ (B ∪ ... ∪ Z)
+      /// A \ B \ ... \ Z = A \ (B ∪ ... ∪ Z)
       template <>
       class BinaryWindingNumberOperations<MESH_BOOLEAN_TYPE_MINUS> {
         public:
           template<typename DerivedW>
           typename DerivedW::Scalar operator()(
-              const Eigen::PlainObjectBase<DerivedW>& win_nums) const 
+              const Eigen::MatrixBase<DerivedW>& win_nums) const 
           {
             assert(win_nums.size()>1);
             // Union of objects 1 through n-1
@@ -89,13 +91,13 @@ namespace igl
           }
       };
 
-      // A ∆ B ∆ ... ∆ Z  (equivalent to set inside odd number of objects)
+      /// A ∆ B ∆ ... ∆ Z  (equivalent to set inside odd number of objects)
       template <>
       class BinaryWindingNumberOperations<MESH_BOOLEAN_TYPE_XOR> {
         public:
           template<typename DerivedW>
           typename DerivedW::Scalar operator()(
-              const Eigen::PlainObjectBase<DerivedW>& win_nums) const 
+              const Eigen::MatrixBase<DerivedW>& win_nums) const 
           {
             // If inside an odd number of objects
             int count = 0;
@@ -107,12 +109,13 @@ namespace igl
           }
       };
 
+      /// Resolve all intersections without removing non-coplanar faces
       template <>
       class BinaryWindingNumberOperations<MESH_BOOLEAN_TYPE_RESOLVE> {
         public:
           template<typename DerivedW>
             typename DerivedW::Scalar operator()(
-                const Eigen::PlainObjectBase<DerivedW>& /*win_nums*/) const {
+                const Eigen::MatrixBase<DerivedW>& /*win_nums*/) const {
               return true;
             }
       };
@@ -123,21 +126,26 @@ namespace igl
       typedef BinaryWindingNumberOperations<MESH_BOOLEAN_TYPE_XOR> BinaryXor;
       typedef BinaryWindingNumberOperations<MESH_BOOLEAN_TYPE_RESOLVE> BinaryResolve;
 
+      /// Types of Keep policies
       enum KeeperType {
+        /// Keep only inside
         KEEP_INSIDE,
+        /// Keep everything
         KEEP_ALL
       };
 
+      /// Filter winding numbers according to keep policy
       template<KeeperType T>
       class WindingNumberFilter {
         public:
           template<typename DerivedW>
             short operator()(
-                const Eigen::PlainObjectBase<DerivedW>& /*win_nums*/) const {
+                const Eigen::MatrixBase<DerivedW>& /*win_nums*/) const {
               throw std::runtime_error("Not implemented");
             }
       };
 
+      /// Keep inside policy
       template<>
       class WindingNumberFilter<KEEP_INSIDE> {
         public:
@@ -149,6 +157,7 @@ namespace igl
           }
       };
 
+      /// Keep all policy
       template<>
       class WindingNumberFilter<KEEP_ALL> {
         public:
@@ -158,8 +167,8 @@ namespace igl
             }
       };
 
-      typedef WindingNumberFilter<KEEP_INSIDE> KeepInside;
-      typedef WindingNumberFilter<KEEP_ALL> KeepAll;
+      using KeepInside = WindingNumberFilter<KEEP_INSIDE>;
+      using KeepAll = WindingNumberFilter<KEEP_ALL>;
     }
   }
 }
